@@ -1,4 +1,5 @@
 import type { Character } from "./rules/character";
+import type { Campaign as CampaignRecord } from "./campaign";
 
 /**
  * Local persistence layer. This is deliberately a thin, swappable API so it can
@@ -94,4 +95,35 @@ export function clearRolls() {
 export function newId() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
   return `id-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/* ---------------------------------------------------------------- campaigns */
+
+const KEY_CAMPAIGNS = "dnd35:campaigns";
+
+export function listCampaigns(): CampaignRecord[] {
+  return read<CampaignRecord[]>(KEY_CAMPAIGNS, []).sort((a, b) =>
+    b.updatedAt.localeCompare(a.updatedAt),
+  );
+}
+
+export function getCampaign(id: string): CampaignRecord | undefined {
+  return read<CampaignRecord[]>(KEY_CAMPAIGNS, []).find((c) => c.id === id);
+}
+
+export function saveCampaign(campaign: CampaignRecord) {
+  const all = read<CampaignRecord[]>(KEY_CAMPAIGNS, []);
+  const next = { ...campaign, updatedAt: new Date().toISOString() };
+  const i = all.findIndex((c) => c.id === campaign.id);
+  if (i >= 0) all[i] = next;
+  else all.push(next);
+  write(KEY_CAMPAIGNS, all);
+  return next;
+}
+
+export function deleteCampaign(id: string) {
+  write(
+    KEY_CAMPAIGNS,
+    read<CampaignRecord[]>(KEY_CAMPAIGNS, []).filter((c) => c.id !== id),
+  );
 }

@@ -251,75 +251,14 @@ export interface AdminInbox {
   messages: InboxMessage[];
 }
 
-function textOf(parts: unknown): string {
-  if (!Array.isArray(parts)) return "";
-  return parts
-    .filter((p: any) => p?.type === "text" && typeof p.text === "string")
-    .map((p: any) => p.text as string)
-    .join("\n")
-    .trim();
-}
 
 export const getAdminInbox = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<AdminInbox> => {
     const ctx = context as unknown as { supabase: any; userId: string };
     await assertAdmin(ctx);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    const [campsRes, profilesRes, readsRes] = await Promise.all([
-      supabaseAdmin
-        .from("campaigns")
-        .select("id, name, user_id, data, updated_at")
-        .order("updated_at", { ascending: false })
-        .limit(300),
-      supabaseAdmin.from("profiles").select("id, display_name"),
-      ctx.supabase
-        .from("admin_message_reads")
-        .select("campaign_id, message_id")
-        .eq("admin_id", ctx.userId),
-    ]);
-
-    const names = new Map<string, string>(
-      (profilesRes.data ?? []).map((p: any) => [p.id, p.display_name ?? "Adventurer"]),
-    );
-    const read = new Set(
-      (readsRes.data ?? []).map((r: any) => `${r.campaign_id}:${r.message_id}`),
-    );
-
-    const messages: InboxMessage[] = [];
-    for (const c of campsRes.data ?? []) {
-      const data = (c.data ?? {}) as any;
-      const list = Array.isArray(data.messages) ? data.messages : [];
-      list.forEach((m: any, index: number) => {
-        if (!m || m.role === "system") return;
-        if (m.metadata?.hidden) return;
-        if (m.role === "user" && index === 0) return;
-        const text = textOf(m.parts);
-        if (!text) return;
-        const messageId = String(m.id ?? `${index}`);
-        const key = `${c.id}:${messageId}`;
-        messages.push({
-          key,
-          messageId,
-          campaignId: c.id,
-          campaignName: c.name ?? "Untitled campaign",
-          sender: m.role === "user" ? names.get(c.user_id) ?? "Adventurer" : "Dungeon Master",
-          senderKind: m.role === "user" ? "player" : "dm",
-          text: text.length > 1200 ? `${text.slice(0, 1200)}…` : text,
-          at: (m.metadata?.at as string) ?? c.updated_at,
-          read: read.has(key),
-        });
-      });
-    }
-
-    messages.sort((a, b) => b.at.localeCompare(a.at));
-    const trimmed = messages.slice(0, 800);
-    return {
-      total: messages.length,
-      unread: messages.filter((m) => !m.read).length,
-      messages: trimmed,
-    };
+    // Nothing is routed to the admin inbox at this time.
+    return { total: 0, unread: 0, messages: [] };
   });
 
 export const setMessageRead = createServerFn({ method: "POST" })

@@ -1,10 +1,10 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Award, BarChart3, CreditCard, LayoutDashboard, Inbox, MessageSquareWarning, Newspaper, Users } from "lucide-react";
+import { Award, BarChart3, CreditCard, LayoutDashboard, MessageSquareWarning, Newspaper, Users } from "lucide-react";
 
 const ITEMS = [
   { to: "/admin", label: "Overview", icon: LayoutDashboard },
   { to: "/admin/players", label: "Players", icon: Users },
-  { to: "/admin/inbox", label: "Inbox", icon: Inbox },
+  
   { to: "/admin/content", label: "Content", icon: BarChart3 },
   { to: "/admin/dev-blog", label: "Dev Blog", icon: Newspaper },
   { to: "/admin/billing", label: "Subscriptions", icon: CreditCard },

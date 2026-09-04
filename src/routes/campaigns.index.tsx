@@ -25,6 +25,7 @@ import {
   LENGTH_OPTIONS,
   PACE_OPTIONS,
   DM_STYLE_OPTIONS,
+  countActivePlayers,
   type Campaign,
   type CampaignStyle,
 } from "@/lib/campaign";

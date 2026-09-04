@@ -71,6 +71,7 @@ function CharacterCreator() {
   const [step, setStep] = useState(0);
   const [char, setChar] = useState<Character>(() => emptyCharacter(newId()));
   const [pointBuyMode, setPointBuyMode] = useState(true);
+  const [raceGroup, setRaceGroup] = useState<(typeof RACE_GROUPS)[number]["key"]>("all");
   const [pointBudget, setPointBudget] = useState<number>(32);
   const [rollMethod, setRollMethod] = useState<AbilityRollMethod>("4d6-drop-lowest");
   const [rolled, setRolled] = useState<{ score: number; dice: number[] }[] | null>(null);

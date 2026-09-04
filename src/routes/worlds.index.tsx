@@ -173,6 +173,7 @@ function WorldsPage() {
             </Button>
           </CardContent>
         </Card>
+        </section>
       </div>
     </AppShell>
   );

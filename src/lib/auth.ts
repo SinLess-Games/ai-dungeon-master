@@ -17,12 +17,14 @@ export interface StoredUser {
   salt: string;
   hash: string;
   createdAt: string;
+  avatarUrl?: string;
 }
 
 export interface SessionUser {
   id: string;
   email: string;
   displayName: string;
+  avatarUrl?: string;
 }
 
 export const AUTH_EVENT = "dnd35:auth-changed";

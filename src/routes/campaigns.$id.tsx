@@ -264,6 +264,21 @@ function Table({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <WorldMapButton campaign={campaign} />
+          <Button
+            variant={campaign.completedAt ? "secondary" : "outline"}
+            size="sm"
+            onClick={() =>
+              commit(
+                {
+                  ...campaign,
+                  completedAt: campaign.completedAt ? undefined : new Date().toISOString(),
+                },
+                character,
+              )
+            }
+          >
+            {campaign.completedAt ? "Story complete" : "Mark story complete"}
+          </Button>
           {campaign.scene.inCombat ? (
             <Badge className="gap-1">
               <Swords className="size-3" /> Combat · round {campaign.scene.round}

@@ -82,7 +82,8 @@ export interface Campaign {
   id: string;
   name: string;
   characterId: string;
-  style: CampaignStyle;
+  /** Up to 3 campaign style tags. */
+  styles: CampaignStyle[];
   type: CampaignType;
   length: CampaignLength;
   pace: CampaignPace;

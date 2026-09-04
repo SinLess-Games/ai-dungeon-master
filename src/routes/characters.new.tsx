@@ -91,9 +91,14 @@ function CharacterCreator() {
   const currentClass = CLASSES.find((c) => c.id === char.classes[0]?.classId);
   const currentClassB = char.gestalt ? CLASSES.find((c) => c.id === char.classesB?.[0]?.classId) : undefined;
   const featQuery = featSearch.trim().toLowerCase();
+  const qualifiedFeats = useMemo(
+    () => FEATS.filter((f) => qualifiesFor(f, { char, derived })),
+    [char, derived],
+  );
   const visibleFeats = useMemo(
     () =>
-      FEATS.filter((f) => (featGroup === "all" || f.type === featGroup))
+      qualifiedFeats
+        .filter((f) => featGroup === "all" || f.type === featGroup)
         .filter(
           (f) =>
             !featQuery ||
@@ -101,8 +106,9 @@ function CharacterCreator() {
             f.benefit.toLowerCase().includes(featQuery) ||
             (f.prereq ?? "").toLowerCase().includes(featQuery),
         ),
-    [featGroup, featQuery],
+    [qualifiedFeats, featGroup, featQuery],
   );
+
 
   const castingTracks = useMemo(() => {
     const tracks: { cls: NonNullable<typeof currentClass>; levels: number }[] = [];

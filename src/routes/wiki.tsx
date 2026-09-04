@@ -265,7 +265,7 @@ function Wiki() {
               onOpenEntry={(id) => open({ type: "entry", id })}
             />
           ) : article ? (
-            <ArticleView article={article} onCategory={(c) => setSel({ type: "category", name: c })} />
+            <ArticleView article={article} />
           ) : entry ? (
             <EntryView entry={entry} onBack={() => open({ type: "category", name: entry.kind })} />
           ) : sel.type === "category" ? (
@@ -335,7 +335,7 @@ function Breadcrumb({ trail }: { trail: string[] }) {
   );
 }
 
-function ArticleView({ article, onCategory }: { article: WikiArticle; onCategory: (c: string) => void }) {
+function ArticleView({ article }: { article: WikiArticle }) {
   return (
     <article className="max-w-3xl">
       <Breadcrumb trail={["Codex wiki", "Dungeon Master's guide", article.category]} />
@@ -375,11 +375,6 @@ function ArticleView({ article, onCategory }: { article: WikiArticle; onCategory
         </section>
       ))}
 
-      <button
-        onClick={() => onCategory("Races")}
-        className="mt-4 hidden"
-        aria-hidden
-      />
       <p className="mt-10 border-t border-border/60 pt-4 text-xs text-muted-foreground">
         Original summaries of d20/3.5 procedures and open SRD material, written for this table.
       </p>

@@ -153,6 +153,7 @@ HOW YOU RUN THE TABLE
 - The player is free to do anything the rules allow. Never railroad. If they go off-script, improvise the world honestly.
 - Combat: announce initiative order, resolve round by round, describe enemy actions, apply damage through updateCharacter.
 - If the player asks a rules question, answer it as the SRD does.
+- Format your narration in Markdown: use **bold** for names, attacks and key items, *italics* for spoken dialogue emphasis, short paragraphs, and \`code\` for dice notation and DCs (e.g. \`1d20+5 vs DC 15\`). Use bullet lists for options or initiative order, tables for stat blocks or loot, and > blockquotes for read-aloud boxed text. Never use # top-level headings.
 
 ${body.context ?? ""}`,
             messages: await convertToModelMessages(body.messages),

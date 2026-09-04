@@ -765,9 +765,11 @@ export function WorldMapView({
 
       {/* ---------------- roads, rivers, sea lanes ---------------- */}
       {world.routes.map((route) => {
-        const a = siteById.get(route.fromSiteId);
-        const b = siteById.get(route.toSiteId);
-        if (!a || !b) return null;
+        const fa = siteById.get(route.fromSiteId);
+        const fb = siteById.get(route.toSiteId);
+        if (!fa || !fb) return null;
+        const a = at(fa);
+        const b = at(fb);
         const d = wanderPath(a, b, route.id, route.kind);
         const water = route.kind === "river" || route.kind === "sea";
         return (
@@ -800,12 +802,12 @@ export function WorldMapView({
           x={r.x + r.w / 2}
           y={r.y + r.h * 0.24}
           textAnchor="middle"
-          fontSize="2.6"
-          letterSpacing="0.45"
+          fontSize={ts(2.6)}
+          letterSpacing={ts(0.45)}
           fill="#4c3f28"
           opacity="0.85"
           stroke="#f6efd9"
-          strokeWidth="0.6"
+          strokeWidth={ts(0.6)}
           paintOrder="stroke"
           style={{ textTransform: "uppercase" }}
         >
@@ -816,6 +818,7 @@ export function WorldMapView({
       {/* ---------------- sites ---------------- */}
       {sites.map((s) => {
         const selected = s.id === selectedSiteId;
+        const p = at(s);
         return (
           <g
             key={s.id}
@@ -827,16 +830,16 @@ export function WorldMapView({
             opacity={s.discovered ? 1 : 0.42}
           >
             <title>{`${s.name} — ${SITE_LABEL.get(s.kind) ?? s.kind}`}</title>
-            {selected && <circle cx={s.x} cy={s.y} r="3.4" fill="none" stroke={gold} strokeWidth="0.35" />}
-            <SiteGlyph kind={s.kind} x={s.x} y={s.y} gold={gold} />
+            {selected && <circle cx={p.x} cy={p.y} r="3.4" fill="none" stroke={gold} strokeWidth="0.35" />}
+            <SiteGlyph kind={s.kind} x={p.x} y={p.y} gold={gold} />
             <text
-              x={s.x}
-              y={s.y + 3}
+              x={p.x}
+              y={p.y + ts(3)}
               textAnchor="middle"
-              fontSize="1.7"
+              fontSize={ts(1.7)}
               fill="#2e2418"
               stroke="#f7f0dc"
-              strokeWidth="0.5"
+              strokeWidth={ts(0.5)}
               paintOrder="stroke"
             >
               {s.name}
@@ -851,17 +854,18 @@ export function WorldMapView({
         <circle cx={world.party.x} cy={world.party.y} r="2.7" fill="none" stroke="#a72b27" strokeWidth="0.2" opacity="0.55" />
         <text
           x={world.party.x}
-          y={world.party.y - 3.2}
+          y={world.party.y - ts(3.2)}
           textAnchor="middle"
-          fontSize="1.8"
+          fontSize={ts(1.8)}
           fill="#7d1f1c"
           stroke="#f7f0dc"
-          strokeWidth="0.55"
+          strokeWidth={ts(0.55)}
           paintOrder="stroke"
         >
           Party
         </text>
       </g>
+
       </g>
 
       {/* ---------------- compass rose (fixed) ---------------- */}

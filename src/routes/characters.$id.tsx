@@ -17,6 +17,8 @@ import { ABILITIES, ABILITY_NAMES } from "@/lib/rules/types";
 import { CLASS_BY_ID } from "@/lib/rules/classes";
 import { FEAT_BY_ID } from "@/lib/rules/feats";
 import { WEAPONS, ARMORS, SHIELDS } from "@/lib/rules/equipment";
+import { LootManager } from "@/components/LootManager";
+import { exportCharacterPdf } from "@/lib/pdf-sheet";
 import type { Character } from "@/lib/rules/character";
 
 export const Route = createFileRoute("/characters/$id")({

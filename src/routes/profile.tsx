@@ -22,6 +22,7 @@ import {
   updateDisplayName,
 } from "@/lib/auth";
 import { listCampaigns, listCharacters, listRolls } from "@/lib/storage";
+import { TitlesPanel, type ActiveTitle } from "@/components/TitlesPanel";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/profile")({
@@ -45,6 +46,7 @@ export const Route = createFileRoute("/profile")({
 function ProfilePage() {
   const { user } = useSession();
   const navigate = useNavigate();
+  const [activeTitle, setActiveTitleState] = useState<ActiveTitle | null>(null);
 
   const characters = useMemo(() => listCharacters(), []);
   const campaigns = useMemo(() => listCampaigns(), []);
@@ -84,6 +86,11 @@ function ProfilePage() {
             />
 
             <h2 className="mt-4 font-display text-xl text-foreground">{user.displayName}</h2>
+            {activeTitle && (
+              <p className="mt-1 text-xs uppercase tracking-[0.18em] text-primary">
+                {activeTitle.name}
+              </p>
+            )}
             <p className="mt-1 text-sm text-muted-foreground">{user.email}</p>
             {createdAt && (
               <p className="mt-2 text-xs text-muted-foreground">
@@ -122,6 +129,7 @@ function ProfilePage() {
             ))}
           </section>
 
+          <TitlesPanel onActiveChange={setActiveTitleState} />
           <DisplayNameForm current={user.displayName} />
           <PasswordForm />
         </div>

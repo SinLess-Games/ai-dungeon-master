@@ -14,7 +14,16 @@ const RARITY_CLASS: Record<string, string> = {
 };
 
 /** Shows the titles a player has earned, lets them wear one, and tracks progress toward the rest. */
-export function TitlesPanel({ onActiveChange }: { onActiveChange?: (slug: string | null) => void }) {
+export interface ActiveTitle {
+  slug: string;
+  name: string;
+}
+
+export function TitlesPanel({
+  onActiveChange,
+}: {
+  onActiveChange?: (title: ActiveTitle | null) => void;
+}) {
   const sync = useServerFn(syncMyTitles);
   const choose = useServerFn(setActiveTitle);
   const [data, setData] = useState<MyTitles | null>(null);
@@ -25,7 +34,8 @@ export function TitlesPanel({ onActiveChange }: { onActiveChange?: (slug: string
       .then((d) => {
         if (!active) return;
         setData(d);
-        onActiveChange?.(d.activeSlug);
+        const current = d.earned.find((t) => t.slug === d.activeSlug);
+        onActiveChange?.(current ? { slug: current.slug, name: current.name } : null);
       })
       .catch(() => undefined);
     return () => {
@@ -36,13 +46,15 @@ export function TitlesPanel({ onActiveChange }: { onActiveChange?: (slug: string
   async function wear(slug: string | null) {
     const previous = data;
     setData((d) => (d ? { ...d, activeSlug: slug } : d));
-    onActiveChange?.(slug);
+    const picked = data?.earned.find((t) => t.slug === slug);
+    onActiveChange?.(picked ? { slug: picked.slug, name: picked.name } : null);
     try {
       await choose({ data: { slug } });
       toast.success(slug ? "Title equipped." : "Title removed.");
     } catch (err) {
       setData(previous);
-      onActiveChange?.(previous?.activeSlug ?? null);
+      const prior = previous?.earned.find((t) => t.slug === previous.activeSlug);
+      onActiveChange?.(prior ? { slug: prior.slug, name: prior.name } : null);
       toast.error(err instanceof Error ? err.message : "Could not change your title.");
     }
   }

@@ -78,6 +78,7 @@ export const SIZE_CARRY_MULT: Record<string, number> = {
 
 export interface DerivedStats {
   level: number;
+  gestalt: boolean;
   /** Class levels + racial Hit Dice + level adjustment. */
   ecl: number;
   levelAdjustment: number;
@@ -150,9 +151,8 @@ export function computeCharacter(c: Character): DerivedStats {
   const classSkillIds = new Set<string>();
   let casting: DerivedStats["casting"];
 
-  function trackStats(track: { classId: string; levels: number }[], firstIsFirst: boolean) {
+  function trackStats(track: { classId: string; levels: number }[]) {
     let bab = 0, fort = 0, ref = 0, will = 0;
-    let firstClass = firstIsFirst;
     for (const cl of track) {
       const def = CLASS_BY_ID[cl.classId];
       if (!def) continue;
@@ -164,13 +164,12 @@ export function computeCharacter(c: Character): DerivedStats {
       if (def.casting && !casting) {
         casting = { label: def.casting.label, ability: def.casting.ability, dcBase: 10 + mods[def.casting.ability] };
       }
-      firstClass = false;
     }
     return { bab, fort, ref, will };
   }
 
-  const a = trackStats(c.classes, true);
-  const b = trackStats(gestaltTrack(c), true);
+  const a = trackStats(c.classes);
+  const b = trackStats(gestaltTrack(c));
 
   // Gestalt: keep the best of each progression.
   let bab = Math.max(a.bab, b.bab);
@@ -245,6 +244,7 @@ export function computeCharacter(c: Character): DerivedStats {
 
   return {
     level,
+    gestalt: isGestalt,
     ecl: level + (rhd?.count ?? 0) + (race.levelAdjustment ?? 0),
     levelAdjustment: race.levelAdjustment ?? 0,
     racialHd: rhd?.count ?? 0,

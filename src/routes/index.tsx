@@ -61,10 +61,15 @@ function Home() {
             The dungeon master that never cancels
           </h1>
         </div>
-        <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
-          Roll a rules-accurate 3.5 character, then sit down at a table that is always open. Free
-          for solo play with The Endless Codex.
-        </p>
+        <div className="mx-auto mt-5 max-w-2xl space-y-3 text-lg text-muted-foreground">
+          <p className="font-display text-xl text-primary">Roll a hero. Enter the world. Play whenever you want.</p>
+          <p>
+            Create a rules-accurate D&D 3.5 character and adventure with an AI Dungeon Master built
+            for solo play. Whether you’ve played for twenty years or have never touched a character
+            sheet, The Endless Codex is your table—always open, always ready.
+          </p>
+          <p className="text-sm text-foreground">Free to play solo.</p>
+        </div>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Button asChild size="lg">
             <Link to="/characters/new">Create a character</Link>

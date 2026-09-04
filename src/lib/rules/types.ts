@@ -105,10 +105,26 @@ export interface Skill {
   explain: string;
 }
 
+export type FeatType =
+  | "General"
+  | "Fighter"
+  | "Metamagic"
+  | "Item Creation"
+  | "Psionic"
+  | "Divine"
+  | "Wild"
+  | "Heritage"
+  | "Tactical"
+  | "Reserve"
+  | "Incarnum"
+  | "Vile"
+  | "Exalted"
+  | "Epic";
+
 export interface Feat {
   id: string;
   name: string;
-  type: "General" | "Fighter" | "Metamagic" | "Item Creation" | "Psionic";
+  type: FeatType;
   prereq?: string;
   benefit: string;
 }

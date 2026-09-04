@@ -160,6 +160,16 @@ export function LocalMapView({
   const outlineD =
     "M " + plan.outline.map((p) => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" L ") + " Z";
 
+  if (artUrl) {
+    return (
+      <img
+        src={artUrl}
+        alt={`Painted map of ${site.name}`}
+        className={`object-cover ${className ?? "h-full w-full rounded-lg border border-border"}`}
+      />
+    );
+  }
+
   return (
     <svg
       viewBox="0 0 100 90"

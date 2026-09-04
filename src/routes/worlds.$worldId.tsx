@@ -55,6 +55,7 @@ function WorldDetail() {
   const [siteKind, setSiteKind] = useState<SiteKind>("town");
   const [terrain, setTerrain] = useState<TerrainKind>("plains");
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
+  const worldArt = useMapArt(world?.artPath);
 
   useEffect(() => {
     setWorld(getWorld(worldId));

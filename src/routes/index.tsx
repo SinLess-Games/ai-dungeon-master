@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { listCharacters } from "@/lib/storage";
 import { computeCharacter } from "@/lib/rules/engine";
 import { CLASS_BY_ID } from "@/lib/rules/classes";
+import logoAsset from "@/assets/logo.png.asset.json";
 import { RACE_BY_ID } from "@/lib/rules/races";
 import type { Character } from "@/lib/rules/character";
 
@@ -49,7 +50,12 @@ function Home() {
   return (
     <AppShell>
       <section className="mb-14 text-center">
-        <p className="text-xs uppercase tracking-[0.4em] text-primary">Third Edition · Revised</p>
+        <img
+          src={logoAsset.url}
+          alt="The Endless Codex — an open tome beneath an infinite starfield"
+          className="mx-auto w-full max-w-xl rounded-lg border border-border/60 shadow-2xl"
+        />
+        <p className="mt-8 text-xs uppercase tracking-[0.4em] text-primary">Third Edition · Revised</p>
         <h1 className="mx-auto mt-4 max-w-3xl font-display text-4xl leading-tight sm:text-6xl">
           The dungeon master never cancels
         </h1>

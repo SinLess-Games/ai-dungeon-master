@@ -69,7 +69,7 @@ export interface DerivedStats {
   ranged: number;
   grapple: number;
   initiative: number;
-  ac: { total: number; touch: number; flatFooted: number; armor: number; shield: number; dex: number; size: number };
+  ac: { total: number; touch: number; flatFooted: number; armor: number; shield: number; dex: number; size: number; natural: number };
   saves: { fort: number; ref: number; will: number };
   speed: number;
   armorCheckPenalty: number;
@@ -159,6 +159,15 @@ export function computeCharacter(c: Character): DerivedStats {
     }
   }
 
+  if (rhd) {
+    bab += babForClass(rhd.bab, rhd.count);
+    fort += saveForClass(rhd.saves.fort, rhd.count);
+    ref += saveForClass(rhd.saves.ref, rhd.count);
+    will += saveForClass(rhd.saves.will, rhd.count);
+    const perHd = Math.max(1, (rhd.skillPointsPerHd ?? 2) + mods.int);
+    skillPointsTotal += perHd * (rhd.count + 3);
+  }
+
   const armor = ARMORS.find((a) => a.id === c.armorId) ?? ARMORS[0]!;
   const shield = SHIELDS.find((s) => s.id === c.shieldId) ?? SHIELDS[0]!;
   const maxDex =
@@ -168,9 +177,10 @@ export function computeCharacter(c: Character): DerivedStats {
   const dexToAc = maxDex === null ? mods.dex : Math.min(mods.dex, maxDex);
   const sizeMod = SIZE_AC_MOD[race.size] ?? 0;
 
-  const acTotal = 10 + armor.acBonus + shield.acBonus + dexToAc + sizeMod;
+  const natural = race.naturalArmor ?? 0;
+  const acTotal = 10 + armor.acBonus + shield.acBonus + dexToAc + sizeMod + natural;
   const acTouch = 10 + dexToAc + sizeMod;
-  const acFlat = 10 + armor.acBonus + shield.acBonus + sizeMod;
+  const acFlat = 10 + armor.acBonus + shield.acBonus + sizeMod + natural;
 
   const initiative = mods.dex + (c.featIds.includes("improved-initiative") ? 4 : 0);
   if (c.featIds.includes("great-fortitude")) fort += 2;
@@ -220,7 +230,7 @@ export function computeCharacter(c: Character): DerivedStats {
     ranged: bab + mods.dex + (["Small", "Tiny", "Diminutive", "Fine"].includes(race.size) ? 1 : 0),
     grapple: bab + mods.str - sizeMod,
     initiative,
-    ac: { total: acTotal, touch: acTouch, flatFooted: acFlat, armor: armor.acBonus, shield: shield.acBonus, dex: dexToAc, size: sizeMod },
+    ac: { total: acTotal, touch: acTouch, flatFooted: acFlat, armor: armor.acBonus, shield: shield.acBonus, dex: dexToAc, size: sizeMod, natural },
     saves: { fort: fort + mods.con, ref: ref + mods.dex, will: will + mods.wis },
     speed: race.speed,
     armorCheckPenalty: acp,

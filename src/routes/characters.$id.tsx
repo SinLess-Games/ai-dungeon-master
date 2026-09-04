@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DiceTray } from "@/components/DiceTray";
 import { getCharacter, saveCharacter } from "@/lib/storage";
+import { formatMovement } from "@/lib/rules/movement";
 import { computeCharacter, formatMod } from "@/lib/rules/engine";
 import { ABILITIES, ABILITY_NAMES } from "@/lib/rules/types";
 import { CLASS_BY_ID } from "@/lib/rules/classes";
@@ -323,7 +324,9 @@ function Sheet() {
               <p>Reflex {formatMod(derived.saves.ref)}</p>
               <p>Will {formatMod(derived.saves.will)}</p>
               <p>Initiative {formatMod(derived.initiative)}</p>
-              <p>Speed {derived.speed} ft.</p>
+              {derived.speeds.map((m) => (
+                <p key={m.mode}>{formatMovement(m)}</p>
+              ))}
               {derived.casting ? <p>Spell DC base {derived.casting.dcBase}</p> : null}
             </CardContent>
           </Card>

@@ -33,6 +33,7 @@ import { CLASSES, CLASS_GROUPS } from "@/lib/rules/classes";
 import { SKILLS } from "@/lib/rules/skills";
 import { FEATS, FEAT_GROUPS } from "@/lib/rules/feats";
 import { SPELLS, POWERS, maxSpellLevel, spellLevelFor } from "@/lib/rules/spells";
+import { formatMovement } from "@/lib/rules/movement";
 import { emptyCharacter, type Character } from "@/lib/rules/character";
 import { computeCharacter, abilityMod, formatMod } from "@/lib/rules/engine";
 import { rollAbilityScores, pointBuyCost, STANDARD_ARRAY, POINT_BUY_BUDGETS, type AbilityRollMethod } from "@/lib/dice";
@@ -955,7 +956,7 @@ function CharacterCreator() {
               <Stat label="Base attack" value={derived.attacks.map(formatMod).join(" / ")} />
               <Stat label="Melee / Ranged" value={`${formatMod(derived.melee)} / ${formatMod(derived.ranged)}`} />
               <Stat label="Saves" value={`F ${formatMod(derived.saves.fort)} · R ${formatMod(derived.saves.ref)} · W ${formatMod(derived.saves.will)}`} />
-              <Stat label="Speed" value={`${derived.speed} ft.`} />
+              <Stat label="Speed" value={derived.speeds.map(formatMovement).join(" · ")} />
               {char.encumbranceEnabled ? (
                 <Stat label="Load" value={`${derived.load.carried} lb (${derived.load.category})`} />
               ) : null}

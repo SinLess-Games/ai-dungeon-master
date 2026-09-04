@@ -5,6 +5,7 @@ import { ARMORS, SHIELDS, carryingCapacity } from "./equipment";
 import type { Character } from "./character";
 import type { AbilityKey, BabProgression, SaveProgression } from "./types";
 import { ABILITIES } from "./types";
+import { movementModes, type MovementMode } from "./movement";
 
 export function abilityMod(score: number) {
   return Math.floor((score - 10) / 2);
@@ -96,6 +97,7 @@ export interface DerivedStats {
   ac: { total: number; touch: number; flatFooted: number; armor: number; shield: number; dex: number; size: number; natural: number };
   saves: { fort: number; ref: number; will: number };
   speed: number;
+  speeds: MovementMode[];
   armorCheckPenalty: number;
   spellFailure: number;
   maxDex: number | null;
@@ -288,6 +290,7 @@ export function computeCharacter(c: Character): DerivedStats {
     ac: { total: acTotal, touch: acTouch, flatFooted: acFlat, armor: armor.acBonus, shield: shield.acBonus, dex: dexToAc, size: sizeMod, natural },
     saves: { fort: fort + mods.con, ref: ref + mods.dex, will: will + mods.wis },
     speed: race.speed,
+    speeds: movementModes(race, race.speed),
     armorCheckPenalty: acp,
     spellFailure: armor.spellFailure + shield.spellFailure,
     maxDex,

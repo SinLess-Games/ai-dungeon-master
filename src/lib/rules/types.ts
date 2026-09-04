@@ -103,10 +103,6 @@ export interface Skill {
   trainedOnly: boolean;
   armorCheckPenalty: boolean;
   explain: string;
-  /** Book this skill comes from. Omitted for core PHB skills. */
-  source?: string;
-  /** True for skills only a few classes or races can take at all. */
-  restricted?: boolean;
 }
 
 export interface Feat {

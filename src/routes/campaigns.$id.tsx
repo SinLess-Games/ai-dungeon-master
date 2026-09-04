@@ -17,7 +17,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { getCampaign, getCharacter, saveCampaign, saveCharacter, pushRoll } from "@/lib/storage";
 import { buildDmContext } from "@/lib/dm-context";
 import { applyDmTool } from "@/lib/dm-tools";
-import { pickOpening } from "@/lib/dm-openings";
+import { pickOpening } from "@/prompts/dungeon-master/openings";
 import { computeCharacter, formatMod } from "@/lib/rules/engine";
 import { parseNotation, roll as rollDice } from "@/lib/dice";
 import { ABILITY_NAMES, type AbilityKey } from "@/lib/rules/types";

@@ -22,6 +22,8 @@ import { EXPANSION3_ARTICLES } from "@/lib/wiki/expansions3";
 import { EXPANSION4_ARTICLES } from "@/lib/wiki/expansions4";
 import { EXPANSION5_ARTICLES } from "@/lib/wiki/expansions5";
 import { EXPANSION6_ARTICLES } from "@/lib/wiki/expansions6";
+import { LEADERSHIP_ARTICLES } from "@/lib/wiki/leadership";
+import { LEADERSHIP_TABLE, MAX_FOLLOWER_LEVEL, leadershipLookup, totalFollowers } from "@/lib/rules/leadership";
 import { SOURCE_BOOK_COUNT, SOURCE_WEBSITE_COUNT } from "@/lib/wiki/sources";
 
 const ALL_ARTICLES: WikiArticle[] = [
@@ -32,6 +34,7 @@ const ALL_ARTICLES: WikiArticle[] = [
   ...EXPANSION4_ARTICLES,
   ...EXPANSION5_ARTICLES,
   ...EXPANSION6_ARTICLES,
+  ...LEADERSHIP_ARTICLES,
 ];
 
 export const Route = createFileRoute("/wiki")({

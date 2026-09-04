@@ -1,15 +1,18 @@
 import type { World, WorldSite } from "@/lib/world";
 
 const STYLE = [
-  "Hand-painted high-fantasy atlas illustration in the style of a classic tabletop campaign map.",
-  "Aged parchment paper, muted natural pigments, soft watercolour washes, fine ink linework.",
-  "Textured deep blue-green ocean with subtle wave hatching and pale shallows along every coast.",
-  "Illustrated terrain: little inked mountain ridges, clustered trees for forests, dune ripples,",
-  "marsh tufts, rolling hill bumps, and thin winding rivers with deltas.",
-  "Painted top-down, no perspective, no photographic realism, no 3D render.",
-  "IMPORTANT: absolutely no text, no words, no letters, no labels, no title, no legend,",
-  "no compass rose, no border frame, no numbers anywhere in the image.",
-  "The illustration must fill the entire frame edge to edge, landscape orientation.",
+  "Photorealistic satellite image of a planet's surface, taken straight down from orbit,",
+  "like high-resolution true-colour Earth observation imagery.",
+  "Deep blue ocean with realistic turquoise shallows over reefs and continental shelves,",
+  "sediment plumes at river mouths, and faint wave and current texture.",
+  "Land shows real biome colouring: green forest canopy, olive grassland, tan and ochre desert",
+  "with visible dune fields, grey-brown rock, snow-capped mountain ranges with sharp ridge shadows,",
+  "dark wetlands, braided river systems and lakes, eroded valleys and alluvial fans.",
+  "Natural terrain relief shading from low sun angle, subtle thin cloud wisps in a few places.",
+  "No illustration, no parchment, no painting, no watercolour, no ink lines, no fantasy map styling.",
+  "IMPORTANT: absolutely no text, no words, no letters, no labels, no legend,",
+  "no compass rose, no border frame, no grid, no numbers anywhere in the image.",
+  "The image must fill the entire frame edge to edge, landscape orientation.",
 ].join(" ");
 
 function pct(n: number) {

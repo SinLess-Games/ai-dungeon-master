@@ -16,8 +16,9 @@ import { COMPENDIUM_SPELLS } from "@/lib/rules/spell-compendium";
 import { ABILITY_NAMES } from "@/lib/rules/types";
 import type { WikiArticle } from "@/lib/wiki/dm-guide";
 import { PLAYER_ARTICLES } from "@/lib/wiki/player-guide";
+import { EXPANSION_ARTICLES } from "@/lib/wiki/expansions";
 
-const ALL_ARTICLES: WikiArticle[] = [...PLAYER_ARTICLES];
+const ALL_ARTICLES: WikiArticle[] = [...PLAYER_ARTICLES, ...EXPANSION_ARTICLES];
 
 export const Route = createFileRoute("/wiki")({
   head: () => ({
@@ -188,7 +189,7 @@ function Wiki() {
     }
     return [...map.entries()];
   };
-  const playerCategories = useMemo(() => group(PLAYER_ARTICLES), []);
+  const playerCategories = useMemo(() => group(ALL_ARTICLES), []);
 
   const needle = q.trim().toLowerCase();
   const searching = needle.length > 0;

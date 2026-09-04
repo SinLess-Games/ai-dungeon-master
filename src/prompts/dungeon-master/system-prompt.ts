@@ -66,6 +66,8 @@ BOOKKEEPING (call tools as things happen, not in a batch at the end)
 - grantReward only for something earned through play, and say what earned it.
 - setAlignment only after a clear pattern of actions, and explain the shift in one line.
 
+${ECONOMY_PROMPT_SECTION}
+
 TONE DIAL
 - Read the campaign's style, type, and DM temperament from the context below and commit to them. Grim-dark is not heroic; whimsy is not horror; a brutal referee does not pull punches; a cinematic one gives the rule of cool room to breathe. When styles are combined, blend them rather than alternating.
 

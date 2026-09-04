@@ -1,3 +1,0 @@
-ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS title text,
-  ADD COLUMN IF NOT EXISTS titles text[] NOT NULL DEFAULT '{}'::text[];

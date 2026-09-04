@@ -55,8 +55,8 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-const GOLD = "hsl(var(--primary))";
-const PIE_COLORS = ["hsl(var(--primary))", "#7c9cc4", "#8b7bd8", "#c48b6a"];
+const GOLD = "var(--primary)";
+const PIE_COLORS = ["var(--primary)", "#7c9cc4", "#8b7bd8", "#c48b6a"];
 
 function fmtDay(d: string) {
   return `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
@@ -107,8 +107,8 @@ function ChartFrame({ title, children }: { title: string; children: React.ReactN
 }
 
 const tooltipStyle = {
-  background: "hsl(var(--card))",
-  border: "1px solid hsl(var(--border))",
+  background: "var(--card)",
+  border: "1px solid var(--border)",
   borderRadius: "0.5rem",
   fontSize: "0.75rem",
 } as const;
@@ -197,9 +197,9 @@ function AdminPage() {
                     <stop offset="100%" stopColor={GOLD} stopOpacity={0.04} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
-                <XAxis dataKey="date" tickFormatter={fmtDay} fontSize={11} stroke="hsl(var(--muted-foreground))" />
-                <YAxis allowDecimals={false} fontSize={11} stroke="hsl(var(--muted-foreground))" width={28} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
+                <XAxis dataKey="date" tickFormatter={fmtDay} fontSize={11} stroke="var(--muted-foreground)" />
+                <YAxis allowDecimals={false} fontSize={11} stroke="var(--muted-foreground)" width={28} />
                 <Tooltip contentStyle={tooltipStyle} labelFormatter={fmtDay} />
                 <Area type="monotone" dataKey="users" stroke={GOLD} fill="url(#goldFill)" strokeWidth={2} />
               </AreaChart>
@@ -207,9 +207,9 @@ function AdminPage() {
 
             <ChartFrame title="Content created — last 30 days">
               <BarChart data={metrics.contentSeries}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
-                <XAxis dataKey="date" tickFormatter={fmtDay} fontSize={11} stroke="hsl(var(--muted-foreground))" />
-                <YAxis allowDecimals={false} fontSize={11} stroke="hsl(var(--muted-foreground))" width={28} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.4} />
+                <XAxis dataKey="date" tickFormatter={fmtDay} fontSize={11} stroke="var(--muted-foreground)" />
+                <YAxis allowDecimals={false} fontSize={11} stroke="var(--muted-foreground)" width={28} />
                 <Tooltip contentStyle={tooltipStyle} labelFormatter={fmtDay} />
                 <Bar dataKey="characters" stackId="a" fill={PIE_COLORS[0]} />
                 <Bar dataKey="campaigns" stackId="a" fill={PIE_COLORS[1]} />

@@ -536,12 +536,44 @@ function SearchResults({
   );
 }
 
+function CategoryCards({
+  categories,
+  onOpenArticle,
+}: {
+  categories: [string, WikiArticle[]][];
+  onOpenArticle: (id: string) => void;
+}) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {categories.map(([cat, arts]) => (
+        <div key={cat} className="rounded-lg border border-border/60 bg-card/50 p-4">
+          <p className="font-display text-sm uppercase tracking-[0.18em] text-muted-foreground">{cat}</p>
+          <ul className="mt-2 space-y-1">
+            {arts.map((a) => (
+              <li key={a.id}>
+                <button
+                  onClick={() => onOpenArticle(a.id)}
+                  className="text-left text-sm text-foreground underline-offset-2 hover:text-primary hover:underline"
+                >
+                  {a.title}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function HomeView({
+  playerCategories,
   dmCategories,
   rulesCount,
   onOpenArticle,
   onOpenCategory,
 }: {
+  playerCategories: [string, WikiArticle[]][];
   dmCategories: [string, WikiArticle[]][];
   rulesCount: number;
   onOpenArticle: (id: string) => void;
@@ -551,33 +583,21 @@ function HomeView({
     <div>
       <h1 className="font-display text-3xl text-foreground sm:text-4xl">The Codex wiki</h1>
       <p className="mt-2 max-w-2xl text-muted-foreground">
-        {DM_ARTICLES.length} Dungeon Master chapters and {rulesCount} rules entries — everything the character
-        builder and the AI DM know, in one place.
+        {ALL_ARTICLES.length} guide articles and {rulesCount} rules entries — everything the character builder and
+        the AI DM know, in one place.
       </p>
       <div className="rune-rule my-6" />
 
       <h2 className="mb-3 flex items-center gap-2 font-display text-xl text-primary">
-        <BookOpen className="size-5" /> Dungeon Master's guide
+        <BookOpen className="size-5" /> Player rules
       </h2>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {dmCategories.map(([cat, arts]) => (
-          <div key={cat} className="rounded-lg border border-border/60 bg-card/50 p-4">
-            <p className="font-display text-sm uppercase tracking-[0.18em] text-muted-foreground">{cat}</p>
-            <ul className="mt-2 space-y-1">
-              {arts.map((a) => (
-                <li key={a.id}>
-                  <button
-                    onClick={() => onOpenArticle(a.id)}
-                    className="text-left text-sm text-foreground underline-offset-2 hover:text-primary hover:underline"
-                  >
-                    {a.title}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
+      <CategoryCards categories={playerCategories} onOpenArticle={onOpenArticle} />
+
+      <h2 className="mb-3 mt-10 flex items-center gap-2 font-display text-xl text-primary">
+        <BookOpen className="size-5" /> Running the game
+      </h2>
+      <CategoryCards categories={dmCategories} onOpenArticle={onOpenArticle} />
+
 
       <h2 className="mb-3 mt-10 flex items-center gap-2 font-display text-xl text-primary">
         <Shapes className="size-5" /> Rules reference

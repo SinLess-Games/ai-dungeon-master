@@ -31,6 +31,9 @@ export interface Character {
   portraitUrl?: string;
   raceId: string;
   classes: ClassLevel[];
+  /** Gestalt: a second, parallel class track (Unearthed Arcana variant). */
+  gestalt?: boolean;
+  classesB?: ClassLevel[];
   alignment: Alignment;
   deity?: string;
   abilities: Record<AbilityKey, number>;
@@ -59,6 +62,8 @@ export function emptyCharacter(id: string): Character {
     name: "",
     raceId: "human",
     classes: [{ classId: "fighter", levels: 1 }],
+    gestalt: false,
+    classesB: [],
     alignment: "NG",
     abilities: { str: 13, dex: 13, con: 13, int: 12, wis: 12, cha: 10 },
     abilityIncreases: [],

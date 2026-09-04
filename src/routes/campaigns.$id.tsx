@@ -269,10 +269,9 @@ function Table({
             size="sm"
             onClick={() =>
               commit(
-                {
-                  ...campaign,
-                  completedAt: campaign.completedAt ? undefined : new Date().toISOString(),
-                },
+                campaign.completedAt
+                  ? (({ completedAt, ...rest }) => rest)(campaign)
+                  : { ...campaign, completedAt: new Date().toISOString() },
                 character,
               )
             }

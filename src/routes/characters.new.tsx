@@ -29,7 +29,7 @@ const RACE_GROUPS = [
   { key: "powerful", label: "Powerful (high LA)" },
   { key: "epic", label: "Epic (LA +8 and up)" },
 ] as const;
-import { CLASSES } from "@/lib/rules/classes";
+import { CLASSES, CLASS_GROUPS } from "@/lib/rules/classes";
 import { SKILLS } from "@/lib/rules/skills";
 import { FEATS } from "@/lib/rules/feats";
 import { ARMORS, SHIELDS, WEAPONS } from "@/lib/rules/equipment";
@@ -73,6 +73,7 @@ function CharacterCreator() {
   const [char, setChar] = useState<Character>(() => emptyCharacter(newId()));
   const [pointBuyMode, setPointBuyMode] = useState(true);
   const [raceGroup, setRaceGroup] = useState<(typeof RACE_GROUPS)[number]["key"]>("all");
+  const [classGroup, setClassGroup] = useState<(typeof CLASS_GROUPS)[number]["key"]>("all");
   const [pointBudget, setPointBudget] = useState<number>(32);
   const [rollMethod, setRollMethod] = useState<AbilityRollMethod>("4d6-drop-lowest");
   const [rolled, setRolled] = useState<{ score: number; dice: number[] }[] | null>(null);
@@ -381,8 +382,28 @@ function CharacterCreator() {
                   <span className="text-sm text-muted-foreground">Levels 21+ use epic progression.</span>
                 </div>
 
+                <div className="flex flex-wrap gap-2">
+                  {CLASS_GROUPS.map((g) => (
+                    <button
+                      key={g.key}
+                      onClick={() => setClassGroup(g.key)}
+                      className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                        classGroup === g.key
+                          ? "border-primary bg-primary/15 text-foreground"
+                          : "border-border/60 text-muted-foreground hover:border-primary/50"
+                      }`}
+                    >
+                      {g.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Every base class is here: core, psionic (psion, wilder, soulknife, ardent and more),
+                  arcane and divine variants, martial adepts, and the NPC classes for followers and troops.
+                </p>
+
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {CLASSES.map((cl) => {
+                  {CLASSES.filter((c) => classGroup === "all" || (c.category ?? "core") === classGroup).map((cl) => {
                     const active = char.classes[0]?.classId === cl.id;
                     return (
                       <button
@@ -397,6 +418,14 @@ function CharacterCreator() {
                           <Badge variant="secondary" className="font-mono text-xs">
                             d{cl.hitDie}
                           </Badge>
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                            {cl.category ?? "core"}
+                          </Badge>
+                          {cl.source ? (
+                            <Badge variant="outline" className="text-[10px]">{cl.source}</Badge>
+                          ) : null}
                         </div>
                         <p className="mt-1 text-sm text-muted-foreground">{cl.blurb}</p>
                         <p className="mt-2 text-xs text-primary/90">{cl.playsLike}</p>

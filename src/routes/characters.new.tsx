@@ -289,10 +289,17 @@ function CharacterCreator() {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Level adjustment (LA) and racial Hit Dice raise your effective character level (ECL).
-                  A gnoll with 1 class level has 2 racial HD and LA +1, so it plays alongside a 4th-level party.
+                  A gnoll with 1 class level has 2 racial HD and LA +1, so it plays alongside a 4th-level party. Races run from LA +0 up to LA +7 monsters like the medusa, illithid, rakshasa, and ogre mage.
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {RACES.filter((r) => raceGroup === "all" || (r.category ?? "core") === raceGroup).map((r) => {
+                  {RACES.filter((r) => raceGroup === "all" || (r.category ?? "core") === raceGroup)
+                    .slice()
+                    .sort(
+                      (a, b) =>
+                        (a.levelAdjustment ?? 0) + (a.racialHitDice?.count ?? 0) -
+                        ((b.levelAdjustment ?? 0) + (b.racialHitDice?.count ?? 0)),
+                    )
+                    .map((r) => {
                     const active = char.raceId === r.id;
                     const la = r.levelAdjustment ?? 0;
                     const rhd = r.racialHitDice?.count ?? 0;

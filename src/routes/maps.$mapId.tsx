@@ -278,6 +278,7 @@ function MapEditor() {
           <div className="flex flex-wrap items-center gap-2">
             {tool === "paint" ? (
               <select
+                aria-label="Terrain type"
                 className="h-9 rounded-md border border-input bg-background px-2 text-sm"
                 value={terrain}
                 onChange={(e) => setTerrain(e.target.value as MapTerrain)}
@@ -291,6 +292,7 @@ function MapEditor() {
             ) : null}
             {tool === "prop" ? (
               <select
+                aria-label="Prop type"
                 className="h-9 rounded-md border border-input bg-background px-2 text-sm"
                 value={propKind}
                 onChange={(e) => setPropKind(e.target.value as PropKind)}
@@ -305,6 +307,7 @@ function MapEditor() {
             {tool === "token" ? (
               <>
                 <select
+                  aria-label="Token side"
                   className="h-9 rounded-md border border-input bg-background px-2 text-sm"
                   value={tokenFaction}
                   onChange={(e) => setTokenFaction(e.target.value as MapToken["faction"])}
@@ -315,6 +318,7 @@ function MapEditor() {
                   <option value="neutral">Neutral</option>
                 </select>
                 <select
+                  aria-label="Token size"
                   className="h-9 rounded-md border border-input bg-background px-2 text-sm"
                   value={tokenSize}
                   onChange={(e) => setTokenSize(e.target.value as TokenSize)}
@@ -410,8 +414,9 @@ function MapEditor() {
               {selectedToken ? (
                 <>
                   <div className="space-y-1.5">
-                    <Label>Name</Label>
+                    <Label htmlFor="token-name">Name</Label>
                     <Input
+                      id="token-name"
                       value={selectedToken.name}
                       onChange={(e) =>
                         update((m) => {
@@ -423,8 +428,9 @@ function MapEditor() {
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <div>
-                      <Label className="text-xs">HP</Label>
+                      <Label htmlFor="token-hp" className="text-xs">HP</Label>
                       <Input
+                        id="token-hp"
                         type="number"
                         value={selectedToken.hp ?? 0}
                         onChange={(e) =>
@@ -436,8 +442,9 @@ function MapEditor() {
                       />
                     </div>
                     <div>
-                      <Label className="text-xs">Max HP</Label>
+                      <Label htmlFor="token-maxhp" className="text-xs">Max HP</Label>
                       <Input
+                        id="token-maxhp"
                         type="number"
                         value={selectedToken.maxHp ?? 0}
                         onChange={(e) =>
@@ -449,8 +456,9 @@ function MapEditor() {
                       />
                     </div>
                     <div>
-                      <Label className="text-xs">Altitude (5 ft)</Label>
+                      <Label htmlFor="token-alt" className="text-xs">Altitude (5 ft)</Label>
                       <Input
+                        id="token-alt"
                         type="number"
                         value={selectedToken.altitude}
                         onChange={(e) =>
@@ -504,6 +512,7 @@ function MapEditor() {
               {map.traps.map((t) => (
                 <div key={t.id} className="space-y-1 rounded-md border border-border p-2 text-sm">
                   <Input
+                    aria-label="Trap name"
                     value={t.name}
                     onChange={(e) =>
                       update((m) => {

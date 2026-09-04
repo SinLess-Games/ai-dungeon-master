@@ -271,6 +271,7 @@ function CharacterCreator() {
                             −
                           </Button>
                           <Input
+                            aria-label={`${ABILITY_NAMES[a]} score`}
                             type="number"
                             value={base}
                             onChange={(e) =>
@@ -703,6 +704,7 @@ function CharacterCreator() {
                   ))}
                 </div>
                 <Input
+                  aria-label="Search feats"
                   value={featSearch}
                   onChange={(e) => setFeatSearch(e.target.value)}
                   placeholder="Search feats by name, prerequisite, or benefit"

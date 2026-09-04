@@ -110,8 +110,9 @@ function CampaignsPage() {
           <CardContent className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <Label>Campaign name</Label>
+                <Label htmlFor="campaign-name">Campaign name</Label>
                 <Input
+                  id="campaign-name"
                   className="mt-2"
                   value={draft.name}
                   onChange={(e) => set("name", e.target.value)}
@@ -120,7 +121,7 @@ function CampaignsPage() {
               <div>
                 <Label>Character</Label>
                 <Select value={draft.characterId} onValueChange={(v) => set("characterId", v)}>
-                  <SelectTrigger className="mt-2">
+                  <SelectTrigger aria-label="Character" className="mt-2">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -175,8 +176,9 @@ function CampaignsPage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <Label>World name</Label>
+                <Label htmlFor="world-name">World name</Label>
                 <Input
+                  id="world-name"
                   className="mt-2"
                   placeholder="Leave blank and the DM will invent one"
                   value={draft.worldName}
@@ -184,8 +186,9 @@ function CampaignsPage() {
                 />
               </div>
               <div>
-                <Label>Starting town / opening situation</Label>
+                <Label htmlFor="opening-scene">Starting town / opening situation</Label>
                 <Input
+                  id="opening-scene"
                   className="mt-2"
                   value={draft.scene.location}
                   onChange={(e) =>

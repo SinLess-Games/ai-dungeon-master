@@ -85,7 +85,7 @@ function Home() {
 
       {characters.length > 0 ? (
         <section className="mb-14">
-          <PageTitle title="Your characters" />
+          <PageTitle as="h2" title="Your characters" />
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {characters.slice(0, 6).map((c) => {
               const d = computeCharacter(c);
@@ -115,7 +115,7 @@ function Home() {
       ) : null}
 
       <section>
-        <PageTitle title="What's at the table" />
+        <PageTitle as="h2" title="What's at the table" />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map(({ icon: Icon, title, text }) => (
             <Card key={title} className="card-etched bg-card/60">

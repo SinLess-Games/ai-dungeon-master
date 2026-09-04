@@ -118,6 +118,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
+                  aria-label="Play menu"
                   className={cn(
                     "flex items-center gap-1.5 rounded-md border px-2.5 py-2 text-xs font-medium transition-all sm:gap-2 sm:px-3.5 sm:text-sm",
                     isPlayActive(location.pathname)
@@ -188,7 +189,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="relative hidden items-center lg:flex">
               <Search className="absolute left-2.5 size-3.5 text-muted-foreground" />
               <input
-                type="text"
+                type="search"
+                aria-label="Search the app"
                 placeholder="Search..."
                 className="h-8 w-40 rounded-md border border-border/60 bg-background/80 pl-8 pr-10 text-xs text-foreground placeholder:text-muted-foreground backdrop-blur focus:border-primary/60 focus:outline-none focus:ring-1 focus:ring-primary/60 xl:w-52"
               />
@@ -303,16 +305,18 @@ export function PageTitle({
   title,
   subtitle,
   action,
+  as: Heading = "h1",
 }: {
   title: string;
   subtitle?: string;
   action?: ReactNode;
+  as?: "h1" | "h2";
 }) {
   return (
     <div className="mb-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl text-foreground sm:text-4xl">{title}</h1>
+          <Heading className="font-display text-3xl text-foreground sm:text-4xl">{title}</Heading>
           {subtitle ? <p className="mt-2 max-w-2xl text-muted-foreground">{subtitle}</p> : null}
         </div>
         {action}

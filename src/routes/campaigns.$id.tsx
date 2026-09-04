@@ -354,6 +354,7 @@ function Table({
           <div className="border-t border-border/70 p-3">
             <div className="flex items-end gap-2">
               <Textarea
+                aria-label="Tell the Dungeon Master what you do"
                 ref={composerRef}
                 rows={2}
                 autoFocus

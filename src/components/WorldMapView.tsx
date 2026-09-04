@@ -571,8 +571,26 @@ export function WorldMapView({
     onMapClick(Math.round(x * 10) / 10, Math.round(y * 10) / 10);
   }
 
+  // settlements must sit on land, never in open water
+  const placed = useMemo(() => {
+    const polys = world.regions.map((r) => coastPoints(r));
+    const map = new Map<string, { x: number; y: number }>();
+    for (const s of world.sites) {
+      const needsLand = LAND_SITES.has(s.kind);
+      const inland = s.kind === "port" || s.kind === "harbor" ? 0.2 : 1.2;
+      map.set(s.id, needsLand ? snapToLand(s, polys, inland) : { x: s.x, y: s.y });
+    }
+    return map;
+  }, [world.regions, world.sites]);
+
+  const at = (s: WorldSite) => placed.get(s.id) ?? { x: s.x, y: s.y };
+
+  // labels keep a constant on-screen size as the map is zoomed
+  const ts = (base: number) => +(base / view.z).toFixed(3);
+
   const sites = world.sites.filter((s) => showUndiscovered || s.discovered);
   const siteById = new Map(world.sites.map((s) => [s.id, s]));
+
 
   return (
     <div className={`relative overflow-hidden ${className ?? "h-full w-full"}`}>

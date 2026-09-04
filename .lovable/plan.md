@@ -94,12 +94,23 @@ A D&D 3.5 app where an AI runs the adventure, you manage a full rules-accurate c
 - Music triggered manually or by DM tool events.
 - Volume controls and mute per layer.
 
-## Item crafting
+## Crafting, enchanting, and ritual magic
 
-- Crafting UI: pick item type (weapon, armor, wand, potion, scroll, misc), material, caster level, prerequisites, and cost/time.
-- Craft checks (Spellcraft, Craft skills) rolled by the player; DM tool applies results.
-- Recipe/item database from SRD; custom items allowed.
-- Inventory updates automatically on success.
+- **Mundane crafting:** Craft skill items — weapons, armor, gear, alchemy — with cost, time, and progress tracked per silver-piece rules.
+- **Item enchanting:** the full magic item creation chain — Craft Magic Arms and Armor, Craft Wondrous Item, Craft Wand/Rod/Staff, Scribe Scroll, Brew Potion, Forge Ring. Pick base item, choose enchantments and abilities, and the app computes market price, XP cost, GP cost, days required, caster level, and required spells, flagging missing prerequisites.
+- **Epic item creation** for epic-level characters, with epic crafting feats and epic costs.
+- **Ritual magic:** multi-caster rituals and long-form magic — participants, components, time, location requirements, and skill/save chain. Rituals can bind creatures, create planar gates, raise the dead, curse a region, or empower an army; the DM resolves outcomes and side effects from the roll results.
+- Craft/Spellcraft checks are rolled by the player; the DM tool applies results and updates inventory, gold, and XP automatically.
+- Recipe/item database from 3.0 and 3.5 sources; custom and homebrew items supported.
+
+## Monsters and bestiary
+
+- Full monster database from 3.0/3.5 sources: stat blocks, abilities, special attacks/qualities, CR, type/subtype, and treasure.
+- Search and filter by CR, type, terrain, and alignment; add a monster to the map as a token in one click.
+- Templates and advancement: apply templates (skeleton, half-dragon, fiendish, etc.) and advance hit dice, with stats recomputed.
+- Encounter builder: assemble encounters by party level and target difficulty, with XP awards computed on victory.
+- Custom monster creator for homebrew.
+
 
 ## Leadership, armies, and factions
 

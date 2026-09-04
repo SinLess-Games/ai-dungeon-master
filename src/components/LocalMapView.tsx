@@ -64,7 +64,7 @@ export function LocalMapView({
   site: WorldSite;
   className?: string;
   /** AI-painted picture of this place; shown instead of the drawn plan. */
-  artUrl?: string;
+  artUrl?: string | undefined;
 }) {
   const plan = useMemo(() => {
     const rand = rng(hash(site.id + site.name + site.kind));

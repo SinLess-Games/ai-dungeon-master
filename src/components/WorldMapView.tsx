@@ -403,7 +403,7 @@ export interface WorldMapViewProps {
   showUndiscovered?: boolean;
   className?: string;
   /** AI-painted backdrop; when present the drawn terrain is replaced by it. */
-  artUrl?: string;
+  artUrl?: string | undefined;
 }
 
 /** Illustrated overland atlas map. Coordinates are normalised 0-100. */

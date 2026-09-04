@@ -14,7 +14,9 @@ import {
   Settings,
   UserRound,
   ShieldCheck,
+  MessageSquareWarning,
 } from "lucide-react";
+import { FeedbackDialog } from "@/components/FeedbackDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,

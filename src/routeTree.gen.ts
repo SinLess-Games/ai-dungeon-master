@@ -37,6 +37,7 @@ import { Route as MapsMapIdRouteImport } from './routes/maps.$mapId'
 import { Route as PartyCampaignIdRouteImport } from './routes/party.$campaignId'
 import { Route as WorldsIndexRouteImport } from './routes/worlds.index'
 import { Route as WorldsWorldIdRouteImport } from './routes/worlds.$worldId'
+import { Route as AdminDevBlogIndexRouteImport } from './routes/admin.dev-blog.index'
 import { Route as ApiPublicBlogMediaSplatRouteImport } from './routes/api/public/blog-media.$'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 
@@ -180,6 +181,11 @@ const WorldsWorldIdRoute = WorldsWorldIdRouteImport.update({
   path: '/worlds/$worldId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminDevBlogIndexRoute = AdminDevBlogIndexRouteImport.update({
+  id: '/dev-blog/',
+  path: '/dev-blog/',
+  getParentRoute: () => AdminRoute,
+} as any)
 const ApiPublicBlogMediaSplatRoute = ApiPublicBlogMediaSplatRouteImport.update({
   id: '/api/public/blog-media/$',
   path: '/api/public/blog-media/$',
@@ -221,6 +227,7 @@ export interface FileRoutesByFullPath {
   '/characters/': typeof CharactersIndexRoute
   '/dev-blog/': typeof DevBlogIndexRoute
   '/worlds/': typeof WorldsIndexRoute
+  '/admin/dev-blog/': typeof AdminDevBlogIndexRoute
   '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
@@ -252,6 +259,7 @@ export interface FileRoutesByTo {
   '/characters': typeof CharactersIndexRoute
   '/dev-blog': typeof DevBlogIndexRoute
   '/worlds': typeof WorldsIndexRoute
+  '/admin/dev-blog': typeof AdminDevBlogIndexRoute
   '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
@@ -285,6 +293,7 @@ export interface FileRoutesById {
   '/characters/': typeof CharactersIndexRoute
   '/dev-blog/': typeof DevBlogIndexRoute
   '/worlds/': typeof WorldsIndexRoute
+  '/admin/dev-blog/': typeof AdminDevBlogIndexRoute
   '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
@@ -319,6 +328,7 @@ export interface FileRouteTypes {
     | '/characters/'
     | '/dev-blog/'
     | '/worlds/'
+    | '/admin/dev-blog/'
     | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
   fileRoutesByTo: FileRoutesByTo
@@ -350,6 +360,7 @@ export interface FileRouteTypes {
     | '/characters'
     | '/dev-blog'
     | '/worlds'
+    | '/admin/dev-blog'
     | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
   id:
@@ -382,6 +393,7 @@ export interface FileRouteTypes {
     | '/characters/'
     | '/dev-blog/'
     | '/worlds/'
+    | '/admin/dev-blog/'
     | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
   fileRoutesById: FileRoutesById
@@ -611,6 +623,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorldsWorldIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/dev-blog/': {
+      id: '/admin/dev-blog/'
+      path: '/dev-blog'
+      fullPath: '/admin/dev-blog/'
+      preLoaderRoute: typeof AdminDevBlogIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/api/public/blog-media/$': {
       id: '/api/public/blog-media/$'
       path: '/api/public/blog-media/$'
@@ -635,6 +654,7 @@ interface AdminRouteChildren {
   AdminPlayersRoute: typeof AdminPlayersRoute
   AdminTitlesRoute: typeof AdminTitlesRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  AdminDevBlogIndexRoute: typeof AdminDevBlogIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -644,6 +664,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminPlayersRoute: AdminPlayersRoute,
   AdminTitlesRoute: AdminTitlesRoute,
   AdminIndexRoute: AdminIndexRoute,
+  AdminDevBlogIndexRoute: AdminDevBlogIndexRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)

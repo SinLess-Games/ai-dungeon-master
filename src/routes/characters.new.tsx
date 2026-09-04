@@ -43,13 +43,13 @@ import { saveCharacter, newId } from "@/lib/storage";
 export const Route = createFileRoute("/characters/new")({
   head: () => ({
     meta: [
-      { title: "Create a character — Grimoire D&D 3.5" },
+      { title: "Create a character — The Endless Codex" },
       {
         name: "description",
         content:
           "Build a D&D 3.5 character step by step: abilities, race, class, skills, feats, and spells, with every rule explained as you go.",
       },
-      { property: "og:title", content: "Create a character — Grimoire D&D 3.5" },
+      { property: "og:title", content: "Create a character — The Endless Codex" },
       { property: "og:description", content: "A guided, rules-accurate 3.5 character creator that explains every choice." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

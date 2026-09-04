@@ -6,13 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export const Route = createFileRoute("/dice")({
   head: () => ({
     meta: [
-      { title: "Dice tray — Grimoire D&D 3.5" },
+      { title: "Dice tray — The Endless Codex" },
       {
         name: "description",
         content:
           "Roll anything from 1d20 to 500d6 with per-die results, totals, averages, and a running history.",
       },
-      { property: "og:title", content: "Dice tray — Grimoire D&D 3.5" },
+      { property: "og:title", content: "Dice tray — The Endless Codex" },
       { property: "og:description", content: "A fast d20 dice roller that handles enormous dice pools honestly." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

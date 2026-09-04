@@ -15,13 +15,13 @@ import { ABILITY_NAMES } from "@/lib/rules/types";
 export const Route = createFileRoute("/wiki")({
   head: () => ({
     meta: [
-      { title: "Rules wiki — Grimoire D&D 3.5" },
+      { title: "Rules wiki — The Endless Codex" },
       {
         name: "description",
         content:
           "Search D&D 3.5 races, classes, skills, feats, weapons, armor, and gear without leaving the table.",
       },
-      { property: "og:title", content: "Rules wiki — Grimoire D&D 3.5" },
+      { property: "og:title", content: "Rules wiki — The Endless Codex" },
       { property: "og:description", content: "An in-app searchable reference for the 3.5 rules you use at the table." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

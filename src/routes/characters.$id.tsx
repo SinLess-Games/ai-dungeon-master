@@ -22,9 +22,9 @@ import type { Character } from "@/lib/rules/character";
 export const Route = createFileRoute("/characters/$id")({
   head: () => ({
     meta: [
-      { title: "Character sheet — Grimoire D&D 3.5" },
+      { title: "Character sheet — The Endless Codex" },
       { name: "description", content: "A live D&D 3.5 character sheet: hit points, AC, saves, skills, feats, gear, and dice shortcuts." },
-      { property: "og:title", content: "Character sheet — Grimoire D&D 3.5" },
+      { property: "og:title", content: "Character sheet — The Endless Codex" },
       { property: "og:description", content: "Track your 3.5 hero with automatically calculated stats and one-click rolls." },
       { property: "og:type", content: "profile" },
       { name: "twitter:card", content: "summary" },

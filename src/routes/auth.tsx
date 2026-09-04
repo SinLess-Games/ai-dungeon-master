@@ -11,16 +11,16 @@ import { useSession } from "@/hooks/useSession";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Sign in or create an account | Grimoire d20" },
+      { title: "Sign in or create an account | The Endless Codex" },
       {
         name: "description",
         content:
-          "Sign in to Grimoire to save your D&D 3.5 characters, campaigns, and dice history, or create a free account for solo play.",
+          "Sign in to The Endless Codex to save your D&D 3.5 characters, campaigns, and dice history, or create a free account for solo play.",
       },
-      { property: "og:title", content: "Sign in or create an account | Grimoire d20" },
+      { property: "og:title", content: "Sign in or create an account | The Endless Codex" },
       {
         property: "og:description",
-        content: "Create a free Grimoire account to save characters and campaigns for D&D 3.5 solo play.",
+        content: "Create a free The Endless Codex account to save characters and campaigns for D&D 3.5 solo play.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

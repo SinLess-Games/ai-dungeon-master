@@ -14,17 +14,17 @@ import type { Character } from "@/lib/rules/character";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Grimoire — D&D 3.5 with an AI Dungeon Master" },
+      { title: "The Endless Codex — D&D 3.5 with an AI Dungeon Master" },
       {
         name: "description",
         content:
-          "Play D&D 3.5 solo with an AI Dungeon Master. Full rules-accurate character builder, dice roller, tactical maps, and campaign saves.",
+          "The Endless Codex is an AI Dungeon Master for D&D 3.5. Build rules-accurate characters, roll dice, explore tactical maps, and save campaigns.",
       },
-      { property: "og:title", content: "Grimoire — D&D 3.5 with an AI Dungeon Master" },
+      { property: "og:title", content: "The Endless Codex — D&D 3.5 with an AI Dungeon Master" },
       {
         property: "og:description",
         content:
-          "Build a rules-accurate 3.5 character and let an AI DM run the adventure. Free for solo play.",
+          "Build a rules-accurate 3.5 character and play with The Endless Codex AI Dungeon Master. Free for solo play.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -55,7 +55,7 @@ function Home() {
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
           Roll a rules-accurate 3.5 character, then sit down at a table that is always open. Free
-          for solo play.
+          for solo play with The Endless Codex.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Button asChild size="lg">

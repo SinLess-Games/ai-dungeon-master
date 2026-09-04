@@ -14,9 +14,9 @@ import type { Character } from "@/lib/rules/character";
 export const Route = createFileRoute("/characters/")({
   head: () => ({
     meta: [
-      { title: "Your characters — Grimoire D&D 3.5" },
+      { title: "Your characters — The Endless Codex" },
       { name: "description", content: "Every 3.5 character you have built: hit points, armor class, saves, and levels at a glance." },
-      { property: "og:title", content: "Your characters — Grimoire D&D 3.5" },
+      { property: "og:title", content: "Your characters — The Endless Codex" },
       { property: "og:description", content: "Manage your rules-accurate D&D 3.5 characters and jump back into play." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

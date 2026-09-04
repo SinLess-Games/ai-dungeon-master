@@ -123,6 +123,26 @@ export function signOut() {
   window.dispatchEvent(new CustomEvent(AUTH_EVENT));
 }
 
+export function updateDisplayName(displayName: string): SessionUser {
+  const session = getSession();
+  if (!session) throw new Error("You are not signed in.");
+  const name = displayName.trim();
+  if (name.length < 2) throw new Error("Display name must be at least 2 characters.");
+  const users = listUsers();
+  const i = users.findIndex((u) => u.id === session.id);
+  const user = users[i];
+  if (i < 0 || !user) throw new Error("Account not found.");
+  users[i] = { ...user, displayName: name };
+  write(KEY_USERS, users);
+  const next = { ...session, displayName: name };
+  write(KEY_SESSION, next);
+  return next;
+}
+
+export function getAccountCreatedAt(userId: string): string | null {
+  return listUsers().find((u) => u.id === userId)?.createdAt ?? null;
+}
+
 export async function changePassword(currentPassword: string, newPassword: string) {
   const session = getSession();
   if (!session) throw new Error("You are not signed in.");

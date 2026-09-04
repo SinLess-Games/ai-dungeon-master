@@ -56,7 +56,16 @@ interface Block {
 }
 
 /** Deterministic settlement or site plan drawn from the site id. */
-export function LocalMapView({ site, className }: { site: WorldSite; className?: string }) {
+export function LocalMapView({
+  site,
+  className,
+  artUrl,
+}: {
+  site: WorldSite;
+  className?: string;
+  /** AI-painted picture of this place; shown instead of the drawn plan. */
+  artUrl?: string;
+}) {
   const plan = useMemo(() => {
     const rand = rng(hash(site.id + site.name + site.kind));
     const walled = site.kind === "city" || site.kind === "town" || site.kind === "keep";

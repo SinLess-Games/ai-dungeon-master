@@ -17,6 +17,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { getCampaign, getCharacter, getWorld, saveCampaign, saveCharacter, pushRoll } from "@/lib/storage";
 import { ensureCampaignWorld } from "@/lib/campaign-world";
 import { WorldMapView } from "@/components/WorldMapView";
+import { LocalMapView } from "@/components/LocalMapView";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { regionAt } from "@/lib/world";
 import { buildDmContext } from "@/lib/dm-context";

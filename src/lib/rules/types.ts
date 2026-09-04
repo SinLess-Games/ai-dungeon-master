@@ -44,6 +44,17 @@ export const ALIGNMENTS: { key: Alignment; name: string; blurb: string }[] = [
 
 export type Size = "Fine" | "Diminutive" | "Tiny" | "Small" | "Medium" | "Large" | "Huge" | "Gargantuan" | "Colossal";
 
+export type RaceCategory = "core" | "planetouched" | "monstrous" | "savage" | "powerful";
+
+export interface RacialHitDice {
+  count: number;
+  hitDie: number;
+  type: string;
+  bab: BabProgression;
+  saves: { fort: SaveProgression; ref: SaveProgression; will: SaveProgression };
+  skillPointsPerHd?: number;
+}
+
 export interface Race {
   id: string;
   name: string;
@@ -55,7 +66,14 @@ export interface Race {
   favoredClass: string;
   traits: string[];
   blurb: string;
+  category?: RaceCategory;
+  /** Effective character level added on top of class levels and racial HD. */
+  levelAdjustment?: number;
+  racialHitDice?: RacialHitDice;
+  naturalArmor?: number;
+  creatureType?: string;
 }
+
 
 export type SaveProgression = "good" | "poor";
 export type BabProgression = "full" | "threeQuarter" | "half";

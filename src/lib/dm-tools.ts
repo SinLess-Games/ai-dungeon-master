@@ -3,6 +3,13 @@ import type { Campaign } from "./campaign";
 import type { Alignment } from "./rules/types";
 import { newId } from "./storage";
 import { removeMemberByName, upsertMemberByName } from "./party";
+import { getWorld } from "./storage";
+import {
+  discoverSite as revealSite,
+  ensureCampaignWorld,
+  moveParty as moveWorldParty,
+  shapeWorld as reshapeWorld,
+} from "./campaign-world";
 
 type Any = Record<string, any>;
 
@@ -188,6 +195,26 @@ export function applyDmTool(
         campaign: removeMemberByName(g, String(i.name ?? "")),
         output: `left the party: ${i.name}`,
       };
+    }
+
+    case "shapeWorld": {
+      const ensured = ensureCampaignWorld(g);
+      const res = reshapeWorld(ensured.world, i);
+      const g2 = { ...ensured.campaign, worldId: res.world.id, worldName: res.world.name };
+      return { character: c, campaign: g2, output: res.summary };
+    }
+
+    case "moveParty": {
+      const ensured = ensureCampaignWorld(g);
+      const res = moveWorldParty(ensured.world, i);
+      return { character: c, campaign: { ...ensured.campaign, worldId: res.world.id }, output: res.summary };
+    }
+
+    case "discoverSite": {
+      const ensured = ensureCampaignWorld(g);
+      const world = getWorld(ensured.campaign.worldId ?? "") ?? ensured.world;
+      const res = revealSite(world, String(i.name ?? ""));
+      return { character: c, campaign: { ...ensured.campaign, worldId: res.world.id }, output: res.summary };
     }
 
     case "addJournal": {

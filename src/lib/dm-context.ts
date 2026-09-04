@@ -5,6 +5,8 @@ import { CLASS_BY_ID } from "./rules/classes";
 import { ALIGNMENTS } from "./rules/types";
 import { STYLE_OPTIONS, TYPE_OPTIONS, DM_STYLE_OPTIONS } from "./campaign";
 import { getParty, partyContext } from "./party";
+import { worldContext } from "./campaign-world";
+import { getWorld } from "./storage";
 
 function classLine(c: Character) {
   const track = (t: { classId: string; levels: number }[]) =>
@@ -37,6 +39,9 @@ DM style: ${dmStyle?.label} — ${dmStyle?.blurb}
 Epic levels allowed: ${campaign.allowEpic ? "yes" : "no"}
 World: ${campaign.worldName || "unnamed"} — ${campaign.worldSummary || "improvise a fitting world"}
 House rules: ${campaign.houseRules || "none"}
+
+WORLD MAP (authoritative geography — keep it in step with the fiction using shapeWorld, moveParty and discoverSite)
+${worldContext(campaign.worldId ? getWorld(campaign.worldId) : undefined)}
 
 CURRENT SCENE
 Location: ${campaign.scene.location}${campaign.scene.region ? ` (${campaign.scene.region})` : ""}

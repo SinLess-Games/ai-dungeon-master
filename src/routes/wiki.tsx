@@ -301,7 +301,11 @@ function Wiki() {
           ) : article ? (
             <ArticleView article={article} />
           ) : entry ? (
-            <EntryView entry={entry} onBack={() => open({ type: "category", name: entry.kind })} />
+            entry.kind === "Classes" ? (
+              <ClassView classId={entry.id.replace(/^class-/, "")} onBack={() => open({ type: "category", name: "Classes" })} />
+            ) : (
+              <EntryView entry={entry} onBack={() => open({ type: "category", name: entry.kind })} />
+            )
           ) : sel.type === "category" ? (
             <CategoryView
               kind={sel.name}

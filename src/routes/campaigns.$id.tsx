@@ -346,6 +346,7 @@ function Table({
                     return null;
                   })}
                 </div>
+                )
               ))}
               {busy ? (
                 <p className="animate-pulse text-sm text-muted-foreground">The DM is thinking…</p>

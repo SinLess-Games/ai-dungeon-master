@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { AUTH_EVENT, getSession, type SessionUser } from "@/lib/auth";
+import { AUTH_EVENT, getSession, startAuthListener, type SessionUser } from "@/lib/auth";
 
 export function useSession() {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    startAuthListener();
     const sync = () => setUser(getSession());
     sync();
     setLoading(false);

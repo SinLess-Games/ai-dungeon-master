@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { signIn, signUp } from "@/lib/auth";
+import { signIn, signInWithGoogle, signUp } from "@/lib/auth";
 import { useSession } from "@/hooks/useSession";
 
 export const Route = createFileRoute("/auth")({
@@ -141,6 +141,31 @@ function AuthPage() {
 
               <Button type="submit" className="w-full" disabled={busy}>
                 {busy ? "Working…" : mode === "signin" ? "Sign in" : "Create account"}
+              </Button>
+
+              <div className="relative py-1 text-center text-xs text-muted-foreground">
+                <span className="bg-card px-2">or</span>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                disabled={busy}
+                onClick={async () => {
+                  setError(null);
+                  setBusy(true);
+                  try {
+                    const result = await signInWithGoogle();
+                    if (result) navigate({ to: "/characters" });
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : "Google sign-in failed.");
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                Continue with Google
               </Button>
             </form>
           </CardContent>

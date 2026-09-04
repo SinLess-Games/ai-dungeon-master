@@ -13,6 +13,7 @@ import {
   Moon,
   Settings,
   UserRound,
+  ShieldCheck,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -23,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useSession } from "@/hooks/useSession";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { signOut } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +45,7 @@ function isPlayActive(pathname: string) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user } = useSession();
+  const { isAdmin } = useIsAdmin();
   const location = useLocation();
   return (
     <div className="dark min-h-screen bg-background text-foreground">
@@ -161,6 +164,23 @@ export function AppShell({ children }: { children: ReactNode }) {
               <BookOpen className="size-4 sm:size-[1.125rem]" />
               <span className="hidden sm:inline">Wiki</span>
             </Link>
+
+            {isAdmin ? (
+              <>
+                <span className="mx-1 hidden h-5 w-px bg-border/70 sm:block" />
+                <Link
+                  to="/admin"
+                  activeProps={{
+                    className:
+                      "border border-primary/70 bg-primary/15 text-primary shadow-[0_0_18px_-4px_rgba(217,169,77,0.5)]",
+                  }}
+                  className="flex items-center gap-1.5 rounded-md border border-transparent px-2.5 py-2 text-xs font-medium text-muted-foreground transition-all hover:bg-accent/60 hover:text-foreground sm:gap-2 sm:px-3.5 sm:text-sm"
+                >
+                  <ShieldCheck className="size-4 sm:size-[1.125rem]" />
+                  <span className="hidden sm:inline">Admin</span>
+                </Link>
+              </>
+            ) : null}
 
             <span className="mx-1 hidden h-5 w-px bg-border/70 sm:block" />
 

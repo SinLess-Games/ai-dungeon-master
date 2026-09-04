@@ -151,7 +151,17 @@ export function starterWorld(id: string, name: string, themes: string[] = []): W
   const siteTails = shuffle(r, SITE_B);
   const kinds: SiteKind[] = ["city", "town", "town", "village", "village", "keep", "port", "ruin", "dungeon", "lair", "camp", "wonder"];
   const extra = shuffle(r, kinds.slice(3));
-  const plan: SiteKind[] = ["city", "town", "village", ...extra.slice(0, int(r, 5, 9))];
+  const plan: SiteKind[] = ["city", "town", "village", "port", ...extra.slice(0, int(r, 5, 9))];
+
+  const settlementName = (i: number) => {
+    const head = siteHeads[i % siteHeads.length]!;
+    let tail = siteTails[i % siteTails.length]!;
+    // never produce doubled names like "Wellwell"
+    for (let k = 1; head.toLowerCase() === tail || tail.startsWith(head.toLowerCase()); k++) {
+      tail = siteTails[(i + k) % siteTails.length]!;
+    }
+    return `${head}${tail}`;
+  };
 
   world.sites = plan.map((kind, i) => {
     const region = world.regions[int(r, 0, world.regions.length - 1)]!;
@@ -162,7 +172,8 @@ export function starterWorld(id: string, name: string, themes: string[] = []): W
       id: newId(),
       name: dungeonish
         ? `${take(r, ["The", "The"])} ${take(r, DUNGEON_A)} ${take(r, DUNGEON_B)}`
-        : `${siteHeads[i % siteHeads.length]}${siteTails[i % siteTails.length]}`,
+        : settlementName(i),
+
       kind,
       x,
       y,

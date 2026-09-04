@@ -39,6 +39,7 @@ import { Route as WorldsIndexRouteImport } from './routes/worlds.index'
 import { Route as WorldsWorldIdRouteImport } from './routes/worlds.$worldId'
 import { Route as AdminDevBlogIndexRouteImport } from './routes/admin.dev-blog.index'
 import { Route as AdminDevBlogNewRouteImport } from './routes/admin.dev-blog.new'
+import { Route as AdminDevBlogIdEditRouteImport } from './routes/admin.dev-blog.$id.edit'
 import { Route as ApiPublicBlogMediaSplatRouteImport } from './routes/api/public/blog-media.$'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 
@@ -192,6 +193,11 @@ const AdminDevBlogNewRoute = AdminDevBlogNewRouteImport.update({
   path: '/dev-blog/new',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminDevBlogIdEditRoute = AdminDevBlogIdEditRouteImport.update({
+  id: '/dev-blog/$id/edit',
+  path: '/dev-blog/$id/edit',
+  getParentRoute: () => AdminRoute,
+} as any)
 const ApiPublicBlogMediaSplatRoute = ApiPublicBlogMediaSplatRouteImport.update({
   id: '/api/public/blog-media/$',
   path: '/api/public/blog-media/$',
@@ -235,6 +241,7 @@ export interface FileRoutesByFullPath {
   '/worlds/': typeof WorldsIndexRoute
   '/admin/dev-blog/new': typeof AdminDevBlogNewRoute
   '/admin/dev-blog/': typeof AdminDevBlogIndexRoute
+  '/admin/dev-blog/$id/edit': typeof AdminDevBlogIdEditRoute
   '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
@@ -268,6 +275,7 @@ export interface FileRoutesByTo {
   '/worlds': typeof WorldsIndexRoute
   '/admin/dev-blog/new': typeof AdminDevBlogNewRoute
   '/admin/dev-blog': typeof AdminDevBlogIndexRoute
+  '/admin/dev-blog/$id/edit': typeof AdminDevBlogIdEditRoute
   '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
@@ -303,6 +311,7 @@ export interface FileRoutesById {
   '/worlds/': typeof WorldsIndexRoute
   '/admin/dev-blog/new': typeof AdminDevBlogNewRoute
   '/admin/dev-blog/': typeof AdminDevBlogIndexRoute
+  '/admin/dev-blog/$id/edit': typeof AdminDevBlogIdEditRoute
   '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
@@ -339,6 +348,7 @@ export interface FileRouteTypes {
     | '/worlds/'
     | '/admin/dev-blog/new'
     | '/admin/dev-blog/'
+    | '/admin/dev-blog/$id/edit'
     | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
   fileRoutesByTo: FileRoutesByTo
@@ -372,6 +382,7 @@ export interface FileRouteTypes {
     | '/worlds'
     | '/admin/dev-blog/new'
     | '/admin/dev-blog'
+    | '/admin/dev-blog/$id/edit'
     | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
   id:
@@ -406,6 +417,7 @@ export interface FileRouteTypes {
     | '/worlds/'
     | '/admin/dev-blog/new'
     | '/admin/dev-blog/'
+    | '/admin/dev-blog/$id/edit'
     | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
   fileRoutesById: FileRoutesById
@@ -649,6 +661,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminDevBlogNewRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/dev-blog/$id/edit': {
+      id: '/admin/dev-blog/$id/edit'
+      path: '/dev-blog/$id/edit'
+      fullPath: '/admin/dev-blog/$id/edit'
+      preLoaderRoute: typeof AdminDevBlogIdEditRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/api/public/blog-media/$': {
       id: '/api/public/blog-media/$'
       path: '/api/public/blog-media/$'
@@ -675,6 +694,7 @@ interface AdminRouteChildren {
   AdminIndexRoute: typeof AdminIndexRoute
   AdminDevBlogNewRoute: typeof AdminDevBlogNewRoute
   AdminDevBlogIndexRoute: typeof AdminDevBlogIndexRoute
+  AdminDevBlogIdEditRoute: typeof AdminDevBlogIdEditRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -686,6 +706,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminIndexRoute: AdminIndexRoute,
   AdminDevBlogNewRoute: AdminDevBlogNewRoute,
   AdminDevBlogIndexRoute: AdminDevBlogIndexRoute,
+  AdminDevBlogIdEditRoute: AdminDevBlogIdEditRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)

@@ -119,15 +119,10 @@ describe("rules data", () => {
   });
 
   it("checks feat prerequisites", () => {
-    const ctx = {
-      abilities: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
-      bab: 0,
-      level: 1,
-      featIds: [],
-      classIds: ["fighter"],
-      skillRanks: {},
-      raceId: "human",
-    } as never;
+    const char = emptyCharacter("prereq");
+    char.raceId = "human";
+    char.classes = [{ classId: "fighter", levels: 1 }];
+    const ctx = { char, derived: computeCharacter(char) };
     const gated = FEATS.find((f) => f.prereq && f.prereq.length > 0)!;
     const issues = prereqIssues(gated, ctx);
     expect(Array.isArray(issues)).toBe(true);

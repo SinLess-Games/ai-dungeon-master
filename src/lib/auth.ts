@@ -160,3 +160,23 @@ export async function changePassword(currentPassword: string, newPassword: strin
   users[i] = { ...user, salt, hash: await hashPassword(newPassword, salt) };
   write(KEY_USERS, users);
 }
+
+/** Store (or clear) the account portrait as a data URL in local storage. */
+export function updateAvatar(avatarUrl: string | null): SessionUser {
+  const session = getSession();
+  if (!session) throw new Error("You are not signed in.");
+  const users = listUsers();
+  const i = users.findIndex((u) => u.id === session.id);
+  const user = users[i];
+  if (i < 0 || !user) throw new Error("Account not found.");
+  const next: StoredUser = { ...user };
+  if (avatarUrl) next.avatarUrl = avatarUrl;
+  else delete next.avatarUrl;
+  users[i] = next;
+  write(KEY_USERS, users);
+  const nextSession: SessionUser = { ...session };
+  if (avatarUrl) nextSession.avatarUrl = avatarUrl;
+  else delete nextSession.avatarUrl;
+  write(KEY_SESSION, nextSession);
+  return nextSession;
+}

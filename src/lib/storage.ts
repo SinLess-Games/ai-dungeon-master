@@ -44,6 +44,7 @@ export function getCharacter(id: string): Character | undefined {
 }
 
 export function saveCharacter(character: Character) {
+  if (isDeleted("characters", character.id)) return character;
   const all = read<Character[]>(KEY_CHARACTERS, []);
   const next = { ...character, updatedAt: new Date().toISOString() };
   const i = all.findIndex((c) => c.id === character.id);

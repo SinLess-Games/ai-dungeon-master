@@ -634,9 +634,10 @@ export function WorldMapView({
           Party
         </text>
       </g>
+      </g>
 
-      {/* ---------------- compass rose ---------------- */}
-      <g transform="translate(92.5,10)" opacity="0.9">
+      {/* ---------------- compass rose (fixed) ---------------- */}
+      <g transform="translate(92.5,10)" opacity="0.9" pointerEvents="none">
         <circle r="5" fill="#f4ecd6" fillOpacity="0.85" stroke={gold} strokeWidth="0.3" />
         <circle r="3.6" fill="none" stroke={gold} strokeWidth="0.12" opacity="0.7" />
         <path d="M 0 -4.2 L 0.9 0 L 0 4.2 L -0.9 0 Z" fill="#3c3427" />
@@ -645,21 +646,41 @@ export function WorldMapView({
         <text y="-5.4" textAnchor="middle" fontSize="1.7" fill="#3c3427">N</text>
       </g>
 
-      {/* ---------------- title cartouche ---------------- */}
-      <g transform="translate(2.5,2.5)">
-        <rect width="36" height="7.6" rx="0.5" fill="#f6eed8" fillOpacity="0.95" stroke={gold} strokeWidth="0.35" />
-        <rect x="0.7" y="0.7" width="34.6" height="6.2" rx="0.3" fill="none" stroke={gold} strokeWidth="0.13" opacity="0.8" />
-        <text x="18" y="5" textAnchor="middle" fontSize="3.2" fill="#3c3427" letterSpacing="0.5">
-          {world.name}
-        </text>
-      </g>
-
       {/* ---------------- neat map border ---------------- */}
-      <rect x="0.6" y="0.6" width="98.8" height="68.8" fill="none" stroke="#2f4a55" strokeWidth="0.5" opacity="0.7" />
-      <rect x="1.5" y="1.5" width="97" height="67" fill="none" stroke="#f4ecd6" strokeWidth="0.18" opacity="0.35" />
+      <rect x="0.6" y="0.6" width="98.8" height="68.8" fill="none" stroke="#2f4a55" strokeWidth="0.5" opacity="0.7" pointerEvents="none" />
+      <rect x="1.5" y="1.5" width="97" height="67" fill="none" stroke="#f4ecd6" strokeWidth="0.18" opacity="0.35" pointerEvents="none" />
 
       {/* ---------------- paper grain ---------------- */}
       <rect x="0" y="0" width="100" height="70" filter="url(#wm-paper)" opacity="0.4" pointerEvents="none" />
     </svg>
+
+      <div className="pointer-events-auto absolute bottom-2 left-2 flex gap-1">
+        <button
+          type="button"
+          aria-label="Zoom in"
+          onClick={() => zoomAt(50, 35, 1.4)}
+          className="size-7 rounded border border-border bg-background/85 text-sm font-semibold leading-none shadow-sm hover:bg-background"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          aria-label="Zoom out"
+          onClick={() => zoomAt(50, 35, 1 / 1.4)}
+          className="size-7 rounded border border-border bg-background/85 text-sm font-semibold leading-none shadow-sm hover:bg-background"
+        >
+          −
+        </button>
+        <button
+          type="button"
+          aria-label="Reset the view"
+          onClick={() => setView({ z: 1, x: 0, y: 0 })}
+          className="h-7 rounded border border-border bg-background/85 px-2 text-xs shadow-sm hover:bg-background"
+        >
+          Reset
+        </button>
+      </div>
+    </div>
   );
 }
+

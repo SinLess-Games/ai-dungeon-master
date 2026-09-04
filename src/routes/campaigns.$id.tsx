@@ -6,7 +6,7 @@ import {
   lastAssistantMessageIsCompleteWithToolCalls,
   type UIMessage,
 } from "ai";
-import { Dices, Send, Swords, Heart, Coins, Scroll, Sparkles, User, Users } from "lucide-react";
+import { Dices, Send, Swords, Heart, Coins, Scroll, Sparkles, User, Users, Map as MapIcon } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { Markdown } from "@/components/Markdown";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { getCampaign, getCharacter, saveCampaign, saveCharacter, pushRoll } from "@/lib/storage";
+import { getCampaign, getCharacter, getWorld, saveCampaign, saveCharacter, pushRoll } from "@/lib/storage";
+import { ensureCampaignWorld } from "@/lib/campaign-world";
+import { WorldMapView } from "@/components/WorldMapView";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { regionAt } from "@/lib/world";
 import { buildDmContext } from "@/lib/dm-context";
 import { applyDmTool } from "@/lib/dm-tools";
 import { pickOpening } from "@/prompts/dungeon-master/openings";
@@ -52,7 +56,10 @@ function TablePage() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    const g = getCampaign(id);
+    const found = getCampaign(id);
+    // Every campaign owns an overland map. Draw one the first time it is opened
+    // so the DM has real geography and the player can always see where they are.
+    const g = found ? saveCampaign(ensureCampaignWorld(found).campaign) : undefined;
     setCampaign(g ?? null);
     setCharacter(g ? getCharacter(g.characterId) ?? null : null);
     setLoaded(true);
@@ -253,7 +260,8 @@ function Table({
             {campaign.scene.weather}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <WorldMapButton campaign={campaign} />
           {campaign.scene.inCombat ? (
             <Badge className="gap-1">
               <Swords className="size-3" /> Combat · round {campaign.scene.round}
@@ -530,5 +538,52 @@ function Table({
         </div>
       </div>
     </AppShell>
+  );
+}
+
+
+/**
+ * The overland map, openable at any moment during play. The marker is whatever
+ * the DM last set with moveParty.
+ */
+function WorldMapButton({ campaign }: { campaign: Campaign }) {
+  const [open, setOpen] = useState(false);
+  const world = open || campaign.worldId ? getWorld(campaign.worldId ?? "") : undefined;
+  const here = world?.sites.find((s) => s.id === world.party.siteId);
+  const region = world ? regionAt(world, world.party.x, world.party.y) : undefined;
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <MapIcon className="mr-2 size-4" /> World map
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle className="font-display text-2xl">
+            {world?.name ?? "The world"}
+          </DialogTitle>
+        </DialogHeader>
+        {world ? (
+          <div className="space-y-4">
+            <WorldMapView world={world} showUndiscovered={false} className="w-full rounded-lg border" />
+            <p className="text-sm text-muted-foreground">
+              You are at <strong className="text-foreground">{here?.name ?? "open country"}</strong>
+              {region ? ` in ${region.name} (${region.terrain})` : ""}. Places you have not heard of stay off the map.
+            </p>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/worlds/$worldId" params={{ worldId: world.id }}>
+                Open the full atlas
+              </Link>
+            </Button>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            The DM is still drawing this world. Check back after the opening scene.
+          </p>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -22,6 +22,7 @@ import { EXPANSION3_ARTICLES } from "@/lib/wiki/expansions3";
 import { EXPANSION4_ARTICLES } from "@/lib/wiki/expansions4";
 import { EXPANSION5_ARTICLES } from "@/lib/wiki/expansions5";
 import { EXPANSION6_ARTICLES } from "@/lib/wiki/expansions6";
+import { EXPANSION7_ARTICLES } from "@/lib/wiki/expansions7";
 import { LEADERSHIP_ARTICLES } from "@/lib/wiki/leadership";
 import {
   LEADERSHIP_TABLE,
@@ -41,6 +42,7 @@ const ALL_ARTICLES: WikiArticle[] = [
   ...EXPANSION4_ARTICLES,
   ...EXPANSION5_ARTICLES,
   ...EXPANSION6_ARTICLES,
+  ...EXPANSION7_ARTICLES,
   ...LEADERSHIP_ARTICLES,
 ];
 

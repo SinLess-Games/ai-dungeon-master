@@ -32,7 +32,9 @@ const RACE_GROUPS = [
 import { CLASSES, CLASS_GROUPS } from "@/lib/rules/classes";
 import { SKILLS } from "@/lib/rules/skills";
 import { FEATS, FEAT_GROUPS } from "@/lib/rules/feats";
+import { qualifiesFor } from "@/lib/rules/prereq";
 import { SPELLS, POWERS, maxSpellLevel, spellLevelFor } from "@/lib/rules/spells";
+import { formatMovement } from "@/lib/rules/movement";
 import { emptyCharacter, type Character } from "@/lib/rules/character";
 import { computeCharacter, abilityMod, formatMod } from "@/lib/rules/engine";
 import { rollAbilityScores, pointBuyCost, STANDARD_ARRAY, POINT_BUY_BUDGETS, type AbilityRollMethod } from "@/lib/dice";
@@ -90,9 +92,14 @@ function CharacterCreator() {
   const currentClass = CLASSES.find((c) => c.id === char.classes[0]?.classId);
   const currentClassB = char.gestalt ? CLASSES.find((c) => c.id === char.classesB?.[0]?.classId) : undefined;
   const featQuery = featSearch.trim().toLowerCase();
+  const qualifiedFeats = useMemo(
+    () => FEATS.filter((f) => char.featIds.includes(f.id) || qualifiesFor(f, { char, derived })),
+    [char, derived],
+  );
   const visibleFeats = useMemo(
     () =>
-      FEATS.filter((f) => (featGroup === "all" || f.type === featGroup))
+      qualifiedFeats
+        .filter((f) => featGroup === "all" || f.type === featGroup)
         .filter(
           (f) =>
             !featQuery ||
@@ -100,8 +107,9 @@ function CharacterCreator() {
             f.benefit.toLowerCase().includes(featQuery) ||
             (f.prereq ?? "").toLowerCase().includes(featQuery),
         ),
-    [featGroup, featQuery],
+    [qualifiedFeats, featGroup, featQuery],
   );
+
 
   const castingTracks = useMemo(() => {
     const tracks: { cls: NonNullable<typeof currentClass>; levels: number }[] = [];
@@ -699,7 +707,7 @@ function CharacterCreator() {
                   onChange={(e) => setFeatSearch(e.target.value)}
                   placeholder="Search feats by name, prerequisite, or benefit"
                 />
-                <p className="text-xs text-muted-foreground">{visibleFeats.length} feats shown of {FEATS.length}</p>
+                <p className="text-xs text-muted-foreground">{visibleFeats.length} shown · {qualifiedFeats.length} of {FEATS.length} feats you currently qualify for</p>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {visibleFeats.map((f) => {
                     const active = char.featIds.includes(f.id);
@@ -955,7 +963,7 @@ function CharacterCreator() {
               <Stat label="Base attack" value={derived.attacks.map(formatMod).join(" / ")} />
               <Stat label="Melee / Ranged" value={`${formatMod(derived.melee)} / ${formatMod(derived.ranged)}`} />
               <Stat label="Saves" value={`F ${formatMod(derived.saves.fort)} · R ${formatMod(derived.saves.ref)} · W ${formatMod(derived.saves.will)}`} />
-              <Stat label="Speed" value={`${derived.speed} ft.`} />
+              <Stat label="Speed" value={derived.speeds.map(formatMovement).join(" · ")} />
               {char.encumbranceEnabled ? (
                 <Stat label="Load" value={`${derived.load.carried} lb (${derived.load.category})`} />
               ) : null}

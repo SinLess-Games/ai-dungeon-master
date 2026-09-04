@@ -103,54 +103,83 @@ A D&D 3.5 app where an AI runs the adventure, you manage a full rules-accurate c
 - Mass combat mini-system (3.5 War rules adapted): resolve army clashes with morale checks and unit stats, narrated by the DM.
 - Domain/stronghold management: holdings generate income/events and can be upgraded.
 
+## Rules wiki (in-app reference)
+
+- Searchable reference panel available anywhere in the app, and as a slide-out during play so you never leave the table.
+- Covers races, base classes, prestige classes, epic progressions, skills, feats, spells, magic items, equipment, conditions, combat rules, and monsters.
+- Search-as-you-type with filters and category browsing; cross-links between entries (a feat links to its prerequisite feats, a spell links to the classes that get it).
+- Contextual lookup: click any feat/spell/skill/condition on a character sheet or in DM chat to open its wiki entry.
+- House rules appear inline on affected entries, flagged as house-ruled.
+- The AI DM can cite wiki entries in chat, and those citations open the entry.
+
+## House rules
+
+- Per-campaign house rule editor: create, enable/disable, and describe rules.
+- Structured rule types that actually change the app: ability score generation method, HP per level (rolled/average/max), XP multiplier, multiclass XP penalty on/off, flanking and critical variants, encumbrance on/off, prestige class prerequisite enforcement, epic progression tweaks, resting/recovery rate.
+- Free-text rules for anything not structured — these go into the AI DM's system prompt so it plays by your table's rules.
+- House rules apply to the rules engine, character creator validation, and the DM's adjudication.
+
 ## World and campaign model
 
 - A "world" is the top-level container for regions, factions, and history.
-- A "campaign" is a running adventure inside a world with its own party, map state, log, and quest list.
+- A "campaign" is a running adventure inside a world with its own party, map state, log, quest list, invited players, and house rules.
 - Worlds can have multiple campaigns over time.
 
 ## Data and rules
 
-- SRD 3.5 rules data (races, classes including epic progressions, skills, feats, spells, equipment, monsters, items) shipped as typed modules.
-- Pure rules engine computes every derived value deterministically from the stored build.
+- 3.5 rules data (races, base and prestige classes with epic progressions, skills, feats, spells, equipment, magic items, monsters) shipped as typed modules and used by both the rules engine and the wiki.
+- Pure rules engine computes every derived value deterministically from the stored build, with house rules applied as modifiers.
 - Bestiary and item/monster references available to the DM for quick spawns.
 
 ## Technical notes
 
-- Backend on Lovable Cloud: auth plus tables for `profiles`, `characters`, `parties`, `party_members`, `campaigns`, `campaign_messages`, `campaign_state`, `dice_rolls`, `npcs`, `factions`, `army_units`, `worlds`, `crafting_jobs`, and `maps`, all scoped to the owning user with row-level security.
-- AI DM runs through Lovable AI on a streaming server route; system prompt carries 3.5 DM guidance plus current snapshots of character/party/scene/faction/army state. It calls tools to mutate persistent state.
-- Tactical map: HTML canvas with state synced through server functions; no real-time multiplayer needed.
+- Backend on Lovable Cloud: auth plus tables for `profiles`, `worlds`, `characters`, `parties`, `party_members`, `campaigns`, `campaign_players`, `campaign_invites`, `campaign_messages`, `campaign_state`, `house_rules`, `dice_rolls`, `npcs`, `factions`, `army_units`, `crafting_jobs`, and `maps`, with row-level security scoping access to the owner and to accepted campaign members.
+- Multiplayer uses realtime subscriptions on campaign messages, map tokens, initiative, and dice rolls so all seated players stay in sync. Invites are accept-by-code/link with membership rows granting read/write access under RLS.
+- AI DM runs through Lovable AI on a streaming server route; system prompt carries 3.5 DM guidance, active house rules, and current snapshots of characters/party/scene/faction/army state. It calls tools to mutate persistent state.
+- Tactical map: HTML canvas with token state persisted and broadcast in realtime.
+- PDF export is generated client-side from the computed sheet into a paginated 3.5-style layout.
 - Audio: Web Audio API and HTML audio elements with preloaded asset packs.
-- Rules engine and SRD data live in the app as typed modules, not in the database.
+- Rules data lives in the app as typed modules, not in the database, so the wiki and engine read the same source.
 
 ## Routes
 
 - `/` dashboard
 - `/auth`
-- `/characters/new` and `/characters/:id` (creator and sheet)
+- `/characters/new` and `/characters/:id` (creator and sheet, with PDF export)
 - `/parties` and `/parties/:id`
-- `/worlds/:worldId/campaigns/:campaignId` (main play screen: chat + tactical map + dice + sheet panels)
-- `/worlds/:worldId/factions`
-- `/worlds/:worldId/armies`
-- `/worlds/:worldId/npcs`
+- `/join/:inviteCode` (accept an invite)
+- `/worlds/:worldId/campaigns/:campaignId` (main play screen: chat + tactical map + dice + sheet + wiki panels)
+- `/worlds/:worldId/campaigns/:campaignId/settings` (players, invites, house rules)
+- `/worlds/:worldId/factions`, `/armies`, `/npcs`
 - `/crafting`
+- `/wiki` and `/wiki/:category/:slug`
 
 ## Build order
 
 **Phase 1 — Playable core**
-1. Cloud setup, auth, dashboard shell, basic schema.
-2. Rules engine + SRD data (core 1–20).
+1. Cloud setup, auth, dashboard shell, schema.
+2. Rules engine + rules data (base classes, races, skills, feats, spells, 1–20).
 3. Character creator and sheet.
-4. Streaming AI DM chat with simple state tools (HP/XP/loot/journal).
+4. Streaming AI DM chat with state tools (HP/XP/loot/journal).
 5. Dice roller with animation.
 
-**Phase 2 — Tactical and social layers**
-6. Party and NPC management.
-7. 2D tactical grid map with tokens, fog, initiative tracker.
-8. Sound and music.
+**Phase 2 — Reference, export, and table**
+6. Rules wiki with search, browse, and contextual lookup.
+7. PDF character sheet export.
+8. Party and NPC management.
+9. Multiplayer invites, campaign membership, realtime shared session.
 
-**Phase 3 — Advanced systems**
-9. Epic levels and expanded SRD data.
-10. Item crafting.
+**Phase 3 — Tactical and atmosphere**
+10. 2D tactical grid map with tokens, fog, initiative tracker.
+11. Sound and music.
+12. House rule engine wired into creation, rules engine, and DM prompt.
+
+**Phase 4 — Advanced systems**
+13. Prestige classes with prerequisite validation.
+14. Epic Level Handbook progressions (21+), epic feats and epic spellcasting.
+15. Item crafting.
+16. Leadership feat, cohorts, followers.
+17. Factions, armies, mass combat, strongholds.
+
 11. Leadership feat, cohorts, followers.
 12. Factions, armies, mass combat, strongholds.

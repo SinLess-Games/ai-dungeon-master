@@ -15,12 +15,16 @@ test.describe("signed-in play", () => {
     await expect(page.locator("body")).toContainText(/character|hero|new/i);
   });
 
-  test("character builder opens and accepts a name", async ({ page }) => {
+  test("character builder walks through its steps", async ({ page }) => {
     await goto(page, "/characters/new");
-    const name = page.locator('input[type="text"]').first();
-    await expect(name).toBeVisible();
-    await name.fill("E2E Testhero");
-    await expect(name).toHaveValue("E2E Testhero");
+    await expect(page.locator("body")).toContainText(/abilities/i);
+    const next = page.getByRole("button", { name: /next|continue/i }).first();
+    await expect(next).toBeVisible();
+    await next.click();
+    await expect(page.locator("body")).toContainText(/race/i);
+    const back = page.getByRole("button", { name: /back|previous/i }).first();
+    if (await back.count()) await back.click();
+    await expect(page.locator("body")).toContainText(/abilities/i);
   });
 
   test("campaigns page renders", async ({ page }) => {

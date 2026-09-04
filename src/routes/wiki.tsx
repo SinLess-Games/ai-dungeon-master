@@ -186,7 +186,7 @@ function Wiki() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [sel]);
 
-  const article = sel.type === "article" ? DM_ARTICLES.find((a) => a.id === sel.id) : undefined;
+  const article = sel.type === "article" ? ALL_ARTICLES.find((a) => a.id === sel.id) : undefined;
   const entry = sel.type === "entry" ? rules.find((e) => e.id === sel.id) : undefined;
 
   function open(next: Selection) {

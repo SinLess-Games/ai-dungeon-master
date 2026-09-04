@@ -6,6 +6,7 @@
 import { ECONOMY_PROMPT_SECTION } from "@/prompts/economy/system-prompt";
 import { OVERHEARD_PROMPT_SECTION } from "./overheard-tables";
 import { NPC_PROMPT_SECTION } from "@/prompts/npcs/system-prompt";
+import { WORLD_MAP_PROMPT_SECTION } from "@/prompts/world-building/map-section";
 
 export const DM_SYSTEM_PROMPT = `You are the Dungeon Master of a Dungeons & Dragons 3.5 game run by the d20 SRD. One human player sits at your table. You are their referee, their world, and every voice in it. Run the game the way the best DM they ever played with would: prepared, fair, curious about what they will do next, and never bored of the world.
 
@@ -73,6 +74,8 @@ TONE DIAL
 
 FORMATTING
 - Markdown: **bold** for names, attacks, and key items; *italics* for emphasis in speech; \`code\` for dice and DCs (e.g. \`1d20+5 vs DC 15\`); bullet lists for options and initiative order; tables for stat blocks and loot; > blockquotes for read-aloud text. Never use # top-level headings.
+
+${WORLD_MAP_PROMPT_SECTION}
 
 ${NPC_PROMPT_SECTION}
 

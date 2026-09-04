@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_message_reads: {
+        Row: {
+          admin_id: string
+          campaign_id: string
+          created_at: string
+          id: string
+          message_id: string
+        }
+        Insert: {
+          admin_id: string
+          campaign_id: string
+          created_at?: string
+          id?: string
+          message_id: string
+        }
+        Update: {
+          admin_id?: string
+          campaign_id?: string
+          created_at?: string
+          id?: string
+          message_id?: string
+        }
+        Relationships: []
+      }
       campaigns: {
         Row: {
           created_at: string

@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useSession } from "@/hooks/useSession";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useTitleSync } from "@/hooks/useTitleSync";
 import { signOut } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +39,7 @@ const PLAY_SUB = [
   { to: "/characters", label: "Characters", icon: Users },
   { to: "/worlds", label: "Worlds", icon: Globe2 },
   { to: "/dice", label: "Dice", icon: Dices },
+  { to: "/wiki", label: "Wiki", icon: BookOpen },
 ] as const;
 
 const NAV = [{ to: "/", label: "Home", icon: Home }] as const;
@@ -50,6 +52,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { user } = useSession();
   const { isAdmin } = useIsAdmin();
   const location = useLocation();
+  useTitleSync();
   return (
     <div className="dark min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-40 shadow-2xl shadow-black/30">
@@ -154,20 +157,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <span className="mx-1 hidden h-5 w-px bg-border/70 sm:block" />
-
-            <Link
-              to="/wiki"
-              activeOptions={{ exact: false }}
-              activeProps={{
-                className:
-                  "border border-primary/70 bg-primary/15 text-primary shadow-[0_0_18px_-4px_rgba(217,169,77,0.5)]",
-              }}
-              className="flex items-center gap-1.5 rounded-md border border-transparent px-2.5 py-2 text-xs font-medium text-muted-foreground transition-all hover:bg-accent/60 hover:text-foreground sm:gap-2 sm:px-3.5 sm:text-sm"
-            >
-              <BookOpen className="size-4 sm:size-[1.125rem]" />
-              <span className="hidden sm:inline">Wiki</span>
-            </Link>
 
             <span className="mx-1 hidden h-5 w-px bg-border/70 sm:block" />
 

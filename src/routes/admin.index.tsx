@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Activity, Dices, Globe2, Map as MapIcon, MessagesSquare, Sparkles, Swords, UserPlus, Users } from "lucide-react";
+import { Activity, Dices, Globe2, Map as MapIcon, MessagesSquare, Sparkles, Swords, UserPlus, Users, UsersRound } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -25,6 +25,7 @@ import {
 } from "@/components/admin/AdminUi";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdminMetrics } from "@/hooks/useAdminMetrics";
+import { CampaignPlayersTable } from "@/components/admin/CampaignPlayersTable";
 
 export const Route = createFileRoute("/admin/")({
   component: AdminOverview,
@@ -75,7 +76,15 @@ function AdminOverview() {
               value={metrics.totals.messages}
               hint="Player and DM chat messages"
             />
+            <StatCard
+              icon={UsersRound}
+              label="Players in campaigns"
+              value={metrics.totals.players}
+              hint={`${metrics.avgPlayersPerCampaign} active per campaign on average`}
+            />
           </div>
+
+          <CampaignPlayersTable />
 
           <div className="grid gap-4 2xl:grid-cols-2">
             <ChartFrame title="Signups — last 30 days">

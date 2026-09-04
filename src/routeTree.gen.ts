@@ -20,6 +20,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminBillingRouteImport } from './routes/admin.billing'
 import { Route as AdminContentRouteImport } from './routes/admin.content'
 import { Route as AdminFeedbackRouteImport } from './routes/admin.feedback'
+import { Route as AdminInboxRouteImport } from './routes/admin.inbox'
 import { Route as AdminPlayersRouteImport } from './routes/admin.players'
 import { Route as AdminTitlesRouteImport } from './routes/admin.titles'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
@@ -97,6 +98,11 @@ const AdminContentRoute = AdminContentRouteImport.update({
 const AdminFeedbackRoute = AdminFeedbackRouteImport.update({
   id: '/feedback',
   path: '/feedback',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminInboxRoute = AdminInboxRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminPlayersRoute = AdminPlayersRouteImport.update({
@@ -227,6 +233,7 @@ export interface FileRoutesByFullPath {
   '/admin/billing': typeof AdminBillingRoute
   '/admin/content': typeof AdminContentRoute
   '/admin/feedback': typeof AdminFeedbackRoute
+  '/admin/inbox': typeof AdminInboxRoute
   '/admin/players': typeof AdminPlayersRoute
   '/admin/titles': typeof AdminTitlesRoute
   '/api/chat': typeof ApiChatRoute
@@ -262,6 +269,7 @@ export interface FileRoutesByTo {
   '/admin/billing': typeof AdminBillingRoute
   '/admin/content': typeof AdminContentRoute
   '/admin/feedback': typeof AdminFeedbackRoute
+  '/admin/inbox': typeof AdminInboxRoute
   '/admin/players': typeof AdminPlayersRoute
   '/admin/titles': typeof AdminTitlesRoute
   '/api/chat': typeof ApiChatRoute
@@ -299,6 +307,7 @@ export interface FileRoutesById {
   '/admin/billing': typeof AdminBillingRoute
   '/admin/content': typeof AdminContentRoute
   '/admin/feedback': typeof AdminFeedbackRoute
+  '/admin/inbox': typeof AdminInboxRoute
   '/admin/players': typeof AdminPlayersRoute
   '/admin/titles': typeof AdminTitlesRoute
   '/api/chat': typeof ApiChatRoute
@@ -337,6 +346,7 @@ export interface FileRouteTypes {
     | '/admin/billing'
     | '/admin/content'
     | '/admin/feedback'
+    | '/admin/inbox'
     | '/admin/players'
     | '/admin/titles'
     | '/api/chat'
@@ -372,6 +382,7 @@ export interface FileRouteTypes {
     | '/admin/billing'
     | '/admin/content'
     | '/admin/feedback'
+    | '/admin/inbox'
     | '/admin/players'
     | '/admin/titles'
     | '/api/chat'
@@ -408,6 +419,7 @@ export interface FileRouteTypes {
     | '/admin/billing'
     | '/admin/content'
     | '/admin/feedback'
+    | '/admin/inbox'
     | '/admin/players'
     | '/admin/titles'
     | '/api/chat'
@@ -538,6 +550,13 @@ declare module '@tanstack/react-router' {
       path: '/feedback'
       fullPath: '/admin/feedback'
       preLoaderRoute: typeof AdminFeedbackRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/inbox': {
+      id: '/admin/inbox'
+      path: '/inbox'
+      fullPath: '/admin/inbox'
+      preLoaderRoute: typeof AdminInboxRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/players': {
@@ -708,6 +727,7 @@ interface AdminRouteChildren {
   AdminBillingRoute: typeof AdminBillingRoute
   AdminContentRoute: typeof AdminContentRoute
   AdminFeedbackRoute: typeof AdminFeedbackRoute
+  AdminInboxRoute: typeof AdminInboxRoute
   AdminPlayersRoute: typeof AdminPlayersRoute
   AdminTitlesRoute: typeof AdminTitlesRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -721,6 +741,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminBillingRoute: AdminBillingRoute,
   AdminContentRoute: AdminContentRoute,
   AdminFeedbackRoute: AdminFeedbackRoute,
+  AdminInboxRoute: AdminInboxRoute,
   AdminPlayersRoute: AdminPlayersRoute,
   AdminTitlesRoute: AdminTitlesRoute,
   AdminIndexRoute: AdminIndexRoute,

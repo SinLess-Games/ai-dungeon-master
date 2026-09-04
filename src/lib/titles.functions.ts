@@ -11,6 +11,11 @@ export const CRITERIA_KINDS = [
   { value: "worlds_created", label: "Worlds forged" },
   { value: "maps_created", label: "Maps made" },
   { value: "dice_rolled", label: "Dice rolled" },
+  { value: "campaigns_completed", label: "Campaigns completed" },
+  { value: "messages_sent", label: "Messages sent to the DM" },
+  { value: "quests_completed", label: "Quests completed" },
+  { value: "party_members", label: "Largest party gathered" },
+  { value: "sites_discovered", label: "Places discovered" },
   { value: "days_since_joined", label: "Days since joining" },
 ] as const;
 export type CriteriaKind = (typeof CRITERIA_KINDS)[number]["value"];
@@ -258,6 +263,49 @@ export const syncMyTitles = createServerFn({ method: "POST" })
     if (needs.has("worlds_created")) stats["worlds_created"] = await countFor(ctx, "worlds");
     if (needs.has("maps_created")) stats["maps_created"] = await countFor(ctx, "game_maps");
     if (needs.has("dice_rolled")) stats["dice_rolled"] = await countFor(ctx, "dice_rolls");
+    const campaignKinds = [
+      "campaigns_completed",
+      "messages_sent",
+      "quests_completed",
+      "party_members",
+      "sites_discovered",
+    ];
+    if (campaignKinds.some((k) => needs.has(k))) {
+      const { data: camps } = await ctx.supabase
+        .from("campaigns")
+        .select("data")
+        .eq("user_id", ctx.userId);
+      let completed = 0;
+      let messages = 0;
+      let quests = 0;
+      let party = 0;
+      let sites = 0;
+      for (const row of (camps ?? []) as any[]) {
+        const d = (row?.data ?? {}) as any;
+        if (d.completedAt) completed += 1;
+        if (Array.isArray(d.messages)) {
+          messages += d.messages.filter(
+            (m: any) => m?.role === "user" && !m?.metadata?.hidden,
+          ).length;
+        }
+        if (Array.isArray(d.quests)) {
+          quests += d.quests.filter((q: any) => q?.status === "done").length;
+        }
+        if (Array.isArray(d.party)) {
+          party = Math.max(
+            party,
+            d.party.filter((m: any) => (m?.status ?? "active") === "active").length,
+          );
+        }
+        const discovered = d.world?.discovered ?? d.discoveredSites;
+        if (Array.isArray(discovered)) sites += discovered.length;
+      }
+      stats["campaigns_completed"] = completed;
+      stats["messages_sent"] = messages;
+      stats["quests_completed"] = quests;
+      stats["party_members"] = party;
+      stats["sites_discovered"] = sites;
+    }
     if (needs.has("days_since_joined")) {
       const created = (profile as any)?.created_at;
       stats["days_since_joined"] = created

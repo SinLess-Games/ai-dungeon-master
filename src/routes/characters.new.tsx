@@ -607,8 +607,9 @@ function CharacterCreator() {
                     </div>
                     <p className="mt-2 text-xs text-muted-foreground">
                       Skill points each level = class base + Intelligence modifier{char.raceId === "human" ? " + 1 (human)" : ""},
-                      minimum 1 — and quadrupled at 1st level. Gestalt characters gain the skill
-                      points of <em>both</em> class tracks each level.
+                      minimum 1 — and quadrupled at 1st level. Gestalt characters add the base
+                      points of <em>both</em> class tracks together (e.g. Wizard 2 + Psion 2), with
+                      the Intelligence modifier applied once.
                     </p>
                   </div>
                 </details>

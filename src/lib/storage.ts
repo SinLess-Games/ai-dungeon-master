@@ -142,8 +142,12 @@ export function listWorlds(): World[] {
 }
 
 export function getWorld(id: string): World | undefined {
-  return read<World[]>(KEY_WORLDS, []).find((w) => w.id === id);
+  const found = read<World[]>(KEY_WORLDS, []).find((w) => w.id === id);
+  if (!found) return undefined;
+  const { world, changed } = repairWorld(found);
+  return changed ? saveWorld(world) : found;
 }
+
 
 export function saveWorld(world: World) {
   const all = read<World[]>(KEY_WORLDS, []);

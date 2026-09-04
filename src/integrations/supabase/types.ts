@@ -188,6 +188,35 @@ export type Database = {
           },
         ]
       }
+      player_titles: {
+        Row: {
+          awarded_at: string
+          id: string
+          title_id: string
+          user_id: string
+        }
+        Insert: {
+          awarded_at?: string
+          id?: string
+          title_id: string
+          user_id: string
+        }
+        Update: {
+          awarded_at?: string
+          id?: string
+          title_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_titles_title_id_fkey"
+            columns: ["title_id"]
+            isOneToOne: false
+            referencedRelation: "titles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -263,6 +292,48 @@ export type Database = {
           stripe_subscription_id?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      titles: {
+        Row: {
+          created_at: string
+          criteria_kind: string
+          criteria_target: number
+          description: string
+          icon: string | null
+          id: string
+          is_active: boolean
+          name: string
+          rarity: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          criteria_kind?: string
+          criteria_target?: number
+          description?: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          rarity?: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          criteria_kind?: string
+          criteria_target?: number
+          description?: string
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          rarity?: string
+          slug?: string
+          updated_at?: string
         }
         Relationships: []
       }

@@ -19,12 +19,15 @@ import { PLAYER_ARTICLES } from "@/lib/wiki/player-guide";
 import { EXPANSION_ARTICLES } from "@/lib/wiki/expansions";
 import { EXPANSION2_ARTICLES } from "@/lib/wiki/expansions2";
 import { EXPANSION3_ARTICLES } from "@/lib/wiki/expansions3";
+import { EXPANSION4_ARTICLES } from "@/lib/wiki/expansions4";
+import { SOURCE_BOOK_COUNT, SOURCE_WEBSITE_COUNT } from "@/lib/wiki/sources";
 
 const ALL_ARTICLES: WikiArticle[] = [
   ...PLAYER_ARTICLES,
   ...EXPANSION_ARTICLES,
   ...EXPANSION2_ARTICLES,
   ...EXPANSION3_ARTICLES,
+  ...EXPANSION4_ARTICLES,
 ];
 
 export const Route = createFileRoute("/wiki")({
@@ -747,8 +750,9 @@ function HomeView({
     <div>
       <h1 className="font-display text-3xl text-foreground sm:text-4xl">The Codex wiki</h1>
       <p className="mt-2 max-w-2xl text-muted-foreground">
-        {ALL_ARTICLES.length} guide articles and {rulesCount} rules entries — everything the character builder and
-        the AI DM know, in one place.
+        {ALL_ARTICLES.length} guide articles and {rulesCount} rules entries, drawn from {SOURCE_BOOK_COUNT}{" "}
+        sourcebooks and {SOURCE_WEBSITE_COUNT} online reference{SOURCE_WEBSITE_COUNT === 1 ? "" : "s"} — everything
+        the character builder and the AI DM know, in one place.
       </p>
       <div className="rune-rule my-6" />
 

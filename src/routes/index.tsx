@@ -56,9 +56,16 @@ function Home() {
           className="mx-auto w-full max-w-xl rounded-lg border border-border/60 shadow-2xl"
         />
         <p className="mt-8 text-xs uppercase tracking-[0.4em] text-primary">Third Edition · Revised</p>
-        <h1 className="mx-auto mt-4 max-w-3xl font-display text-4xl leading-tight sm:text-6xl">
-          The dungeon master never cancels
-        </h1>
+        <div className="mt-4 flex items-center justify-center gap-3">
+          <img
+            src={logoAsset.url}
+            alt=""
+            className="h-12 w-auto rounded-md border border-border/60 shadow-lg sm:h-16"
+          />
+          <h1 className="max-w-3xl font-display text-4xl leading-tight sm:text-6xl">
+            The dungeon master that never cancels
+          </h1>
+        </div>
         <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
           Roll a rules-accurate 3.5 character, then sit down at a table that is always open. Free
           for solo play with The Endless Codex.

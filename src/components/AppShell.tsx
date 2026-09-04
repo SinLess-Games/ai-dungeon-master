@@ -92,12 +92,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* Navigation row */}
         <div className="border-b border-border/60 bg-card/95 backdrop-blur">
           <nav className="mx-auto flex max-w-7xl items-center gap-1 px-4 py-2 sm:gap-2">
-            {NAV.map(({ to, label, icon: Icon }, i) => (
+            {NAV.map(({ to, label, icon: Icon }) => (
               <Fragment key={to}>
-                {i > 0 && <span className="mx-1 hidden h-5 w-px bg-border/70 sm:block" />}
                 <Link
                   to={to}
-                  activeOptions={{ exact: to === "/" }}
+                  activeOptions={{ exact: true }}
                   activeProps={{
                     className:
                       "border border-primary/70 bg-primary/15 text-primary shadow-[0_0_18px_-4px_rgba(217,169,77,0.5)]",
@@ -147,6 +146,21 @@ export function AppShell({ children }: { children: ReactNode }) {
                 })}
               </DropdownMenuContent>
             </DropdownMenu>
+
+            <span className="mx-1 hidden h-5 w-px bg-border/70 sm:block" />
+
+            <Link
+              to="/wiki"
+              activeOptions={{ exact: false }}
+              activeProps={{
+                className:
+                  "border border-primary/70 bg-primary/15 text-primary shadow-[0_0_18px_-4px_rgba(217,169,77,0.5)]",
+              }}
+              className="flex items-center gap-1.5 rounded-md border border-transparent px-2.5 py-2 text-xs font-medium text-muted-foreground transition-all hover:bg-accent/60 hover:text-foreground sm:gap-2 sm:px-3.5 sm:text-sm"
+            >
+              <BookOpen className="size-4 sm:size-[1.125rem]" />
+              <span className="hidden sm:inline">Wiki</span>
+            </Link>
 
             <span className="mx-1 hidden h-5 w-px bg-border/70 sm:block" />
 

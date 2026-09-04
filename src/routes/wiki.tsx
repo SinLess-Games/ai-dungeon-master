@@ -145,6 +145,7 @@ function buildRulesIndex(): RulesEntry[] {
         sp.duration ? `Duration: ${sp.duration}` : "",
         sp.save ? `Saving Throw: ${sp.save}` : "",
         sp.sr ? `Spell Resistance: ${sp.sr}` : "",
+        sp.mechanics ? `\n${sp.mechanics}` : "",
       ]
         .filter(Boolean)
         .join("\n"),

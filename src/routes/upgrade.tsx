@@ -1,9 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { Users, Save, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { useStripeCheckout } from "@/hooks/useStripeCheckout";
+import { useSession } from "@/hooks/useSession";
+import { useSubscription } from "@/hooks/useSubscription";
+import { getStripeEnvironment } from "@/lib/stripe";
+import { createPortalSession } from "@/utils/payments.functions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+
 
 export const Route = createFileRoute("/upgrade")({
   head: () => ({

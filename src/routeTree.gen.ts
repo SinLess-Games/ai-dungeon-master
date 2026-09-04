@@ -17,6 +17,7 @@ import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as UpgradeRouteImport } from './routes/upgrade'
 import { Route as WikiRouteImport } from './routes/wiki'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminBillingRouteImport } from './routes/admin.billing'
 import { Route as AdminContentRouteImport } from './routes/admin.content'
 import { Route as AdminFeedbackRouteImport } from './routes/admin.feedback'
 import { Route as AdminPlayersRouteImport } from './routes/admin.players'
@@ -72,6 +73,11 @@ const WikiRoute = WikiRouteImport.update({
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminBillingRoute = AdminBillingRouteImport.update({
+  id: '/billing',
+  path: '/billing',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminContentRoute = AdminContentRouteImport.update({
@@ -164,6 +170,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof ProfileRoute
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
+  '/admin/billing': typeof AdminBillingRoute
   '/admin/content': typeof AdminContentRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/players': typeof AdminPlayersRoute
@@ -189,6 +196,7 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileRoute
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
+  '/admin/billing': typeof AdminBillingRoute
   '/admin/content': typeof AdminContentRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/players': typeof AdminPlayersRoute
@@ -216,6 +224,7 @@ export interface FileRoutesById {
   '/profile': typeof ProfileRoute
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
+  '/admin/billing': typeof AdminBillingRoute
   '/admin/content': typeof AdminContentRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/players': typeof AdminPlayersRoute
@@ -244,6 +253,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/upgrade'
     | '/wiki'
+    | '/admin/billing'
     | '/admin/content'
     | '/admin/feedback'
     | '/admin/players'
@@ -269,6 +279,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/upgrade'
     | '/wiki'
+    | '/admin/billing'
     | '/admin/content'
     | '/admin/feedback'
     | '/admin/players'
@@ -295,6 +306,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/upgrade'
     | '/wiki'
+    | '/admin/billing'
     | '/admin/content'
     | '/admin/feedback'
     | '/admin/players'
@@ -393,6 +405,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/billing': {
+      id: '/admin/billing'
+      path: '/billing'
+      fullPath: '/admin/billing'
+      preLoaderRoute: typeof AdminBillingRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/content': {
@@ -511,6 +530,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
+  AdminBillingRoute: typeof AdminBillingRoute
   AdminContentRoute: typeof AdminContentRoute
   AdminFeedbackRoute: typeof AdminFeedbackRoute
   AdminPlayersRoute: typeof AdminPlayersRoute
@@ -518,6 +538,7 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminBillingRoute: AdminBillingRoute,
   AdminContentRoute: AdminContentRoute,
   AdminFeedbackRoute: AdminFeedbackRoute,
   AdminPlayersRoute: AdminPlayersRoute,

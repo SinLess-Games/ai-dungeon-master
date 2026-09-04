@@ -87,7 +87,7 @@ function PostPage() {
       <article className="mx-auto max-w-3xl">
         <Link
           to="/dev-blog"
-          className="mb-6 inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-primary hover:text-primary/80"
+          className="mb-6 flex w-fit items-center gap-2 text-xs uppercase tracking-[0.2em] text-primary hover:text-primary/80"
         >
           <ArrowLeft className="size-3.5" /> Developer Chronicle
         </Link>

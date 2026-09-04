@@ -73,6 +73,7 @@ function CharacterCreator() {
   const [char, setChar] = useState<Character>(() => emptyCharacter(newId()));
   const [pointBuyMode, setPointBuyMode] = useState(true);
   const [raceGroup, setRaceGroup] = useState<(typeof RACE_GROUPS)[number]["key"]>("all");
+  const [activeTrack, setActiveTrack] = useState<"a" | "b">("a");
   const [classGroup, setClassGroup] = useState<(typeof CLASS_GROUPS)[number]["key"]>("all");
   const [pointBudget, setPointBudget] = useState<number>(32);
   const [rollMethod, setRollMethod] = useState<AbilityRollMethod>("4d6-drop-lowest");
@@ -310,7 +311,11 @@ function CharacterCreator() {
                         key={r.id}
                         onClick={() => patch({ raceId: r.id })}
                         className={`rounded-lg border p-4 text-left transition-colors ${
-                          active ? "border-primary bg-primary/10" : "border-border/60 hover:border-primary/50"
+                          active
+                            ? "border-primary bg-primary/10"
+                            : otherId === cl.id && char.gestalt
+                              ? "border-primary/40 bg-primary/5"
+                              : "border-border/60 hover:border-primary/50"
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">
@@ -370,16 +375,70 @@ function CharacterCreator() {
                     min={1}
                     max={40}
                     value={char.classes[0]?.levels ?? 1}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const lv = Math.max(1, Math.min(40, Number(e.target.value) || 1));
                       patch({
-                        classes: [
-                          { classId: char.classes[0]?.classId ?? "fighter", levels: Math.max(1, Math.min(40, Number(e.target.value) || 1)) },
-                        ],
-                      })
-                    }
+                        classes: [{ classId: char.classes[0]?.classId ?? "fighter", levels: lv }],
+                        classesB: char.classesB?.[0] ? [{ classId: char.classesB[0].classId, levels: lv }] : char.classesB,
+                      });
+                    }}
                     className="w-24 font-mono"
                   />
                   <span className="text-sm text-muted-foreground">Levels 21+ use epic progression.</span>
+                </div>
+
+                <div className="rounded-lg border border-border/60 p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="font-display text-lg">Gestalt character</p>
+                      <p className="text-sm text-muted-foreground">
+                        The Unearthed Arcana high-power variant: you advance in two classes at once at
+                        the same character level, keeping the better hit die, base attack bonus, saving
+                        throws, and skill points from each, and every class feature from both.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={!!char.gestalt}
+                      onCheckedChange={(v) => {
+                        setActiveTrack(v ? "b" : "a");
+                        patch({
+                          gestalt: v,
+                          classesB: v
+                            ? char.classesB?.length
+                              ? char.classesB
+                              : [{ classId: "wizard", levels: char.classes[0]?.levels ?? 1 }]
+                            : [],
+                        });
+                      }}
+                    />
+                  </div>
+                  {char.gestalt ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {(["a", "b"] as const).map((t) => {
+                        const id = t === "a" ? char.classes[0]?.classId : char.classesB?.[0]?.classId;
+                        const cl = CLASSES.find((x) => x.id === id);
+                        return (
+                          <button
+                            key={t}
+                            onClick={() => setActiveTrack(t)}
+                            className={`rounded-md border px-3 py-2 text-sm transition-colors ${
+                              activeTrack === t
+                                ? "border-primary bg-primary/10 text-foreground"
+                                : "border-border/60 text-muted-foreground hover:border-primary/50"
+                            }`}
+                          >
+                            Side {t.toUpperCase()}: {cl?.name ?? "choose a class"}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                  {char.gestalt ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Pick the side you want to edit, then choose a class below. Gestalt is a house
+                      rule — check with your DM (or the AI DM) before using it.
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -404,13 +463,23 @@ function CharacterCreator() {
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   {CLASSES.filter((c) => classGroup === "all" || (c.category ?? "core") === classGroup).map((cl) => {
-                    const active = char.classes[0]?.classId === cl.id;
+                    const trackId = activeTrack === "a" ? char.classes[0]?.classId : char.classesB?.[0]?.classId;
+                    const active = trackId === cl.id;
+                    const otherId = activeTrack === "a" ? char.classesB?.[0]?.classId : char.classes[0]?.classId;
                     return (
                       <button
                         key={cl.id}
-                        onClick={() => patch({ classes: [{ classId: cl.id, levels: char.classes[0]?.levels ?? 1 }] })}
+                        onClick={() => {
+                          const lv = char.classes[0]?.levels ?? 1;
+                          if (activeTrack === "a") patch({ classes: [{ classId: cl.id, levels: lv }] });
+                          else patch({ classesB: [{ classId: cl.id, levels: lv }] });
+                        }}
                         className={`rounded-lg border p-4 text-left transition-colors ${
-                          active ? "border-primary bg-primary/10" : "border-border/60 hover:border-primary/50"
+                          active
+                            ? "border-primary bg-primary/10"
+                            : otherId === cl.id && char.gestalt
+                              ? "border-primary/40 bg-primary/5"
+                              : "border-border/60 hover:border-primary/50"
                         }`}
                       >
                         <div className="flex items-center justify-between">

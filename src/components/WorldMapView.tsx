@@ -374,21 +374,12 @@ const LAND_SITES = new Set([
   "city",
   "town",
   "village",
-  "hamlet",
-  "capital",
   "keep",
-  "castle",
-  "fort",
-  "temple",
-  "ruin",
-  "ruins",
-  "dungeon",
-  "tower",
-  "mine",
   "camp",
-  "landmark",
-  "port",
-  "harbor",
+  "ruin",
+  "dungeon",
+  "lair",
+  "wonder",
 ]);
 
 /** Nudge a settlement inland until it sits inside a landmass. */
@@ -577,7 +568,7 @@ export function WorldMapView({
     const map = new Map<string, { x: number; y: number }>();
     for (const s of world.sites) {
       const needsLand = LAND_SITES.has(s.kind);
-      const inland = s.kind === "port" || s.kind === "harbor" ? 0.2 : 1.2;
+      const inland = 1.2;
       map.set(s.id, needsLand ? snapToLand(s, polys, inland) : { x: s.x, y: s.y });
     }
     return map;

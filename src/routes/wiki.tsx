@@ -714,9 +714,6 @@ function HomeView({
       </p>
       <div className="rune-rule my-6" />
 
-      <h2 className="mb-3 flex items-center gap-2 font-display text-xl text-primary">
-        <BookOpen className="size-5" /> Player rules
-      </h2>
       <CategoryCards categories={playerCategories} onOpenArticle={onOpenArticle} />
 
 

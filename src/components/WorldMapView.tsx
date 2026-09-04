@@ -532,25 +532,12 @@ export function WorldMapView({
         const a = siteById.get(route.fromSiteId);
         const b = siteById.get(route.toSiteId);
         if (!a || !b) return null;
-        const rand = rng(hash(route.id));
-        const segs = 6;
-        let d = `M ${a.x} ${a.y}`;
-        for (let i = 1; i <= segs; i++) {
-          const t = i / segs;
-          const px = a.x + (b.x - a.x) * t;
-          const py = a.y + (b.y - a.y) * t;
-          const amp = Math.sin(Math.PI * t) * (route.kind === "river" ? 3 : 1.8);
-          const nx = -(b.y - a.y);
-          const ny = b.x - a.x;
-          const len = Math.hypot(nx, ny) || 1;
-          const off = (rand() - 0.5) * amp;
-          d += ` L ${(px + (nx / len) * off).toFixed(2)} ${(py + (ny / len) * off).toFixed(2)}`;
-        }
+        const d = wanderPath(a, b, route.id, route.kind);
         const water = route.kind === "river" || route.kind === "sea";
         return (
           <g key={route.id}>
             {route.kind === "road" && (
-              <path d={d} fill="none" stroke="#f2e8cd" strokeWidth="0.7" opacity="0.5" strokeLinecap="round" />
+              <path d={d} fill="none" stroke="#f2e8cd" strokeWidth="0.85" opacity="0.55" strokeLinecap="round" />
             )}
             <path
               d={d}
@@ -560,10 +547,12 @@ export function WorldMapView({
               strokeDasharray={route.kind === "trail" ? "0.8 0.9" : route.kind === "sea" ? "1.6 1.1" : undefined}
               opacity={0.85}
               strokeLinecap="round"
+              strokeLinejoin="round"
             />
           </g>
         );
       })}
+
 
       {/* ---------------- region names ---------------- */}
       {world.regions.map((r) => (

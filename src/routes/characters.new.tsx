@@ -86,6 +86,7 @@ function CharacterCreator() {
   const pointsLeft = pointBudget - pointsSpent;
 
   const currentClass = CLASSES.find((c) => c.id === char.classes[0]?.classId);
+  const currentClassB = char.gestalt ? CLASSES.find((c) => c.id === char.classesB?.[0]?.classId) : undefined;
   const spentPoints = derived.skillPointsSpent;
   const remainingPoints = derived.skillPointsTotal - spentPoints;
 
@@ -508,11 +509,28 @@ function CharacterCreator() {
                   })}
                 </div>
 
-                {currentClass ? (
-                  <div className="rounded-lg border border-border/60 p-4">
-                    <p className="font-display text-lg">{currentClass.name} features</p>
+                {[currentClass, currentClassB].filter(Boolean).map((cc) => (
+                  <div key={cc!.id} className="rounded-lg border border-border/60 p-4">
+                    <p className="font-display text-lg">{cc!.name} features</p>
                     <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                      {currentClass.features
+                      {cc!.features
+                        .filter((f) => f.level <= (char.classes[0]?.levels ?? 1))
+                        .map((f) => (
+                          <li key={f.name}>
+                            <span className="text-foreground">
+                              {f.name} (lvl {f.level}):
+                            </span>{" "}
+                            {f.text}
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                ))}
+                {false ? (
+                  <div className="rounded-lg border border-border/60 p-4">
+                    <p className="font-display text-lg">{currentClass!.name} features</p>
+                    <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                      {currentClass!.features
                         .filter((f) => f.level <= (char.classes[0]?.levels ?? 1))
                         .map((f) => (
                           <li key={f.name}>
@@ -840,7 +858,9 @@ function CharacterCreator() {
             <CardHeader className="pb-2">
               <CardTitle className="font-display text-lg">{char.name || "Unnamed Adventurer"}</CardTitle>
               <p className="text-sm text-muted-foreground">
-                {derived.race.name} · {currentClass?.name} {char.classes[0]?.levels ?? 1} · {char.alignment}
+                {derived.race.name} · {currentClass?.name}
+                {currentClassB ? `//${currentClassB.name}` : ""} {char.classes[0]?.levels ?? 1} ·{" "}
+                {char.alignment}
               </p>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">

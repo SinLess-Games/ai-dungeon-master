@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -32,10 +32,12 @@ interface Props {
   /** Omit for the world atlas; pass a site for a local map. */
   site?: WorldSite;
   onPainted?: () => void;
+  /** Paint automatically the first time this map has no picture yet. */
+  auto?: boolean;
 }
 
 /** Paints the map with AI and stores the picture against the world or site. */
-export function PaintMapButton({ world, site, onPainted }: Props) {
+export function PaintMapButton({ world, site, onPainted, auto }: Props) {
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -71,6 +73,14 @@ export function PaintMapButton({ world, site, onPainted }: Props) {
       setPreview(null);
     }
   }
+
+  const tried = useRef(false);
+  useEffect(() => {
+    if (!auto || already || tried.current) return;
+    tried.current = true;
+    void paint();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auto, already]);
 
   return (
     <>

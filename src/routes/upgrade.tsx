@@ -1,9 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { Users, Save, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { useStripeCheckout } from "@/hooks/useStripeCheckout";
+import { useSession } from "@/hooks/useSession";
+import { useSubscription } from "@/hooks/useSubscription";
+import { getStripeEnvironment } from "@/lib/stripe";
+import { createPortalSession } from "@/utils/payments.functions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+
 
 export const Route = createFileRoute("/upgrade")({
   head: () => ({
@@ -35,12 +42,35 @@ const PERKS = [
 
 function UpgradePage() {
   const { openCheckout, closeCheckout, isOpen, checkoutElement } = useStripeCheckout();
+  const { user } = useSession();
+  const { subscription, isActive } = useSubscription();
+  const openPortal = useServerFn(createPortalSession);
 
-  const open = (priceId: string) =>
+  const open = (priceId: string) => {
+    if (!user) {
+      toast.error("Sign in first so your pass is linked to your account.");
+      return;
+    }
     openCheckout({
       priceId,
+      userId: user.id,
+      customerEmail: user.email,
       returnUrl: `${window.location.origin}/checkout/return?session_id={CHECKOUT_SESSION_ID}`,
     });
+  };
+
+  const manageBilling = async () => {
+    try {
+      const result = await openPortal({
+        data: { returnUrl: window.location.href, environment: getStripeEnvironment() },
+      });
+      if ("error" in result) throw new Error(result.error);
+      window.open(result.url, "_blank");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not open billing.");
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -78,7 +108,28 @@ function UpgradePage() {
               </p>
             </div>
 
+            {isActive ? (
+              <Card className="card-etched mx-auto mb-10 max-w-xl border-primary/50">
+                <CardContent className="flex flex-col items-center gap-3 p-6 text-center">
+                  <Badge>Your pass is active</Badge>
+                  <p className="text-sm text-muted-foreground">
+                    {subscription?.cancel_at_period_end
+                      ? "Your pass ends on "
+                      : "Your pass renews on "}
+                    {subscription?.current_period_end
+                      ? new Date(subscription.current_period_end).toLocaleDateString()
+                      : "your next billing date"}
+                    .
+                  </p>
+                  <Button variant="outline" onClick={manageBilling}>
+                    Manage billing
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : null}
+
             <h2 className="mb-8 text-center font-display text-2xl text-foreground">Choose your plan</h2>
+
             <div className="grid gap-6 md:grid-cols-2">
               <Card className="card-etched">
                 <CardHeader>

@@ -30,7 +30,7 @@
 
 ## Phase 4 — Multiplayer & monetization
 - [ ] Invites, membership, realtime sessions
-- [ ] Subscription paywall for multiplayer
+- [x] Subscription paywall for multiplayer (Stripe checkout, subscriptions table, webhook, billing portal, admin subscriptions view)
 - [ ] Gift codes + admin console
 
 ## Phase 5 — Advanced systems

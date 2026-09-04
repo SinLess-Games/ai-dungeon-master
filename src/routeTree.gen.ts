@@ -17,6 +17,7 @@ import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as UpgradeRouteImport } from './routes/upgrade'
 import { Route as WikiRouteImport } from './routes/wiki'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminBillingRouteImport } from './routes/admin.billing'
 import { Route as AdminContentRouteImport } from './routes/admin.content'
 import { Route as AdminFeedbackRouteImport } from './routes/admin.feedback'
 import { Route as AdminPlayersRouteImport } from './routes/admin.players'
@@ -32,6 +33,7 @@ import { Route as MapsMapIdRouteImport } from './routes/maps.$mapId'
 import { Route as PartyCampaignIdRouteImport } from './routes/party.$campaignId'
 import { Route as WorldsIndexRouteImport } from './routes/worlds.index'
 import { Route as WorldsWorldIdRouteImport } from './routes/worlds.$worldId'
+import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -71,6 +73,11 @@ const WikiRoute = WikiRouteImport.update({
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminBillingRoute = AdminBillingRouteImport.update({
+  id: '/billing',
+  path: '/billing',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminContentRoute = AdminContentRouteImport.update({
@@ -148,6 +155,12 @@ const WorldsWorldIdRoute = WorldsWorldIdRouteImport.update({
   path: '/worlds/$worldId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicPaymentsWebhookRoute =
+  ApiPublicPaymentsWebhookRouteImport.update({
+    id: '/api/public/payments/webhook',
+    path: '/api/public/payments/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -157,6 +170,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof ProfileRoute
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
+  '/admin/billing': typeof AdminBillingRoute
   '/admin/content': typeof AdminContentRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/players': typeof AdminPlayersRoute
@@ -173,6 +187,7 @@ export interface FileRoutesByFullPath {
   '/campaigns/': typeof CampaignsIndexRoute
   '/characters/': typeof CharactersIndexRoute
   '/worlds/': typeof WorldsIndexRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -181,6 +196,7 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileRoute
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
+  '/admin/billing': typeof AdminBillingRoute
   '/admin/content': typeof AdminContentRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/players': typeof AdminPlayersRoute
@@ -197,6 +213,7 @@ export interface FileRoutesByTo {
   '/campaigns': typeof CampaignsIndexRoute
   '/characters': typeof CharactersIndexRoute
   '/worlds': typeof WorldsIndexRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -207,6 +224,7 @@ export interface FileRoutesById {
   '/profile': typeof ProfileRoute
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
+  '/admin/billing': typeof AdminBillingRoute
   '/admin/content': typeof AdminContentRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/players': typeof AdminPlayersRoute
@@ -223,6 +241,7 @@ export interface FileRoutesById {
   '/campaigns/': typeof CampaignsIndexRoute
   '/characters/': typeof CharactersIndexRoute
   '/worlds/': typeof WorldsIndexRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -234,6 +253,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/upgrade'
     | '/wiki'
+    | '/admin/billing'
     | '/admin/content'
     | '/admin/feedback'
     | '/admin/players'
@@ -250,6 +270,7 @@ export interface FileRouteTypes {
     | '/campaigns/'
     | '/characters/'
     | '/worlds/'
+    | '/api/public/payments/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -258,6 +279,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/upgrade'
     | '/wiki'
+    | '/admin/billing'
     | '/admin/content'
     | '/admin/feedback'
     | '/admin/players'
@@ -274,6 +296,7 @@ export interface FileRouteTypes {
     | '/campaigns'
     | '/characters'
     | '/worlds'
+    | '/api/public/payments/webhook'
   id:
     | '__root__'
     | '/'
@@ -283,6 +306,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/upgrade'
     | '/wiki'
+    | '/admin/billing'
     | '/admin/content'
     | '/admin/feedback'
     | '/admin/players'
@@ -299,6 +323,7 @@ export interface FileRouteTypes {
     | '/campaigns/'
     | '/characters/'
     | '/worlds/'
+    | '/api/public/payments/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -321,6 +346,7 @@ export interface RootRouteChildren {
   CampaignsIndexRoute: typeof CampaignsIndexRoute
   CharactersIndexRoute: typeof CharactersIndexRoute
   WorldsIndexRoute: typeof WorldsIndexRoute
+  ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -379,6 +405,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/billing': {
+      id: '/admin/billing'
+      path: '/billing'
+      fullPath: '/admin/billing'
+      preLoaderRoute: typeof AdminBillingRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/content': {
@@ -486,10 +519,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorldsWorldIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/payments/webhook': {
+      id: '/api/public/payments/webhook'
+      path: '/api/public/payments/webhook'
+      fullPath: '/api/public/payments/webhook'
+      preLoaderRoute: typeof ApiPublicPaymentsWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 interface AdminRouteChildren {
+  AdminBillingRoute: typeof AdminBillingRoute
   AdminContentRoute: typeof AdminContentRoute
   AdminFeedbackRoute: typeof AdminFeedbackRoute
   AdminPlayersRoute: typeof AdminPlayersRoute
@@ -497,6 +538,7 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminBillingRoute: AdminBillingRoute,
   AdminContentRoute: AdminContentRoute,
   AdminFeedbackRoute: AdminFeedbackRoute,
   AdminPlayersRoute: AdminPlayersRoute,
@@ -525,6 +567,7 @@ const rootRouteChildren: RootRouteChildren = {
   CampaignsIndexRoute: CampaignsIndexRoute,
   CharactersIndexRoute: CharactersIndexRoute,
   WorldsIndexRoute: WorldsIndexRoute,
+  ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

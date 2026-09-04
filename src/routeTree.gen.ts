@@ -20,6 +20,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminContentRouteImport } from './routes/admin.content'
 import { Route as AdminPlayersRouteImport } from './routes/admin.players'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
+import { Route as ApiGenerateMapRouteImport } from './routes/api/generate-map'
 import { Route as CampaignsIndexRouteImport } from './routes/campaigns.index'
 import { Route as CampaignsIdRouteImport } from './routes/campaigns.$id'
 import { Route as CharactersIndexRouteImport } from './routes/characters.index'
@@ -86,6 +87,11 @@ const ApiChatRoute = ApiChatRouteImport.update({
   path: '/api/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGenerateMapRoute = ApiGenerateMapRouteImport.update({
+  id: '/api/generate-map',
+  path: '/api/generate-map',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CampaignsIndexRoute = CampaignsIndexRouteImport.update({
   id: '/campaigns/',
   path: '/campaigns/',
@@ -148,6 +154,7 @@ export interface FileRoutesByFullPath {
   '/admin/content': typeof AdminContentRoute
   '/admin/players': typeof AdminPlayersRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/generate-map': typeof ApiGenerateMapRoute
   '/campaigns/$id': typeof CampaignsIdRoute
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
@@ -170,6 +177,7 @@ export interface FileRoutesByTo {
   '/admin/content': typeof AdminContentRoute
   '/admin/players': typeof AdminPlayersRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/generate-map': typeof ApiGenerateMapRoute
   '/campaigns/$id': typeof CampaignsIdRoute
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
@@ -194,6 +202,7 @@ export interface FileRoutesById {
   '/admin/content': typeof AdminContentRoute
   '/admin/players': typeof AdminPlayersRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/generate-map': typeof ApiGenerateMapRoute
   '/campaigns/$id': typeof CampaignsIdRoute
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
@@ -219,6 +228,7 @@ export interface FileRouteTypes {
     | '/admin/content'
     | '/admin/players'
     | '/api/chat'
+    | '/api/generate-map'
     | '/campaigns/$id'
     | '/characters/$id'
     | '/characters/new'
@@ -241,6 +251,7 @@ export interface FileRouteTypes {
     | '/admin/content'
     | '/admin/players'
     | '/api/chat'
+    | '/api/generate-map'
     | '/campaigns/$id'
     | '/characters/$id'
     | '/characters/new'
@@ -264,6 +275,7 @@ export interface FileRouteTypes {
     | '/admin/content'
     | '/admin/players'
     | '/api/chat'
+    | '/api/generate-map'
     | '/campaigns/$id'
     | '/characters/$id'
     | '/characters/new'
@@ -286,6 +298,7 @@ export interface RootRouteChildren {
   UpgradeRoute: typeof UpgradeRoute
   WikiRoute: typeof WikiRoute
   ApiChatRoute: typeof ApiChatRoute
+  ApiGenerateMapRoute: typeof ApiGenerateMapRoute
   CampaignsIdRoute: typeof CampaignsIdRoute
   CharactersIdRoute: typeof CharactersIdRoute
   CharactersNewRoute: typeof CharactersNewRoute
@@ -375,6 +388,13 @@ declare module '@tanstack/react-router' {
       path: '/api/chat'
       fullPath: '/api/chat'
       preLoaderRoute: typeof ApiChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/generate-map': {
+      id: '/api/generate-map'
+      path: '/api/generate-map'
+      fullPath: '/api/generate-map'
+      preLoaderRoute: typeof ApiGenerateMapRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/campaigns/': {
@@ -473,6 +493,7 @@ const rootRouteChildren: RootRouteChildren = {
   UpgradeRoute: UpgradeRoute,
   WikiRoute: WikiRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiGenerateMapRoute: ApiGenerateMapRoute,
   CampaignsIdRoute: CampaignsIdRoute,
   CharactersIdRoute: CharactersIdRoute,
   CharactersNewRoute: CharactersNewRoute,

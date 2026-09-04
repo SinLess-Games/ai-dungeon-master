@@ -152,7 +152,7 @@ export function shapeWorld(world: World, input: ShapeWorldInput): { world: World
         id: newId(),
         name: r.name.trim(),
         terrain: terrain ?? "plains",
-        description: r.description ?? undefined,
+        ...(r.description ? { description: r.description } : {}),
         ...rect,
       });
     }
@@ -196,8 +196,8 @@ export function shapeWorld(world: World, input: ShapeWorldInput): { world: World
         kind,
         x,
         y,
-        regionId: region?.id,
-        description: s.description ?? undefined,
+        ...(region ? { regionId: region.id } : {}),
+        ...(s.description ? { description: s.description } : {}),
         discovered: s.discovered ?? false,
       });
     }

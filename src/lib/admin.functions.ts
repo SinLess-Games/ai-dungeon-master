@@ -334,6 +334,15 @@ export const getCampaignPlayers = createServerFn({ method: "GET" })
 
 /* --------------------------------------------- campaign dashboard */
 
+function textOf(parts: unknown): string {
+  if (!Array.isArray(parts)) return "";
+  return parts
+    .filter((p: any) => p?.type === "text" && typeof p.text === "string")
+    .map((p: any) => p.text as string)
+    .join("\n")
+    .trim();
+}
+
 export interface CampaignPlayerRow {
   key: string;
   name: string;

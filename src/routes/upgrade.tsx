@@ -42,12 +42,35 @@ const PERKS = [
 
 function UpgradePage() {
   const { openCheckout, closeCheckout, isOpen, checkoutElement } = useStripeCheckout();
+  const { user } = useSession();
+  const { subscription, isActive } = useSubscription();
+  const openPortal = useServerFn(createPortalSession);
 
-  const open = (priceId: string) =>
+  const open = (priceId: string) => {
+    if (!user) {
+      toast.error("Sign in first so your pass is linked to your account.");
+      return;
+    }
     openCheckout({
       priceId,
+      userId: user.id,
+      customerEmail: user.email,
       returnUrl: `${window.location.origin}/checkout/return?session_id={CHECKOUT_SESSION_ID}`,
     });
+  };
+
+  const manageBilling = async () => {
+    try {
+      const result = await openPortal({
+        data: { returnUrl: window.location.href, environment: getStripeEnvironment() },
+      });
+      if ("error" in result) throw new Error(result.error);
+      window.open(result.url, "_blank");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not open billing.");
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-background">

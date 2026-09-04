@@ -74,7 +74,7 @@ function listUsers(): StoredUser[] {
 }
 
 function publicUser(u: StoredUser): SessionUser {
-  return { id: u.id, email: u.email, displayName: u.displayName };
+  return { id: u.id, email: u.email, displayName: u.displayName, avatarUrl: u.avatarUrl };
 }
 
 export function getSession(): SessionUser | null {

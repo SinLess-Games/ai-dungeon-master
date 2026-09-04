@@ -251,14 +251,6 @@ export interface AdminInbox {
   messages: InboxMessage[];
 }
 
-function textOf(parts: unknown): string {
-  if (!Array.isArray(parts)) return "";
-  return parts
-    .filter((p: any) => p?.type === "text" && typeof p.text === "string")
-    .map((p: any) => p.text as string)
-    .join("\n")
-    .trim();
-}
 
 export const getAdminInbox = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Award, BarChart3, CreditCard, LayoutDashboard, Inbox, MessageSquareWarning, Newspaper, Users } from "lucide-react";
+import { Award, BarChart3, CreditCard, LayoutDashboard, MessageSquareWarning, Newspaper, Users } from "lucide-react";
 
 const ITEMS = [
   { to: "/admin", label: "Overview", icon: LayoutDashboard },

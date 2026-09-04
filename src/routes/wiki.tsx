@@ -9,6 +9,8 @@ import { SKILLS } from "@/lib/rules/skills";
 import { FEATS } from "@/lib/rules/feats";
 import { RACES } from "@/lib/rules/races";
 import { CLASSES } from "@/lib/rules/classes";
+import { CLASS_DETAILS } from "@/lib/wiki/class-details";
+import { babForClass, saveForClass } from "@/lib/rules/engine";
 import { WEAPONS, ARMORS, SHIELDS, GEAR } from "@/lib/rules/equipment";
 import { ABILITY_NAMES } from "@/lib/rules/types";
 import { DM_ARTICLES, type WikiArticle } from "@/lib/wiki/dm-guide";

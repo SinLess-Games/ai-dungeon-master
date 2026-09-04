@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Heart, Shield, Swords, Backpack, ScrollText } from "lucide-react";
+import { Heart, Shield, Swords, Backpack, ScrollText, FileDown } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,8 @@ import { ABILITIES, ABILITY_NAMES } from "@/lib/rules/types";
 import { CLASS_BY_ID } from "@/lib/rules/classes";
 import { FEAT_BY_ID } from "@/lib/rules/feats";
 import { WEAPONS, ARMORS, SHIELDS } from "@/lib/rules/equipment";
+import { LootManager } from "@/components/LootManager";
+import { exportCharacterPdf } from "@/lib/pdf-sheet";
 import type { Character } from "@/lib/rules/character";
 
 export const Route = createFileRoute("/characters/$id")({
@@ -81,9 +83,14 @@ function Sheet() {
         title={char.name || "Unnamed Adventurer"}
         subtitle={`${derived.race.name} · ${char.classes.map((c) => `${CLASS_BY_ID[c.classId]?.name ?? c.classId} ${c.levels}`).join(" / ")}${derived.gestalt ? ` // ${(char.classesB ?? []).map((c) => `${CLASS_BY_ID[c.classId]?.name ?? c.classId} ${c.levels}`).join(" / ")} (gestalt)` : ""} · ${char.alignment}${char.deity ? ` · ${char.deity}` : ""}${derived.ecl !== derived.level ? ` · ECL ${derived.ecl}${derived.racialHd ? ` (${derived.racialHd} racial HD` : " ("}${derived.levelAdjustment ? `${derived.racialHd ? ", " : ""}LA +${derived.levelAdjustment}` : ""})` : ""}`}
         action={
-          <Button variant="outline" asChild>
-            <Link to="/characters">All characters</Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => exportCharacterPdf(char, derived)}>
+              <FileDown className="mr-2 size-4" /> Export PDF
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to="/characters">All characters</Link>
+            </Button>
+          </div>
         }
       />
 
@@ -260,31 +267,8 @@ function Sheet() {
                 </CardContent>
               </Card>
 
-              {(["person", "stored", "party"] as const).map((loc) => (
-                <Card key={loc} className="card-etched bg-card/70">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base capitalize">
-                      {loc === "person" ? "On person" : loc === "stored" ? "Stored loot" : "Party loot"}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 text-sm">
-                    {char.inventory.filter((i) => i.location === loc).length === 0 ? (
-                      <p className="text-muted-foreground">Nothing here yet.</p>
-                    ) : (
-                      char.inventory
-                        .filter((i) => i.location === loc)
-                        .map((i) => (
-                          <div key={i.id} className="flex justify-between rounded border border-border/40 px-2 py-1">
-                            <span>
-                              {i.name} ×{i.quantity}
-                            </span>
-                            <span className="font-mono text-muted-foreground">{i.weight * i.quantity} lb</span>
-                          </div>
-                        ))
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+              <LootManager character={char} onChange={(next) => update(next)} />
+
             </TabsContent>
 
             <TabsContent value="log" className="mt-4">

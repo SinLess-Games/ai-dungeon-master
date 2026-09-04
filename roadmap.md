@@ -16,8 +16,8 @@
 
 ## Phase 2 — Reference, loot, export
 - [x] Rules wiki with search + filters
-- [~] Loot tracking (on-person / stored / party) — display done, editing next
-- [ ] PDF character sheet export
+- [x] Loot tracking (on-person / stored / party) — editable pools, split/assign, item history
+- [x] PDF character sheet export
 - [ ] Party + NPC companions (DM-run or player-run)
 
 ## Phase 3 — Maps & atmosphere

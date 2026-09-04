@@ -129,9 +129,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
               {user ? (
                 <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/50 bg-primary/10 text-xs font-display text-primary shadow-md sm:h-9 sm:w-9">
+                  <Link
+                    to="/profile"
+                    aria-label="Your profile"
+                    className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/50 bg-primary/10 text-xs font-display text-primary shadow-md transition-colors hover:bg-primary/25 sm:h-9 sm:w-9"
+                  >
                     {user.displayName?.slice(0, 1).toUpperCase() ?? "U"}
-                  </div>
+                  </Link>
                   <div className="flex flex-col items-start leading-none">
                     <span className="hidden max-w-[8rem] truncate text-xs text-foreground sm:inline">
                       {user.displayName}

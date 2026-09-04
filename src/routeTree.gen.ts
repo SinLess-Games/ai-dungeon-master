@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DiceRouteImport } from './routes/dice'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as UpgradeRouteImport } from './routes/upgrade'
 import { Route as WikiRouteImport } from './routes/wiki'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
@@ -35,6 +36,11 @@ const AuthRoute = AuthRouteImport.update({
 const DiceRoute = DiceRouteImport.update({
   id: '/dice',
   path: '/dice',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UpgradeRoute = UpgradeRouteImport.update({
@@ -87,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/dice': typeof DiceRoute
+  '/profile': typeof ProfileRoute
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
   '/api/chat': typeof ApiChatRoute
@@ -101,6 +108,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/dice': typeof DiceRoute
+  '/profile': typeof ProfileRoute
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
   '/api/chat': typeof ApiChatRoute
@@ -116,6 +124,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/dice': typeof DiceRoute
+  '/profile': typeof ProfileRoute
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
   '/api/chat': typeof ApiChatRoute
@@ -132,6 +141,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/dice'
+    | '/profile'
     | '/upgrade'
     | '/wiki'
     | '/api/chat'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/dice'
+    | '/profile'
     | '/upgrade'
     | '/wiki'
     | '/api/chat'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/dice'
+    | '/profile'
     | '/upgrade'
     | '/wiki'
     | '/api/chat'
@@ -175,6 +187,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   DiceRoute: typeof DiceRoute
+  ProfileRoute: typeof ProfileRoute
   UpgradeRoute: typeof UpgradeRoute
   WikiRoute: typeof WikiRoute
   ApiChatRoute: typeof ApiChatRoute
@@ -207,6 +220,13 @@ declare module '@tanstack/react-router' {
       path: '/dice'
       fullPath: '/dice'
       preLoaderRoute: typeof DiceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/upgrade': {
@@ -279,6 +299,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   DiceRoute: DiceRoute,
+  ProfileRoute: ProfileRoute,
   UpgradeRoute: UpgradeRoute,
   WikiRoute: WikiRoute,
   ApiChatRoute: ApiChatRoute,

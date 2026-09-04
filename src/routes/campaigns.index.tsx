@@ -269,6 +269,14 @@ function CampaignsPage() {
                 <Badge variant="secondary">{c.type}</Badge>
                 <Badge variant="outline">{c.pace}</Badge>
                 {c.scene.inCombat ? <Badge>in combat</Badge> : null}
+                <Badge variant="outline" className="border-primary/40 text-primary">
+                  {countActivePlayers(c)} {countActivePlayers(c) === 1 ? "player" : "players"}
+                </Badge>
+                {c.completedAt ? (
+                  <Badge variant="outline" className="border-emerald-500/50 text-emerald-300">
+                    completed
+                  </Badge>
+                ) : null}
               </CardContent>
             </Card>
           );

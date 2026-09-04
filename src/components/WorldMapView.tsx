@@ -402,6 +402,8 @@ export interface WorldMapViewProps {
   onMapClick?: (x: number, y: number) => void;
   showUndiscovered?: boolean;
   className?: string;
+  /** AI-painted backdrop; when present the drawn terrain is replaced by it. */
+  artUrl?: string;
 }
 
 /** Illustrated overland atlas map. Coordinates are normalised 0-100. */
@@ -412,6 +414,7 @@ export function WorldMapView({
   onMapClick,
   showUndiscovered = true,
   className,
+  artUrl,
 }: WorldMapViewProps) {
   const ref = useRef<SVGSVGElement | null>(null);
   const gold = "#9c7c34";

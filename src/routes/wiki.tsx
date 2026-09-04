@@ -12,6 +12,7 @@ import { CLASSES } from "@/lib/rules/classes";
 import { CLASS_DETAILS } from "@/lib/wiki/class-details";
 import { babForClass, saveForClass } from "@/lib/rules/engine";
 import { WEAPONS, ARMORS, SHIELDS, GEAR } from "@/lib/rules/equipment";
+import { COMPENDIUM_SPELLS } from "@/lib/rules/spell-compendium";
 import { ABILITY_NAMES } from "@/lib/rules/types";
 import type { WikiArticle } from "@/lib/wiki/dm-guide";
 import { PLAYER_ARTICLES } from "@/lib/wiki/player-guide";
@@ -126,6 +127,30 @@ function buildRulesIndex(): RulesEntry[] {
       ],
     });
   }
+  for (const sp of COMPENDIUM_SPELLS) {
+    const schoolLine = [sp.school, sp.subschool ? `(${sp.subschool})` : "", sp.descriptors ? `[${sp.descriptors}]` : ""]
+      .filter(Boolean)
+      .join(" ");
+    out.push({
+      id: `spell-${sp.id}`,
+      name: sp.name,
+      kind: "Spells",
+      text: [
+        schoolLine ? `School: ${schoolLine}` : "",
+        sp.level ? `Level: ${sp.level}` : "",
+        sp.components ? `Components: ${sp.components}` : "",
+        sp.castingTime ? `Casting Time: ${sp.castingTime}` : "",
+        sp.range ? `Range: ${sp.range}` : "",
+        sp.target ? `Target/Area/Effect: ${sp.target}` : "",
+        sp.duration ? `Duration: ${sp.duration}` : "",
+        sp.save ? `Saving Throw: ${sp.save}` : "",
+        sp.sr ? `Spell Resistance: ${sp.sr}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      tags: [sp.school, ...(sp.descriptors ? [sp.descriptors] : []), ...(sp.level ? [sp.level] : [])].filter(Boolean),
+    });
+  }
   for (const g of GEAR) {
     out.push({
       id: `gear-${g.id}`,
@@ -138,7 +163,7 @@ function buildRulesIndex(): RulesEntry[] {
   return out;
 }
 
-const RULES_KINDS = ["Races", "Classes", "Skills", "Feats", "Weapons", "Armor", "Shields", "Gear"];
+const RULES_KINDS = ["Races", "Classes", "Skills", "Feats", "Spells", "Weapons", "Armor", "Shields", "Gear"];
 
 /* ------------------------------------------------------------ component --- */
 
@@ -550,7 +575,11 @@ function EntryView({ entry, onBack }: { entry: RulesEntry; onBack: () => void })
         ))}
       </div>
       <div className="rune-rule my-6" />
-      <p className="text-[0.95rem] leading-relaxed text-foreground/90">{entry.text}</p>
+      <div className="space-y-1 text-[0.95rem] leading-relaxed text-foreground/90">
+        {entry.text.split("\n").map((line) => (
+          <p key={line}>{line}</p>
+        ))}
+      </div>
       <button onClick={onBack} className="mt-8 text-sm text-primary underline-offset-2 hover:underline">
         ← Back to all {entry.kind.toLowerCase()}
       </button>

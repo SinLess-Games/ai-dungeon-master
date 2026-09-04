@@ -27,6 +27,7 @@ const RACE_GROUPS = [
   { key: "savage", label: "Savage" },
   { key: "monstrous", label: "Monstrous" },
   { key: "powerful", label: "Powerful (high LA)" },
+  { key: "epic", label: "Epic (LA +8 and up)" },
 ] as const;
 import { CLASSES } from "@/lib/rules/classes";
 import { SKILLS } from "@/lib/rules/skills";

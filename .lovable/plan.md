@@ -122,8 +122,31 @@ A D&D 3.5 app where an AI runs the adventure, you manage a full rules-accurate c
 ## World and campaign model
 
 - A "world" is the top-level container for regions, factions, and history.
-- A "campaign" is a running adventure inside a world with its own party, map state, log, quest list, invited players, and house rules.
+- A "campaign" is a running adventure inside a world with its own party, map state, log, quest list, invited players, house rules, and campaign settings.
 - Worlds can have multiple campaigns over time.
+
+## Campaign creation
+
+When you start a new campaign, a setup wizard lets you pick:
+
+- **Style:** heroic, gritty/dark, high magic, low magic, horror, intrigue/political, military, exploration, dungeon crawl, sandbox, or a custom blend.
+- **Type/structure:** story arc, episodic quests, open sandbox, hexcrawl, megadungeon, war campaign, city campaign.
+- **Length:** one-shot, short (3–5 sessions), standard arc, long-running, endless open world.
+- **Pace:** narrative-fast, balanced, tactical-slow (more combat grid time), montage travel vs. hour-by-hour detail.
+- **Level range:** starting level, target end level, epic continuation on/off.
+- **Tone and content dials:** violence, romance, humor, darkness sliders.
+- **DM style:** how chatty the DM is, how much it describes vs. asks, how strict it rules.
+- **House rules:** applied at creation from the house rule set you choose.
+- **Starting setup:** generated opening scene, starting region, and starting hook — or bring your own premise.
+- All settings are editable mid-campaign, and every choice feeds the AI DM's prompt and the app's XP/combat pacing.
+
+## World creation
+
+- World builder: name, themes, geography (regions, terrains, cities), history/eras, pantheon, and notable figures.
+- AI-assisted generation: describe the world in a sentence and the AI drafts regions, factions, and history you can edit; or build everything manually.
+- Regions and locations get tokens on a world overview map; clicking a region opens its notes, NPCs, and factions.
+- Worlds persist and can host new campaigns later — an old campaign's history carries into the next one.
+- Start from a blank world or a prebuilt starter world.
 
 ## Data and rules
 
@@ -148,8 +171,10 @@ A D&D 3.5 app where an AI runs the adventure, you manage a full rules-accurate c
 - `/characters/new` and `/characters/:id` (creator and sheet, with PDF export)
 - `/parties` and `/parties/:id`
 - `/join/:inviteCode` (accept an invite)
+- `/worlds/new` (world builder)
+- `/worlds/:worldId/campaigns/new` (campaign setup wizard)
 - `/worlds/:worldId/campaigns/:campaignId` (main play screen: chat + tactical map + dice + sheet + wiki panels)
-- `/worlds/:worldId/campaigns/:campaignId/settings` (players, invites, house rules)
+- `/worlds/:worldId/campaigns/:campaignId/settings` (players, invites, campaign settings, house rules)
 - `/worlds/:worldId/factions`, `/armies`, `/npcs`
 - `/crafting`
 - `/wiki` and `/wiki/:category/:slug`
@@ -160,7 +185,7 @@ A D&D 3.5 app where an AI runs the adventure, you manage a full rules-accurate c
 1. Cloud setup, auth, dashboard shell, schema.
 2. Rules engine + rules data (base classes, races, skills, feats, spells, 1–20).
 3. Character creator and sheet.
-4. Streaming AI DM chat with state tools (HP/XP/loot/journal).
+4. Streaming AI DM chat with state tools (HP/XP/loot/journal), plus world and campaign creation wizards feeding its prompt.
 5. Dice roller with animation.
 
 **Phase 2 — Reference, export, and table**

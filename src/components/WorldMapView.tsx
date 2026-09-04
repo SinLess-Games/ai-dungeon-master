@@ -854,8 +854,10 @@ export function WorldMapView({
 
       {/* ---------------- party ---------------- */}
       <g>
-        <circle cx={world.party.x} cy={world.party.y} r="1.4" fill="#a72b27" stroke="#f7f0dc" strokeWidth="0.35" />
-        <circle cx={world.party.x} cy={world.party.y} r="2.7" fill="none" stroke="#a72b27" strokeWidth="0.2" opacity="0.55" />
+        <g transform={`translate(${world.party.x} ${world.party.y}) scale(${1 / view.z})`}>
+          <circle r="1.4" fill="#a72b27" stroke="#f7f0dc" strokeWidth="0.35" />
+          <circle r="2.7" fill="none" stroke="#a72b27" strokeWidth="0.2" opacity="0.55" />
+        </g>
         <text
           x={world.party.x}
           y={world.party.y - ts(3.2)}

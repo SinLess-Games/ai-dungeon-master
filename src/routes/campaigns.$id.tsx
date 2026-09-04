@@ -26,13 +26,13 @@ import type { Character } from "@/lib/rules/character";
 export const Route = createFileRoute("/campaigns/$id")({
   head: () => ({
     meta: [
-      { title: "At the table — AI Dungeon Master | Grimoire" },
+      { title: "At the table — The Endless Codex" },
       {
         name: "description",
         content:
-          "Play your D&D 3.5 campaign with an AI Dungeon Master that tracks HP, XP, loot, NPCs, quests and alignment as you play.",
+          "Play your D&D 3.5 campaign with The Endless Codex, an AI Dungeon Master that tracks HP, XP, loot, NPCs, quests and alignment as you play.",
       },
-      { property: "og:title", content: "At the table — AI Dungeon Master" },
+      { property: "og:title", content: "At the table — The Endless Codex" },
       {
         property: "og:description",
         content: "Narrated solo D&D 3.5 play with live rules-accurate character tracking.",

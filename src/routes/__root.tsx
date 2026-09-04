@@ -78,14 +78,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "The Endless Codex" },
+      { name: "description", content: "A D&D 3.5 solo and multiplayer table powered by an AI Dungeon Master." },
+      { name: "author", content: "The Endless Codex" },
+      { property: "og:title", content: "The Endless Codex" },
+      { property: "og:description", content: "A D&D 3.5 solo and multiplayer table powered by an AI Dungeon Master." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:site", content: "@EndlessCodex" },
     ],
     links: [
       {

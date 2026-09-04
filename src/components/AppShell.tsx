@@ -19,7 +19,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-40 border-b border-border/70 bg-background/85 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4">
           <Link to="/" className="flex items-baseline gap-2">
-            <span className="font-display text-xl tracking-widest text-primary">GRIMOIRE</span>
+            <span className="font-display text-lg tracking-wide text-primary">THE ENDLESS CODEX</span>
             <span className="hidden text-xs uppercase tracking-[0.3em] text-muted-foreground sm:inline">
               d20 · 3.5e
             </span>

@@ -365,7 +365,7 @@ function Breadcrumb({ trail }: { trail: string[] }) {
 function ArticleView({ article }: { article: WikiArticle }) {
   return (
     <article className="max-w-3xl">
-      <Breadcrumb trail={["Codex wiki", "Dungeon Master's guide", article.category]} />
+      <Breadcrumb trail={["Codex wiki", article.category]} />
       <h1 className="font-display text-3xl text-foreground sm:text-4xl">{article.title}</h1>
       <p className="mt-3 text-lg leading-relaxed text-muted-foreground">{article.summary}</p>
       <div className="mt-3 flex flex-wrap gap-1">

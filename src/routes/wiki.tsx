@@ -63,7 +63,13 @@ function buildRulesIndex(): RulesEntry[] {
       id: `class-${c.id}`,
       name: c.name,
       kind: "Classes",
-      text: `${c.blurb} ${c.playsLike}`,
+      text: [
+        c.blurb,
+        c.playsLike,
+        CLASS_DETAILS[c.id]?.role ?? "",
+        ...(CLASS_DETAILS[c.id]?.sections.map((s) => `${s.heading} ${s.body}`) ?? []),
+        ...c.features.map((f) => `${f.name} ${f.text}`),
+      ].join(" "),
       tags: [
         `d${c.hitDie} hit die`,
         `${c.skillPoints}+Int skill points`,

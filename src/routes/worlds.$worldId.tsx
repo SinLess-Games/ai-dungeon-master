@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorldMapView } from "@/components/WorldMapView";
+import { PaintMapButton, useMapArt } from "@/components/MapArtControls";
 import { getWorld, listMaps, newId, saveMap, saveWorld } from "@/lib/storage";
 import {
   SITE_KINDS,

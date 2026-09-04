@@ -9,6 +9,7 @@ export interface AdminMetrics {
     worlds: number;
     maps: number;
     rolls: number;
+    messages: number;
   };
   newUsers7d: number;
   activeUsers30d: number;
@@ -49,7 +50,7 @@ export const getAdminMetrics = createServerFn({ method: "GET" })
     const [usersRes, chars, camps, worlds, maps, rolls, roles] = await Promise.all([
       supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
       supabaseAdmin.from("characters").select("id, created_at, user_id"),
-      supabaseAdmin.from("campaigns").select("id, created_at, user_id"),
+      supabaseAdmin.from("campaigns").select("id, created_at, user_id, data"),
       supabaseAdmin.from("worlds").select("id, created_at, user_id"),
       supabaseAdmin.from("game_maps").select("id, created_at"),
       supabaseAdmin.from("dice_rolls").select("id, created_at"),
@@ -100,6 +101,14 @@ export const getAdminMetrics = createServerFn({ method: "GET" })
         worlds: worlds.data?.length ?? 0,
         maps: maps.data?.length ?? 0,
         rolls: rolls.data?.length ?? 0,
+        messages: (camps.data ?? []).reduce(
+          (sum, c) =>
+            sum +
+            (Array.isArray((c.data as { messages?: unknown[] } | null)?.messages)
+              ? ((c.data as { messages: unknown[] }).messages.length)
+              : 0),
+          0,
+        ),
       },
       newUsers7d,
       activeUsers30d,

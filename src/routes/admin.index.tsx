@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Activity, Dices, Globe2, Map as MapIcon, Sparkles, Swords, UserPlus, Users } from "lucide-react";
+import { Activity, Dices, Globe2, Map as MapIcon, MessagesSquare, Sparkles, Swords, UserPlus, Users } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -69,6 +69,12 @@ function AdminOverview() {
             <StatCard icon={Globe2} label="Worlds" value={metrics.totals.worlds} />
             <StatCard icon={MapIcon} label="Maps" value={metrics.totals.maps} />
             <StatCard icon={Dices} label="Dice rolls" value={metrics.totals.rolls} />
+            <StatCard
+              icon={MessagesSquare}
+              label="Messages"
+              value={metrics.totals.messages}
+              hint="Player and DM chat messages"
+            />
           </div>
 
           <div className="grid gap-4 2xl:grid-cols-2">

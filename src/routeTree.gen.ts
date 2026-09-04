@@ -11,10 +11,12 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DiceRouteImport } from './routes/dice'
+import { Route as UpgradeRouteImport } from './routes/upgrade'
 import { Route as WikiRouteImport } from './routes/wiki'
 import { Route as CharactersIndexRouteImport } from './routes/characters.index'
 import { Route as CharactersIdRouteImport } from './routes/characters.$id'
 import { Route as CharactersNewRouteImport } from './routes/characters.new'
+import { Route as CheckoutReturnRouteImport } from './routes/checkout/return'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -24,6 +26,11 @@ const IndexRoute = IndexRouteImport.update({
 const DiceRoute = DiceRouteImport.update({
   id: '/dice',
   path: '/dice',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UpgradeRoute = UpgradeRouteImport.update({
+  id: '/upgrade',
+  path: '/upgrade',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WikiRoute = WikiRouteImport.update({
@@ -46,30 +53,41 @@ const CharactersNewRoute = CharactersNewRouteImport.update({
   path: '/characters/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
+  id: '/checkout/return',
+  path: '/checkout/return',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dice': typeof DiceRoute
+  '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
+  '/checkout/return': typeof CheckoutReturnRoute
   '/characters/': typeof CharactersIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dice': typeof DiceRoute
+  '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
+  '/checkout/return': typeof CheckoutReturnRoute
   '/characters': typeof CharactersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dice': typeof DiceRoute
+  '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
+  '/checkout/return': typeof CheckoutReturnRoute
   '/characters/': typeof CharactersIndexRoute
 }
 export interface FileRouteTypes {
@@ -77,34 +95,42 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/dice'
+    | '/upgrade'
     | '/wiki'
     | '/characters/$id'
     | '/characters/new'
+    | '/checkout/return'
     | '/characters/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/dice'
+    | '/upgrade'
     | '/wiki'
     | '/characters/$id'
     | '/characters/new'
+    | '/checkout/return'
     | '/characters'
   id:
     | '__root__'
     | '/'
     | '/dice'
+    | '/upgrade'
     | '/wiki'
     | '/characters/$id'
     | '/characters/new'
+    | '/checkout/return'
     | '/characters/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DiceRoute: typeof DiceRoute
+  UpgradeRoute: typeof UpgradeRoute
   WikiRoute: typeof WikiRoute
   CharactersIdRoute: typeof CharactersIdRoute
   CharactersNewRoute: typeof CharactersNewRoute
+  CheckoutReturnRoute: typeof CheckoutReturnRoute
   CharactersIndexRoute: typeof CharactersIndexRoute
 }
 
@@ -122,6 +148,13 @@ declare module '@tanstack/react-router' {
       path: '/dice'
       fullPath: '/dice'
       preLoaderRoute: typeof DiceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/upgrade': {
+      id: '/upgrade'
+      path: '/upgrade'
+      fullPath: '/upgrade'
+      preLoaderRoute: typeof UpgradeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/wiki': {
@@ -152,15 +185,24 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CharactersNewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/checkout/return': {
+      id: '/checkout/return'
+      path: '/checkout/return'
+      fullPath: '/checkout/return'
+      preLoaderRoute: typeof CheckoutReturnRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DiceRoute: DiceRoute,
+  UpgradeRoute: UpgradeRoute,
   WikiRoute: WikiRoute,
   CharactersIdRoute: CharactersIdRoute,
   CharactersNewRoute: CharactersNewRoute,
+  CheckoutReturnRoute: CheckoutReturnRoute,
   CharactersIndexRoute: CharactersIndexRoute,
 }
 export const routeTree = rootRouteImport

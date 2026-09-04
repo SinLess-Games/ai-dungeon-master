@@ -133,11 +133,9 @@ function CampaignsPage() {
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <PickField
-                label="Style"
-                value={draft.style}
-                onChange={(v) => set("style", v as Campaign["style"])}
-                options={STYLE_OPTIONS}
+              <StylePicker
+                values={draft.styles}
+                onChange={(v) => set("styles", v)}
               />
               <PickField
                 label="Campaign type"

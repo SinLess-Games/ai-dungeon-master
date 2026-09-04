@@ -20,10 +20,10 @@ export interface InventoryItem {
   quantity: number;
   weight: number;
   cost: number;
-  note?: string;
+  note?: string | undefined;
   /** where the item lives: carried on the character, in a stash, or the party pool */
   location: LootLocation;
-  container?: string;
+  container?: string | undefined;
   /** provenance: where it came from, who held it, when it moved */
   history?: ItemEvent[];
 }

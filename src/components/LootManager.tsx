@@ -70,7 +70,7 @@ export function LootManager({ character, onChange }: Props) {
 
   function handleGive(item: InventoryItem, heroId: string) {
     const hero = others.find((o) => o.id === heroId);
-    if (!hero) return;
+    if (!hero) return undefined;
     const { from, to } = transferItem(character, hero, item.id);
     saveCharacter(to);
     onChange(from);
@@ -79,9 +79,15 @@ export function LootManager({ character, onChange }: Props) {
 
   function handleEqualSplit() {
     const pool = byLocation("party");
-    if (pool.length === 0) return toast.error("The party pool is empty.");
+    if (pool.length === 0) {
+      toast.error("The party pool is empty.");
+      return;
+    }
     const heroes = [character, ...others.filter((o) => shareIds.includes(o.id))];
-    if (heroes.length < 2) return toast.error("Pick at least one other hero to share with.");
+    if (heroes.length < 2) {
+      toast.error("Pick at least one other hero to share with.");
+      return;
+    }
 
     const plan = planEqualSplit(pool, heroes.map((h) => h.id));
     let self = character;
@@ -211,7 +217,7 @@ export function LootManager({ character, onChange }: Props) {
                     item={item}
                     others={others}
                     onPatch={(patch) => onChange(updateItem(character, item.id, patch))}
-                    onMove={(to, quantity) => onChange(moveItem(character, item.id, to, { quantity }))}
+                    onMove={(to, quantity) => onChange(moveItem(character, item.id, to, quantity ? { quantity } : {}))}
                     onGive={(heroId) => handleGive(item, heroId)}
                     onDelete={() => onChange(removeItem(character, item.id))}
                   />

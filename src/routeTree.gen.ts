@@ -38,6 +38,7 @@ import { Route as PartyCampaignIdRouteImport } from './routes/party.$campaignId'
 import { Route as WorldsIndexRouteImport } from './routes/worlds.index'
 import { Route as WorldsWorldIdRouteImport } from './routes/worlds.$worldId'
 import { Route as AdminDevBlogIndexRouteImport } from './routes/admin.dev-blog.index'
+import { Route as AdminDevBlogNewRouteImport } from './routes/admin.dev-blog.new'
 import { Route as ApiPublicBlogMediaSplatRouteImport } from './routes/api/public/blog-media.$'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 
@@ -186,6 +187,11 @@ const AdminDevBlogIndexRoute = AdminDevBlogIndexRouteImport.update({
   path: '/dev-blog/',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminDevBlogNewRoute = AdminDevBlogNewRouteImport.update({
+  id: '/dev-blog/new',
+  path: '/dev-blog/new',
+  getParentRoute: () => AdminRoute,
+} as any)
 const ApiPublicBlogMediaSplatRoute = ApiPublicBlogMediaSplatRouteImport.update({
   id: '/api/public/blog-media/$',
   path: '/api/public/blog-media/$',
@@ -227,6 +233,7 @@ export interface FileRoutesByFullPath {
   '/characters/': typeof CharactersIndexRoute
   '/dev-blog/': typeof DevBlogIndexRoute
   '/worlds/': typeof WorldsIndexRoute
+  '/admin/dev-blog/new': typeof AdminDevBlogNewRoute
   '/admin/dev-blog/': typeof AdminDevBlogIndexRoute
   '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
@@ -259,6 +266,7 @@ export interface FileRoutesByTo {
   '/characters': typeof CharactersIndexRoute
   '/dev-blog': typeof DevBlogIndexRoute
   '/worlds': typeof WorldsIndexRoute
+  '/admin/dev-blog/new': typeof AdminDevBlogNewRoute
   '/admin/dev-blog': typeof AdminDevBlogIndexRoute
   '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
@@ -293,6 +301,7 @@ export interface FileRoutesById {
   '/characters/': typeof CharactersIndexRoute
   '/dev-blog/': typeof DevBlogIndexRoute
   '/worlds/': typeof WorldsIndexRoute
+  '/admin/dev-blog/new': typeof AdminDevBlogNewRoute
   '/admin/dev-blog/': typeof AdminDevBlogIndexRoute
   '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
@@ -328,6 +337,7 @@ export interface FileRouteTypes {
     | '/characters/'
     | '/dev-blog/'
     | '/worlds/'
+    | '/admin/dev-blog/new'
     | '/admin/dev-blog/'
     | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
@@ -360,6 +370,7 @@ export interface FileRouteTypes {
     | '/characters'
     | '/dev-blog'
     | '/worlds'
+    | '/admin/dev-blog/new'
     | '/admin/dev-blog'
     | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
@@ -393,6 +404,7 @@ export interface FileRouteTypes {
     | '/characters/'
     | '/dev-blog/'
     | '/worlds/'
+    | '/admin/dev-blog/new'
     | '/admin/dev-blog/'
     | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
@@ -630,6 +642,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminDevBlogIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/dev-blog/new': {
+      id: '/admin/dev-blog/new'
+      path: '/dev-blog/new'
+      fullPath: '/admin/dev-blog/new'
+      preLoaderRoute: typeof AdminDevBlogNewRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/api/public/blog-media/$': {
       id: '/api/public/blog-media/$'
       path: '/api/public/blog-media/$'
@@ -654,6 +673,7 @@ interface AdminRouteChildren {
   AdminPlayersRoute: typeof AdminPlayersRoute
   AdminTitlesRoute: typeof AdminTitlesRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  AdminDevBlogNewRoute: typeof AdminDevBlogNewRoute
   AdminDevBlogIndexRoute: typeof AdminDevBlogIndexRoute
 }
 
@@ -664,6 +684,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminPlayersRoute: AdminPlayersRoute,
   AdminTitlesRoute: AdminTitlesRoute,
   AdminIndexRoute: AdminIndexRoute,
+  AdminDevBlogNewRoute: AdminDevBlogNewRoute,
   AdminDevBlogIndexRoute: AdminDevBlogIndexRoute,
 }
 

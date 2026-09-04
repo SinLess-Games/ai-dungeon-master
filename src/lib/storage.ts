@@ -2,6 +2,8 @@ import type { Character } from "./rules/character";
 import type { Campaign as CampaignRecord } from "./campaign";
 import type { World } from "./world";
 import type { TacticalMap } from "./tacticalmap";
+import { repairWorld } from "./world-repair";
+
 
 /**
  * Local persistence layer. This is deliberately a thin, swappable API so it can

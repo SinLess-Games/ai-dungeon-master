@@ -18,6 +18,7 @@ import { Route as UpgradeRouteImport } from './routes/upgrade'
 import { Route as WikiRouteImport } from './routes/wiki'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminContentRouteImport } from './routes/admin.content'
+import { Route as AdminFeedbackRouteImport } from './routes/admin.feedback'
 import { Route as AdminPlayersRouteImport } from './routes/admin.players'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiGenerateMapRouteImport } from './routes/api/generate-map'
@@ -75,6 +76,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
 const AdminContentRoute = AdminContentRouteImport.update({
   id: '/content',
   path: '/content',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFeedbackRoute = AdminFeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminPlayersRoute = AdminPlayersRouteImport.update({
@@ -152,6 +158,7 @@ export interface FileRoutesByFullPath {
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
   '/admin/content': typeof AdminContentRoute
+  '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/players': typeof AdminPlayersRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-map': typeof ApiGenerateMapRoute
@@ -175,6 +182,7 @@ export interface FileRoutesByTo {
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
   '/admin/content': typeof AdminContentRoute
+  '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/players': typeof AdminPlayersRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-map': typeof ApiGenerateMapRoute
@@ -200,6 +208,7 @@ export interface FileRoutesById {
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
   '/admin/content': typeof AdminContentRoute
+  '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/players': typeof AdminPlayersRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-map': typeof ApiGenerateMapRoute
@@ -226,6 +235,7 @@ export interface FileRouteTypes {
     | '/upgrade'
     | '/wiki'
     | '/admin/content'
+    | '/admin/feedback'
     | '/admin/players'
     | '/api/chat'
     | '/api/generate-map'
@@ -249,6 +259,7 @@ export interface FileRouteTypes {
     | '/upgrade'
     | '/wiki'
     | '/admin/content'
+    | '/admin/feedback'
     | '/admin/players'
     | '/api/chat'
     | '/api/generate-map'
@@ -273,6 +284,7 @@ export interface FileRouteTypes {
     | '/upgrade'
     | '/wiki'
     | '/admin/content'
+    | '/admin/feedback'
     | '/admin/players'
     | '/api/chat'
     | '/api/generate-map'
@@ -376,6 +388,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminContentRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/feedback': {
+      id: '/admin/feedback'
+      path: '/feedback'
+      fullPath: '/admin/feedback'
+      preLoaderRoute: typeof AdminFeedbackRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/players': {
       id: '/admin/players'
       path: '/players'
@@ -472,12 +491,14 @@ declare module '@tanstack/react-router' {
 
 interface AdminRouteChildren {
   AdminContentRoute: typeof AdminContentRoute
+  AdminFeedbackRoute: typeof AdminFeedbackRoute
   AdminPlayersRoute: typeof AdminPlayersRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminContentRoute: AdminContentRoute,
+  AdminFeedbackRoute: AdminFeedbackRoute,
   AdminPlayersRoute: AdminPlayersRoute,
   AdminIndexRoute: AdminIndexRoute,
 }

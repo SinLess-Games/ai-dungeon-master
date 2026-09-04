@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
 import { signOut } from "@/lib/auth";
-import logoAsset from "@/assets/logo.png.asset.json";
+
 import headerBgAsset from "@/assets/header-bg.png.asset.json";
 
 const NAV = [
@@ -43,7 +43,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {/* Logo + title block */}
             <Link to="/" className="flex items-center gap-3 sm:gap-4">
               <img
-                src={logoAsset.url}
+                src="/favicon.png"
                 alt="The Endless Codex"
                 className="h-14 w-14 rounded-md border-2 border-primary/70 object-cover shadow-lg shadow-black/60 sm:h-[4.5rem] sm:w-[4.5rem]"
               />

@@ -58,12 +58,18 @@ A D&D 3.5 app where an AI runs the adventure, you manage a full rules-accurate c
 
 ## Tactical map
 
-- 2D square-grid battle map (5 ft per square) rendered on HTML canvas.
-- Map tools: draw/move tokens, set token size (Medium, Large, Huge, etc.), draw walls/terrain zones, fog-of-war reveal, measure distance/range, snap-to-grid and free placement.
+- Square-grid battle map (5 ft per square) rendered on HTML canvas in a **2.5D / isometric style**: drawn as a 2D map but with elevation, so cliffs, ledges, stairs, balconies, pits, rooftops, and multi-level dungeons read as real height.
+- Elevation per tile with height shading and drop shadows; tokens sit at their tile's height and show an elevation badge. Flying/climbing tokens set their own altitude.
+- Height matters in rules: cover and line of sight blocked by higher terrain, high-ground attack bonus, falling damage from ledges, reach and jump/climb DCs by height difference.
+- Multi-level maps: dungeon levels stacked with a level switcher, and connectors (stairs, ladders, shafts) linking them.
+- Map tools: draw/move tokens, set token size (Medium through Colossal), paint terrain and elevation, place walls/doors/windows, fog-of-war reveal, measure distance and spell range/templates, snap-to-grid and free placement.
+- **Traps and hazards:** place traps on tiles with type, search/disable DCs, trigger, save, and damage. Hidden until spotted; the DM can trigger them and the app resolves the roll chain. Environmental hazards too — fire, ice, poison gas, water depth, difficult terrain.
+- **Location builder:** dungeons, caves, cities, towns, villages, keeps, wilderness camps, and ruins. Generate a layout from a prompt or build it by hand from tile sets; city/town maps support districts, shops, taverns, temples, and named NPC residents.
 - Miniature-style tokens: round bases with portrait/art, colored rings per faction, HP/condition badges.
-- Preloaded map tiles and textures; upload custom background images.
+- Preloaded tile sets and textures; upload custom background images.
 - Save map state per scene/combat encounter; load from campaign state.
 - Turn order sidebar with current turn highlight, delay/ready actions, end-turn button.
+
 
 ## Dice roller
 
@@ -88,12 +94,23 @@ A D&D 3.5 app where an AI runs the adventure, you manage a full rules-accurate c
 - Music triggered manually or by DM tool events.
 - Volume controls and mute per layer.
 
-## Item crafting
+## Crafting, enchanting, and ritual magic
 
-- Crafting UI: pick item type (weapon, armor, wand, potion, scroll, misc), material, caster level, prerequisites, and cost/time.
-- Craft checks (Spellcraft, Craft skills) rolled by the player; DM tool applies results.
-- Recipe/item database from SRD; custom items allowed.
-- Inventory updates automatically on success.
+- **Mundane crafting:** Craft skill items — weapons, armor, gear, alchemy — with cost, time, and progress tracked per silver-piece rules.
+- **Item enchanting:** the full magic item creation chain — Craft Magic Arms and Armor, Craft Wondrous Item, Craft Wand/Rod/Staff, Scribe Scroll, Brew Potion, Forge Ring. Pick base item, choose enchantments and abilities, and the app computes market price, XP cost, GP cost, days required, caster level, and required spells, flagging missing prerequisites.
+- **Epic item creation** for epic-level characters, with epic crafting feats and epic costs.
+- **Ritual magic:** multi-caster rituals and long-form magic — participants, components, time, location requirements, and skill/save chain. Rituals can bind creatures, create planar gates, raise the dead, curse a region, or empower an army; the DM resolves outcomes and side effects from the roll results.
+- Craft/Spellcraft checks are rolled by the player; the DM tool applies results and updates inventory, gold, and XP automatically.
+- Recipe/item database from 3.0 and 3.5 sources; custom and homebrew items supported.
+
+## Monsters and bestiary
+
+- Full monster database from 3.0/3.5 sources: stat blocks, abilities, special attacks/qualities, CR, type/subtype, and treasure.
+- Search and filter by CR, type, terrain, and alignment; add a monster to the map as a token in one click.
+- Templates and advancement: apply templates (skeleton, half-dragon, fiendish, etc.) and advance hit dice, with stats recomputed.
+- Encounter builder: assemble encounters by party level and target difficulty, with XP awards computed on victory.
+- Custom monster creator for homebrew.
+
 
 ## Leadership, armies, and factions
 
@@ -129,37 +146,41 @@ A D&D 3.5 app where an AI runs the adventure, you manage a full rules-accurate c
 
 When you start a new campaign, a setup wizard lets you pick:
 
-- **Style:** heroic, gritty/dark, high magic, low magic, horror, intrigue/political, military, exploration, dungeon crawl, sandbox, or a custom blend.
-- **Type/structure:** story arc, episodic quests, open sandbox, hexcrawl, megadungeon, war campaign, city campaign.
+- **Game type (preset adventure archetypes):** Westward March (frontier expansion and travel), Dungeon Crawl, Death Trap (lethal trap-heavy gauntlet), Epic (21+ world-shaking play), Heroes (classic rise from nobody to legend), Defeat the Demon Lord (long arc toward a great evil), Apocalypse (surviving and reversing a world-ending event) — plus custom. Each preset sets default pacing, encounter mix, trap frequency, lethality, XP curve, and DM prompt framing.
+- **Style:** heroic, gritty/dark, high magic, low magic, horror, intrigue/political, military, exploration, sandbox, or a custom blend.
+- **Structure:** story arc, episodic quests, open sandbox, hexcrawl, megadungeon, war campaign, city campaign.
 - **Length:** one-shot, short (3–5 sessions), standard arc, long-running, endless open world.
 - **Pace:** narrative-fast, balanced, tactical-slow (more combat grid time), montage travel vs. hour-by-hour detail.
+- **Difficulty and lethality:** encounter difficulty curve, trap frequency and deadliness, resurrection availability.
 - **Level range:** starting level, target end level, epic continuation on/off.
 - **Tone and content dials:** violence, romance, humor, darkness sliders.
 - **DM style:** how chatty the DM is, how much it describes vs. asks, how strict it rules.
 - **House rules:** applied at creation from the house rule set you choose.
 - **Starting setup:** generated opening scene, starting region, and starting hook — or bring your own premise.
-- All settings are editable mid-campaign, and every choice feeds the AI DM's prompt and the app's XP/combat pacing.
+- All settings are editable mid-campaign, and every choice feeds the AI DM's prompt and the app's XP/encounter pacing.
 
 ## World creation
 
-- World builder: name, themes, geography (regions, terrains, cities), history/eras, pantheon, and notable figures.
-- AI-assisted generation: describe the world in a sentence and the AI drafts regions, factions, and history you can edit; or build everything manually.
-- Regions and locations get tokens on a world overview map; clicking a region opens its notes, NPCs, and factions.
+- World builder: name, themes, geography (regions, terrains, settlements), history/eras, pantheon, planes, and notable figures.
+- Settlements: cities, towns, and villages with size, government, population, economy, notable locations (shops, temples, taverns, guilds), and resident NPCs — each can open into a playable map.
+- Dungeon and site registry: named dungeons, ruins, and lairs attached to regions, each with its own multi-level map, traps, and inhabitants.
+- AI-assisted generation: describe the world in a sentence and the AI drafts regions, settlements, factions, and history you can edit; or build everything manually.
+- Regions and locations get pins on a world overview map; clicking one opens its notes, NPCs, factions, and maps.
 - Worlds persist and can host new campaigns later — an old campaign's history carries into the next one.
 - Start from a blank world or a prebuilt starter world.
 
 ## Data and rules
 
-- 3.5 rules data (races, base and prestige classes with epic progressions, skills, feats, spells, equipment, magic items, monsters) shipped as typed modules and used by both the rules engine and the wiki.
+- Rules data from **3rd edition and 3.5 edition** sources (races, base and prestige classes with epic progressions, skills, feats, spells, equipment, magic items, traps, monsters), shipped as typed modules used by both the rules engine and the wiki. 3.5 is the default; 3.0-only content is tagged so a campaign can allow or exclude it.
 - Pure rules engine computes every derived value deterministically from the stored build, with house rules applied as modifiers.
-- Bestiary and item/monster references available to the DM for quick spawns.
+- Bestiary, trap tables, and item references available to the DM for quick spawns.
 
 ## Technical notes
 
-- Backend on Lovable Cloud: auth plus tables for `profiles`, `worlds`, `characters`, `parties`, `party_members`, `campaigns`, `campaign_players`, `campaign_invites`, `campaign_messages`, `campaign_state`, `house_rules`, `dice_rolls`, `npcs`, `factions`, `army_units`, `crafting_jobs`, and `maps`, with row-level security scoping access to the owner and to accepted campaign members.
+- Backend on Lovable Cloud: auth plus tables for `profiles`, `worlds`, `regions`, `settlements`, `sites`, `characters`, `parties`, `party_members`, `campaigns`, `campaign_players`, `campaign_invites`, `campaign_messages`, `campaign_state`, `house_rules`, `dice_rolls`, `npcs`, `monsters_custom`, `factions`, `army_units`, `crafting_jobs`, `rituals`, `maps`, `map_levels`, `map_tokens`, and `traps`, with row-level security scoping access to the owner and to accepted campaign members.
 - Multiplayer uses realtime subscriptions on campaign messages, map tokens, initiative, and dice rolls so all seated players stay in sync. Invites are accept-by-code/link with membership rows granting read/write access under RLS.
-- AI DM runs through Lovable AI on a streaming server route; system prompt carries 3.5 DM guidance, active house rules, and current snapshots of characters/party/scene/faction/army state. It calls tools to mutate persistent state.
-- Tactical map: HTML canvas with token state persisted and broadcast in realtime.
+- AI DM runs through Lovable AI on a streaming server route; system prompt carries 3.0/3.5 DM guidance, campaign type/style/pace settings, active house rules, and current snapshots of characters/party/scene/faction/army state. It calls tools to mutate persistent state, spawn monsters, trigger traps, and change the map.
+- Tactical map: HTML canvas rendered in an isometric 2.5D projection with per-tile elevation, multi-level stacks, and token state persisted and broadcast in realtime.
 - PDF export is generated client-side from the computed sheet into a paginated 3.5-style layout.
 - Audio: Web Audio API and HTML audio elements with preloaded asset packs.
 - Rules data lives in the app as typed modules, not in the database, so the wiki and engine read the same source.
@@ -171,12 +192,14 @@ When you start a new campaign, a setup wizard lets you pick:
 - `/characters/new` and `/characters/:id` (creator and sheet, with PDF export)
 - `/parties` and `/parties/:id`
 - `/join/:inviteCode` (accept an invite)
-- `/worlds/new` (world builder)
+- `/worlds/new` and `/worlds/:worldId` (world builder and overview map)
 - `/worlds/:worldId/campaigns/new` (campaign setup wizard)
 - `/worlds/:worldId/campaigns/:campaignId` (main play screen: chat + tactical map + dice + sheet + wiki panels)
 - `/worlds/:worldId/campaigns/:campaignId/settings` (players, invites, campaign settings, house rules)
-- `/worlds/:worldId/factions`, `/armies`, `/npcs`
-- `/crafting`
+- `/worlds/:worldId/maps/:mapId` (map editor: terrain, elevation, traps, tokens)
+- `/worlds/:worldId/factions`, `/armies`, `/npcs`, `/settlements`
+- `/crafting` (crafting, enchanting, rituals)
+- `/bestiary`
 - `/wiki` and `/wiki/:category/:slug`
 
 ## Build order
@@ -185,26 +208,30 @@ When you start a new campaign, a setup wizard lets you pick:
 1. Cloud setup, auth, dashboard shell, schema.
 2. Rules engine + rules data (base classes, races, skills, feats, spells, 1–20).
 3. Character creator and sheet.
-4. Streaming AI DM chat with state tools (HP/XP/loot/journal), plus world and campaign creation wizards feeding its prompt.
-5. Dice roller with animation.
+4. World builder and campaign setup wizard (game types, style, length, pace).
+5. Streaming AI DM chat with state tools (HP/XP/loot/journal).
+6. Dice roller with animation.
 
 **Phase 2 — Reference, export, and table**
-6. Rules wiki with search, browse, and contextual lookup.
-7. PDF character sheet export.
-8. Party and NPC management.
-9. Multiplayer invites, campaign membership, realtime shared session.
+7. Rules wiki with search, browse, and contextual lookup.
+8. PDF character sheet export.
+9. Party and NPC management.
+10. Multiplayer invites, campaign membership, realtime shared session.
 
 **Phase 3 — Tactical and atmosphere**
-10. 2D tactical grid map with tokens, fog, initiative tracker.
-11. Sound and music.
-12. House rule engine wired into creation, rules engine, and DM prompt.
+11. Isometric 2.5D grid map with elevation, multi-level dungeons, tokens, fog, initiative tracker.
+12. Traps, hazards, and the location builder (dungeons, cities, towns, wilderness).
+13. Bestiary and encounter builder with one-click monster tokens.
+14. Sound and music.
+15. House rule engine wired into creation, rules engine, and DM prompt.
 
 **Phase 4 — Advanced systems**
-13. Prestige classes with prerequisite validation.
-14. Epic Level Handbook progressions (21+), epic feats and epic spellcasting.
-15. Item crafting.
-16. Leadership feat, cohorts, followers.
-17. Factions, armies, mass combat, strongholds.
+16. Prestige classes with prerequisite validation.
+17. Epic Level Handbook progressions (21+), epic feats and epic spellcasting.
+18. Crafting, item enchanting, and ritual magic.
+19. Leadership feat, cohorts, followers.
+20. Factions, armies, mass combat, strongholds.
 
-11. Leadership feat, cohorts, followers.
-12. Factions, armies, mass combat, strongholds.
+## Note on source material
+
+The app implements the 3.0/3.5 rules mechanics and the freely available SRD content. Copyrighted, non-SRD text from specific published books will not be reproduced verbatim — the wiki uses SRD text and original summaries, and homebrew entry covers anything not in the SRD.

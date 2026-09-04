@@ -336,7 +336,66 @@ function SiteGlyph({ kind, x, y, gold }: { kind: WorldSite["kind"]; x: number; y
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* meandering roads / rivers: never a straight line                     */
+/* ------------------------------------------------------------------ */
+
+/** Catmull-Rom through an open list of points, rendered as smooth beziers. */
+function curveThrough(pts: Pt[]): string {
+  if (pts.length < 2) return "";
+  let d = `M ${pts[0]![0].toFixed(2)} ${pts[0]![1].toFixed(2)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)]!;
+    const p1 = pts[i]!;
+    const p2 = pts[i + 1]!;
+    const p3 = pts[Math.min(pts.length - 1, i + 2)]!;
+    const c1: Pt = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+    const c2: Pt = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    d += ` C ${c1[0].toFixed(2)} ${c1[1].toFixed(2)}, ${c2[0].toFixed(2)} ${c2[1].toFixed(2)}, ${p2[0].toFixed(2)} ${p2[1].toFixed(2)}`;
+  }
+  return d;
+}
+
+function wanderPath(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  seed: string,
+  kind: string,
+): string {
+  const rand = rng(hash(seed + kind));
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len;
+  const ny = dx / len;
+
+  // three overlapping waves give a wandering, terrain-following line
+  const waves = [0, 1, 2].map(() => ({
+    amp: (rand() - 0.5) * (kind === "river" ? 0.24 : 0.15) * len,
+    freq: 1 + Math.floor(rand() * 3),
+    phase: rand() * Math.PI * 2,
+  }));
+  const bias = (rand() - 0.5) * (kind === "river" ? 0.2 : 0.13) * len;
+
+  const steps = Math.max(6, Math.min(16, Math.round(len / 4)));
+  const pts: Pt[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const taper = Math.sin(Math.PI * t); // pinned at both settlements
+    let off = bias * taper;
+    for (const w of waves) off += w.amp * taper * Math.sin(w.freq * Math.PI * t + w.phase);
+    // small along-track jitter so the line is not evenly paced
+    const jitter = i === 0 || i === steps ? 0 : (rand() - 0.5) * 0.9;
+    pts.push([
+      a.x + dx * t + nx * off + (dx / len) * jitter,
+      a.y + dy * t + ny * off + (dy / len) * jitter,
+    ]);
+  }
+  return curveThrough(pts);
+}
+
 export interface WorldMapViewProps {
+
   world: World;
   selectedSiteId?: string | null;
   onSelectSite?: (site: WorldSite) => void;

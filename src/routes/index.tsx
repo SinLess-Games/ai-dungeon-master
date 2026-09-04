@@ -64,6 +64,9 @@ function Home() {
           <Button asChild size="lg" variant="outline">
             <Link to="/dice">Open the dice tray</Link>
           </Button>
+          <Button asChild size="lg" variant="secondary">
+            <Link to="/upgrade">Get the Multiplayer Pass</Link>
+          </Button>
         </div>
       </section>
 

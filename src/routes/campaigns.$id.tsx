@@ -8,6 +8,7 @@ import {
 } from "ai";
 import { Dices, Send, Swords, Heart, Coins, Scroll, Sparkles, User } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { Markdown } from "@/components/Markdown";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

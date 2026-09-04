@@ -2,6 +2,8 @@ import type { Character } from "./rules/character";
 import type { Campaign as CampaignRecord } from "./campaign";
 import type { World } from "./world";
 import type { TacticalMap } from "./tacticalmap";
+import { repairWorld } from "./world-repair";
+
 
 /**
  * Local persistence layer. This is deliberately a thin, swappable API so it can
@@ -142,8 +144,12 @@ export function listWorlds(): World[] {
 }
 
 export function getWorld(id: string): World | undefined {
-  return read<World[]>(KEY_WORLDS, []).find((w) => w.id === id);
+  const found = read<World[]>(KEY_WORLDS, []).find((w) => w.id === id);
+  if (!found) return undefined;
+  const { world, changed } = repairWorld(found);
+  return changed ? saveWorld(world) : found;
 }
+
 
 export function saveWorld(world: World) {
   const all = read<World[]>(KEY_WORLDS, []);

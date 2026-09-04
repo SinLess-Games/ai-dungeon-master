@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DiceRouteImport } from './routes/dice'
+import { Route as WikiRouteImport } from './routes/wiki'
 import { Route as CharactersIndexRouteImport } from './routes/characters.index'
 import { Route as CharactersIdRouteImport } from './routes/characters.$id'
 import { Route as CharactersNewRouteImport } from './routes/characters.new'
@@ -23,6 +24,11 @@ const IndexRoute = IndexRouteImport.update({
 const DiceRoute = DiceRouteImport.update({
   id: '/dice',
   path: '/dice',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WikiRoute = WikiRouteImport.update({
+  id: '/wiki',
+  path: '/wiki',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CharactersIndexRoute = CharactersIndexRouteImport.update({
@@ -44,6 +50,7 @@ const CharactersNewRoute = CharactersNewRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dice': typeof DiceRoute
+  '/wiki': typeof WikiRoute
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
   '/characters/': typeof CharactersIndexRoute
@@ -51,6 +58,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dice': typeof DiceRoute
+  '/wiki': typeof WikiRoute
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
   '/characters': typeof CharactersIndexRoute
@@ -59,6 +67,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dice': typeof DiceRoute
+  '/wiki': typeof WikiRoute
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
   '/characters/': typeof CharactersIndexRoute
@@ -66,13 +75,25 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/dice' | '/characters/$id' | '/characters/new' | '/characters/'
+    | '/'
+    | '/dice'
+    | '/wiki'
+    | '/characters/$id'
+    | '/characters/new'
+    | '/characters/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dice' | '/characters/$id' | '/characters/new' | '/characters'
+  to:
+    | '/'
+    | '/dice'
+    | '/wiki'
+    | '/characters/$id'
+    | '/characters/new'
+    | '/characters'
   id:
     | '__root__'
     | '/'
     | '/dice'
+    | '/wiki'
     | '/characters/$id'
     | '/characters/new'
     | '/characters/'
@@ -81,6 +102,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DiceRoute: typeof DiceRoute
+  WikiRoute: typeof WikiRoute
   CharactersIdRoute: typeof CharactersIdRoute
   CharactersNewRoute: typeof CharactersNewRoute
   CharactersIndexRoute: typeof CharactersIndexRoute
@@ -100,6 +122,13 @@ declare module '@tanstack/react-router' {
       path: '/dice'
       fullPath: '/dice'
       preLoaderRoute: typeof DiceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/wiki': {
+      id: '/wiki'
+      path: '/wiki'
+      fullPath: '/wiki'
+      preLoaderRoute: typeof WikiRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/characters/': {
@@ -129,6 +158,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DiceRoute: DiceRoute,
+  WikiRoute: WikiRoute,
   CharactersIdRoute: CharactersIdRoute,
   CharactersNewRoute: CharactersNewRoute,
   CharactersIndexRoute: CharactersIndexRoute,

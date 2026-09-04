@@ -32,6 +32,7 @@ import { Route as MapsMapIdRouteImport } from './routes/maps.$mapId'
 import { Route as PartyCampaignIdRouteImport } from './routes/party.$campaignId'
 import { Route as WorldsIndexRouteImport } from './routes/worlds.index'
 import { Route as WorldsWorldIdRouteImport } from './routes/worlds.$worldId'
+import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -148,6 +149,12 @@ const WorldsWorldIdRoute = WorldsWorldIdRouteImport.update({
   path: '/worlds/$worldId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicPaymentsWebhookRoute =
+  ApiPublicPaymentsWebhookRouteImport.update({
+    id: '/api/public/payments/webhook',
+    path: '/api/public/payments/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -173,6 +180,7 @@ export interface FileRoutesByFullPath {
   '/campaigns/': typeof CampaignsIndexRoute
   '/characters/': typeof CharactersIndexRoute
   '/worlds/': typeof WorldsIndexRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -197,6 +205,7 @@ export interface FileRoutesByTo {
   '/campaigns': typeof CampaignsIndexRoute
   '/characters': typeof CharactersIndexRoute
   '/worlds': typeof WorldsIndexRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -223,6 +232,7 @@ export interface FileRoutesById {
   '/campaigns/': typeof CampaignsIndexRoute
   '/characters/': typeof CharactersIndexRoute
   '/worlds/': typeof WorldsIndexRoute
+  '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -250,6 +260,7 @@ export interface FileRouteTypes {
     | '/campaigns/'
     | '/characters/'
     | '/worlds/'
+    | '/api/public/payments/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -274,6 +285,7 @@ export interface FileRouteTypes {
     | '/campaigns'
     | '/characters'
     | '/worlds'
+    | '/api/public/payments/webhook'
   id:
     | '__root__'
     | '/'
@@ -299,6 +311,7 @@ export interface FileRouteTypes {
     | '/campaigns/'
     | '/characters/'
     | '/worlds/'
+    | '/api/public/payments/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -321,6 +334,7 @@ export interface RootRouteChildren {
   CampaignsIndexRoute: typeof CampaignsIndexRoute
   CharactersIndexRoute: typeof CharactersIndexRoute
   WorldsIndexRoute: typeof WorldsIndexRoute
+  ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -486,6 +500,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorldsWorldIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/payments/webhook': {
+      id: '/api/public/payments/webhook'
+      path: '/api/public/payments/webhook'
+      fullPath: '/api/public/payments/webhook'
+      preLoaderRoute: typeof ApiPublicPaymentsWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -525,6 +546,7 @@ const rootRouteChildren: RootRouteChildren = {
   CampaignsIndexRoute: CampaignsIndexRoute,
   CharactersIndexRoute: CharactersIndexRoute,
   WorldsIndexRoute: WorldsIndexRoute,
+  ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -2,11 +2,25 @@ import { newId } from "./storage";
 
 export type CampaignStyle =
   | "heroic"
-  | "gritty"
-  | "high-fantasy"
-  | "horror"
-  | "intrigue"
-  | "comedic";
+  | "high-magic"
+  | "grim-dark"
+  | "steampunk-magitech"
+  | "low-fantasy"
+  | "sword-and-sorcery"
+  | "mythic-epic"
+  | "gothic-horror"
+  | "cosmic-horror"
+  | "political-intrigue"
+  | "dungeon-delving"
+  | "wilderness-exploration"
+  | "nautical-pirate"
+  | "planar-adventure"
+  | "post-apocalyptic"
+  | "fairytale-whimsy"
+  | "noir-mystery"
+  | "wuxia-martial"
+  | "science-fantasy"
+  | "sandbox";
 
 export type CampaignType =
   | "dungeon-crawl"

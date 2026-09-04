@@ -40,6 +40,7 @@ import { Route as WorldsWorldIdRouteImport } from './routes/worlds.$worldId'
 import { Route as AdminDevBlogIndexRouteImport } from './routes/admin.dev-blog.index'
 import { Route as AdminDevBlogNewRouteImport } from './routes/admin.dev-blog.new'
 import { Route as AdminDevBlogIdEditRouteImport } from './routes/admin.dev-blog.$id.edit'
+import { Route as AdminDevBlogIdPreviewRouteImport } from './routes/admin.dev-blog.$id.preview'
 import { Route as ApiPublicBlogMediaSplatRouteImport } from './routes/api/public/blog-media.$'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 
@@ -198,6 +199,11 @@ const AdminDevBlogIdEditRoute = AdminDevBlogIdEditRouteImport.update({
   path: '/dev-blog/$id/edit',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminDevBlogIdPreviewRoute = AdminDevBlogIdPreviewRouteImport.update({
+  id: '/dev-blog/$id/preview',
+  path: '/dev-blog/$id/preview',
+  getParentRoute: () => AdminRoute,
+} as any)
 const ApiPublicBlogMediaSplatRoute = ApiPublicBlogMediaSplatRouteImport.update({
   id: '/api/public/blog-media/$',
   path: '/api/public/blog-media/$',
@@ -242,6 +248,7 @@ export interface FileRoutesByFullPath {
   '/admin/dev-blog/new': typeof AdminDevBlogNewRoute
   '/admin/dev-blog/': typeof AdminDevBlogIndexRoute
   '/admin/dev-blog/$id/edit': typeof AdminDevBlogIdEditRoute
+  '/admin/dev-blog/$id/preview': typeof AdminDevBlogIdPreviewRoute
   '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
@@ -276,6 +283,7 @@ export interface FileRoutesByTo {
   '/admin/dev-blog/new': typeof AdminDevBlogNewRoute
   '/admin/dev-blog': typeof AdminDevBlogIndexRoute
   '/admin/dev-blog/$id/edit': typeof AdminDevBlogIdEditRoute
+  '/admin/dev-blog/$id/preview': typeof AdminDevBlogIdPreviewRoute
   '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
@@ -312,6 +320,7 @@ export interface FileRoutesById {
   '/admin/dev-blog/new': typeof AdminDevBlogNewRoute
   '/admin/dev-blog/': typeof AdminDevBlogIndexRoute
   '/admin/dev-blog/$id/edit': typeof AdminDevBlogIdEditRoute
+  '/admin/dev-blog/$id/preview': typeof AdminDevBlogIdPreviewRoute
   '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
@@ -349,6 +358,7 @@ export interface FileRouteTypes {
     | '/admin/dev-blog/new'
     | '/admin/dev-blog/'
     | '/admin/dev-blog/$id/edit'
+    | '/admin/dev-blog/$id/preview'
     | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
   fileRoutesByTo: FileRoutesByTo
@@ -383,6 +393,7 @@ export interface FileRouteTypes {
     | '/admin/dev-blog/new'
     | '/admin/dev-blog'
     | '/admin/dev-blog/$id/edit'
+    | '/admin/dev-blog/$id/preview'
     | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
   id:
@@ -418,6 +429,7 @@ export interface FileRouteTypes {
     | '/admin/dev-blog/new'
     | '/admin/dev-blog/'
     | '/admin/dev-blog/$id/edit'
+    | '/admin/dev-blog/$id/preview'
     | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
   fileRoutesById: FileRoutesById
@@ -668,6 +680,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminDevBlogIdEditRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/dev-blog/$id/preview': {
+      id: '/admin/dev-blog/$id/preview'
+      path: '/dev-blog/$id/preview'
+      fullPath: '/admin/dev-blog/$id/preview'
+      preLoaderRoute: typeof AdminDevBlogIdPreviewRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/api/public/blog-media/$': {
       id: '/api/public/blog-media/$'
       path: '/api/public/blog-media/$'
@@ -695,6 +714,7 @@ interface AdminRouteChildren {
   AdminDevBlogNewRoute: typeof AdminDevBlogNewRoute
   AdminDevBlogIndexRoute: typeof AdminDevBlogIndexRoute
   AdminDevBlogIdEditRoute: typeof AdminDevBlogIdEditRoute
+  AdminDevBlogIdPreviewRoute: typeof AdminDevBlogIdPreviewRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -707,6 +727,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminDevBlogNewRoute: AdminDevBlogNewRoute,
   AdminDevBlogIndexRoute: AdminDevBlogIndexRoute,
   AdminDevBlogIdEditRoute: AdminDevBlogIdEditRoute,
+  AdminDevBlogIdPreviewRoute: AdminDevBlogIdPreviewRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)

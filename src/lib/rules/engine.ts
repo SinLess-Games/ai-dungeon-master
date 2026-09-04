@@ -177,13 +177,18 @@ export function computeCharacter(c: Character): DerivedStats {
   let ref = Math.max(a.ref, b.ref);
   let will = Math.max(a.will, b.will);
 
-  // Skill points: best skill-point value available at each level.
+  // Skill points. Gestalt characters get the skill points of BOTH classes
+  // (and the class skill lists of both, unioned above).
   let skillPointsTotal = 0;
   for (let i = 0; i < level; i++) {
-    const base = Math.max(trackA[i]?.skillPoints ?? 0, trackB[i]?.skillPoints ?? 0);
-    if (base === 0) continue;
-    const perLevel = Math.max(1, base + mods.int + (race.bonusSkillPointsPerLevel ?? 0));
-    skillPointsTotal += i === 0 ? perLevel * 4 : perLevel;
+    const baseA = trackA[i]?.skillPoints ?? 0;
+    const baseB = trackB[i]?.skillPoints ?? 0;
+    const bases = c.gestalt ? [baseA, baseB] : [Math.max(baseA, baseB)];
+    for (const base of bases) {
+      if (base === 0) continue;
+      const perLevel = Math.max(1, base + mods.int + (race.bonusSkillPointsPerLevel ?? 0));
+      skillPointsTotal += i === 0 ? perLevel * 4 : perLevel;
+    }
   }
 
   if (rhd) {

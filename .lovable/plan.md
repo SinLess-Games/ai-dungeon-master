@@ -171,8 +171,10 @@ When you start a new campaign, a setup wizard lets you pick:
 - `/characters/new` and `/characters/:id` (creator and sheet, with PDF export)
 - `/parties` and `/parties/:id`
 - `/join/:inviteCode` (accept an invite)
+- `/worlds/new` (world builder)
+- `/worlds/:worldId/campaigns/new` (campaign setup wizard)
 - `/worlds/:worldId/campaigns/:campaignId` (main play screen: chat + tactical map + dice + sheet + wiki panels)
-- `/worlds/:worldId/campaigns/:campaignId/settings` (players, invites, house rules)
+- `/worlds/:worldId/campaigns/:campaignId/settings` (players, invites, campaign settings, house rules)
 - `/worlds/:worldId/factions`, `/armies`, `/npcs`
 - `/crafting`
 - `/wiki` and `/wiki/:category/:slug`
@@ -183,7 +185,7 @@ When you start a new campaign, a setup wizard lets you pick:
 1. Cloud setup, auth, dashboard shell, schema.
 2. Rules engine + rules data (base classes, races, skills, feats, spells, 1–20).
 3. Character creator and sheet.
-4. Streaming AI DM chat with state tools (HP/XP/loot/journal).
+4. Streaming AI DM chat with state tools (HP/XP/loot/journal), plus world and campaign creation wizards feeding its prompt.
 5. Dice roller with animation.
 
 **Phase 2 — Reference, export, and table**

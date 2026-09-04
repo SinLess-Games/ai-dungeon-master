@@ -356,6 +356,73 @@ function curveThrough(pts: Pt[]): string {
   return d;
 }
 
+/* ------------------------------------------------------------------ */
+/* keep settlements on dry land                                         */
+/* ------------------------------------------------------------------ */
+
+function pointInPoly(pts: Pt[], x: number, y: number) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i]!;
+    const [xj, yj] = pts[j]!;
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+const LAND_SITES = new Set([
+  "city",
+  "town",
+  "village",
+  "hamlet",
+  "capital",
+  "keep",
+  "castle",
+  "fort",
+  "temple",
+  "ruin",
+  "ruins",
+  "dungeon",
+  "tower",
+  "mine",
+  "camp",
+  "landmark",
+  "port",
+  "harbor",
+]);
+
+/** Nudge a settlement inland until it sits inside a landmass. */
+function snapToLand(s: WorldSite, polys: Pt[][], inland: number): { x: number; y: number } {
+  if (!polys.length) return { x: s.x, y: s.y };
+  const isLand = (x: number, y: number) => polys.some((p) => pointInPoly(p, x, y));
+  if (isLand(s.x, s.y)) return { x: s.x, y: s.y };
+
+  // spiral outward for the closest dry-land point
+  let best: { x: number; y: number } | null = null;
+  let bestD = Infinity;
+  for (let r = 0.6; r <= 26 && !best; r += 0.6) {
+    for (let a = 0; a < 48; a++) {
+      const ang = (a / 48) * Math.PI * 2;
+      const x = s.x + Math.cos(ang) * r;
+      const y = s.y + Math.sin(ang) * r;
+      if (!isLand(x, y)) continue;
+      // step a little further inland so the glyph is clear of the shoreline
+      const ix = x + Math.cos(ang) * inland;
+      const iy = y + Math.sin(ang) * inland;
+      const use = isLand(ix, iy) ? { x: ix, y: iy } : { x, y };
+      const d = Math.hypot(use.x - s.x, use.y - s.y);
+      if (d < bestD) {
+        bestD = d;
+        best = use;
+      }
+    }
+    if (bestD < Infinity) break;
+  }
+  return best ?? { x: s.x, y: s.y };
+}
+
+
+
 function wanderPath(
   a: { x: number; y: number },
   b: { x: number; y: number },

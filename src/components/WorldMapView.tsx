@@ -293,6 +293,16 @@ export function WorldMapView({
         <filter id="wm-coast" x="-30%" y="-30%" width="160%" height="160%">
           <feGaussianBlur stdDeviation="0.9" />
         </filter>
+        {/* single outline around the merged continent silhouette */}
+        <filter id="wm-outline" x="-20%" y="-20%" width="140%" height="140%">
+          <feMorphology in="SourceAlpha" operator="dilate" radius="0.35" result="fat" />
+          <feFlood floodColor="#3f5a63" result="ink" />
+          <feComposite in="ink" in2="fat" operator="in" result="edge" />
+          <feMerge>
+            <feMergeNode in="edge" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
         <filter id="wm-paper" x="0" y="0" width="100%" height="100%">
           <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" result="n" />
           <feColorMatrix in="n" type="saturate" values="0" />

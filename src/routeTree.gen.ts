@@ -32,6 +32,7 @@ import { Route as CharactersNewRouteImport } from './routes/characters.new'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout/return'
 import { Route as DevBlogIndexRouteImport } from './routes/dev-blog.index'
 import { Route as DevBlogSlugRouteImport } from './routes/dev-blog.$slug'
+import { Route as DevBlogRssDotxmlRouteImport } from './routes/dev-blog.rss[.]xml'
 import { Route as MapsMapIdRouteImport } from './routes/maps.$mapId'
 import { Route as PartyCampaignIdRouteImport } from './routes/party.$campaignId'
 import { Route as WorldsIndexRouteImport } from './routes/worlds.index'
@@ -154,6 +155,11 @@ const DevBlogSlugRoute = DevBlogSlugRouteImport.update({
   path: '/dev-blog/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DevBlogRssDotxmlRoute = DevBlogRssDotxmlRouteImport.update({
+  id: '/dev-blog/rss.xml',
+  path: '/dev-blog/rss.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MapsMapIdRoute = MapsMapIdRouteImport.update({
   id: '/maps/$mapId',
   path: '/maps/$mapId',
@@ -206,6 +212,7 @@ export interface FileRoutesByFullPath {
   '/characters/new': typeof CharactersNewRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/dev-blog/$slug': typeof DevBlogSlugRoute
+  '/dev-blog/rss.xml': typeof DevBlogRssDotxmlRoute
   '/maps/$mapId': typeof MapsMapIdRoute
   '/party/$campaignId': typeof PartyCampaignIdRoute
   '/worlds/$worldId': typeof WorldsWorldIdRoute
@@ -236,6 +243,7 @@ export interface FileRoutesByTo {
   '/characters/new': typeof CharactersNewRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/dev-blog/$slug': typeof DevBlogSlugRoute
+  '/dev-blog/rss.xml': typeof DevBlogRssDotxmlRoute
   '/maps/$mapId': typeof MapsMapIdRoute
   '/party/$campaignId': typeof PartyCampaignIdRoute
   '/worlds/$worldId': typeof WorldsWorldIdRoute
@@ -268,6 +276,7 @@ export interface FileRoutesById {
   '/characters/new': typeof CharactersNewRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/dev-blog/$slug': typeof DevBlogSlugRoute
+  '/dev-blog/rss.xml': typeof DevBlogRssDotxmlRoute
   '/maps/$mapId': typeof MapsMapIdRoute
   '/party/$campaignId': typeof PartyCampaignIdRoute
   '/worlds/$worldId': typeof WorldsWorldIdRoute
@@ -301,6 +310,7 @@ export interface FileRouteTypes {
     | '/characters/new'
     | '/checkout/return'
     | '/dev-blog/$slug'
+    | '/dev-blog/rss.xml'
     | '/maps/$mapId'
     | '/party/$campaignId'
     | '/worlds/$worldId'
@@ -331,6 +341,7 @@ export interface FileRouteTypes {
     | '/characters/new'
     | '/checkout/return'
     | '/dev-blog/$slug'
+    | '/dev-blog/rss.xml'
     | '/maps/$mapId'
     | '/party/$campaignId'
     | '/worlds/$worldId'
@@ -362,6 +373,7 @@ export interface FileRouteTypes {
     | '/characters/new'
     | '/checkout/return'
     | '/dev-blog/$slug'
+    | '/dev-blog/rss.xml'
     | '/maps/$mapId'
     | '/party/$campaignId'
     | '/worlds/$worldId'
@@ -389,6 +401,7 @@ export interface RootRouteChildren {
   CharactersNewRoute: typeof CharactersNewRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   DevBlogSlugRoute: typeof DevBlogSlugRoute
+  DevBlogRssDotxmlRoute: typeof DevBlogRssDotxmlRoute
   MapsMapIdRoute: typeof MapsMapIdRoute
   PartyCampaignIdRoute: typeof PartyCampaignIdRoute
   WorldsWorldIdRoute: typeof WorldsWorldIdRoute
@@ -563,6 +576,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DevBlogSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dev-blog/rss.xml': {
+      id: '/dev-blog/rss.xml'
+      path: '/dev-blog/rss.xml'
+      fullPath: '/dev-blog/rss.xml'
+      preLoaderRoute: typeof DevBlogRssDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/maps/$mapId': {
       id: '/maps/$mapId'
       path: '/maps/$mapId'
@@ -643,6 +663,7 @@ const rootRouteChildren: RootRouteChildren = {
   CharactersNewRoute: CharactersNewRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
   DevBlogSlugRoute: DevBlogSlugRoute,
+  DevBlogRssDotxmlRoute: DevBlogRssDotxmlRoute,
   MapsMapIdRoute: MapsMapIdRoute,
   PartyCampaignIdRoute: PartyCampaignIdRoute,
   WorldsWorldIdRoute: WorldsWorldIdRoute,

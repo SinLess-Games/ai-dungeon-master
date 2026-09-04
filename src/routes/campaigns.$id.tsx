@@ -162,9 +162,22 @@ function Table({
     campaignRef.current = saveCampaign(g);
   }, [messages]);
 
+  // Keep the latest text (and thus the composer context) in view. While the
+  // DM streams we jump instantly each chunk; smooth-scroll only between turns.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView({ behavior: busy ? "auto" : "smooth", block: "end" });
   }, [messages, busy]);
+
+  // The DM always opens the campaign: fire the opening narration once when a
+  // fresh table has no transcript yet.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (autoStarted.current || messages.length > 0 || busy) return;
+    autoStarted.current = true;
+    void sendMessage({
+      text: `Begin the campaign. Set the opening scene in ${campaignRef.current.scene.location} and tell me what I see, hear, and smell. End with a situation that invites my first action.`,
+    });
+  }, [messages.length, busy, sendMessage]);
 
   useEffect(() => {
     if (!busy) composerRef.current?.focus();
@@ -249,20 +262,10 @@ function Table({
           <ScrollArea className="flex-1 px-5 py-4">
             {!started ? (
               <div className="py-12 text-center">
-                <Sparkles className="mx-auto size-8 text-primary" />
+                <Sparkles className="mx-auto size-8 animate-pulse text-primary" />
                 <p className="mt-4 text-muted-foreground">
-                  The DM is waiting. Open the scene however you like, or let it begin.
+                  The DM is setting the opening scene…
                 </p>
-                <Button
-                  className="mt-4"
-                  onClick={() =>
-                    send(
-                      `Begin the campaign. Set the opening scene in ${campaign.scene.location} and tell me what I see.`,
-                    )
-                  }
-                >
-                  Begin the adventure
-                </Button>
               </div>
             ) : null}
 

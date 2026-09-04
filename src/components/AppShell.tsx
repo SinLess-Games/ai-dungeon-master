@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { Fragment, type ReactNode } from "react";
 import {
   Dices,
@@ -24,17 +24,25 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useSession } from "@/hooks/useSession";
 import { signOut } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 
 import headerBgAsset from "@/assets/header-bg.png.asset.json";
 
-const NAV = [
-  { to: "/", label: "Home", icon: Home },
-  { to: "/campaigns", label: "Play", icon: Swords },
+const PLAY_SUB = [
+  { to: "/campaigns", label: "Campaigns", icon: Swords },
   { to: "/characters", label: "Characters", icon: Users },
   { to: "/worlds", label: "Worlds", icon: Globe2 },
   { to: "/dice", label: "Dice", icon: Dices },
+] as const;
+
+const NAV = [
+  { to: "/", label: "Home", icon: Home },
   { to: "/wiki", label: "Wiki", icon: BookOpen },
 ] as const;
+
+function isPlayActive(pathname: string) {
+  return PLAY_SUB.some((s) => pathname.startsWith(s.to));
+}
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user } = useSession();

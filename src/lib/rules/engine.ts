@@ -55,6 +55,10 @@ export const SIZE_CARRY_MULT: Record<string, number> = {
 
 export interface DerivedStats {
   level: number;
+  /** Class levels + racial Hit Dice + level adjustment. */
+  ecl: number;
+  levelAdjustment: number;
+  racialHd: number;
   race: ReturnType<typeof raceOf>;
   abilityScores: Record<AbilityKey, number>;
   abilityMods: Record<AbilityKey, number>;
@@ -113,6 +117,12 @@ export function computeCharacter(c: Character): DerivedStats {
         hpMax += Math.floor(def.hitDie / 2) + 1;
       }
       hpMax += mods.con;
+    }
+  }
+  const rhd = race.racialHitDice;
+  if (rhd) {
+    for (let i = 0; i < rhd.count; i++) {
+      hpMax += Math.floor(rhd.hitDie / 2) + 1 + mods.con;
     }
   }
   hpMax = Math.max(level, hpMax);
@@ -183,8 +193,9 @@ export function computeCharacter(c: Character): DerivedStats {
     return { id: s.id, name: s.name, ability: s.ability, total, ranks, isClassSkill, trainedOnly: s.trainedOnly };
   });
 
+  const totalHd = level + (rhd?.count ?? 0);
   const featSlots =
-    1 + Math.floor(level / 3) + (race.bonusFeatsAtFirst ?? 0) + fighterBonusFeats(c) + wizardBonusFeats(c);
+    1 + Math.floor(totalHd / 3) + (race.bonusFeatsAtFirst ?? 0) + fighterBonusFeats(c) + wizardBonusFeats(c);
   const abilityIncreaseSlots = Math.floor(level / 4);
 
   const carried = c.inventory
@@ -196,6 +207,9 @@ export function computeCharacter(c: Character): DerivedStats {
 
   return {
     level,
+    ecl: level + (rhd?.count ?? 0) + (race.levelAdjustment ?? 0),
+    levelAdjustment: race.levelAdjustment ?? 0,
+    racialHd: rhd?.count ?? 0,
     race,
     abilityScores: scores,
     abilityMods: mods,

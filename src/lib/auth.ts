@@ -1,184 +1,194 @@
 /**
- * Local account layer.
+ * Account layer backed by Lovable Cloud auth.
  *
- * Deliberately a small, swappable API (signUp / signIn / signOut / getSession)
- * so it can be replaced by Lovable Cloud auth without touching the UI.
- * Passwords are never stored in plain text: we keep a PBKDF2-SHA256 hash with
- * a per-account random salt in local storage.
+ * The UI reads the current user synchronously through `getSession()`, so we keep
+ * a small in-memory + localStorage mirror of the signed-in profile that is kept
+ * fresh by `startAuthListener()` (mounted once by `useSession`).
  */
 
-const KEY_USERS = "dnd35:users";
-const KEY_SESSION = "dnd35:session";
+import { supabase } from "@/integrations/supabase/client";
 
-export interface StoredUser {
-  id: string;
-  email: string;
-  displayName: string;
-  salt: string;
-  hash: string;
-  createdAt: string;
-  avatarUrl?: string;
-}
+const KEY_SESSION = "codex:session-cache";
 
 export interface SessionUser {
   id: string;
   email: string;
   displayName: string;
   avatarUrl?: string;
+  createdAt?: string;
 }
 
-export const AUTH_EVENT = "dnd35:auth-changed";
+export const AUTH_EVENT = "codex:auth-changed";
 
-function read<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
+let cached: SessionUser | null | undefined;
+
+function readCache(): SessionUser | null {
+  if (cached !== undefined) return cached;
+  if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
+    const raw = window.localStorage.getItem(KEY_SESSION);
+    cached = raw ? (JSON.parse(raw) as SessionUser) : null;
   } catch {
-    return fallback;
+    cached = null;
   }
+  return cached;
 }
 
-function write(key: string, value: unknown) {
+function writeCache(user: SessionUser | null) {
+  cached = user;
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(key, JSON.stringify(value));
+  if (user) window.localStorage.setItem(KEY_SESSION, JSON.stringify(user));
+  else window.localStorage.removeItem(KEY_SESSION);
   window.dispatchEvent(new CustomEvent(AUTH_EVENT));
 }
 
-function toHex(buf: ArrayBuffer) {
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-async function hashPassword(password: string, saltHex: string) {
-  const enc = new TextEncoder();
-  const salt = Uint8Array.from(saltHex.match(/.{2}/g) ?? [], (h) => parseInt(h, 16));
-  const key = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, [
-    "deriveBits",
-  ]);
-  const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations: 150_000, hash: "SHA-256" },
-    key,
-    256,
-  );
-  return toHex(bits);
-}
-
-function newSalt() {
-  return toHex(crypto.getRandomValues(new Uint8Array(16)).buffer);
-}
-
-function listUsers(): StoredUser[] {
-  return read<StoredUser[]>(KEY_USERS, []);
-}
-
-function publicUser(u: StoredUser): SessionUser {
-  const s: SessionUser = { id: u.id, email: u.email, displayName: u.displayName };
-  if (u.avatarUrl) s.avatarUrl = u.avatarUrl;
-  return s;
-}
-
+/** Synchronous read of the last known signed-in user. */
 export function getSession(): SessionUser | null {
-  return read<SessionUser | null>(KEY_SESSION, null);
+  return readCache();
+}
+
+interface ProfileRow {
+  display_name: string | null;
+  avatar_url: string | null;
+  created_at: string | null;
+}
+
+async function loadProfile(userId: string, email: string): Promise<SessionUser> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("display_name, avatar_url, created_at")
+    .eq("id", userId)
+    .maybeSingle<ProfileRow>();
+
+  const user: SessionUser = {
+    id: userId,
+    email,
+    displayName: data?.display_name || email.split("@")[0] || "Adventurer",
+  };
+  if (data?.avatar_url) user.avatarUrl = data.avatar_url;
+  if (data?.created_at) user.createdAt = data.created_at;
+  return user;
+}
+
+/** Refresh the cached profile from the server. */
+export async function refreshSession(): Promise<SessionUser | null> {
+  const { data } = await supabase.auth.getSession();
+  const session = data.session;
+  if (!session?.user) {
+    writeCache(null);
+    return null;
+  }
+  const user = await loadProfile(session.user.id, session.user.email ?? "");
+  writeCache(user);
+  return user;
+}
+
+let listening = false;
+
+/** Mounted once by useSession: keeps the cached profile in sync with auth state. */
+export function startAuthListener() {
+  if (listening || typeof window === "undefined") return;
+  listening = true;
+  supabase.auth.onAuthStateChange((_event, session) => {
+    if (!session?.user) {
+      writeCache(null);
+      return;
+    }
+    // Never await inside the auth callback; defer the profile read.
+    setTimeout(() => {
+      void loadProfile(session.user.id, session.user.email ?? "").then(writeCache);
+    }, 0);
+  });
+  void refreshSession();
 }
 
 export async function signUp(input: {
   email: string;
   password: string;
-  displayName: string;
+  displayName?: string;
 }): Promise<SessionUser> {
-  const email = input.email.trim().toLowerCase();
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Enter a valid email address.");
-  if (input.password.length < 8) throw new Error("Password must be at least 8 characters.");
-
-  const users = listUsers();
-  if (users.some((u) => u.email === email)) throw new Error("An account with that email already exists.");
-
-  const salt = newSalt();
-  const user: StoredUser = {
-    id: crypto.randomUUID(),
-    email,
-    displayName: input.displayName.trim() || email.split("@")[0]!,
-    salt,
-    hash: await hashPassword(input.password, salt),
-    createdAt: new Date().toISOString(),
-  };
-  users.push(user);
-  write(KEY_USERS, users);
-  const session = publicUser(user);
-  write(KEY_SESSION, session);
-  return session;
+  const displayName = input.displayName?.trim() || input.email.split("@")[0] || "Adventurer";
+  const { data, error } = await supabase.auth.signUp({
+    email: input.email.trim(),
+    password: input.password,
+    options: {
+      emailRedirectTo: `${window.location.origin}/`,
+      data: { display_name: displayName },
+    },
+  });
+  if (error) throw new Error(error.message);
+  if (!data.user) throw new Error("Sign up failed.");
+  if (!data.session) {
+    throw new Error("Check your email to confirm your account, then sign in.");
+  }
+  const user = await loadProfile(data.user.id, data.user.email ?? input.email);
+  writeCache(user);
+  return user;
 }
 
 export async function signIn(email: string, password: string): Promise<SessionUser> {
-  const user = listUsers().find((u) => u.email === email.trim().toLowerCase());
-  if (!user) throw new Error("No account found with that email.");
-  const hash = await hashPassword(password, user.salt);
-  if (hash !== user.hash) throw new Error("Incorrect password.");
-  const session = publicUser(user);
-  write(KEY_SESSION, session);
-  return session;
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: email.trim(),
+    password,
+  });
+  if (error) throw new Error(error.message);
+  const user = await loadProfile(data.user.id, data.user.email ?? email);
+  writeCache(user);
+  return user;
+}
+
+export async function signInWithGoogle() {
+  const { lovable } = await import("@/integrations/lovable/index");
+  const result = await lovable.auth.signInWithOAuth("google", {
+    redirect_uri: window.location.origin,
+  });
+  if (result.error) throw new Error(result.error.message ?? "Google sign-in failed.");
+  if (result.redirected) return null;
+  return refreshSession();
 }
 
 export function signOut() {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(KEY_SESSION);
-  window.dispatchEvent(new CustomEvent(AUTH_EVENT));
+  writeCache(null);
+  void supabase.auth.signOut();
 }
 
-export function updateDisplayName(displayName: string): SessionUser {
+export async function updateDisplayName(displayName: string): Promise<SessionUser> {
   const session = getSession();
   if (!session) throw new Error("You are not signed in.");
   const name = displayName.trim();
   if (name.length < 2) throw new Error("Display name must be at least 2 characters.");
-  const users = listUsers();
-  const i = users.findIndex((u) => u.id === session.id);
-  const user = users[i];
-  if (i < 0 || !user) throw new Error("Account not found.");
-  users[i] = { ...user, displayName: name };
-  write(KEY_USERS, users);
+  const { error } = await supabase
+    .from("profiles")
+    .update({ display_name: name })
+    .eq("id", session.id);
+  if (error) throw new Error(error.message);
   const next = { ...session, displayName: name };
-  write(KEY_SESSION, next);
+  writeCache(next);
   return next;
 }
 
-export function getAccountCreatedAt(userId: string): string | null {
-  return listUsers().find((u) => u.id === userId)?.createdAt ?? null;
-}
-
-export async function changePassword(currentPassword: string, newPassword: string) {
+/** Store (or clear) the account portrait. */
+export async function updateAvatar(avatarUrl: string | null): Promise<SessionUser> {
   const session = getSession();
   if (!session) throw new Error("You are not signed in.");
-  if (newPassword.length < 8) throw new Error("Password must be at least 8 characters.");
-  const users = listUsers();
-  const i = users.findIndex((u) => u.id === session.id);
-  const user = users[i];
-  if (i < 0 || !user) throw new Error("Account not found.");
-  if ((await hashPassword(currentPassword, user.salt)) !== user.hash) {
-    throw new Error("Current password is incorrect.");
-  }
-  const salt = newSalt();
-  users[i] = { ...user, salt, hash: await hashPassword(newPassword, salt) };
-  write(KEY_USERS, users);
-}
-
-/** Store (or clear) the account portrait as a data URL in local storage. */
-export function updateAvatar(avatarUrl: string | null): SessionUser {
-  const session = getSession();
-  if (!session) throw new Error("You are not signed in.");
-  const users = listUsers();
-  const i = users.findIndex((u) => u.id === session.id);
-  const user = users[i];
-  if (i < 0 || !user) throw new Error("Account not found.");
-  const next: StoredUser = { ...user };
+  const { error } = await supabase
+    .from("profiles")
+    .update({ avatar_url: avatarUrl })
+    .eq("id", session.id);
+  if (error) throw new Error(error.message);
+  const next: SessionUser = { ...session };
   if (avatarUrl) next.avatarUrl = avatarUrl;
   else delete next.avatarUrl;
-  users[i] = next;
-  write(KEY_USERS, users);
-  const nextSession: SessionUser = { ...session };
-  if (avatarUrl) nextSession.avatarUrl = avatarUrl;
-  else delete nextSession.avatarUrl;
-  write(KEY_SESSION, nextSession);
-  return nextSession;
+  writeCache(next);
+  return next;
+}
+
+export function getAccountCreatedAt(_userId: string): string | null {
+  return getSession()?.createdAt ?? null;
+}
+
+export async function changePassword(_currentPassword: string, newPassword: string) {
+  if (newPassword.length < 8) throw new Error("Password must be at least 8 characters.");
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw new Error(error.message);
 }

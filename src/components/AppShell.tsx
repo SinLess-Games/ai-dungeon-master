@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Fragment, type ReactNode } from "react";
 import {
   Dices,
+  Globe2,
   Home,
   BookOpen,
   LogIn,
@@ -30,6 +31,7 @@ const NAV = [
   { to: "/", label: "Home", icon: Home },
   { to: "/campaigns", label: "Play", icon: Swords },
   { to: "/characters", label: "Characters", icon: Users },
+  { to: "/worlds", label: "Worlds", icon: Globe2 },
   { to: "/dice", label: "Dice", icon: Dices },
   { to: "/wiki", label: "Wiki", icon: BookOpen },
 ] as const;

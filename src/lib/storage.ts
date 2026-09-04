@@ -1,5 +1,7 @@
 import type { Character } from "./rules/character";
 import type { Campaign as CampaignRecord } from "./campaign";
+import type { World } from "./world";
+import type { TacticalMap } from "./tacticalmap";
 
 /**
  * Local persistence layer. This is deliberately a thin, swappable API so it can
@@ -127,3 +129,73 @@ export function deleteCampaign(id: string) {
     read<CampaignRecord[]>(KEY_CAMPAIGNS, []).filter((c) => c.id !== id),
   );
 }
+
+/* --------------------------------------------------------- worlds and maps */
+
+const KEY_WORLDS = "dnd35:worlds";
+const KEY_MAPS = "dnd35:maps";
+
+export function listWorlds(): World[] {
+  return read<World[]>(KEY_WORLDS, []).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+export function getWorld(id: string): World | undefined {
+  return read<World[]>(KEY_WORLDS, []).find((w) => w.id === id);
+}
+
+export function saveWorld(world: World) {
+  const all = read<World[]>(KEY_WORLDS, []);
+  const next = { ...world, updatedAt: new Date().toISOString() };
+  const i = all.findIndex((w) => w.id === world.id);
+  if (i >= 0) all[i] = next;
+  else all.push(next);
+  write(KEY_WORLDS, all);
+  return next;
+}
+
+export function deleteWorld(id: string) {
+  write(KEY_WORLDS, read<World[]>(KEY_WORLDS, []).filter((w) => w.id !== id));
+  write(KEY_MAPS, read<TacticalMap[]>(KEY_MAPS, []).filter((m) => m.worldId !== id));
+}
+
+export function listMaps(worldId?: string): TacticalMap[] {
+  return read<TacticalMap[]>(KEY_MAPS, [])
+    .filter((m) => (worldId ? m.worldId === worldId : true))
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+export function getMap(id: string): TacticalMap | undefined {
+  return read<TacticalMap[]>(KEY_MAPS, []).find((m) => m.id === id);
+}
+
+export function saveMap(map: TacticalMap) {
+  const all = read<TacticalMap[]>(KEY_MAPS, []);
+  const next = { ...map, updatedAt: new Date().toISOString() };
+  const i = all.findIndex((m) => m.id === map.id);
+  if (i >= 0) all[i] = next;
+  else all.push(next);
+  write(KEY_MAPS, all);
+  return next;
+}
+
+export function deleteMap(id: string) {
+  write(KEY_MAPS, read<TacticalMap[]>(KEY_MAPS, []).filter((m) => m.id !== id));
+}
+
+/** Keys used by the cloud sync layer. */
+export const STORE_KEYS = {
+  characters: KEY_CHARACTERS,
+  campaigns: KEY_CAMPAIGNS,
+  worlds: KEY_WORLDS,
+  maps: KEY_MAPS,
+  rolls: KEY_ROLLS,
+} as const;
+
+export function readCollection<T>(key: string): T[] {
+  return read<T[]>(key, []);
+}
+
+export function writeCollection<T>(key: string, rows: T[]) {
+  write(key, rows);
+}
+

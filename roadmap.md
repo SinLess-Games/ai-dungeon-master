@@ -1,7 +1,7 @@
 # Roadmap — D&D 3.5 AI Dungeon Master
 
 ## Phase 1 — Playable solo core
-- [ ] Lovable Cloud: auth, roles, schema, game-state saves (BLOCKED: provisioning failed, retry)
+- [x] Lovable Cloud: auth (email + Google), roles, schema, offline-first cloud sync of characters/campaigns/worlds/maps
 - [x] Design system (dark arcane theme, fonts)
 - [x] Rules data: races, base classes, skills, feats, alignments
 - [x] Rules engine: derived stats, encumbrance (toggleable)
@@ -12,7 +12,7 @@
 - [x] Character sheet (live, editable)
 - [x] Campaign setup wizard (style, type, length, pace, DM temperament, world notes, house rules)
 - [x] Streaming AI DM with state tools, player rolls, grants, alignment tracking
-- [ ] Standalone world builder + world map
+- [x] Standalone world builder + world map
 
 ## Phase 2 — Reference, loot, export
 - [x] Rules wiki with search + filters
@@ -21,8 +21,8 @@
 - [ ] Party + NPC companions (DM-run or player-run)
 
 ## Phase 3 — Maps & atmosphere
-- [ ] World map with travel + exploration
-- [ ] Isometric 2.5D tactical map, elevation, multi-level
+- [x] World map with travel + exploration
+- [x] Isometric 2.5D tactical map: elevation, multi-level, props, traps, fog, tokens
 - [ ] Traps, hazards, location builder
 - [ ] Bestiary + encounter builder
 - [ ] Sound and music

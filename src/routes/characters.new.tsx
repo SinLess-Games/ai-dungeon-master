@@ -586,6 +586,32 @@ function CharacterCreator() {
                     {remainingPoints} of {derived.skillPointsTotal} skill points left
                   </Badge>
                 </div>
+                <details className="rounded-md border border-border/60 bg-background/40 p-3">
+                  <summary className="cursor-pointer font-display text-sm text-primary">
+                    Where do my skill points come from?
+                  </summary>
+                  <div className="mt-2 space-y-1">
+                    {derived.skillPointBreakdown.map((line, i) => (
+                      <div
+                        key={i}
+                        className="flex items-baseline justify-between gap-3 text-xs text-muted-foreground"
+                      >
+                        <span>{line.label}</span>
+                        <span className="shrink-0 font-mono text-foreground">+{line.points}</span>
+                      </div>
+                    ))}
+                    <Separator className="my-2" />
+                    <div className="flex items-baseline justify-between gap-3 text-xs font-semibold">
+                      <span>Total</span>
+                      <span className="font-mono">{derived.skillPointsTotal}</span>
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Skill points each level = class base + Intelligence modifier{char.raceId === "human" ? " + 1 (human)" : ""},
+                      minimum 1 — and quadrupled at 1st level. Gestalt characters gain the skill
+                      points of <em>both</em> class tracks each level.
+                    </p>
+                  </div>
+                </details>
                 <div className="space-y-1">
                   {SKILLS.map((s) => {
                     const ranks = char.skillRanks[s.id] ?? 0;

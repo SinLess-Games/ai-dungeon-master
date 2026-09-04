@@ -55,8 +55,8 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-const GOLD = "var(--primary)";
-const PIE_COLORS = ["var(--primary)", "#7c9cc4", "#8b7bd8", "#c48b6a"];
+const GOLD = "#d9a94d"; // chart-only literal: SVG fills cannot resolve oklch tokens in recharts
+const PIE_COLORS = [GOLD, "#7c9cc4", "#8b7bd8", "#c48b6a"];
 
 function fmtDay(d: string) {
   return `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;

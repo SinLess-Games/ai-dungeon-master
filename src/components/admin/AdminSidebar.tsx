@@ -4,7 +4,7 @@ import { Award, BarChart3, CreditCard, LayoutDashboard, MessageSquareWarning, Ne
 const ITEMS = [
   { to: "/admin", label: "Overview", icon: LayoutDashboard },
   { to: "/admin/players", label: "Players", icon: Users },
-  { to: "/admin/inbox", label: "Inbox", icon: Inbox },
+  
   { to: "/admin/content", label: "Content", icon: BarChart3 },
   { to: "/admin/dev-blog", label: "Dev Blog", icon: Newspaper },
   { to: "/admin/billing", label: "Subscriptions", icon: CreditCard },

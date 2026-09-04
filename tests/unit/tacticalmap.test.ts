@@ -45,14 +45,14 @@ describe("tactical maps", () => {
   });
 
   it("applies falling, high ground and cover", () => {
-    expect(fallingDamage(0).dice).toBe(0);
-    expect(fallingDamage(30).dice).toBe(3);
-    expect(fallingDamage(500).dice).toBeLessThanOrEqual(20);
+    expect(fallingDamage(0)).toBe("none");
+    expect(fallingDamage(30)).toBe("3d6");
+    expect(fallingDamage(500)).toBe("20d6");
     expect(highGroundBonus(1, 0)).toBeGreaterThan(0);
-    expect(highGroundBonus(0, 1)).toBeLessThanOrEqual(0);
-    expect(coverBonus(true, false)).toBeGreaterThan(0);
-    expect(coverBonus(false, true)).toBeGreaterThan(0);
-    expect(coverBonus(false, false)).toBe(0);
+    expect(highGroundBonus(0, 1)).toBe(0);
+    expect(coverBonus(true, false).ac).toBe(4);
+    expect(coverBonus(false, true).ac).toBe(2);
+    expect(coverBonus(false, false).ac).toBe(0);
   });
 
   it("traces line of sight and reveals fog", () => {
@@ -60,7 +60,7 @@ describe("tactical maps", () => {
     const clear = hasLineOfSight(level, [], { x: 0, y: 0 }, { x: 5, y: 0 });
     expect(typeof clear).toBe("boolean");
 
-    const revealed = revealAround(level, [], 5, 5, 3);
-    expect(revealed.tiles.filter((t) => t.explored).length).toBeGreaterThan(0);
+    revealAround(level, [], 5, 5, 3);
+    expect(level.revealed.filter(Boolean).length).toBeGreaterThan(0);
   });
 });

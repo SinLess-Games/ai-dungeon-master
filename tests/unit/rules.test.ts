@@ -21,7 +21,7 @@ import { prereqIssues, qualifiesFor } from "@/lib/rules/prereq";
 import { movementModes, formatMovement } from "@/lib/rules/movement";
 import { ARMORS, SHIELDS, WEAPONS, GEAR, carryingCapacity } from "@/lib/rules/equipment";
 import { SPELLS, POWERS, maxSpellLevel, spellLevelFor } from "@/lib/rules/spells";
-import { SPELL_COMPENDIUM } from "@/lib/rules/spell-compendium";
+import { COMPENDIUM_SPELLS } from "@/lib/rules/spell-compendium";
 import {
   LEADERSHIP_TABLE,
   leadershipLookup,
@@ -77,11 +77,11 @@ describe("rules engine", () => {
     const d = computeCharacter(c);
     expect(d.level).toBe(4);
     expect(d.bab).toBe(4);
-    expect(d.ac).toBeGreaterThan(10);
-    expect(d.hp.max).toBeGreaterThan(0);
-    expect(d.saves.fort.total).toBeGreaterThan(0);
+    expect(d.ac.total).toBeGreaterThan(10);
+    expect(d.hpMax).toBeGreaterThan(0);
+    expect(d.saves.fort).toBeGreaterThan(0);
     expect(Array.isArray(d.skills)).toBe(true);
-    expect(d.carry.light).toBeGreaterThan(0);
+    expect(d.load.light).toBeGreaterThan(0);
   });
 
   it("handles an unarmoured spellcaster with encumbrance", () => {
@@ -161,8 +161,8 @@ describe("rules data", () => {
   });
 
   it("has a fully described spell compendium", () => {
-    expect(SPELL_COMPENDIUM.length).toBeGreaterThan(800);
-    const missing = SPELL_COMPENDIUM.filter((s) => !s.name || !s.mechanics);
+    expect(COMPENDIUM_SPELLS.length).toBeGreaterThan(800);
+    const missing = COMPENDIUM_SPELLS.filter((s) => !s.name || !s.mechanics);
     expect(missing).toHaveLength(0);
   });
 

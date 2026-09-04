@@ -71,7 +71,7 @@ describe("loot", () => {
     const item = newItem({ name: "Wand", quantity: 2 });
     from = addItem(from, item);
 
-    const res = transferItem(from, to, item.id, { quantity: 1 });
+    const res = transferItem(from, to, item.id, 1);
     expect(res.from.inventory[0]!.quantity).toBe(1);
     expect(res.to.inventory).toHaveLength(1);
     expect(res.to.inventory[0]!.quantity).toBe(1);

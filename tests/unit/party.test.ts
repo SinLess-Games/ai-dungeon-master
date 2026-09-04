@@ -93,12 +93,12 @@ describe("party roster", () => {
 
   it("lets the DM add and remove members by name", () => {
     let campaign = emptyCampaign("hero-1");
-    const res = upsertMemberByName(campaign, "Grip the Hireling", { tier: "follower", level: 2 });
+    const res = upsertMemberByName(campaign, { name: "Grip the Hireling", tier: "follower", level: 2 });
     campaign = res.campaign;
     expect(getParty(campaign)).toHaveLength(1);
-    expect(res.output).toBeTruthy();
+    expect(res.created).toBe(true);
 
-    const again = upsertMemberByName(campaign, "Grip the Hireling", { hp: 9 });
+    const again = upsertMemberByName(campaign, { name: "Grip the Hireling", hp: 9 });
     campaign = again.campaign;
     expect(getParty(campaign)).toHaveLength(1);
     expect(getParty(campaign)[0]!.hp).toBe(9);

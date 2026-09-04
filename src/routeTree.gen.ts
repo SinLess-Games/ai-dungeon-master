@@ -17,6 +17,7 @@ import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as UpgradeRouteImport } from './routes/upgrade'
 import { Route as WikiRouteImport } from './routes/wiki'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminContentRouteImport } from './routes/admin.content'
 import { Route as AdminPlayersRouteImport } from './routes/admin.players'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as CampaignsIndexRouteImport } from './routes/campaigns.index'
@@ -67,6 +68,11 @@ const WikiRoute = WikiRouteImport.update({
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminContentRoute = AdminContentRouteImport.update({
+  id: '/content',
+  path: '/content',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminPlayersRoute = AdminPlayersRouteImport.update({
@@ -133,6 +139,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof ProfileRoute
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
+  '/admin/content': typeof AdminContentRoute
   '/admin/players': typeof AdminPlayersRoute
   '/api/chat': typeof ApiChatRoute
   '/campaigns/$id': typeof CampaignsIdRoute
@@ -153,6 +160,7 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileRoute
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
+  '/admin/content': typeof AdminContentRoute
   '/admin/players': typeof AdminPlayersRoute
   '/api/chat': typeof ApiChatRoute
   '/campaigns/$id': typeof CampaignsIdRoute
@@ -175,6 +183,7 @@ export interface FileRoutesById {
   '/profile': typeof ProfileRoute
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
+  '/admin/content': typeof AdminContentRoute
   '/admin/players': typeof AdminPlayersRoute
   '/api/chat': typeof ApiChatRoute
   '/campaigns/$id': typeof CampaignsIdRoute
@@ -198,6 +207,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/upgrade'
     | '/wiki'
+    | '/admin/content'
     | '/admin/players'
     | '/api/chat'
     | '/campaigns/$id'
@@ -218,6 +228,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/upgrade'
     | '/wiki'
+    | '/admin/content'
     | '/admin/players'
     | '/api/chat'
     | '/campaigns/$id'
@@ -239,6 +250,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/upgrade'
     | '/wiki'
+    | '/admin/content'
     | '/admin/players'
     | '/api/chat'
     | '/campaigns/$id'
@@ -331,6 +343,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/content': {
+      id: '/admin/content'
+      path: '/content'
+      fullPath: '/admin/content'
+      preLoaderRoute: typeof AdminContentRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/players': {
       id: '/admin/players'
       path: '/players'
@@ -412,11 +431,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
+  AdminContentRoute: typeof AdminContentRoute
   AdminPlayersRoute: typeof AdminPlayersRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminContentRoute: AdminContentRoute,
   AdminPlayersRoute: AdminPlayersRoute,
   AdminIndexRoute: AdminIndexRoute,
 }

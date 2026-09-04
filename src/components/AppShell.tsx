@@ -1,13 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { Dices, Scroll, Users, Globe2, BookOpen } from "lucide-react";
+import { Dices, Scroll, Users, BookOpen } from "lucide-react";
 
 const NAV = [
   { to: "/", label: "Table", icon: Scroll },
   { to: "/characters", label: "Characters", icon: Users },
   { to: "/dice", label: "Dice", icon: Dices },
   { to: "/wiki", label: "Wiki", icon: BookOpen },
-  { to: "/worlds", label: "Worlds", icon: Globe2 },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {

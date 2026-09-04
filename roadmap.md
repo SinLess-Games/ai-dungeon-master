@@ -14,8 +14,8 @@
 - [ ] Streaming AI DM with state tools, grants, alignment tracking
 
 ## Phase 2 — Reference, loot, export
-- [ ] Rules wiki with search + contextual lookup
-- [ ] Loot tracking (on-person / stored / party)
+- [x] Rules wiki with search + filters
+- [~] Loot tracking (on-person / stored / party) — display done, editing next
 - [ ] PDF character sheet export
 - [ ] Party + NPC companions (DM-run or player-run)
 

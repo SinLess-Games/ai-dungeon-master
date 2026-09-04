@@ -482,7 +482,7 @@ function SearchResults({
 
       {articles.length > 0 && (
         <section className="mb-8">
-          <h2 className="mb-3 font-display text-lg text-primary">Dungeon Master's guide</h2>
+          <h2 className="mb-3 font-display text-lg text-primary">Guides</h2>
           <div className="space-y-2">
             {articles.map((a) => (
               <button

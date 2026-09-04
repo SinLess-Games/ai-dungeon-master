@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Dices, Users, Swords, Globe2, Sparkles, ScrollText } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
+import { WhatsNewPanel } from "@/components/WhatsNewPanel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -129,6 +130,10 @@ function Home() {
             </Card>
           ))}
         </div>
+      </section>
+
+      <section className="mt-10">
+        <WhatsNewPanel />
       </section>
     </AppShell>
   );

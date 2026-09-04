@@ -177,10 +177,10 @@ When you start a new campaign, a setup wizard lets you pick:
 
 ## Technical notes
 
-- Backend on Lovable Cloud: auth plus tables for `profiles`, `worlds`, `characters`, `parties`, `party_members`, `campaigns`, `campaign_players`, `campaign_invites`, `campaign_messages`, `campaign_state`, `house_rules`, `dice_rolls`, `npcs`, `factions`, `army_units`, `crafting_jobs`, and `maps`, with row-level security scoping access to the owner and to accepted campaign members.
+- Backend on Lovable Cloud: auth plus tables for `profiles`, `worlds`, `regions`, `settlements`, `sites`, `characters`, `parties`, `party_members`, `campaigns`, `campaign_players`, `campaign_invites`, `campaign_messages`, `campaign_state`, `house_rules`, `dice_rolls`, `npcs`, `monsters_custom`, `factions`, `army_units`, `crafting_jobs`, `rituals`, `maps`, `map_levels`, `map_tokens`, and `traps`, with row-level security scoping access to the owner and to accepted campaign members.
 - Multiplayer uses realtime subscriptions on campaign messages, map tokens, initiative, and dice rolls so all seated players stay in sync. Invites are accept-by-code/link with membership rows granting read/write access under RLS.
-- AI DM runs through Lovable AI on a streaming server route; system prompt carries 3.5 DM guidance, active house rules, and current snapshots of characters/party/scene/faction/army state. It calls tools to mutate persistent state.
-- Tactical map: HTML canvas with token state persisted and broadcast in realtime.
+- AI DM runs through Lovable AI on a streaming server route; system prompt carries 3.0/3.5 DM guidance, campaign type/style/pace settings, active house rules, and current snapshots of characters/party/scene/faction/army state. It calls tools to mutate persistent state, spawn monsters, trigger traps, and change the map.
+- Tactical map: HTML canvas rendered in an isometric 2.5D projection with per-tile elevation, multi-level stacks, and token state persisted and broadcast in realtime.
 - PDF export is generated client-side from the computed sheet into a paginated 3.5-style layout.
 - Audio: Web Audio API and HTML audio elements with preloaded asset packs.
 - Rules data lives in the app as typed modules, not in the database, so the wiki and engine read the same source.
@@ -192,12 +192,14 @@ When you start a new campaign, a setup wizard lets you pick:
 - `/characters/new` and `/characters/:id` (creator and sheet, with PDF export)
 - `/parties` and `/parties/:id`
 - `/join/:inviteCode` (accept an invite)
-- `/worlds/new` (world builder)
+- `/worlds/new` and `/worlds/:worldId` (world builder and overview map)
 - `/worlds/:worldId/campaigns/new` (campaign setup wizard)
 - `/worlds/:worldId/campaigns/:campaignId` (main play screen: chat + tactical map + dice + sheet + wiki panels)
 - `/worlds/:worldId/campaigns/:campaignId/settings` (players, invites, campaign settings, house rules)
-- `/worlds/:worldId/factions`, `/armies`, `/npcs`
-- `/crafting`
+- `/worlds/:worldId/maps/:mapId` (map editor: terrain, elevation, traps, tokens)
+- `/worlds/:worldId/factions`, `/armies`, `/npcs`, `/settlements`
+- `/crafting` (crafting, enchanting, rituals)
+- `/bestiary`
 - `/wiki` and `/wiki/:category/:slug`
 
 ## Build order
@@ -206,26 +208,30 @@ When you start a new campaign, a setup wizard lets you pick:
 1. Cloud setup, auth, dashboard shell, schema.
 2. Rules engine + rules data (base classes, races, skills, feats, spells, 1–20).
 3. Character creator and sheet.
-4. Streaming AI DM chat with state tools (HP/XP/loot/journal), plus world and campaign creation wizards feeding its prompt.
-5. Dice roller with animation.
+4. World builder and campaign setup wizard (game types, style, length, pace).
+5. Streaming AI DM chat with state tools (HP/XP/loot/journal).
+6. Dice roller with animation.
 
 **Phase 2 — Reference, export, and table**
-6. Rules wiki with search, browse, and contextual lookup.
-7. PDF character sheet export.
-8. Party and NPC management.
-9. Multiplayer invites, campaign membership, realtime shared session.
+7. Rules wiki with search, browse, and contextual lookup.
+8. PDF character sheet export.
+9. Party and NPC management.
+10. Multiplayer invites, campaign membership, realtime shared session.
 
 **Phase 3 — Tactical and atmosphere**
-10. 2D tactical grid map with tokens, fog, initiative tracker.
-11. Sound and music.
-12. House rule engine wired into creation, rules engine, and DM prompt.
+11. Isometric 2.5D grid map with elevation, multi-level dungeons, tokens, fog, initiative tracker.
+12. Traps, hazards, and the location builder (dungeons, cities, towns, wilderness).
+13. Bestiary and encounter builder with one-click monster tokens.
+14. Sound and music.
+15. House rule engine wired into creation, rules engine, and DM prompt.
 
 **Phase 4 — Advanced systems**
-13. Prestige classes with prerequisite validation.
-14. Epic Level Handbook progressions (21+), epic feats and epic spellcasting.
-15. Item crafting.
-16. Leadership feat, cohorts, followers.
-17. Factions, armies, mass combat, strongholds.
+16. Prestige classes with prerequisite validation.
+17. Epic Level Handbook progressions (21+), epic feats and epic spellcasting.
+18. Crafting, item enchanting, and ritual magic.
+19. Leadership feat, cohorts, followers.
+20. Factions, armies, mass combat, strongholds.
 
-11. Leadership feat, cohorts, followers.
-12. Factions, armies, mass combat, strongholds.
+## Note on source material
+
+The app implements the 3.0/3.5 rules mechanics and the freely available SRD content. Copyrighted, non-SRD text from specific published books will not be reproduced verbatim — the wiki uses SRD text and original summaries, and homebrew entry covers anything not in the SRD.

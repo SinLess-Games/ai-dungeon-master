@@ -11,7 +11,16 @@ import {
   Search,
   Moon,
   Settings,
+  UserRound,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useSession } from "@/hooks/useSession";
 import { signOut } from "@/lib/auth";
 

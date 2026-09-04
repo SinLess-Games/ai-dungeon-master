@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
 import { signOut } from "@/lib/auth";
-import logoAsset from "@/assets/logo.png.asset.json";
+
 import headerBgAsset from "@/assets/header-bg.png.asset.json";
 
 const NAV = [

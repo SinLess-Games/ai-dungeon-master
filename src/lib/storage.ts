@@ -236,6 +236,11 @@ export function listDeletions(): Tombstone[] {
   return read<Tombstone[]>(KEY_DELETED, []);
 }
 
+/** True while a delete is still remembered, so nothing can bring the row back. */
+export function isDeleted(table: SyncTable, id: string): boolean {
+  return read<Tombstone[]>(KEY_DELETED, []).some((t) => t.table === table && t.id === id);
+}
+
 export function clearDeletions(done: Tombstone[]) {
   const gone = new Set(done.map((t) => `${t.table}:${t.id}`));
   write(

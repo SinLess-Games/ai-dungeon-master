@@ -58,12 +58,18 @@ A D&D 3.5 app where an AI runs the adventure, you manage a full rules-accurate c
 
 ## Tactical map
 
-- 2D square-grid battle map (5 ft per square) rendered on HTML canvas.
-- Map tools: draw/move tokens, set token size (Medium, Large, Huge, etc.), draw walls/terrain zones, fog-of-war reveal, measure distance/range, snap-to-grid and free placement.
+- Square-grid battle map (5 ft per square) rendered on HTML canvas in a **2.5D / isometric style**: drawn as a 2D map but with elevation, so cliffs, ledges, stairs, balconies, pits, rooftops, and multi-level dungeons read as real height.
+- Elevation per tile with height shading and drop shadows; tokens sit at their tile's height and show an elevation badge. Flying/climbing tokens set their own altitude.
+- Height matters in rules: cover and line of sight blocked by higher terrain, high-ground attack bonus, falling damage from ledges, reach and jump/climb DCs by height difference.
+- Multi-level maps: dungeon levels stacked with a level switcher, and connectors (stairs, ladders, shafts) linking them.
+- Map tools: draw/move tokens, set token size (Medium through Colossal), paint terrain and elevation, place walls/doors/windows, fog-of-war reveal, measure distance and spell range/templates, snap-to-grid and free placement.
+- **Traps and hazards:** place traps on tiles with type, search/disable DCs, trigger, save, and damage. Hidden until spotted; the DM can trigger them and the app resolves the roll chain. Environmental hazards too — fire, ice, poison gas, water depth, difficult terrain.
+- **Location builder:** dungeons, caves, cities, towns, villages, keeps, wilderness camps, and ruins. Generate a layout from a prompt or build it by hand from tile sets; city/town maps support districts, shops, taverns, temples, and named NPC residents.
 - Miniature-style tokens: round bases with portrait/art, colored rings per faction, HP/condition badges.
-- Preloaded map tiles and textures; upload custom background images.
+- Preloaded tile sets and textures; upload custom background images.
 - Save map state per scene/combat encounter; load from campaign state.
 - Turn order sidebar with current turn highlight, delay/ready actions, end-turn button.
+
 
 ## Dice roller
 

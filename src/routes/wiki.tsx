@@ -146,14 +146,16 @@ function Wiki() {
   const [sel, setSel] = useState<Selection>({ type: "home" });
   const paneRef = useRef<HTMLDivElement>(null);
 
-  const dmCategories = useMemo(() => {
+  const group = (list: WikiArticle[]) => {
     const map = new Map<string, WikiArticle[]>();
-    for (const a of DM_ARTICLES) {
+    for (const a of list) {
       if (!map.has(a.category)) map.set(a.category, []);
       map.get(a.category)!.push(a);
     }
     return [...map.entries()];
-  }, []);
+  };
+  const playerCategories = useMemo(() => group(PLAYER_ARTICLES), []);
+  const dmCategories = useMemo(() => group(DM_ARTICLES), []);
 
   const needle = q.trim().toLowerCase();
   const searching = needle.length > 0;

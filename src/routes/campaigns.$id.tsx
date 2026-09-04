@@ -182,7 +182,10 @@ function Table({
   useEffect(() => {
     if (autoStarted.current || messages.length > 0 || busy) return;
     autoStarted.current = true;
-    void sendMessage({ text: pickOpening(campaignRef.current) });
+    void sendMessage({
+      text: pickOpening(campaignRef.current),
+      metadata: { hidden: true },
+    } as any);
   }, [messages.length, busy, sendMessage]);
 
   useEffect(() => {
@@ -276,7 +279,9 @@ function Table({
             ) : null}
 
             <div className="space-y-5">
-              {messages.map((m) => (
+              {messages.map((m, mi) => (
+                (m.role === "user" &&
+                  (mi === 0 || (m as any).metadata?.hidden)) ? null : (
                 <div key={m.id} className="space-y-2">
                   {m.parts.map((part: any, i: number) => {
                     if (part.type === "text") {
@@ -341,6 +346,7 @@ function Table({
                     return null;
                   })}
                 </div>
+                )
               ))}
               {busy ? (
                 <p className="animate-pulse text-sm text-muted-foreground">The DM is thinking…</p>

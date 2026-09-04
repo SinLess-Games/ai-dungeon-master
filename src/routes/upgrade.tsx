@@ -108,7 +108,28 @@ function UpgradePage() {
               </p>
             </div>
 
+            {isActive ? (
+              <Card className="card-etched mx-auto mb-10 max-w-xl border-primary/50">
+                <CardContent className="flex flex-col items-center gap-3 p-6 text-center">
+                  <Badge>Your pass is active</Badge>
+                  <p className="text-sm text-muted-foreground">
+                    {subscription?.cancel_at_period_end
+                      ? "Your pass ends on "
+                      : "Your pass renews on "}
+                    {subscription?.current_period_end
+                      ? new Date(subscription.current_period_end).toLocaleDateString()
+                      : "your next billing date"}
+                    .
+                  </p>
+                  <Button variant="outline" onClick={manageBilling}>
+                    Manage billing
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : null}
+
             <h2 className="mb-8 text-center font-display text-2xl text-foreground">Choose your plan</h2>
+
             <div className="grid gap-6 md:grid-cols-2">
               <Card className="card-etched">
                 <CardHeader>

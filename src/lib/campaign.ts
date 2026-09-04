@@ -3,8 +3,11 @@ import type { PartyMember } from "./party";
 
 export type CampaignStyle =
   | "heroic"
+  | "high-fantasy"
   | "high-magic"
   | "grim-dark"
+  | "steampunk"
+  | "magi-tech"
   | "steampunk-magitech"
   | "low-fantasy"
   | "sword-and-sorcery"

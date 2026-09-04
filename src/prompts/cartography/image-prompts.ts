@@ -76,12 +76,13 @@ export function siteMapPrompt(site: WorldSite, world?: World) {
   };
 
   return [
-    "Hand-painted top-down fantasy town plan on aged parchment, watercolour and ink,",
-    "muted earth pigments, fine linework, the kind of local map drawn inside a fantasy atlas.",
-    `Depict ${layout[kind] ?? "a small settlement of stone and timber buildings"}.`,
-    "Include surrounding terrain: roads leading out of frame, trees, streams, and fields.",
+    "Photorealistic high-resolution aerial/satellite image looking straight down from above,",
+    "true-colour drone survey imagery with natural lighting and soft shadows from a low sun.",
+    `Depict ${layout[kind] ?? "a small settlement of stone and timber buildings"}, seen from directly overhead.`,
+    "Surrounding terrain is realistic: dirt tracks leading out of frame, tree canopy, streams, tilled fields.",
+    "No illustration, no parchment, no painting, no ink lines, no fantasy map styling.",
     "IMPORTANT: no text, no words, no letters, no labels, no legend, no compass, no border frame.",
-    "Painted straight down from above, filling the whole frame, landscape orientation.",
+    "Filling the whole frame, landscape orientation.",
     site.description ? `Local flavour: ${site.description.slice(0, 300)}` : "",
     world?.themes.length ? `Overall mood: ${world.themes.join(", ")}.` : "",
   ]

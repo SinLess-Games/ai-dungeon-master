@@ -14,6 +14,9 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DiceRouteImport } from './routes/dice'
 import { Route as UpgradeRouteImport } from './routes/upgrade'
 import { Route as WikiRouteImport } from './routes/wiki'
+import { Route as ApiChatRouteImport } from './routes/api/chat'
+import { Route as CampaignsIndexRouteImport } from './routes/campaigns.index'
+import { Route as CampaignsIdRouteImport } from './routes/campaigns.$id'
 import { Route as CharactersIndexRouteImport } from './routes/characters.index'
 import { Route as CharactersIdRouteImport } from './routes/characters.$id'
 import { Route as CharactersNewRouteImport } from './routes/characters.new'
@@ -44,6 +47,21 @@ const WikiRoute = WikiRouteImport.update({
   path: '/wiki',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiChatRoute = ApiChatRouteImport.update({
+  id: '/api/chat',
+  path: '/api/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CampaignsIndexRoute = CampaignsIndexRouteImport.update({
+  id: '/campaigns/',
+  path: '/campaigns/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CampaignsIdRoute = CampaignsIdRouteImport.update({
+  id: '/campaigns/$id',
+  path: '/campaigns/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CharactersIndexRoute = CharactersIndexRouteImport.update({
   id: '/characters/',
   path: '/characters/',
@@ -71,9 +89,12 @@ export interface FileRoutesByFullPath {
   '/dice': typeof DiceRoute
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
+  '/api/chat': typeof ApiChatRoute
+  '/campaigns/$id': typeof CampaignsIdRoute
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
   '/checkout/return': typeof CheckoutReturnRoute
+  '/campaigns/': typeof CampaignsIndexRoute
   '/characters/': typeof CharactersIndexRoute
 }
 export interface FileRoutesByTo {
@@ -82,9 +103,12 @@ export interface FileRoutesByTo {
   '/dice': typeof DiceRoute
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
+  '/api/chat': typeof ApiChatRoute
+  '/campaigns/$id': typeof CampaignsIdRoute
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
   '/checkout/return': typeof CheckoutReturnRoute
+  '/campaigns': typeof CampaignsIndexRoute
   '/characters': typeof CharactersIndexRoute
 }
 export interface FileRoutesById {
@@ -94,9 +118,12 @@ export interface FileRoutesById {
   '/dice': typeof DiceRoute
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
+  '/api/chat': typeof ApiChatRoute
+  '/campaigns/$id': typeof CampaignsIdRoute
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
   '/checkout/return': typeof CheckoutReturnRoute
+  '/campaigns/': typeof CampaignsIndexRoute
   '/characters/': typeof CharactersIndexRoute
 }
 export interface FileRouteTypes {
@@ -107,9 +134,12 @@ export interface FileRouteTypes {
     | '/dice'
     | '/upgrade'
     | '/wiki'
+    | '/api/chat'
+    | '/campaigns/$id'
     | '/characters/$id'
     | '/characters/new'
     | '/checkout/return'
+    | '/campaigns/'
     | '/characters/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -118,9 +148,12 @@ export interface FileRouteTypes {
     | '/dice'
     | '/upgrade'
     | '/wiki'
+    | '/api/chat'
+    | '/campaigns/$id'
     | '/characters/$id'
     | '/characters/new'
     | '/checkout/return'
+    | '/campaigns'
     | '/characters'
   id:
     | '__root__'
@@ -129,9 +162,12 @@ export interface FileRouteTypes {
     | '/dice'
     | '/upgrade'
     | '/wiki'
+    | '/api/chat'
+    | '/campaigns/$id'
     | '/characters/$id'
     | '/characters/new'
     | '/checkout/return'
+    | '/campaigns/'
     | '/characters/'
   fileRoutesById: FileRoutesById
 }
@@ -141,9 +177,12 @@ export interface RootRouteChildren {
   DiceRoute: typeof DiceRoute
   UpgradeRoute: typeof UpgradeRoute
   WikiRoute: typeof WikiRoute
+  ApiChatRoute: typeof ApiChatRoute
+  CampaignsIdRoute: typeof CampaignsIdRoute
   CharactersIdRoute: typeof CharactersIdRoute
   CharactersNewRoute: typeof CharactersNewRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
+  CampaignsIndexRoute: typeof CampaignsIndexRoute
   CharactersIndexRoute: typeof CharactersIndexRoute
 }
 
@@ -184,6 +223,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WikiRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/chat': {
+      id: '/api/chat'
+      path: '/api/chat'
+      fullPath: '/api/chat'
+      preLoaderRoute: typeof ApiChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/campaigns/': {
+      id: '/campaigns/'
+      path: '/campaigns'
+      fullPath: '/campaigns/'
+      preLoaderRoute: typeof CampaignsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/campaigns/$id': {
+      id: '/campaigns/$id'
+      path: '/campaigns/$id'
+      fullPath: '/campaigns/$id'
+      preLoaderRoute: typeof CampaignsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/characters/': {
       id: '/characters/'
       path: '/characters'
@@ -221,9 +281,12 @@ const rootRouteChildren: RootRouteChildren = {
   DiceRoute: DiceRoute,
   UpgradeRoute: UpgradeRoute,
   WikiRoute: WikiRoute,
+  ApiChatRoute: ApiChatRoute,
+  CampaignsIdRoute: CampaignsIdRoute,
   CharactersIdRoute: CharactersIdRoute,
   CharactersNewRoute: CharactersNewRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
+  CampaignsIndexRoute: CampaignsIndexRoute,
   CharactersIndexRoute: CharactersIndexRoute,
 }
 export const routeTree = rootRouteImport

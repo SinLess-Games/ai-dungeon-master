@@ -206,7 +206,26 @@ function Wiki() {
             <BookOpen className="size-4" /> Codex wiki
           </button>
 
-          <SidebarGroup label="Dungeon Master's guide" icon={<BookOpen className="size-4" />}>
+          <SidebarGroup label="Player rules" icon={<BookOpen className="size-4" />}>
+            {playerCategories.map(([cat, arts]) => (
+              <div key={cat} className="mb-3">
+                <p className="mb-1 rounded bg-primary/10 px-2 py-1.5 font-display text-xs font-bold uppercase tracking-wide text-primary">
+                  {cat}
+                </p>
+                {arts.map((a) => (
+                  <SidebarLink
+                    key={a.id}
+                    active={sel.type === "article" && sel.id === a.id}
+                    onClick={() => open({ type: "article", id: a.id })}
+                  >
+                    {a.title}
+                  </SidebarLink>
+                ))}
+              </div>
+            ))}
+          </SidebarGroup>
+
+          <SidebarGroup label="Running the game" icon={<BookOpen className="size-4" />}>
             {dmCategories.map(([cat, arts]) => (
               <div key={cat} className="mb-3">
                 <p className="mb-1 rounded bg-primary/10 px-2 py-1.5 font-display text-xs font-bold uppercase tracking-wide text-primary">

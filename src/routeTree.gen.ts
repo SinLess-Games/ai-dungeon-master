@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DiceRouteImport } from './routes/dice'
 import { Route as UpgradeRouteImport } from './routes/upgrade'
 import { Route as WikiRouteImport } from './routes/wiki'
+import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as CharactersIndexRouteImport } from './routes/characters.index'
 import { Route as CharactersIdRouteImport } from './routes/characters.$id'
 import { Route as CharactersNewRouteImport } from './routes/characters.new'
@@ -44,6 +45,11 @@ const WikiRoute = WikiRouteImport.update({
   path: '/wiki',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiChatRoute = ApiChatRouteImport.update({
+  id: '/api/chat',
+  path: '/api/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CharactersIndexRoute = CharactersIndexRouteImport.update({
   id: '/characters/',
   path: '/characters/',
@@ -71,6 +77,7 @@ export interface FileRoutesByFullPath {
   '/dice': typeof DiceRoute
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
+  '/api/chat': typeof ApiChatRoute
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -82,6 +89,7 @@ export interface FileRoutesByTo {
   '/dice': typeof DiceRoute
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
+  '/api/chat': typeof ApiChatRoute
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -94,6 +102,7 @@ export interface FileRoutesById {
   '/dice': typeof DiceRoute
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
+  '/api/chat': typeof ApiChatRoute
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -107,6 +116,7 @@ export interface FileRouteTypes {
     | '/dice'
     | '/upgrade'
     | '/wiki'
+    | '/api/chat'
     | '/characters/$id'
     | '/characters/new'
     | '/checkout/return'
@@ -118,6 +128,7 @@ export interface FileRouteTypes {
     | '/dice'
     | '/upgrade'
     | '/wiki'
+    | '/api/chat'
     | '/characters/$id'
     | '/characters/new'
     | '/checkout/return'
@@ -129,6 +140,7 @@ export interface FileRouteTypes {
     | '/dice'
     | '/upgrade'
     | '/wiki'
+    | '/api/chat'
     | '/characters/$id'
     | '/characters/new'
     | '/checkout/return'
@@ -141,6 +153,7 @@ export interface RootRouteChildren {
   DiceRoute: typeof DiceRoute
   UpgradeRoute: typeof UpgradeRoute
   WikiRoute: typeof WikiRoute
+  ApiChatRoute: typeof ApiChatRoute
   CharactersIdRoute: typeof CharactersIdRoute
   CharactersNewRoute: typeof CharactersNewRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
@@ -184,6 +197,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WikiRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/chat': {
+      id: '/api/chat'
+      path: '/api/chat'
+      fullPath: '/api/chat'
+      preLoaderRoute: typeof ApiChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/characters/': {
       id: '/characters/'
       path: '/characters'
@@ -221,6 +241,7 @@ const rootRouteChildren: RootRouteChildren = {
   DiceRoute: DiceRoute,
   UpgradeRoute: UpgradeRoute,
   WikiRoute: WikiRoute,
+  ApiChatRoute: ApiChatRoute,
   CharactersIdRoute: CharactersIdRoute,
   CharactersNewRoute: CharactersNewRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,

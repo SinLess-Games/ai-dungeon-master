@@ -27,6 +27,7 @@ import { Route as CharactersIdRouteImport } from './routes/characters.$id'
 import { Route as CharactersNewRouteImport } from './routes/characters.new'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout/return'
 import { Route as MapsMapIdRouteImport } from './routes/maps.$mapId'
+import { Route as PartyCampaignIdRouteImport } from './routes/party.$campaignId'
 import { Route as WorldsIndexRouteImport } from './routes/worlds.index'
 import { Route as WorldsWorldIdRouteImport } from './routes/worlds.$worldId'
 
@@ -120,6 +121,11 @@ const MapsMapIdRoute = MapsMapIdRouteImport.update({
   path: '/maps/$mapId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PartyCampaignIdRoute = PartyCampaignIdRouteImport.update({
+  id: '/party/$campaignId',
+  path: '/party/$campaignId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WorldsIndexRoute = WorldsIndexRouteImport.update({
   id: '/worlds/',
   path: '/worlds/',
@@ -147,6 +153,7 @@ export interface FileRoutesByFullPath {
   '/characters/new': typeof CharactersNewRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/maps/$mapId': typeof MapsMapIdRoute
+  '/party/$campaignId': typeof PartyCampaignIdRoute
   '/worlds/$worldId': typeof WorldsWorldIdRoute
   '/admin/': typeof AdminIndexRoute
   '/campaigns/': typeof CampaignsIndexRoute
@@ -168,6 +175,7 @@ export interface FileRoutesByTo {
   '/characters/new': typeof CharactersNewRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/maps/$mapId': typeof MapsMapIdRoute
+  '/party/$campaignId': typeof PartyCampaignIdRoute
   '/worlds/$worldId': typeof WorldsWorldIdRoute
   '/admin': typeof AdminIndexRoute
   '/campaigns': typeof CampaignsIndexRoute
@@ -191,6 +199,7 @@ export interface FileRoutesById {
   '/characters/new': typeof CharactersNewRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/maps/$mapId': typeof MapsMapIdRoute
+  '/party/$campaignId': typeof PartyCampaignIdRoute
   '/worlds/$worldId': typeof WorldsWorldIdRoute
   '/admin/': typeof AdminIndexRoute
   '/campaigns/': typeof CampaignsIndexRoute
@@ -215,6 +224,7 @@ export interface FileRouteTypes {
     | '/characters/new'
     | '/checkout/return'
     | '/maps/$mapId'
+    | '/party/$campaignId'
     | '/worlds/$worldId'
     | '/admin/'
     | '/campaigns/'
@@ -236,6 +246,7 @@ export interface FileRouteTypes {
     | '/characters/new'
     | '/checkout/return'
     | '/maps/$mapId'
+    | '/party/$campaignId'
     | '/worlds/$worldId'
     | '/admin'
     | '/campaigns'
@@ -258,6 +269,7 @@ export interface FileRouteTypes {
     | '/characters/new'
     | '/checkout/return'
     | '/maps/$mapId'
+    | '/party/$campaignId'
     | '/worlds/$worldId'
     | '/admin/'
     | '/campaigns/'
@@ -279,6 +291,7 @@ export interface RootRouteChildren {
   CharactersNewRoute: typeof CharactersNewRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   MapsMapIdRoute: typeof MapsMapIdRoute
+  PartyCampaignIdRoute: typeof PartyCampaignIdRoute
   WorldsWorldIdRoute: typeof WorldsWorldIdRoute
   CampaignsIndexRoute: typeof CampaignsIndexRoute
   CharactersIndexRoute: typeof CharactersIndexRoute
@@ -413,6 +426,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MapsMapIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/party/$campaignId': {
+      id: '/party/$campaignId'
+      path: '/party/$campaignId'
+      fullPath: '/party/$campaignId'
+      preLoaderRoute: typeof PartyCampaignIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/worlds/': {
       id: '/worlds/'
       path: '/worlds'
@@ -458,6 +478,7 @@ const rootRouteChildren: RootRouteChildren = {
   CharactersNewRoute: CharactersNewRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
   MapsMapIdRoute: MapsMapIdRoute,
+  PartyCampaignIdRoute: PartyCampaignIdRoute,
   WorldsWorldIdRoute: WorldsWorldIdRoute,
   CampaignsIndexRoute: CampaignsIndexRoute,
   CharactersIndexRoute: CharactersIndexRoute,

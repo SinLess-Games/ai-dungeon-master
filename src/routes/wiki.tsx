@@ -519,6 +519,8 @@ function ArticleView({ article }: { article: WikiArticle }) {
         </section>
       ))}
 
+      {article.id === "leadership-followers" ? <LeadershipCalculator /> : null}
+
       <p className="mt-10 border-t border-border/60 pt-4 text-xs text-muted-foreground">
         Original summaries of d20/3.5 procedures and open SRD material, written for this table.
       </p>

@@ -292,10 +292,11 @@ function Wiki() {
 
 /* --------------------------------------------------------------- parts --- */
 
-function SidebarGroup({ label, children }: { label: string; children: React.ReactNode }) {
+function SidebarGroup({ label, icon, children }: { label: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="mb-6">
-      <h2 className="mb-2 border-b border-primary/40 pb-1 font-display text-sm font-bold tracking-wide text-primary">
+      <h2 className="mb-3 flex items-center gap-2 rounded border border-primary/40 bg-primary/10 px-3 py-2 font-display text-sm font-bold tracking-wide text-primary shadow-sm">
+        {icon}
         {label}
       </h2>
       {children}

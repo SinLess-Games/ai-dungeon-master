@@ -32,6 +32,7 @@ const RACE_GROUPS = [
 import { CLASSES, CLASS_GROUPS } from "@/lib/rules/classes";
 import { SKILLS } from "@/lib/rules/skills";
 import { FEATS, FEAT_GROUPS } from "@/lib/rules/feats";
+import { qualifiesFor } from "@/lib/rules/prereq";
 import { SPELLS, POWERS, maxSpellLevel, spellLevelFor } from "@/lib/rules/spells";
 import { formatMovement } from "@/lib/rules/movement";
 import { emptyCharacter, type Character } from "@/lib/rules/character";
@@ -92,7 +93,7 @@ function CharacterCreator() {
   const currentClassB = char.gestalt ? CLASSES.find((c) => c.id === char.classesB?.[0]?.classId) : undefined;
   const featQuery = featSearch.trim().toLowerCase();
   const qualifiedFeats = useMemo(
-    () => FEATS.filter((f) => qualifiesFor(f, { char, derived })),
+    () => FEATS.filter((f) => char.featIds.includes(f.id) || qualifiesFor(f, { char, derived })),
     [char, derived],
   );
   const visibleFeats = useMemo(
@@ -706,7 +707,7 @@ function CharacterCreator() {
                   onChange={(e) => setFeatSearch(e.target.value)}
                   placeholder="Search feats by name, prerequisite, or benefit"
                 />
-                <p className="text-xs text-muted-foreground">{visibleFeats.length} feats shown of {FEATS.length}</p>
+                <p className="text-xs text-muted-foreground">{visibleFeats.length} shown · {qualifiedFeats.length} of {FEATS.length} feats you currently qualify for</p>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {visibleFeats.map((f) => {
                     const active = char.featIds.includes(f.id);

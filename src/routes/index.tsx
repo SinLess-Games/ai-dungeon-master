@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { listCharacters } from "@/lib/storage";
 import { computeCharacter } from "@/lib/rules/engine";
 import { CLASS_BY_ID } from "@/lib/rules/classes";
-import logoAsset from "@/assets/logo.png.asset.json";
+import logoAsset from "@/assets/endless-codex-logo.png.asset.json";
 import { RACE_BY_ID } from "@/lib/rules/races";
 import type { Character } from "@/lib/rules/character";
 

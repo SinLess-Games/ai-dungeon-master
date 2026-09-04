@@ -17,6 +17,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { getCampaign, getCharacter, saveCampaign, saveCharacter, pushRoll } from "@/lib/storage";
 import { buildDmContext } from "@/lib/dm-context";
 import { applyDmTool } from "@/lib/dm-tools";
+import { pickOpening } from "@/lib/dm-openings";
 import { computeCharacter, formatMod } from "@/lib/rules/engine";
 import { parseNotation, roll as rollDice } from "@/lib/dice";
 import { ABILITY_NAMES, type AbilityKey } from "@/lib/rules/types";
@@ -181,9 +182,7 @@ function Table({
   useEffect(() => {
     if (autoStarted.current || messages.length > 0 || busy) return;
     autoStarted.current = true;
-    void sendMessage({
-      text: `Begin the campaign. Set the opening scene in ${campaignRef.current.scene.location} and tell me what I see, hear, and smell. End with a situation that invites my first action.`,
-    });
+    void sendMessage({ text: pickOpening(campaignRef.current) });
   }, [messages.length, busy, sendMessage]);
 
   useEffect(() => {

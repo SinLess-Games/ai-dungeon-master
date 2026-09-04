@@ -80,6 +80,8 @@ export interface WorldSite {
   population?: number;
   government?: string;
   discovered: boolean;
+  /** Storage path of the AI-painted local map, if one has been made. */
+  artPath?: string;
   /** Tactical map that this site opens into. */
   mapId?: string;
 }

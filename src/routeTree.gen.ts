@@ -30,10 +30,18 @@ import { Route as CharactersIndexRouteImport } from './routes/characters.index'
 import { Route as CharactersIdRouteImport } from './routes/characters.$id'
 import { Route as CharactersNewRouteImport } from './routes/characters.new'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout/return'
+import { Route as DevBlogIndexRouteImport } from './routes/dev-blog.index'
+import { Route as DevBlogSlugRouteImport } from './routes/dev-blog.$slug'
+import { Route as DevBlogRssDotxmlRouteImport } from './routes/dev-blog.rss[.]xml'
 import { Route as MapsMapIdRouteImport } from './routes/maps.$mapId'
 import { Route as PartyCampaignIdRouteImport } from './routes/party.$campaignId'
 import { Route as WorldsIndexRouteImport } from './routes/worlds.index'
 import { Route as WorldsWorldIdRouteImport } from './routes/worlds.$worldId'
+import { Route as AdminDevBlogIndexRouteImport } from './routes/admin.dev-blog.index'
+import { Route as AdminDevBlogNewRouteImport } from './routes/admin.dev-blog.new'
+import { Route as AdminDevBlogIdEditRouteImport } from './routes/admin.dev-blog.$id.edit'
+import { Route as AdminDevBlogIdPreviewRouteImport } from './routes/admin.dev-blog.$id.preview'
+import { Route as ApiPublicBlogMediaSplatRouteImport } from './routes/api/public/blog-media.$'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 
 const IndexRoute = IndexRouteImport.update({
@@ -141,6 +149,21 @@ const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
   path: '/checkout/return',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DevBlogIndexRoute = DevBlogIndexRouteImport.update({
+  id: '/dev-blog/',
+  path: '/dev-blog/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevBlogSlugRoute = DevBlogSlugRouteImport.update({
+  id: '/dev-blog/$slug',
+  path: '/dev-blog/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevBlogRssDotxmlRoute = DevBlogRssDotxmlRouteImport.update({
+  id: '/dev-blog/rss.xml',
+  path: '/dev-blog/rss.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MapsMapIdRoute = MapsMapIdRouteImport.update({
   id: '/maps/$mapId',
   path: '/maps/$mapId',
@@ -159,6 +182,31 @@ const WorldsIndexRoute = WorldsIndexRouteImport.update({
 const WorldsWorldIdRoute = WorldsWorldIdRouteImport.update({
   id: '/worlds/$worldId',
   path: '/worlds/$worldId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminDevBlogIndexRoute = AdminDevBlogIndexRouteImport.update({
+  id: '/dev-blog/',
+  path: '/dev-blog/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminDevBlogNewRoute = AdminDevBlogNewRouteImport.update({
+  id: '/dev-blog/new',
+  path: '/dev-blog/new',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminDevBlogIdEditRoute = AdminDevBlogIdEditRouteImport.update({
+  id: '/dev-blog/$id/edit',
+  path: '/dev-blog/$id/edit',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminDevBlogIdPreviewRoute = AdminDevBlogIdPreviewRouteImport.update({
+  id: '/dev-blog/$id/preview',
+  path: '/dev-blog/$id/preview',
+  getParentRoute: () => AdminRoute,
+} as any)
+const ApiPublicBlogMediaSplatRoute = ApiPublicBlogMediaSplatRouteImport.update({
+  id: '/api/public/blog-media/$',
+  path: '/api/public/blog-media/$',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicPaymentsWebhookRoute =
@@ -187,13 +235,21 @@ export interface FileRoutesByFullPath {
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
   '/checkout/return': typeof CheckoutReturnRoute
+  '/dev-blog/$slug': typeof DevBlogSlugRoute
+  '/dev-blog/rss.xml': typeof DevBlogRssDotxmlRoute
   '/maps/$mapId': typeof MapsMapIdRoute
   '/party/$campaignId': typeof PartyCampaignIdRoute
   '/worlds/$worldId': typeof WorldsWorldIdRoute
   '/admin/': typeof AdminIndexRoute
   '/campaigns/': typeof CampaignsIndexRoute
   '/characters/': typeof CharactersIndexRoute
+  '/dev-blog/': typeof DevBlogIndexRoute
   '/worlds/': typeof WorldsIndexRoute
+  '/admin/dev-blog/new': typeof AdminDevBlogNewRoute
+  '/admin/dev-blog/': typeof AdminDevBlogIndexRoute
+  '/admin/dev-blog/$id/edit': typeof AdminDevBlogIdEditRoute
+  '/admin/dev-blog/$id/preview': typeof AdminDevBlogIdPreviewRoute
+  '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -214,13 +270,21 @@ export interface FileRoutesByTo {
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
   '/checkout/return': typeof CheckoutReturnRoute
+  '/dev-blog/$slug': typeof DevBlogSlugRoute
+  '/dev-blog/rss.xml': typeof DevBlogRssDotxmlRoute
   '/maps/$mapId': typeof MapsMapIdRoute
   '/party/$campaignId': typeof PartyCampaignIdRoute
   '/worlds/$worldId': typeof WorldsWorldIdRoute
   '/admin': typeof AdminIndexRoute
   '/campaigns': typeof CampaignsIndexRoute
   '/characters': typeof CharactersIndexRoute
+  '/dev-blog': typeof DevBlogIndexRoute
   '/worlds': typeof WorldsIndexRoute
+  '/admin/dev-blog/new': typeof AdminDevBlogNewRoute
+  '/admin/dev-blog': typeof AdminDevBlogIndexRoute
+  '/admin/dev-blog/$id/edit': typeof AdminDevBlogIdEditRoute
+  '/admin/dev-blog/$id/preview': typeof AdminDevBlogIdPreviewRoute
+  '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
 export interface FileRoutesById {
@@ -243,13 +307,21 @@ export interface FileRoutesById {
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
   '/checkout/return': typeof CheckoutReturnRoute
+  '/dev-blog/$slug': typeof DevBlogSlugRoute
+  '/dev-blog/rss.xml': typeof DevBlogRssDotxmlRoute
   '/maps/$mapId': typeof MapsMapIdRoute
   '/party/$campaignId': typeof PartyCampaignIdRoute
   '/worlds/$worldId': typeof WorldsWorldIdRoute
   '/admin/': typeof AdminIndexRoute
   '/campaigns/': typeof CampaignsIndexRoute
   '/characters/': typeof CharactersIndexRoute
+  '/dev-blog/': typeof DevBlogIndexRoute
   '/worlds/': typeof WorldsIndexRoute
+  '/admin/dev-blog/new': typeof AdminDevBlogNewRoute
+  '/admin/dev-blog/': typeof AdminDevBlogIndexRoute
+  '/admin/dev-blog/$id/edit': typeof AdminDevBlogIdEditRoute
+  '/admin/dev-blog/$id/preview': typeof AdminDevBlogIdPreviewRoute
+  '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
 export interface FileRouteTypes {
@@ -273,13 +345,21 @@ export interface FileRouteTypes {
     | '/characters/$id'
     | '/characters/new'
     | '/checkout/return'
+    | '/dev-blog/$slug'
+    | '/dev-blog/rss.xml'
     | '/maps/$mapId'
     | '/party/$campaignId'
     | '/worlds/$worldId'
     | '/admin/'
     | '/campaigns/'
     | '/characters/'
+    | '/dev-blog/'
     | '/worlds/'
+    | '/admin/dev-blog/new'
+    | '/admin/dev-blog/'
+    | '/admin/dev-blog/$id/edit'
+    | '/admin/dev-blog/$id/preview'
+    | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -300,13 +380,21 @@ export interface FileRouteTypes {
     | '/characters/$id'
     | '/characters/new'
     | '/checkout/return'
+    | '/dev-blog/$slug'
+    | '/dev-blog/rss.xml'
     | '/maps/$mapId'
     | '/party/$campaignId'
     | '/worlds/$worldId'
     | '/admin'
     | '/campaigns'
     | '/characters'
+    | '/dev-blog'
     | '/worlds'
+    | '/admin/dev-blog/new'
+    | '/admin/dev-blog'
+    | '/admin/dev-blog/$id/edit'
+    | '/admin/dev-blog/$id/preview'
+    | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
   id:
     | '__root__'
@@ -328,13 +416,21 @@ export interface FileRouteTypes {
     | '/characters/$id'
     | '/characters/new'
     | '/checkout/return'
+    | '/dev-blog/$slug'
+    | '/dev-blog/rss.xml'
     | '/maps/$mapId'
     | '/party/$campaignId'
     | '/worlds/$worldId'
     | '/admin/'
     | '/campaigns/'
     | '/characters/'
+    | '/dev-blog/'
     | '/worlds/'
+    | '/admin/dev-blog/new'
+    | '/admin/dev-blog/'
+    | '/admin/dev-blog/$id/edit'
+    | '/admin/dev-blog/$id/preview'
+    | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
   fileRoutesById: FileRoutesById
 }
@@ -352,12 +448,16 @@ export interface RootRouteChildren {
   CharactersIdRoute: typeof CharactersIdRoute
   CharactersNewRoute: typeof CharactersNewRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
+  DevBlogSlugRoute: typeof DevBlogSlugRoute
+  DevBlogRssDotxmlRoute: typeof DevBlogRssDotxmlRoute
   MapsMapIdRoute: typeof MapsMapIdRoute
   PartyCampaignIdRoute: typeof PartyCampaignIdRoute
   WorldsWorldIdRoute: typeof WorldsWorldIdRoute
   CampaignsIndexRoute: typeof CampaignsIndexRoute
   CharactersIndexRoute: typeof CharactersIndexRoute
+  DevBlogIndexRoute: typeof DevBlogIndexRoute
   WorldsIndexRoute: typeof WorldsIndexRoute
+  ApiPublicBlogMediaSplatRoute: typeof ApiPublicBlogMediaSplatRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
 }
 
@@ -510,6 +610,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CheckoutReturnRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dev-blog/': {
+      id: '/dev-blog/'
+      path: '/dev-blog'
+      fullPath: '/dev-blog/'
+      preLoaderRoute: typeof DevBlogIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dev-blog/$slug': {
+      id: '/dev-blog/$slug'
+      path: '/dev-blog/$slug'
+      fullPath: '/dev-blog/$slug'
+      preLoaderRoute: typeof DevBlogSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dev-blog/rss.xml': {
+      id: '/dev-blog/rss.xml'
+      path: '/dev-blog/rss.xml'
+      fullPath: '/dev-blog/rss.xml'
+      preLoaderRoute: typeof DevBlogRssDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/maps/$mapId': {
       id: '/maps/$mapId'
       path: '/maps/$mapId'
@@ -538,6 +659,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorldsWorldIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/dev-blog/': {
+      id: '/admin/dev-blog/'
+      path: '/dev-blog'
+      fullPath: '/admin/dev-blog/'
+      preLoaderRoute: typeof AdminDevBlogIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/dev-blog/new': {
+      id: '/admin/dev-blog/new'
+      path: '/dev-blog/new'
+      fullPath: '/admin/dev-blog/new'
+      preLoaderRoute: typeof AdminDevBlogNewRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/dev-blog/$id/edit': {
+      id: '/admin/dev-blog/$id/edit'
+      path: '/dev-blog/$id/edit'
+      fullPath: '/admin/dev-blog/$id/edit'
+      preLoaderRoute: typeof AdminDevBlogIdEditRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/dev-blog/$id/preview': {
+      id: '/admin/dev-blog/$id/preview'
+      path: '/dev-blog/$id/preview'
+      fullPath: '/admin/dev-blog/$id/preview'
+      preLoaderRoute: typeof AdminDevBlogIdPreviewRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/api/public/blog-media/$': {
+      id: '/api/public/blog-media/$'
+      path: '/api/public/blog-media/$'
+      fullPath: '/api/public/blog-media/$'
+      preLoaderRoute: typeof ApiPublicBlogMediaSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/payments/webhook': {
       id: '/api/public/payments/webhook'
       path: '/api/public/payments/webhook'
@@ -555,6 +711,10 @@ interface AdminRouteChildren {
   AdminPlayersRoute: typeof AdminPlayersRoute
   AdminTitlesRoute: typeof AdminTitlesRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  AdminDevBlogNewRoute: typeof AdminDevBlogNewRoute
+  AdminDevBlogIndexRoute: typeof AdminDevBlogIndexRoute
+  AdminDevBlogIdEditRoute: typeof AdminDevBlogIdEditRoute
+  AdminDevBlogIdPreviewRoute: typeof AdminDevBlogIdPreviewRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -564,6 +724,10 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminPlayersRoute: AdminPlayersRoute,
   AdminTitlesRoute: AdminTitlesRoute,
   AdminIndexRoute: AdminIndexRoute,
+  AdminDevBlogNewRoute: AdminDevBlogNewRoute,
+  AdminDevBlogIndexRoute: AdminDevBlogIndexRoute,
+  AdminDevBlogIdEditRoute: AdminDevBlogIdEditRoute,
+  AdminDevBlogIdPreviewRoute: AdminDevBlogIdPreviewRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
@@ -582,12 +746,16 @@ const rootRouteChildren: RootRouteChildren = {
   CharactersIdRoute: CharactersIdRoute,
   CharactersNewRoute: CharactersNewRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
+  DevBlogSlugRoute: DevBlogSlugRoute,
+  DevBlogRssDotxmlRoute: DevBlogRssDotxmlRoute,
   MapsMapIdRoute: MapsMapIdRoute,
   PartyCampaignIdRoute: PartyCampaignIdRoute,
   WorldsWorldIdRoute: WorldsWorldIdRoute,
   CampaignsIndexRoute: CampaignsIndexRoute,
   CharactersIndexRoute: CharactersIndexRoute,
+  DevBlogIndexRoute: DevBlogIndexRoute,
   WorldsIndexRoute: WorldsIndexRoute,
+  ApiPublicBlogMediaSplatRoute: ApiPublicBlogMediaSplatRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
 }
 export const routeTree = rootRouteImport

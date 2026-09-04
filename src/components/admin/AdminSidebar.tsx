@@ -1,14 +1,16 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Award, BarChart3, CreditCard, LayoutDashboard, MessageSquareWarning, Users } from "lucide-react";
+import { Award, BarChart3, CreditCard, LayoutDashboard, MessageSquareWarning, Newspaper, Users } from "lucide-react";
 
 const ITEMS = [
   { to: "/admin", label: "Overview", icon: LayoutDashboard },
   { to: "/admin/players", label: "Players", icon: Users },
   { to: "/admin/content", label: "Content", icon: BarChart3 },
+  { to: "/admin/dev-blog", label: "Dev Blog", icon: Newspaper },
   { to: "/admin/billing", label: "Subscriptions", icon: CreditCard },
   { to: "/admin/titles", label: "Titles", icon: Award },
   { to: "/admin/feedback", label: "Feedback", icon: MessageSquareWarning },
 ] as const;
+
 
 
 export function AdminSidebar() {

@@ -281,14 +281,14 @@ function MemberCard({
         <CardContent className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Field label="Name">
-              <Input value={member.name} onChange={(e) => onPatch({ name: e.target.value })} />
+              <Input aria-label="Member name" value={member.name} onChange={(e) => onPatch({ name: e.target.value })} />
             </Field>
             <Field label="Run by">
               <Select
                 value={member.controlledBy}
                 onValueChange={(v) => onPatch({ controlledBy: v as PartyMember["controlledBy"] })}
               >
-                <SelectTrigger>
+                <SelectTrigger aria-label="Run by">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -302,7 +302,7 @@ function MemberCard({
                 value={member.tier ?? "companion"}
                 onValueChange={(v) => onPatch({ tier: v as PartyTier })}
               >
-                <SelectTrigger>
+                <SelectTrigger aria-label="Section">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -319,7 +319,7 @@ function MemberCard({
                 value={member.status}
                 onValueChange={(v) => onPatch({ status: v as PartyMember["status"] })}
               >
-                <SelectTrigger>
+                <SelectTrigger aria-label="Status">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -331,7 +331,7 @@ function MemberCard({
             </Field>
             <Field label="Role">
               <Select value={member.role} onValueChange={(v) => onPatch({ role: v })}>
-                <SelectTrigger>
+                <SelectTrigger aria-label="Role">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -344,10 +344,11 @@ function MemberCard({
               </Select>
             </Field>
             <Field label="Race">
-              <Input value={member.race} onChange={(e) => onPatch({ race: e.target.value })} />
+              <Input aria-label="Race" value={member.race} onChange={(e) => onPatch({ race: e.target.value })} />
             </Field>
             <Field label="Classes">
               <Input
+                aria-label="Classes and levels"
                 value={member.classLine}
                 placeholder="Fighter 3 / Rogue 1"
                 onChange={(e) => onPatch({ classLine: e.target.value })}
@@ -355,7 +356,7 @@ function MemberCard({
             </Field>
             <Field label="Attitude">
               <Select value={member.attitude} onValueChange={(v) => onPatch({ attitude: v })}>
-                <SelectTrigger>
+                <SelectTrigger aria-label="Attitude">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -407,11 +408,13 @@ function MemberCard({
                     className="grid gap-2 rounded-lg border border-border/70 p-2 sm:grid-cols-[1fr_5rem_9rem_1fr_auto]"
                   >
                     <Input
+                      aria-label="Item name"
                       value={g.name}
                       placeholder="Item"
                       onChange={(e) => onGearPatch(g.id, { name: e.target.value })}
                     />
                     <Input
+                      aria-label="Item quantity"
                       type="number"
                       min={1}
                       value={g.quantity}
@@ -420,7 +423,7 @@ function MemberCard({
                       }
                     />
                     <Select value={g.slot} onValueChange={(v) => onGearPatch(g.id, { slot: v })}>
-                      <SelectTrigger>
+                      <SelectTrigger aria-label="Gear slot">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -432,6 +435,7 @@ function MemberCard({
                       </SelectContent>
                     </Select>
                     <Input
+                      aria-label="Item notes"
                       value={g.notes}
                       placeholder="Notes"
                       onChange={(e) => onGearPatch(g.id, { notes: e.target.value })}
@@ -476,7 +480,7 @@ function NumberField({
 }) {
   return (
     <Field label={label}>
-      <Input type="number" value={value} onChange={(e) => onChange(Number(e.target.value) || 0)} />
+      <Input aria-label={label} type="number" value={value} onChange={(e) => onChange(Number(e.target.value) || 0)} />
     </Field>
   );
 }

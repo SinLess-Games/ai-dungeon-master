@@ -65,11 +65,11 @@ function coastPoints(r: WorldRegion): Pt[] {
   const cx = r.x + r.w / 2;
   const cy = r.y + r.h / 2;
   // oversized so neighbouring regions fuse into a single continent
-  const rx = (r.w / 2) * 1.26;
-  const ry = (r.h / 2) * 1.26;
+  const rx = (r.w / 2) * 1.34;
+  const ry = (r.h / 2) * 1.34;
 
   let pts: Pt[] = [];
-  const base = 14;
+  const base = 16;
   for (let i = 0; i < base; i++) {
     const a = (i / base) * Math.PI * 2;
     const wobble = 0.72 + rand() * 0.4;
@@ -77,8 +77,8 @@ function coastPoints(r: WorldRegion): Pt[] {
   }
 
   // 4 rounds of midpoint displacement => fjords, headlands, bays
-  let rough = 0.3;
-  for (let pass = 0; pass < 4; pass++) {
+  let rough = 0.5;
+  for (let pass = 0; pass < 5; pass++) {
     const next: Pt[] = [];
     for (let i = 0; i < pts.length; i++) {
       const p = pts[i]!;
@@ -93,13 +93,13 @@ function coastPoints(r: WorldRegion): Pt[] {
       next.push([mx + (-dy / len) * off, my + (dx / len) * off]);
     }
     pts = next;
-    rough *= 0.72;
+    rough *= 0.66;
   }
   return pts;
 }
 
 /** Smooth closed path through points (Catmull-Rom → cubic bezier). */
-function smoothPath(pts: Pt[], tension = 6) {
+function smoothPath(pts: Pt[], tension = 14) {
   if (!pts.length) return "";
   let d = `M ${pts[0]![0].toFixed(2)} ${pts[0]![1].toFixed(2)}`;
   for (let i = 0; i < pts.length; i++) {
@@ -138,7 +138,7 @@ function features(r: WorldRegion): Feature[] {
 
   if (r.terrain === "mountains" || r.terrain === "hills") {
     // ridges: chains of peaks following a wandering spine
-    const chains = Math.max(2, Math.round(area / 220));
+    const chains = Math.max(2, Math.round(area / 130));
     for (let c = 0; c < chains; c++) {
       let x = inX(rand());
       let y = inY(rand());
@@ -151,7 +151,7 @@ function features(r: WorldRegion): Feature[] {
       }
     }
   } else if (r.terrain === "forest" || r.terrain === "jungle" || r.terrain === "swamp") {
-    const clumps = Math.max(3, Math.round(area / 150));
+    const clumps = Math.max(3, Math.round(area / 85));
     for (let c = 0; c < clumps; c++) {
       const cx = inX(rand());
       const cy = inY(rand());
@@ -166,13 +166,13 @@ function features(r: WorldRegion): Feature[] {
       }
     }
   } else if (r.terrain === "desert" || r.terrain === "wasteland") {
-    const n = Math.max(6, Math.round(area / 90));
+    const n = Math.max(6, Math.round(area / 55));
     for (let i = 0; i < n; i++) push("dune", inX(rand()), inY(rand()), 0.8 + rand() * 0.7);
   } else if (r.terrain === "tundra") {
-    const n = Math.max(6, Math.round(area / 90));
+    const n = Math.max(6, Math.round(area / 55));
     for (let i = 0; i < n; i++) push("ice", inX(rand()), inY(rand()), 0.8 + rand() * 0.6);
   } else {
-    const n = Math.max(6, Math.round(area / 100));
+    const n = Math.max(6, Math.round(area / 60));
     for (let i = 0; i < n; i++) push("grass", inX(rand()), inY(rand()), 0.8 + rand() * 0.5);
     // a few lonely copses on open ground
     for (let i = 0; i < Math.round(n / 3); i++)

@@ -262,20 +262,10 @@ function Table({
           <ScrollArea className="flex-1 px-5 py-4">
             {!started ? (
               <div className="py-12 text-center">
-                <Sparkles className="mx-auto size-8 text-primary" />
+                <Sparkles className="mx-auto size-8 animate-pulse text-primary" />
                 <p className="mt-4 text-muted-foreground">
-                  The DM is waiting. Open the scene however you like, or let it begin.
+                  The DM is setting the opening scene…
                 </p>
-                <Button
-                  className="mt-4"
-                  onClick={() =>
-                    send(
-                      `Begin the campaign. Set the opening scene in ${campaign.scene.location} and tell me what I see.`,
-                    )
-                  }
-                >
-                  Begin the adventure
-                </Button>
               </div>
             ) : null}
 

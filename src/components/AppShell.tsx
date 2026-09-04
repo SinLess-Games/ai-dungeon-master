@@ -46,6 +46,7 @@ function isPlayActive(pathname: string) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user } = useSession();
+  const location = useLocation();
   return (
     <div className="dark min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-40 shadow-2xl shadow-black/30">

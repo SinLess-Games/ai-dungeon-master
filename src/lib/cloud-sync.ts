@@ -7,7 +7,13 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
-import { STORE_KEYS, readCollection, writeCollection } from "@/lib/storage";
+import {
+  STORE_KEYS,
+  clearDeletions,
+  listDeletions,
+  readCollection,
+  writeCollection,
+} from "@/lib/storage";
 import { AUTH_EVENT, getSession } from "@/lib/auth";
 
 interface SyncRow {
@@ -89,6 +95,23 @@ async function syncSpec(userId: string, spec: (typeof SPECS)[number]) {
   }
 }
 
+/** Push local deletes to the backend before pulling, so rows stay deleted. */
+async function flushDeletions(userId: string) {
+  const pending = listDeletions();
+  if (!pending.length) return;
+  const done: typeof pending = [];
+  for (const t of pending) {
+    if (!UUID.test(t.id)) {
+      done.push(t);
+      continue;
+    }
+    const { error } = await supabase.from(t.table).delete().eq("id", t.id).eq("user_id", userId);
+    if (error) throw new Error(error.message);
+    done.push(t);
+  }
+  clearDeletions(done);
+}
+
 let running: Promise<void> | null = null;
 
 export function syncNow(): Promise<void> {
@@ -103,6 +126,7 @@ export function syncNow(): Promise<void> {
   emit();
   running = (async () => {
     try {
+      await flushDeletions(user.id);
       for (const spec of SPECS) await syncSpec(user.id, spec);
       status = "idle";
       lastSyncedAt = new Date().toISOString();

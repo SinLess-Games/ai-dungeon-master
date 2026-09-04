@@ -113,7 +113,7 @@ export function LocalMapView({ site, className }: { site: WorldSite; className?:
         [w / 2, -h / 2],
         [w / 2, h / 2],
         [-w / 2, h / 2],
-      ].map(([x, y]) => [cx + x * cs - y * sn, cy + x * sn + y * cs]);
+      ].map(([x, y]) => [cx + x! * cs - y! * sn, cy + x! * sn + y! * cs] as Pt);
       blocks.push({ pts: corners, cx, cy });
     }
 
@@ -129,7 +129,7 @@ export function LocalMapView({ site, className }: { site: WorldSite; className?:
       river = "M " + pts.map((p) => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" L ");
     }
 
-    const names = LANDMARKS[site.kind] ?? LANDMARKS.town!;
+    const names = LANDMARKS[site.kind] ?? LANDMARKS['town']!;
     const marks = names.slice(0, site.kind === "village" || site.kind === "camp" ? 4 : 6).map((label, i) => {
       const a = (i / 6) * Math.PI * 2 + rand();
       const rr = 6 + rand() * 18;

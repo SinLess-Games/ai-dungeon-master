@@ -8,6 +8,7 @@ import {
 } from "ai";
 import { Dices, Send, Swords, Heart, Coins, Scroll, Sparkles, User } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { Markdown } from "@/components/Markdown";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -276,7 +277,7 @@ function Table({
                           className={
                             m.role === "user"
                               ? "ml-auto max-w-[85%] rounded-lg bg-accent/60 px-4 py-2 text-sm"
-                              : "max-w-[95%] whitespace-pre-wrap text-[0.95rem] leading-relaxed"
+                            : "max-w-[95%] text-[0.95rem] leading-relaxed"
                           }
                         >
                           {m.role === "user" ? (
@@ -285,7 +286,7 @@ function Table({
                               <span>{part.text}</span>
                             </span>
                           ) : (
-                            part.text
+                            <Markdown text={part.text} />
                           )}
                         </div>
                       );

@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { Fragment, type ReactNode } from "react";
 import {
   Dices,
@@ -24,20 +24,26 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useSession } from "@/hooks/useSession";
 import { signOut } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 
 import headerBgAsset from "@/assets/header-bg.png.asset.json";
 
-const NAV = [
-  { to: "/", label: "Home", icon: Home },
-  { to: "/campaigns", label: "Play", icon: Swords },
+const PLAY_SUB = [
+  { to: "/campaigns", label: "Campaigns", icon: Swords },
   { to: "/characters", label: "Characters", icon: Users },
   { to: "/worlds", label: "Worlds", icon: Globe2 },
   { to: "/dice", label: "Dice", icon: Dices },
-  { to: "/wiki", label: "Wiki", icon: BookOpen },
 ] as const;
+
+const NAV = [{ to: "/", label: "Home", icon: Home }] as const;
+
+function isPlayActive(pathname: string) {
+  return PLAY_SUB.some((s) => pathname.startsWith(s.to));
+}
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user } = useSession();
+  const location = useLocation();
   return (
     <div className="dark min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-40 shadow-2xl shadow-black/30">
@@ -86,12 +92,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* Navigation row */}
         <div className="border-b border-border/60 bg-card/95 backdrop-blur">
           <nav className="mx-auto flex max-w-7xl items-center gap-1 px-4 py-2 sm:gap-2">
-            {NAV.map(({ to, label, icon: Icon }, i) => (
+            {NAV.map(({ to, label, icon: Icon }) => (
               <Fragment key={to}>
-                {i > 0 && <span className="mx-1 hidden h-5 w-px bg-border/70 sm:block" />}
                 <Link
                   to={to}
-                  activeOptions={{ exact: to === "/" }}
+                  activeOptions={{ exact: true }}
                   activeProps={{
                     className:
                       "border border-primary/70 bg-primary/15 text-primary shadow-[0_0_18px_-4px_rgba(217,169,77,0.5)]",
@@ -103,6 +108,59 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </Link>
               </Fragment>
             ))}
+
+            <span className="mx-1 hidden h-5 w-px bg-border/70 sm:block" />
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-md border px-2.5 py-2 text-xs font-medium transition-all sm:gap-2 sm:px-3.5 sm:text-sm",
+                    isPlayActive(location.pathname)
+                      ? "border-primary/70 bg-primary/15 text-primary shadow-[0_0_18px_-4px_rgba(217,169,77,0.5)]"
+                      : "border-transparent text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+                  )}
+                >
+                  <Swords className="size-4 sm:size-[1.125rem]" />
+                  <span className="hidden sm:inline">Play</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-44">
+                {PLAY_SUB.map(({ to, label, icon: Icon }) => {
+                  const active = location.pathname.startsWith(to);
+                  return (
+                    <DropdownMenuItem key={to} asChild>
+                      <Link
+                        to={to}
+                        className={cn(
+                          "flex w-full cursor-pointer items-center gap-2",
+                          active && "bg-primary/10 text-primary",
+                        )}
+                      >
+                        <Icon className="size-4" />
+                        <span>{label}</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <span className="mx-1 hidden h-5 w-px bg-border/70 sm:block" />
+
+            <Link
+              to="/wiki"
+              activeOptions={{ exact: false }}
+              activeProps={{
+                className:
+                  "border border-primary/70 bg-primary/15 text-primary shadow-[0_0_18px_-4px_rgba(217,169,77,0.5)]",
+              }}
+              className="flex items-center gap-1.5 rounded-md border border-transparent px-2.5 py-2 text-xs font-medium text-muted-foreground transition-all hover:bg-accent/60 hover:text-foreground sm:gap-2 sm:px-3.5 sm:text-sm"
+            >
+              <BookOpen className="size-4 sm:size-[1.125rem]" />
+              <span className="hidden sm:inline">Wiki</span>
+            </Link>
 
             <span className="mx-1 hidden h-5 w-px bg-border/70 sm:block" />
 

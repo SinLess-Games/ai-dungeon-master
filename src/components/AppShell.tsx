@@ -14,7 +14,9 @@ import {
   Settings,
   UserRound,
   ShieldCheck,
+  MessageSquareWarning,
 } from "lucide-react";
+import { FeedbackDialog } from "@/components/FeedbackDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -182,6 +184,21 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </Link>
               </>
             ) : null}
+
+            <span className="mx-1 hidden h-5 w-px bg-border/70 sm:block" />
+
+            <FeedbackDialog
+              trigger={
+                <button
+                  type="button"
+                  aria-label="Send feedback"
+                  className="flex items-center gap-1.5 rounded-md border border-transparent px-2.5 py-2 text-xs font-medium text-muted-foreground transition-all hover:bg-accent/60 hover:text-foreground sm:gap-2 sm:px-3.5 sm:text-sm"
+                >
+                  <MessageSquareWarning className="size-4 sm:size-[1.125rem]" />
+                  <span className="hidden sm:inline">Feedback</span>
+                </button>
+              }
+            />
 
             <span className="mx-1 hidden h-5 w-px bg-border/70 sm:block" />
 

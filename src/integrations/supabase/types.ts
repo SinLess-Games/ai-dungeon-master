@@ -111,6 +111,45 @@ export type Database = {
           },
         ]
       }
+      feedback: {
+        Row: {
+          admin_note: string | null
+          created_at: string
+          details: string
+          id: string
+          kind: string
+          page_url: string | null
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          admin_note?: string | null
+          created_at?: string
+          details?: string
+          id?: string
+          kind?: string
+          page_url?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          admin_note?: string | null
+          created_at?: string
+          details?: string
+          id?: string
+          kind?: string
+          page_url?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       game_maps: {
         Row: {
           created_at: string

@@ -81,7 +81,7 @@ function AdminTitles() {
   async function submit() {
     setBusy(true);
     try {
-      await save(draft as never);
+      await save({ data: draft });
       setDraft({ ...BLANK });
       await refresh();
       toast.success("Title saved.");
@@ -255,7 +255,7 @@ function AdminTitles() {
                     size="sm"
                     variant="ghost"
                     onClick={async () => {
-                      await remove({ data: { id: t.id } } as never);
+                      await remove({ data: { id: t.id } });
                       await refresh();
                       toast.success("Title removed.");
                     }}
@@ -306,7 +306,7 @@ function AdminTitles() {
                       onClick={async () => {
                         await grant({
                           data: { userId: p.userId, titleId: grantTitleId, grant: !has },
-                        } as never);
+                        });
                         await refresh();
                       }}
                     >

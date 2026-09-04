@@ -117,6 +117,8 @@ export interface World {
   routes: WorldRoute[];
   factions: WorldFaction[];
   party: { x: number; y: number; siteId?: string };
+  /** Storage path of the AI-painted atlas backdrop, if one has been made. */
+  artPath?: string;
   /** Miles per normalised unit — used for travel time. */
   scaleMilesPerUnit: number;
   createdAt: string;

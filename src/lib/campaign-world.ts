@@ -28,7 +28,6 @@ const STYLE_THEME: Partial<Record<CampaignStyle, string>> = {
   "fairytale-whimsy": "Fairytale",
   "science-fantasy": "Science fantasy",
   "wilderness-exploration": "Frontier",
-  "westward-march": "Frontier" as never,
 };
 
 export function campaignThemes(campaign: Campaign): string[] {

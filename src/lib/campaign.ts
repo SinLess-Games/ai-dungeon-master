@@ -90,6 +90,8 @@ export interface Campaign {
   pace: CampaignPace;
   dmStyle: DmStyle;
   allowEpic: boolean;
+  /** Overland map drawn for this campaign (see lib/campaign-world). */
+  worldId?: string;
   worldName: string;
   worldSummary: string;
   houseRules: string;

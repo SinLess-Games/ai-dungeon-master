@@ -181,14 +181,34 @@ export function computeCharacter(c: Character): DerivedStats {
   // Skill points. Gestalt characters get the skill points of BOTH classes
   // (and the class skill lists of both, unioned above).
   let skillPointsTotal = 0;
+  const skillPointBreakdown: { label: string; points: number }[] = [];
+  const intMod = mods.int;
+  const raceSkillBonus = race.bonusSkillPointsPerLevel ?? 0;
   for (let i = 0; i < level; i++) {
     const baseA = trackA[i]?.skillPoints ?? 0;
     const baseB = trackB[i]?.skillPoints ?? 0;
-    const bases = c.gestalt ? [baseA, baseB] : [Math.max(baseA, baseB)];
-    for (const base of bases) {
-      if (base === 0) continue;
-      const perLevel = Math.max(1, base + mods.int + (race.bonusSkillPointsPerLevel ?? 0));
-      skillPointsTotal += i === 0 ? perLevel * 4 : perLevel;
+    const sources = c.gestalt
+      ? ([
+          { def: trackA[i], base: baseA },
+          { def: trackB[i], base: baseB },
+        ] as const)
+      : ([{ def: baseA >= baseB ? trackA[i] : trackB[i], base: Math.max(baseA, baseB) }] as const);
+    for (const src of sources) {
+      if (!src || src.base === 0) continue;
+      const perLevel = Math.max(1, src.base + intMod + raceSkillBonus);
+      const points = i === 0 ? perLevel * 4 : perLevel;
+      skillPointsTotal += points;
+      const className = src.def?.name ?? "Class";
+      const parts = [`${className} ${src.base}`];
+      if (intMod !== 0) parts.push(`Int ${formatModStr(intMod)}`);
+      if (raceSkillBonus !== 0) parts.push(`${race.name} +${raceSkillBonus}`);
+      skillPointBreakdown.push({
+        label:
+          i === 0
+            ? `Level 1 (×4 at 1st level): ${parts.join(" + ")} = ${perLevel} × 4`
+            : `Level ${i + 1}: ${parts.join(" + ")}`,
+        points,
+      });
     }
   }
 
@@ -197,8 +217,13 @@ export function computeCharacter(c: Character): DerivedStats {
     fort += saveForClass(rhd.saves.fort, rhd.count);
     ref += saveForClass(rhd.saves.ref, rhd.count);
     will += saveForClass(rhd.saves.will, rhd.count);
-    const perHd = Math.max(1, (rhd.skillPointsPerHd ?? 2) + mods.int);
-    skillPointsTotal += perHd * (rhd.count + 3);
+    const perHd = Math.max(1, (rhd.skillPointsPerHd ?? 2) + intMod);
+    const rhdPoints = perHd * (rhd.count + 3);
+    skillPointsTotal += rhdPoints;
+    skillPointBreakdown.push({
+      label: `${race.name} racial Hit Dice: (${rhd.skillPointsPerHd ?? 2} + Int ${formatModStr(intMod)}) × (${rhd.count} HD + 3)`,
+      points: rhdPoints,
+    });
   }
 
   const armor = ARMORS.find((a) => a.id === c.armorId) ?? ARMORS[0]!;

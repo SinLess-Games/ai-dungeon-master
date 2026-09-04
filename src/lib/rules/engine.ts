@@ -187,29 +187,25 @@ export function computeCharacter(c: Character): DerivedStats {
   for (let i = 0; i < level; i++) {
     const baseA = trackA[i]?.skillPoints ?? 0;
     const baseB = trackB[i]?.skillPoints ?? 0;
-    const sources = c.gestalt
-      ? ([
-          { def: trackA[i], base: baseA },
-          { def: trackB[i], base: baseB },
-        ] as const)
-      : ([{ def: baseA >= baseB ? trackA[i] : trackB[i], base: Math.max(baseA, baseB) }] as const);
-    for (const src of sources) {
-      if (!src || src.base === 0) continue;
-      const perLevel = Math.max(1, src.base + intMod + raceSkillBonus);
-      const points = i === 0 ? perLevel * 4 : perLevel;
-      skillPointsTotal += points;
-      const className = src.def?.name ?? "Class";
-      const parts = [`${className} ${src.base}`];
-      if (intMod !== 0) parts.push(`Int ${formatMod(intMod)}`);
-      if (raceSkillBonus !== 0) parts.push(`${race.name} +${raceSkillBonus}`);
-      skillPointBreakdown.push({
-        label:
-          i === 0
-            ? `Level 1 (×4 at 1st level): ${parts.join(" + ")} = ${perLevel} × 4`
-            : `Level ${i + 1}: ${parts.join(" + ")}`,
-        points,
-      });
-    }
+    const isGestaltLevel = c.gestalt && trackB[i];
+    // Gestalt: add both classes' base skill points together; Int applies once.
+    const base = isGestaltLevel ? baseA + baseB : Math.max(baseA, baseB);
+    if (base === 0) continue;
+    const perLevel = Math.max(1, base + intMod + raceSkillBonus);
+    const points = i === 0 ? perLevel * 4 : perLevel;
+    skillPointsTotal += points;
+    const parts = isGestaltLevel
+      ? [`${trackA[i]?.name ?? "Class"} ${baseA}`, `${trackB[i]?.name ?? "Class"} ${baseB}`]
+      : [`${(baseA >= baseB ? trackA[i] : trackB[i])?.name ?? "Class"} ${base}`];
+    if (intMod !== 0) parts.push(`Int ${formatMod(intMod)}`);
+    if (raceSkillBonus !== 0) parts.push(`${race.name} +${raceSkillBonus}`);
+    skillPointBreakdown.push({
+      label:
+        i === 0
+          ? `Level 1 (×4 at 1st level): ${parts.join(" + ")} = ${perLevel} × 4`
+          : `Level ${i + 1}: ${parts.join(" + ")}`,
+      points,
+    });
   }
 
   if (rhd) {

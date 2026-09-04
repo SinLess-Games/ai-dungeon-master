@@ -1,7 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, type UIMessage } from "ai";
+import {
+  DefaultChatTransport,
+  lastAssistantMessageIsCompleteWithToolCalls,
+  type UIMessage,
+} from "ai";
 import { Dices, Send, Swords, Heart, Coins, Scroll, Sparkles, User } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -127,6 +131,9 @@ function Table({
     id: initialCampaign.id,
     messages: initialCampaign.messages as unknown as UIMessage[],
     transport,
+    // Once every tool call has a result, hand the turn back to the DM so it
+    // narrates the outcome.
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     onError: (e) => setError(e.message),
     onToolCall: async ({ toolCall }) => {
       const applied = applyDmTool(

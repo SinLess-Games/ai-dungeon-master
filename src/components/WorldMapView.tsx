@@ -402,6 +402,8 @@ export interface WorldMapViewProps {
   onMapClick?: (x: number, y: number) => void;
   showUndiscovered?: boolean;
   className?: string;
+  /** AI-painted backdrop; when present the drawn terrain is replaced by it. */
+  artUrl?: string | undefined;
 }
 
 /** Illustrated overland atlas map. Coordinates are normalised 0-100. */
@@ -412,6 +414,7 @@ export function WorldMapView({
   onMapClick,
   showUndiscovered = true,
   className,
+  artUrl,
 }: WorldMapViewProps) {
   const ref = useRef<SVGSVGElement | null>(null);
   const gold = "#9c7c34";
@@ -596,6 +599,19 @@ export function WorldMapView({
       <g transform={`translate(${view.x} ${view.y}) scale(${view.z})`}>
 
 
+      {artUrl && (
+        <image
+          href={artUrl}
+          x="0"
+          y="0"
+          width="100"
+          height="70"
+          preserveAspectRatio="xMidYMid slice"
+        />
+      )}
+
+      {!artUrl && (
+        <>
       {/* ---------------- ocean ---------------- */}
       <rect x="0" y="0" width="100" height="70" fill="url(#wm-ocean)" />
       <rect x="0" y="0" width="100" height="70" filter="url(#wm-water)" opacity="0.5" />
@@ -687,6 +703,9 @@ export function WorldMapView({
           </g>
         );
       })}
+        </>
+      )}
+
 
 
       {/* ---------------- region names ---------------- */}

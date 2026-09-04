@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WorldMapView } from "@/components/WorldMapView";
+import { PaintMapButton, useMapArt } from "@/components/MapArtControls";
 import { getWorld, listMaps, newId, saveMap, saveWorld } from "@/lib/storage";
 import {
   SITE_KINDS,
@@ -54,6 +55,7 @@ function WorldDetail() {
   const [siteKind, setSiteKind] = useState<SiteKind>("town");
   const [terrain, setTerrain] = useState<TerrainKind>("plains");
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
+  const worldArt = useMapArt(world?.artPath);
 
   useEffect(() => {
     setWorld(getWorld(worldId));
@@ -196,11 +198,29 @@ function WorldDetail() {
           <div className="aspect-[10/7] w-full">
             <WorldMapView
               world={world}
+              artUrl={worldArt}
               selectedSiteId={selectedSiteId}
               onSelectSite={(s) => setSelectedSiteId(s.id)}
               onMapClick={handleMapClick}
             />
           </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <PaintMapButton world={world} onPainted={() => setWorld(getWorld(worldId))} />
+            {selectedSiteId ? (
+              (() => {
+                const site = world.sites.find((s) => s.id === selectedSiteId);
+                return site ? (
+                  <PaintMapButton
+                    world={world}
+                    site={site}
+                    onPainted={() => setWorld(getWorld(worldId))}
+                  />
+                ) : null;
+              })()
+            ) : null}
+          </div>
+
 
           <p className="text-xs text-muted-foreground">
             Scale: {world.scaleMilesPerUnit} miles per map unit. Party is in{" "}

@@ -80,6 +80,8 @@ export interface WorldSite {
   population?: number;
   government?: string;
   discovered: boolean;
+  /** Storage path of the AI-painted local map, if one has been made. */
+  artPath?: string;
   /** Tactical map that this site opens into. */
   mapId?: string;
 }
@@ -117,6 +119,8 @@ export interface World {
   routes: WorldRoute[];
   factions: WorldFaction[];
   party: { x: number; y: number; siteId?: string };
+  /** Storage path of the AI-painted atlas backdrop, if one has been made. */
+  artPath?: string;
   /** Miles per normalised unit — used for travel time. */
   scaleMilesPerUnit: number;
   createdAt: string;

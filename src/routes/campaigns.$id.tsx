@@ -18,6 +18,7 @@ import { getCampaign, getCharacter, getWorld, saveCampaign, saveCharacter, pushR
 import { ensureCampaignWorld } from "@/lib/campaign-world";
 import { WorldMapView } from "@/components/WorldMapView";
 import { LocalMapView } from "@/components/LocalMapView";
+import { PaintMapButton, useMapArt } from "@/components/MapArtControls";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { regionAt } from "@/lib/world";
 import { buildDmContext } from "@/lib/dm-context";
@@ -550,10 +551,16 @@ function Table({
 function WorldMapButton({ campaign }: { campaign: Campaign }) {
   const [open, setOpen] = useState(false);
   const [siteId, setSiteId] = useState<string | null>(null);
-  const world = open || campaign.worldId ? getWorld(campaign.worldId ?? "") : undefined;
+  const [tick, setTick] = useState(0);
+  const world = useMemo(
+    () => (open || campaign.worldId ? getWorld(campaign.worldId ?? "") : undefined),
+    [open, campaign.worldId, tick],
+  );
   const here = world?.sites.find((s) => s.id === world.party.siteId);
   const region = world ? regionAt(world, world.party.x, world.party.y) : undefined;
   const openSite = world?.sites.find((s) => s.id === siteId);
+  const worldArt = useMapArt(world?.artPath);
+  const siteArt = useMapArt(openSite?.artPath);
 
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setSiteId(null); }}>
@@ -571,20 +578,32 @@ function WorldMapButton({ campaign }: { campaign: Campaign }) {
         {world ? (
           openSite ? (
             <div className="space-y-4">
-              <LocalMapView site={openSite} className="h-[72vh] w-full rounded-lg border" />
+              <LocalMapView
+                site={openSite}
+                artUrl={siteArt}
+                className="h-[72vh] w-full rounded-lg border"
+              />
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm text-muted-foreground">
                   {openSite.description || "A local plan of the place, drawn as the party knows it."}
                 </p>
-                <Button variant="outline" size="sm" onClick={() => setSiteId(null)}>
-                  Back to the world
-                </Button>
+                <div className="flex items-center gap-2">
+                  <PaintMapButton
+                    world={world}
+                    site={openSite}
+                    onPainted={() => setTick((t) => t + 1)}
+                  />
+                  <Button variant="outline" size="sm" onClick={() => setSiteId(null)}>
+                    Back to the world
+                  </Button>
+                </div>
               </div>
             </div>
           ) : (
             <div className="space-y-4">
               <WorldMapView
                 world={world}
+                artUrl={worldArt}
                 showUndiscovered={false}
                 onSelectSite={(s) => setSiteId(s.id)}
                 className="h-[74vh] w-full"
@@ -594,11 +613,14 @@ function WorldMapButton({ campaign }: { campaign: Campaign }) {
                 {region ? ` in ${region.name} (${region.terrain})` : ""}. Drag to move the map, scroll to zoom,
                 and click any place to open its local map.
               </p>
-              <Button asChild variant="outline" size="sm">
-                <Link to="/worlds/$worldId" params={{ worldId: world.id }}>
-                  Open the full atlas
-                </Link>
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <PaintMapButton world={world} onPainted={() => setTick((t) => t + 1)} />
+                <Button asChild variant="outline" size="sm">
+                  <Link to="/worlds/$worldId" params={{ worldId: world.id }}>
+                    Open the full atlas
+                  </Link>
+                </Button>
+              </div>
             </div>
           )
         ) : (

@@ -56,7 +56,16 @@ interface Block {
 }
 
 /** Deterministic settlement or site plan drawn from the site id. */
-export function LocalMapView({ site, className }: { site: WorldSite; className?: string }) {
+export function LocalMapView({
+  site,
+  className,
+  artUrl,
+}: {
+  site: WorldSite;
+  className?: string;
+  /** AI-painted picture of this place; shown instead of the drawn plan. */
+  artUrl?: string | undefined;
+}) {
   const plan = useMemo(() => {
     const rand = rng(hash(site.id + site.name + site.kind));
     const walled = site.kind === "city" || site.kind === "town" || site.kind === "keep";
@@ -150,6 +159,16 @@ export function LocalMapView({ site, className }: { site: WorldSite; className?:
 
   const outlineD =
     "M " + plan.outline.map((p) => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" L ") + " Z";
+
+  if (artUrl) {
+    return (
+      <img
+        src={artUrl}
+        alt={`Painted map of ${site.name}`}
+        className={`object-cover ${className ?? "h-full w-full rounded-lg border border-border"}`}
+      />
+    );
+  }
 
   return (
     <svg

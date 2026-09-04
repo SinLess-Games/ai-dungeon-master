@@ -312,11 +312,7 @@ function CharacterCreator() {
                         key={r.id}
                         onClick={() => patch({ raceId: r.id })}
                         className={`rounded-lg border p-4 text-left transition-colors ${
-                          active
-                            ? "border-primary bg-primary/10"
-                            : otherId === cl.id && char.gestalt
-                              ? "border-primary/40 bg-primary/5"
-                              : "border-border/60 hover:border-primary/50"
+                          active ? "border-primary bg-primary/10" : "border-border/60 hover:border-primary/50"
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2">

@@ -315,9 +315,12 @@ export const LEADERSHIP_TABLE: LeadershipRow[] = [
 
 export const MAX_FOLLOWER_LEVEL = Math.max(...LEADERSHIP_TABLE.map((r) => r[2].length));
 
+export const LEADERSHIP_MIN_SCORE = LEADERSHIP_TABLE[0]![0];
+export const LEADERSHIP_MAX_SCORE = LEADERSHIP_TABLE[LEADERSHIP_TABLE.length - 1]![0];
+
 export function leadershipLookup(score: number): LeadershipRow {
-  const clamped = Math.max(LEADERSHIP_TABLE[0][0], Math.min(LEADERSHIP_TABLE[LEADERSHIP_TABLE.length - 1][0], Math.round(score)));
-  return LEADERSHIP_TABLE.find((r) => r[0] === clamped) ?? LEADERSHIP_TABLE[0];
+  const clamped = Math.max(LEADERSHIP_MIN_SCORE, Math.min(LEADERSHIP_MAX_SCORE, Math.round(score)));
+  return LEADERSHIP_TABLE.find((r) => r[0] === clamped) ?? LEADERSHIP_TABLE[0]!;
 }
 
 export function totalFollowers(row: LeadershipRow): number {

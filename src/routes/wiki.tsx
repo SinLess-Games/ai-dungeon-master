@@ -23,7 +23,14 @@ import { EXPANSION4_ARTICLES } from "@/lib/wiki/expansions4";
 import { EXPANSION5_ARTICLES } from "@/lib/wiki/expansions5";
 import { EXPANSION6_ARTICLES } from "@/lib/wiki/expansions6";
 import { LEADERSHIP_ARTICLES } from "@/lib/wiki/leadership";
-import { LEADERSHIP_TABLE, MAX_FOLLOWER_LEVEL, leadershipLookup, totalFollowers } from "@/lib/rules/leadership";
+import {
+  LEADERSHIP_TABLE,
+  LEADERSHIP_MIN_SCORE,
+  LEADERSHIP_MAX_SCORE,
+  MAX_FOLLOWER_LEVEL,
+  leadershipLookup,
+  totalFollowers,
+} from "@/lib/rules/leadership";
 import { SOURCE_BOOK_COUNT, SOURCE_WEBSITE_COUNT } from "@/lib/wiki/sources";
 
 const ALL_ARTICLES: WikiArticle[] = [
@@ -403,8 +410,8 @@ function LeadershipCalculator() {
   const [score, setScore] = useState(15);
   const row = leadershipLookup(score);
   const levels = Array.from({ length: MAX_FOLLOWER_LEVEL }, (_, i) => i + 1);
-  const min = LEADERSHIP_TABLE[0][0];
-  const max = LEADERSHIP_TABLE[LEADERSHIP_TABLE.length - 1][0];
+  const min = LEADERSHIP_MIN_SCORE;
+  const max = LEADERSHIP_MAX_SCORE;
 
   return (
     <section className="mb-8">
@@ -466,7 +473,7 @@ function LeadershipCalculator() {
                 <td className="px-2 py-1">{r[1]}</td>
                 {levels.map((l) => (
                   <td key={l} className="px-2 py-1 text-right tabular-nums">
-                    {r[2][l - 1] ? r[2][l - 1].toLocaleString() : "—"}
+                    {r[2][l - 1] ? r[2][l - 1]!.toLocaleString() : "—"}
                   </td>
                 ))}
               </tr>

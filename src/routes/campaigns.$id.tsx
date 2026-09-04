@@ -236,7 +236,9 @@ function Table({
               <Swords className="size-3" /> Combat · round {campaign.scene.round}
             </Badge>
           ) : null}
-          <Badge variant="secondary">{campaign.style}</Badge>
+          {campaign.styles.map((s) => (
+            <Badge key={s} variant="secondary">{s}</Badge>
+          ))}
           <Badge variant="secondary">{campaign.type}</Badge>
         </div>
       </div>

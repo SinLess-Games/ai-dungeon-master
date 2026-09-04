@@ -1,4 +1,4 @@
-import type { Campaign, CampaignStyle, CampaignType } from "./campaign";
+import type { Campaign, CampaignStyle, CampaignType } from "@/lib/campaign";
 
 /**
  * Randomised campaign openings. The DM always narrates the first scene, but the

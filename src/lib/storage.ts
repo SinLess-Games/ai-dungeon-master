@@ -117,6 +117,7 @@ export function getCampaign(id: string): CampaignRecord | undefined {
 }
 
 export function saveCampaign(campaign: CampaignRecord) {
+  if (isDeleted("campaigns", campaign.id)) return campaign;
   const all = read<CampaignRecord[]>(KEY_CAMPAIGNS, []);
   const next = { ...campaign, updatedAt: new Date().toISOString() };
   const i = all.findIndex((c) => c.id === campaign.id);
@@ -127,11 +128,11 @@ export function saveCampaign(campaign: CampaignRecord) {
 }
 
 export function deleteCampaign(id: string) {
+  recordDeletion("campaigns", id);
   write(
     KEY_CAMPAIGNS,
     read<CampaignRecord[]>(KEY_CAMPAIGNS, []).filter((c) => c.id !== id),
   );
-  recordDeletion("campaigns", id);
 }
 
 /* --------------------------------------------------------- worlds and maps */

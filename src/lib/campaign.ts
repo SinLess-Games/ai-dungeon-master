@@ -148,7 +148,7 @@ export function emptyCampaign(characterId: string): Campaign {
     id: newId(),
     name: "New campaign",
     characterId,
-    style: "heroic",
+    styles: ["heroic"],
     type: "heroes",
     length: "standard",
     pace: "measured",

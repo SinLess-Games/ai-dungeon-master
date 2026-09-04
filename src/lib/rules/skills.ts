@@ -44,6 +44,10 @@ export const SKILLS: Skill[] = [
   { id: "tumble", name: "Tumble", ability: "dex", trainedOnly: true, armorCheckPenalty: true, explain: "Move through threatened squares without provoking attacks." },
   { id: "use-magic-device", name: "Use Magic Device", ability: "cha", trainedOnly: true, armorCheckPenalty: false, explain: "Activate wands and scrolls you have no business using." },
   { id: "use-rope", name: "Use Rope", ability: "dex", trainedOnly: false, armorCheckPenalty: false, explain: "Tie knots, secure grapples, bind prisoners." },
+  { id: "autohypnosis", name: "Autohypnosis", ability: "wis", trainedOnly: true, armorCheckPenalty: false, explain: "Psionic self-discipline: resist fear, ignore pain, memorize perfectly, and hold on when dying." },
+  { id: "knowledge-psionics", name: "Knowledge (psionics)", ability: "int", trainedOnly: true, armorCheckPenalty: false, explain: "Psionic traditions, crystals, mind flayers, and other psionic creatures." },
+  { id: "psicraft", name: "Psicraft", ability: "int", trainedOnly: true, armorCheckPenalty: false, explain: "Identify powers as they are manifested and understand psionic items." },
+  { id: "martial-lore", name: "Martial Lore", ability: "int", trainedOnly: true, armorCheckPenalty: false, explain: "Recognize martial maneuvers, stances, and the schools that teach them." },
 ];
 
 export const SKILL_BY_ID = Object.fromEntries(SKILLS.map((s) => [s.id, s]));

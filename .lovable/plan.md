@@ -146,30 +146,34 @@ A D&D 3.5 app where an AI runs the adventure, you manage a full rules-accurate c
 
 When you start a new campaign, a setup wizard lets you pick:
 
-- **Style:** heroic, gritty/dark, high magic, low magic, horror, intrigue/political, military, exploration, dungeon crawl, sandbox, or a custom blend.
-- **Type/structure:** story arc, episodic quests, open sandbox, hexcrawl, megadungeon, war campaign, city campaign.
+- **Game type (preset adventure archetypes):** Westward March (frontier expansion and travel), Dungeon Crawl, Death Trap (lethal trap-heavy gauntlet), Epic (21+ world-shaking play), Heroes (classic rise from nobody to legend), Defeat the Demon Lord (long arc toward a great evil), Apocalypse (surviving and reversing a world-ending event) — plus custom. Each preset sets default pacing, encounter mix, trap frequency, lethality, XP curve, and DM prompt framing.
+- **Style:** heroic, gritty/dark, high magic, low magic, horror, intrigue/political, military, exploration, sandbox, or a custom blend.
+- **Structure:** story arc, episodic quests, open sandbox, hexcrawl, megadungeon, war campaign, city campaign.
 - **Length:** one-shot, short (3–5 sessions), standard arc, long-running, endless open world.
 - **Pace:** narrative-fast, balanced, tactical-slow (more combat grid time), montage travel vs. hour-by-hour detail.
+- **Difficulty and lethality:** encounter difficulty curve, trap frequency and deadliness, resurrection availability.
 - **Level range:** starting level, target end level, epic continuation on/off.
 - **Tone and content dials:** violence, romance, humor, darkness sliders.
 - **DM style:** how chatty the DM is, how much it describes vs. asks, how strict it rules.
 - **House rules:** applied at creation from the house rule set you choose.
 - **Starting setup:** generated opening scene, starting region, and starting hook — or bring your own premise.
-- All settings are editable mid-campaign, and every choice feeds the AI DM's prompt and the app's XP/combat pacing.
+- All settings are editable mid-campaign, and every choice feeds the AI DM's prompt and the app's XP/encounter pacing.
 
 ## World creation
 
-- World builder: name, themes, geography (regions, terrains, cities), history/eras, pantheon, and notable figures.
-- AI-assisted generation: describe the world in a sentence and the AI drafts regions, factions, and history you can edit; or build everything manually.
-- Regions and locations get tokens on a world overview map; clicking a region opens its notes, NPCs, and factions.
+- World builder: name, themes, geography (regions, terrains, settlements), history/eras, pantheon, planes, and notable figures.
+- Settlements: cities, towns, and villages with size, government, population, economy, notable locations (shops, temples, taverns, guilds), and resident NPCs — each can open into a playable map.
+- Dungeon and site registry: named dungeons, ruins, and lairs attached to regions, each with its own multi-level map, traps, and inhabitants.
+- AI-assisted generation: describe the world in a sentence and the AI drafts regions, settlements, factions, and history you can edit; or build everything manually.
+- Regions and locations get pins on a world overview map; clicking one opens its notes, NPCs, factions, and maps.
 - Worlds persist and can host new campaigns later — an old campaign's history carries into the next one.
 - Start from a blank world or a prebuilt starter world.
 
 ## Data and rules
 
-- 3.5 rules data (races, base and prestige classes with epic progressions, skills, feats, spells, equipment, magic items, monsters) shipped as typed modules and used by both the rules engine and the wiki.
+- Rules data from **3rd edition and 3.5 edition** sources (races, base and prestige classes with epic progressions, skills, feats, spells, equipment, magic items, traps, monsters), shipped as typed modules used by both the rules engine and the wiki. 3.5 is the default; 3.0-only content is tagged so a campaign can allow or exclude it.
 - Pure rules engine computes every derived value deterministically from the stored build, with house rules applied as modifiers.
-- Bestiary and item/monster references available to the DM for quick spawns.
+- Bestiary, trap tables, and item references available to the DM for quick spawns.
 
 ## Technical notes
 

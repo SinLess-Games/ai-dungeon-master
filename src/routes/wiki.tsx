@@ -12,6 +12,9 @@ import { CLASSES } from "@/lib/rules/classes";
 import { WEAPONS, ARMORS, SHIELDS, GEAR } from "@/lib/rules/equipment";
 import { ABILITY_NAMES } from "@/lib/rules/types";
 import { DM_ARTICLES, type WikiArticle } from "@/lib/wiki/dm-guide";
+import { PLAYER_ARTICLES } from "@/lib/wiki/player-guide";
+
+const ALL_ARTICLES: WikiArticle[] = [...PLAYER_ARTICLES, ...DM_ARTICLES];
 
 export const Route = createFileRoute("/wiki")({
   head: () => ({

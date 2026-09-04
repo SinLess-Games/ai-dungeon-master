@@ -29,9 +29,11 @@ import {
   removeGear,
   removeMember,
   reorderMember,
+  TIERS,
   updateGear,
   updateMember,
   type PartyMember,
+  type PartyTier,
 } from "@/lib/party";
 import type { Campaign } from "@/lib/campaign";
 
@@ -97,15 +99,20 @@ function PartyPage() {
               Back to the table
             </Link>
           </Button>
-          <Button
-            onClick={() => {
-              const m = emptyMember("npc");
-              commit(addMember(campaign, m));
-              setOpenId(m.id);
-            }}
-          >
-            <UserPlus className="size-4" /> Add companion
-          </Button>
+          {TIERS.map((t) => (
+            <Button
+              key={t.value}
+              variant={t.value === "companion" ? "default" : "secondary"}
+              onClick={() => {
+                const m = emptyMember("npc", t.value);
+                commit(addMember(campaign, m));
+                setOpenId(m.id);
+              }}
+            >
+              <UserPlus className="size-4" /> Add{" "}
+              {t.value === "companion" ? "companion" : t.value}
+            </Button>
+          ))}
         </div>
       </div>
 
@@ -115,28 +122,45 @@ function PartyPage() {
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
                 <Users className="mx-auto mb-3 size-8 opacity-60" />
-                No one else is travelling with you yet. Add a companion, or bring in one of your
-                saved heroes from the panel on the right.
+                No one else is travelling with you yet. Add a companion, cohort or follower, or
+                bring in one of your saved heroes from the panel on the right.
               </CardContent>
             </Card>
           ) : null}
 
-          {party.map((m, i) => (
-            <MemberCard
-              key={m.id}
-              member={m}
-              open={openId === m.id}
-              first={i === 0}
-              last={i === party.length - 1}
-              onToggle={() => setOpenId(openId === m.id ? null : m.id)}
-              onPatch={(patch) => commit(updateMember(campaign, m.id, patch))}
-              onMove={(d) => commit(reorderMember(campaign, m.id, d))}
-              onRemove={() => commit(removeMember(campaign, m.id))}
-              onAddGear={() => commit(addGear(campaign, m.id))}
-              onGearPatch={(gid, patch) => commit(updateGear(campaign, m.id, gid, patch))}
-              onGearRemove={(gid) => commit(removeGear(campaign, m.id, gid))}
-            />
-          ))}
+          {TIERS.map((tier) => {
+            const rows = party.filter((m) => (m.tier ?? "companion") === tier.value);
+            if (!rows.length) return null;
+            return (
+              <section key={tier.value} className="space-y-3">
+                <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-2">
+                  <h2 className="font-display text-lg font-bold uppercase tracking-wide text-primary">
+                    {tier.label}
+                    <span className="ml-2 text-xs font-normal normal-case text-muted-foreground">
+                      {rows.length}
+                    </span>
+                  </h2>
+                  <p className="text-xs text-muted-foreground">{tier.blurb}</p>
+                </div>
+                {rows.map((m, i) => (
+                  <MemberCard
+                    key={m.id}
+                    member={m}
+                    open={openId === m.id}
+                    first={i === 0}
+                    last={i === rows.length - 1}
+                    onToggle={() => setOpenId(openId === m.id ? null : m.id)}
+                    onPatch={(patch) => commit(updateMember(campaign, m.id, patch))}
+                    onMove={(d) => commit(reorderMember(campaign, m.id, d))}
+                    onRemove={() => commit(removeMember(campaign, m.id))}
+                    onAddGear={() => commit(addGear(campaign, m.id))}
+                    onGearPatch={(gid, patch) => commit(updateGear(campaign, m.id, gid, patch))}
+                    onGearRemove={(gid) => commit(removeGear(campaign, m.id, gid))}
+                  />
+                ))}
+              </section>
+            );
+          })}
         </div>
 
         <div className="space-y-4">
@@ -270,6 +294,23 @@ function MemberCard({
                 <SelectContent>
                   <SelectItem value="player">You</SelectItem>
                   <SelectItem value="dm">The Dungeon Master</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Section">
+              <Select
+                value={member.tier ?? "companion"}
+                onValueChange={(v) => onPatch({ tier: v as PartyTier })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIERS.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </Field>

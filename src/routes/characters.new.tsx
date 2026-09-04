@@ -707,87 +707,105 @@ function CharacterCreator() {
           ) : null}
 
           {/* ---------------- Gear ---------------- */}
+          {/* ---------------- Spells ---------------- */}
           {step === 5 ? (
             <Card className="card-etched bg-card/70">
               <CardHeader>
-                <CardTitle className="font-display text-2xl">Armor, shield, and weapons</CardTitle>
+                <CardTitle className="font-display text-2xl">Spells and powers</CardTitle>
               </CardHeader>
               <CardContent className="space-y-5">
                 <Explain>
-                  Heavier armor raises your Armor Class but caps how much Dexterity helps you, slows
-                  you down, and hurts physical skills. Spellcasters also risk arcane spell failure.
+                  You start your adventure in a settlement, so gear is bought in play with the DM —
+                  nothing to pick here. What you do lock in now is magic: choose the spells you know or
+                  prepare, and psionic characters choose powers. Pick from every level you can cast.
                 </Explain>
 
-                <div>
-                  <Label className="mb-2 block">Armor</Label>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {ARMORS.map((a) => (
-                      <button
-                        key={a.id}
-                        onClick={() => patch({ armorId: a.id })}
-                        className={`rounded-md border p-2 text-left text-sm ${
-                          char.armorId === a.id ? "border-primary bg-primary/10" : "border-border/60"
-                        }`}
-                      >
-                        <span className="font-medium">{a.name}</span>
-                        <span className="ml-2 font-mono text-xs text-muted-foreground">
-                          +{a.acBonus} AC · maxDex {a.maxDex ?? "—"} · ACP {a.checkPenalty} · {a.spellFailure}% ASF · {a.weight} lb
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                {castingTracks.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Neither of your classes casts spells or manifests powers, so there is nothing to
+                    select. Move on to the last step.
+                  </p>
+                ) : null}
 
-                <div>
-                  <Label className="mb-2 block">Shield</Label>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {SHIELDS.map((a) => (
-                      <button
-                        key={a.id}
-                        onClick={() => patch({ shieldId: a.id })}
-                        className={`rounded-md border p-2 text-left text-sm ${
-                          char.shieldId === a.id ? "border-primary bg-primary/10" : "border-border/60"
-                        }`}
-                      >
-                        <span className="font-medium">{a.name}</span>
-                        <span className="ml-2 font-mono text-xs text-muted-foreground">
-                          +{a.acBonus} AC · ACP {a.checkPenalty} · {a.weight} lb
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                {castingTracks.map((track) => {
+                  const psionic = track.cls.casting!.type === "psionic";
+                  const progression: "full" | "half" =
+                    ["paladin", "ranger"].includes(track.cls.id) ? "half" : "full";
+                  const cap = maxSpellLevel(track.levels, progression);
+                  const fallback: "arcane" | "divine" =
+                    track.cls.casting!.ability === "int" || track.cls.casting!.ability === "cha"
+                      ? "arcane"
+                      : "divine";
+                  const list = psionic
+                    ? POWERS.filter((pw) => pw.level <= Math.max(1, cap)).map((pw) => ({
+                        id: pw.id,
+                        name: pw.name,
+                        tag: pw.discipline,
+                        level: pw.level,
+                        summary: pw.summary,
+                      }))
+                    : SPELLS.map((sp) => {
+                        const lvl = spellLevelFor(sp, track.cls.id, fallback);
+                        return lvl === undefined || lvl > cap
+                          ? null
+                          : { id: sp.id, name: sp.name, tag: sp.school, level: lvl, summary: sp.summary };
+                      }).filter(Boolean) as { id: string; name: string; tag: string; level: number; summary: string }[];
+                  const chosen = psionic ? char.powerIds : char.spellIds;
+                  const toggle = (id: string) => {
+                    const next = chosen.includes(id) ? chosen.filter((x) => x !== id) : [...chosen, id];
+                    patch(psionic ? { powerIds: next } : { spellIds: next });
+                  };
 
-                <div>
-                  <Label className="mb-2 block">Weapons</Label>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {WEAPONS.map((w) => {
-                      const active = char.weaponIds.includes(w.id);
-                      return (
-                        <button
-                          key={w.id}
-                          onClick={() =>
-                            patch({
-                              weaponIds: active
-                                ? char.weaponIds.filter((x) => x !== w.id)
-                                : [...char.weaponIds, w.id],
-                            })
-                          }
-                          className={`rounded-md border p-2 text-left text-sm ${
-                            active ? "border-primary bg-primary/10" : "border-border/60"
-                          }`}
-                        >
-                          <span className="font-medium">{w.name}</span>
-                          <span className="ml-2 font-mono text-xs text-muted-foreground">
-                            {w.damage} · {w.critical} · {w.weight} lb
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <Separator />
+                  return (
+                    <div key={track.cls.id} className="space-y-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-display text-lg">{track.cls.name}</p>
+                        <Badge variant="outline">{track.cls.casting!.label}</Badge>
+                        <Badge variant="secondary">
+                          up to {psionic ? "power" : "spell"} level {cap}
+                        </Badge>
+                        <Badge variant="secondary">{chosen.length} chosen</Badge>
+                      </div>
+                      {list.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          You cannot cast anything yet at this class level.
+                        </p>
+                      ) : null}
+                      {[...new Set(list.map((i) => i.level))]
+                        .sort((a, b) => a - b)
+                        .map((lvl) => (
+                          <div key={lvl}>
+                            <Label className="mb-2 block">
+                              {lvl === 0 ? "Cantrips / orisons" : `Level ${lvl}`}
+                            </Label>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              {list
+                                .filter((i) => i.level === lvl)
+                                .map((i) => {
+                                  const active = chosen.includes(i.id);
+                                  return (
+                                    <button
+                                      key={i.id}
+                                      onClick={() => toggle(i.id)}
+                                      className={`rounded-md border p-2 text-left text-sm ${
+                                        active ? "border-primary bg-primary/10" : "border-border/60"
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="font-medium">{i.name}</span>
+                                        <Badge variant="outline" className="text-xs">{i.tag}</Badge>
+                                      </div>
+                                      <p className="text-xs text-muted-foreground">{i.summary}</p>
+                                    </button>
+                                  );
+                                })}
+                            </div>
+                          </div>
+                        ))}
+                      <Separator />
+                    </div>
+                  );
+                })}
 
                 <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
                   <div>
@@ -800,17 +818,6 @@ function CharacterCreator() {
                   <Switch
                     checked={char.encumbranceEnabled}
                     onCheckedChange={(v) => patch({ encumbranceEnabled: v })}
-                  />
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <Label htmlFor="gold">Starting gold (gp)</Label>
-                  <Input
-                    id="gold"
-                    type="number"
-                    value={char.gold}
-                    onChange={(e) => patch({ gold: Number(e.target.value) || 0 })}
-                    className="w-32 font-mono"
                   />
                 </div>
               </CardContent>

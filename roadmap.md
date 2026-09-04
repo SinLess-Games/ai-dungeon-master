@@ -10,8 +10,9 @@
 - [x] Dashboard
 - [x] Character creator with inline explanations
 - [x] Character sheet (live, editable)
-- [ ] World builder + campaign setup wizard
-- [ ] Streaming AI DM with state tools, grants, alignment tracking
+- [x] Campaign setup wizard (style, type, length, pace, DM temperament, world notes, house rules)
+- [x] Streaming AI DM with state tools, player rolls, grants, alignment tracking
+- [ ] Standalone world builder + world map
 
 ## Phase 2 — Reference, loot, export
 - [x] Rules wiki with search + filters

@@ -302,6 +302,7 @@ function Wiki() {
             />
           ) : (
             <HomeView
+              playerCategories={playerCategories}
               dmCategories={dmCategories}
               rulesCount={rules.length}
               onOpenArticle={(id) => open({ type: "article", id })}

@@ -376,7 +376,7 @@ function CharacterCreator() {
                       const lv = Math.max(1, Math.min(40, Number(e.target.value) || 1));
                       patch({
                         classes: [{ classId: char.classes[0]?.classId ?? "fighter", levels: lv }],
-                        classesB: char.classesB?.[0] ? [{ classId: char.classesB[0].classId, levels: lv }] : char.classesB,
+                        classesB: char.classesB?.[0] ? [{ classId: char.classesB[0].classId, levels: lv }] : (char.classesB ?? []),
                       });
                     }}
                     className="w-24 font-mono"

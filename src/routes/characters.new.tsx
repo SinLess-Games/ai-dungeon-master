@@ -19,6 +19,15 @@ import {
   type Alignment,
 } from "@/lib/rules/types";
 import { RACES } from "@/lib/rules/races";
+
+const RACE_GROUPS = [
+  { key: "all", label: "All" },
+  { key: "core", label: "Core" },
+  { key: "planetouched", label: "Planetouched" },
+  { key: "savage", label: "Savage" },
+  { key: "monstrous", label: "Monstrous" },
+  { key: "powerful", label: "Powerful (high LA)" },
+] as const;
 import { CLASSES } from "@/lib/rules/classes";
 import { SKILLS } from "@/lib/rules/skills";
 import { FEATS } from "@/lib/rules/feats";
@@ -262,9 +271,30 @@ function CharacterCreator() {
                   Your race adjusts ability scores, sets your size and speed, and hands you a few
                   permanent traits. It never limits what class you can take — it only nudges you.
                 </Explain>
+                <div className="flex flex-wrap gap-2">
+                  {RACE_GROUPS.map((g) => (
+                    <button
+                      key={g.key}
+                      onClick={() => setRaceGroup(g.key)}
+                      className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                        raceGroup === g.key
+                          ? "border-primary bg-primary/15 text-foreground"
+                          : "border-border/60 text-muted-foreground hover:border-primary/50"
+                      }`}
+                    >
+                      {g.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Level adjustment (LA) and racial Hit Dice raise your effective character level (ECL).
+                  A gnoll with 1 class level has 2 racial HD and LA +1, so it plays alongside a 4th-level party.
+                </p>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {RACES.map((r) => {
+                  {RACES.filter((r) => raceGroup === "all" || (r.category ?? "core") === raceGroup).map((r) => {
                     const active = char.raceId === r.id;
+                    const la = r.levelAdjustment ?? 0;
+                    const rhd = r.racialHitDice?.count ?? 0;
                     return (
                       <button
                         key={r.id}
@@ -273,7 +303,7 @@ function CharacterCreator() {
                           active ? "border-primary bg-primary/10" : "border-border/60 hover:border-primary/50"
                         }`}
                       >
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between gap-2">
                           <span className="font-display text-lg">{r.name}</span>
                           <span className="text-xs text-muted-foreground">
                             {r.size} · {r.speed} ft.
@@ -286,6 +316,15 @@ function CharacterCreator() {
                               {formatMod(r.abilityMods[a]!)} {ABILITY_NAMES[a].slice(0, 3)}
                             </Badge>
                           ))}
+                          {la > 0 ? (
+                            <Badge variant="outline" className="font-mono text-xs">LA +{la}</Badge>
+                          ) : null}
+                          {rhd > 0 ? (
+                            <Badge variant="outline" className="font-mono text-xs">{rhd} racial HD</Badge>
+                          ) : null}
+                          {r.naturalArmor ? (
+                            <Badge variant="outline" className="font-mono text-xs">+{r.naturalArmor} natural</Badge>
+                          ) : null}
                         </div>
                         <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground">
                           {r.traits.slice(0, 4).map((t) => (

@@ -44,6 +44,7 @@ export function getCharacter(id: string): Character | undefined {
 }
 
 export function saveCharacter(character: Character) {
+  if (isDeleted("characters", character.id)) return character;
   const all = read<Character[]>(KEY_CHARACTERS, []);
   const next = { ...character, updatedAt: new Date().toISOString() };
   const i = all.findIndex((c) => c.id === character.id);
@@ -117,6 +118,7 @@ export function getCampaign(id: string): CampaignRecord | undefined {
 }
 
 export function saveCampaign(campaign: CampaignRecord) {
+  if (isDeleted("campaigns", campaign.id)) return campaign;
   const all = read<CampaignRecord[]>(KEY_CAMPAIGNS, []);
   const next = { ...campaign, updatedAt: new Date().toISOString() };
   const i = all.findIndex((c) => c.id === campaign.id);
@@ -127,11 +129,11 @@ export function saveCampaign(campaign: CampaignRecord) {
 }
 
 export function deleteCampaign(id: string) {
+  recordDeletion("campaigns", id);
   write(
     KEY_CAMPAIGNS,
     read<CampaignRecord[]>(KEY_CAMPAIGNS, []).filter((c) => c.id !== id),
   );
-  recordDeletion("campaigns", id);
 }
 
 /* --------------------------------------------------------- worlds and maps */
@@ -152,6 +154,7 @@ export function getWorld(id: string): World | undefined {
 
 
 export function saveWorld(world: World) {
+  if (isDeleted("worlds", world.id)) return world;
   const all = read<World[]>(KEY_WORLDS, []);
   const next = { ...world, updatedAt: new Date().toISOString() };
   const i = all.findIndex((w) => w.id === world.id);
@@ -180,6 +183,7 @@ export function getMap(id: string): TacticalMap | undefined {
 }
 
 export function saveMap(map: TacticalMap) {
+  if (isDeleted("game_maps", map.id)) return map;
   const all = read<TacticalMap[]>(KEY_MAPS, []);
   const next = { ...map, updatedAt: new Date().toISOString() };
   const i = all.findIndex((m) => m.id === map.id);
@@ -233,6 +237,11 @@ export function recordDeletion(table: SyncTable, id: string) {
 
 export function listDeletions(): Tombstone[] {
   return read<Tombstone[]>(KEY_DELETED, []);
+}
+
+/** True while a delete is still remembered, so nothing can bring the row back. */
+export function isDeleted(table: SyncTable, id: string): boolean {
+  return read<Tombstone[]>(KEY_DELETED, []).some((t) => t.table === table && t.id === id);
 }
 
 export function clearDeletions(done: Tombstone[]) {

@@ -49,7 +49,15 @@ function emit() {
 }
 
 async function syncSpec(userId: string, spec: (typeof SPECS)[number]) {
-  const local = readCollection<SyncRow>(spec.key).filter((r) => r && UUID.test(r.id));
+  // Anything the player deleted stays gone, even if the cloud copy lingers.
+  const gone = new Set(
+    listDeletions()
+      .filter((t) => t.table === spec.table)
+      .map((t) => t.id),
+  );
+  const local = readCollection<SyncRow>(spec.key).filter(
+    (r) => r && UUID.test(r.id) && !gone.has(r.id),
+  );
   const { data: remote, error } = await supabase
     .from(spec.table)
     .select("id, data, updated_at")
@@ -61,6 +69,7 @@ async function syncSpec(userId: string, spec: (typeof SPECS)[number]) {
 
   const pushes: SyncRow[] = [];
   for (const row of remote ?? []) {
+    if (gone.has(row.id as string)) continue;
     const remoteRow = (row as unknown as { data: SyncRow }).data;
     if (!remoteRow || typeof remoteRow !== "object") continue;
     const localRow = byId.get(row.id as string);
@@ -105,9 +114,13 @@ async function flushDeletions(userId: string) {
       done.push(t);
       continue;
     }
-    const { error } = await supabase.from(t.table).delete().eq("id", t.id).eq("user_id", userId);
-    if (error) throw new Error(error.message);
-    done.push(t);
+    try {
+      const { error } = await supabase.from(t.table).delete().eq("id", t.id).eq("user_id", userId);
+      // A failed delete keeps its tombstone so we try again next sync.
+      if (!error) done.push(t);
+    } catch {
+      /* keep it pending */
+    }
   }
   clearDeletions(done);
 }

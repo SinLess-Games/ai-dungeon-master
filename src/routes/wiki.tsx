@@ -13,24 +13,24 @@ import { CLASS_DETAILS } from "@/lib/wiki/class-details";
 import { babForClass, saveForClass } from "@/lib/rules/engine";
 import { WEAPONS, ARMORS, SHIELDS, GEAR } from "@/lib/rules/equipment";
 import { ABILITY_NAMES } from "@/lib/rules/types";
-import { DM_ARTICLES, type WikiArticle } from "@/lib/wiki/dm-guide";
+import type { WikiArticle } from "@/lib/wiki/dm-guide";
 import { PLAYER_ARTICLES } from "@/lib/wiki/player-guide";
 
-const ALL_ARTICLES: WikiArticle[] = [...PLAYER_ARTICLES, ...DM_ARTICLES];
+const ALL_ARTICLES: WikiArticle[] = [...PLAYER_ARTICLES];
 
 export const Route = createFileRoute("/wiki")({
   head: () => ({
     meta: [
-      { title: "Codex wiki — DM guide & 3.5 rules reference" },
+      { title: "Codex wiki — D&D 3.5 player rules reference" },
       {
         name: "description",
         content:
-          "A full in-app wiki: Dungeon Master guidance on encounters, treasure, traps, NPCs and worlds, plus searchable D&D 3.5 races, classes, skills, feats and gear.",
+          "A full in-app player wiki: how the game works, character creation, combat and magic, plus searchable D&D 3.5 races, classes, skills, feats and gear.",
       },
-      { property: "og:title", content: "Codex wiki — DM guide & 3.5 rules reference" },
+      { property: "og:title", content: "Codex wiki — D&D 3.5 player rules reference" },
       {
         property: "og:description",
-        content: "Browse DM chapters and every rules entry the character builder knows, without leaving the table.",
+        content: "Browse player rules and every rules entry the character builder knows, without leaving the table.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -163,7 +163,6 @@ function Wiki() {
     return [...map.entries()];
   };
   const playerCategories = useMemo(() => group(PLAYER_ARTICLES), []);
-  const dmCategories = useMemo(() => group(DM_ARTICLES), []);
 
   const needle = q.trim().toLowerCase();
   const searching = needle.length > 0;
@@ -216,25 +215,6 @@ function Wiki() {
 
           <SidebarGroup label="Player rules" icon={<BookOpen className="size-4" />}>
             {playerCategories.map(([cat, arts]) => (
-              <div key={cat} className="mb-3">
-                <p className="mb-1 rounded bg-primary/10 px-2 py-1.5 font-display text-xs font-bold uppercase tracking-wide text-primary">
-                  {cat}
-                </p>
-                {arts.map((a) => (
-                  <SidebarLink
-                    key={a.id}
-                    active={sel.type === "article" && sel.id === a.id}
-                    onClick={() => open({ type: "article", id: a.id })}
-                  >
-                    {a.title}
-                  </SidebarLink>
-                ))}
-              </div>
-            ))}
-          </SidebarGroup>
-
-          <SidebarGroup label="Running the game" icon={<BookOpen className="size-4" />}>
-            {dmCategories.map(([cat, arts]) => (
               <div key={cat} className="mb-3">
                 <p className="mb-1 rounded bg-primary/10 px-2 py-1.5 font-display text-xs font-bold uppercase tracking-wide text-primary">
                   {cat}
@@ -315,7 +295,6 @@ function Wiki() {
           ) : (
             <HomeView
               playerCategories={playerCategories}
-              dmCategories={dmCategories}
               rulesCount={rules.length}
               onOpenArticle={(id) => open({ type: "article", id })}
               onOpenCategory={(name) => open({ type: "category", name })}
@@ -716,13 +695,11 @@ function CategoryCards({
 
 function HomeView({
   playerCategories,
-  dmCategories,
   rulesCount,
   onOpenArticle,
   onOpenCategory,
 }: {
   playerCategories: [string, WikiArticle[]][];
-  dmCategories: [string, WikiArticle[]][];
   rulesCount: number;
   onOpenArticle: (id: string) => void;
   onOpenCategory: (name: string) => void;
@@ -741,10 +718,7 @@ function HomeView({
       </h2>
       <CategoryCards categories={playerCategories} onOpenArticle={onOpenArticle} />
 
-      <h2 className="mb-3 mt-10 flex items-center gap-2 font-display text-xl text-primary">
-        <BookOpen className="size-5" /> Running the game
-      </h2>
-      <CategoryCards categories={dmCategories} onOpenArticle={onOpenArticle} />
+
 
 
       <h2 className="mb-3 mt-10 flex items-center gap-2 font-display text-xl text-primary">

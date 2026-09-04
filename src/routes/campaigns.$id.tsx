@@ -18,6 +18,7 @@ import { getCampaign, getCharacter, getWorld, saveCampaign, saveCharacter, pushR
 import { ensureCampaignWorld } from "@/lib/campaign-world";
 import { WorldMapView } from "@/components/WorldMapView";
 import { LocalMapView } from "@/components/LocalMapView";
+import { PaintMapButton, useMapArt } from "@/components/MapArtControls";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { regionAt } from "@/lib/world";
 import { buildDmContext } from "@/lib/dm-context";

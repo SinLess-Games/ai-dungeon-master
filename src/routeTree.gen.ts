@@ -31,6 +31,7 @@ import { Route as CharactersIdRouteImport } from './routes/characters.$id'
 import { Route as CharactersNewRouteImport } from './routes/characters.new'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout/return'
 import { Route as DevBlogIndexRouteImport } from './routes/dev-blog.index'
+import { Route as DevBlogSlugRouteImport } from './routes/dev-blog.$slug'
 import { Route as MapsMapIdRouteImport } from './routes/maps.$mapId'
 import { Route as PartyCampaignIdRouteImport } from './routes/party.$campaignId'
 import { Route as WorldsIndexRouteImport } from './routes/worlds.index'
@@ -148,6 +149,11 @@ const DevBlogIndexRoute = DevBlogIndexRouteImport.update({
   path: '/dev-blog/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DevBlogSlugRoute = DevBlogSlugRouteImport.update({
+  id: '/dev-blog/$slug',
+  path: '/dev-blog/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MapsMapIdRoute = MapsMapIdRouteImport.update({
   id: '/maps/$mapId',
   path: '/maps/$mapId',
@@ -199,6 +205,7 @@ export interface FileRoutesByFullPath {
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
   '/checkout/return': typeof CheckoutReturnRoute
+  '/dev-blog/$slug': typeof DevBlogSlugRoute
   '/maps/$mapId': typeof MapsMapIdRoute
   '/party/$campaignId': typeof PartyCampaignIdRoute
   '/worlds/$worldId': typeof WorldsWorldIdRoute
@@ -228,6 +235,7 @@ export interface FileRoutesByTo {
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
   '/checkout/return': typeof CheckoutReturnRoute
+  '/dev-blog/$slug': typeof DevBlogSlugRoute
   '/maps/$mapId': typeof MapsMapIdRoute
   '/party/$campaignId': typeof PartyCampaignIdRoute
   '/worlds/$worldId': typeof WorldsWorldIdRoute
@@ -259,6 +267,7 @@ export interface FileRoutesById {
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
   '/checkout/return': typeof CheckoutReturnRoute
+  '/dev-blog/$slug': typeof DevBlogSlugRoute
   '/maps/$mapId': typeof MapsMapIdRoute
   '/party/$campaignId': typeof PartyCampaignIdRoute
   '/worlds/$worldId': typeof WorldsWorldIdRoute
@@ -291,6 +300,7 @@ export interface FileRouteTypes {
     | '/characters/$id'
     | '/characters/new'
     | '/checkout/return'
+    | '/dev-blog/$slug'
     | '/maps/$mapId'
     | '/party/$campaignId'
     | '/worlds/$worldId'
@@ -320,6 +330,7 @@ export interface FileRouteTypes {
     | '/characters/$id'
     | '/characters/new'
     | '/checkout/return'
+    | '/dev-blog/$slug'
     | '/maps/$mapId'
     | '/party/$campaignId'
     | '/worlds/$worldId'
@@ -350,6 +361,7 @@ export interface FileRouteTypes {
     | '/characters/$id'
     | '/characters/new'
     | '/checkout/return'
+    | '/dev-blog/$slug'
     | '/maps/$mapId'
     | '/party/$campaignId'
     | '/worlds/$worldId'
@@ -376,6 +388,7 @@ export interface RootRouteChildren {
   CharactersIdRoute: typeof CharactersIdRoute
   CharactersNewRoute: typeof CharactersNewRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
+  DevBlogSlugRoute: typeof DevBlogSlugRoute
   MapsMapIdRoute: typeof MapsMapIdRoute
   PartyCampaignIdRoute: typeof PartyCampaignIdRoute
   WorldsWorldIdRoute: typeof WorldsWorldIdRoute
@@ -543,6 +556,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DevBlogIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dev-blog/$slug': {
+      id: '/dev-blog/$slug'
+      path: '/dev-blog/$slug'
+      fullPath: '/dev-blog/$slug'
+      preLoaderRoute: typeof DevBlogSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/maps/$mapId': {
       id: '/maps/$mapId'
       path: '/maps/$mapId'
@@ -622,6 +642,7 @@ const rootRouteChildren: RootRouteChildren = {
   CharactersIdRoute: CharactersIdRoute,
   CharactersNewRoute: CharactersNewRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
+  DevBlogSlugRoute: DevBlogSlugRoute,
   MapsMapIdRoute: MapsMapIdRoute,
   PartyCampaignIdRoute: PartyCampaignIdRoute,
   WorldsWorldIdRoute: WorldsWorldIdRoute,

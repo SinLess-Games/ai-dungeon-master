@@ -115,6 +115,44 @@ export function AppShell({ children }: { children: ReactNode }) {
 
             <span className="mx-1 hidden h-5 w-px bg-border/70 sm:block" />
 
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-md border px-2.5 py-2 text-xs font-medium transition-all sm:gap-2 sm:px-3.5 sm:text-sm",
+                    isPlayActive(location.pathname)
+                      ? "border-primary/70 bg-primary/15 text-primary shadow-[0_0_18px_-4px_rgba(217,169,77,0.5)]"
+                      : "border-transparent text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+                  )}
+                >
+                  <Swords className="size-4 sm:size-[1.125rem]" />
+                  <span className="hidden sm:inline">Play</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-44">
+                {PLAY_SUB.map(({ to, label, icon: Icon }) => {
+                  const active = location.pathname.startsWith(to);
+                  return (
+                    <DropdownMenuItem key={to} asChild>
+                      <Link
+                        to={to}
+                        className={cn(
+                          "flex w-full cursor-pointer items-center gap-2",
+                          active && "bg-primary/10 text-primary",
+                        )}
+                      >
+                        <Icon className="size-4" />
+                        <span>{label}</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <span className="mx-1 hidden h-5 w-px bg-border/70 sm:block" />
+
             {/* Search input */}
             <div className="relative hidden items-center lg:flex">
               <Search className="absolute left-2.5 size-3.5 text-muted-foreground" />

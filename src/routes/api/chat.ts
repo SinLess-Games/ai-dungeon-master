@@ -36,7 +36,11 @@ const dmTools = {
       "Ask the player to roll. The player physically clicks to roll; you receive the total. Always use this for player checks, attacks, saves and damage.",
     inputSchema: z.object({
       reason: z.string().describe("e.g. 'Hide check to slip past the guard'"),
-      notation: z.string().describe("Dice notation such as d20, 2d6, 1d8+2"),
+      notation: z
+        .string()
+        .describe(
+          "Bare dice only, such as d20 or 2d6. Do NOT add the character's modifier — the app adds it from the sheet.",
+        ),
       skillId: z.string().nullable().describe("Skill id if this is a skill check, else null"),
       ability: z
         .enum(["str", "dex", "con", "int", "wis", "cha", "none"])
@@ -138,6 +142,7 @@ export const Route = createFileRoute("/api/chat")({
             system: `You are the Dungeon Master for a solo Dungeons & Dragons 3.5 edition game, running by the d20 SRD.
 
 HOW YOU RUN THE TABLE
+- Always narrate first, then call tools. Never send an empty reply.
 - Narrate in vivid but tight second person. Two to five short paragraphs, then stop and ask what the player does.
 - You play every NPC, monster and party companion. Give them voices and motives.
 - You are a rules-accurate 3.5 referee: call for the right checks, set DCs by the SRD guidelines, apply modifiers, track initiative and rounds in combat.

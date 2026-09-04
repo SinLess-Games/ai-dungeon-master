@@ -180,13 +180,16 @@ function Table({
       sides: 20,
       modifier: 0,
     };
-    let mod = parsed.modifier;
+    // The app owns the modifiers: if the DM named a skill or ability we use the
+    // sheet's number and ignore any modifier baked into the notation.
     const skill = input.skillId
       ? derived.skills.find((s) => s.id === input.skillId || s.name === input.skillId)
       : undefined;
-    if (skill) mod += skill.total;
-    else if (input.ability && input.ability !== "none")
-      mod += derived.abilityMods[input.ability as AbilityKey] ?? 0;
+    const mod = skill
+      ? skill.total
+      : input.ability && input.ability !== "none"
+        ? derived.abilityMods[input.ability as AbilityKey] ?? 0
+        : parsed.modifier;
 
     const r = rollDice(parsed.count, parsed.sides, mod, String(input.reason ?? "DM request"));
     pushRoll({

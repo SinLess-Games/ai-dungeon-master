@@ -17,12 +17,14 @@ export interface StoredUser {
   salt: string;
   hash: string;
   createdAt: string;
+  avatarUrl?: string;
 }
 
 export interface SessionUser {
   id: string;
   email: string;
   displayName: string;
+  avatarUrl?: string;
 }
 
 export const AUTH_EVENT = "dnd35:auth-changed";
@@ -72,7 +74,9 @@ function listUsers(): StoredUser[] {
 }
 
 function publicUser(u: StoredUser): SessionUser {
-  return { id: u.id, email: u.email, displayName: u.displayName };
+  const s: SessionUser = { id: u.id, email: u.email, displayName: u.displayName };
+  if (u.avatarUrl) s.avatarUrl = u.avatarUrl;
+  return s;
 }
 
 export function getSession(): SessionUser | null {
@@ -157,4 +161,24 @@ export async function changePassword(currentPassword: string, newPassword: strin
   const salt = newSalt();
   users[i] = { ...user, salt, hash: await hashPassword(newPassword, salt) };
   write(KEY_USERS, users);
+}
+
+/** Store (or clear) the account portrait as a data URL in local storage. */
+export function updateAvatar(avatarUrl: string | null): SessionUser {
+  const session = getSession();
+  if (!session) throw new Error("You are not signed in.");
+  const users = listUsers();
+  const i = users.findIndex((u) => u.id === session.id);
+  const user = users[i];
+  if (i < 0 || !user) throw new Error("Account not found.");
+  const next: StoredUser = { ...user };
+  if (avatarUrl) next.avatarUrl = avatarUrl;
+  else delete next.avatarUrl;
+  users[i] = next;
+  write(KEY_USERS, users);
+  const nextSession: SessionUser = { ...session };
+  if (avatarUrl) nextSession.avatarUrl = avatarUrl;
+  else delete nextSession.avatarUrl;
+  write(KEY_SESSION, nextSession);
+  return nextSession;
 }

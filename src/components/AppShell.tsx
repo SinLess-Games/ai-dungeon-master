@@ -11,7 +11,16 @@ import {
   Search,
   Moon,
   Settings,
+  UserRound,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useSession } from "@/hooks/useSession";
 import { signOut } from "@/lib/auth";
 
@@ -117,13 +126,45 @@ export function AppShell({ children }: { children: ReactNode }) {
               >
                 <Moon className="size-4" />
               </button>
-              <button
-                type="button"
-                aria-label="Settings"
-                className="hidden items-center justify-center rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground lg:flex"
-              >
-                <Settings className="size-4" />
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Settings"
+                    className="hidden items-center justify-center rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground lg:flex"
+                  >
+                    <Settings className="size-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  {user ? (
+                    <>
+                      <DropdownMenuLabel className="truncate">{user.displayName}</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link to="/profile">
+                          <UserRound className="mr-2 size-4" /> Your profile
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link to="/characters">
+                          <Users className="mr-2 size-4" /> Your heroes
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onSelect={() => signOut()}>
+                        <LogOut className="mr-2 size-4" /> Sign out
+                      </DropdownMenuItem>
+                    </>
+                  ) : (
+                    <DropdownMenuItem asChild>
+                      <Link to="/auth">
+                        <LogIn className="mr-2 size-4" /> Sign in
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               <span className="mx-1 hidden h-5 w-px bg-border/70 sm:block" />
 
@@ -132,9 +173,17 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <Link
                     to="/profile"
                     aria-label="Your profile"
-                    className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/50 bg-primary/10 text-xs font-display text-primary shadow-md transition-colors hover:bg-primary/25 sm:h-9 sm:w-9"
+                    className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-primary/50 bg-primary/10 text-xs font-display text-primary shadow-md transition-colors hover:bg-primary/25 sm:h-9 sm:w-9"
                   >
-                    {user.displayName?.slice(0, 1).toUpperCase() ?? "U"}
+                    {user.avatarUrl ? (
+                      <img
+                        src={user.avatarUrl}
+                        alt={`${user.displayName} portrait`}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      (user.displayName?.slice(0, 1).toUpperCase() ?? "U")
+                    )}
                   </Link>
                   <div className="flex flex-col items-start leading-none">
                     <span className="hidden max-w-[8rem] truncate text-xs text-foreground sm:inline">

@@ -1,18 +1,26 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   BookOpen,
   Dices,
   KeyRound,
   LogOut,
+  ImagePlus,
   Pencil,
+  Trash2,
   Scroll,
   Swords,
   UserRound,
 } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
 import { useSession } from "@/hooks/useSession";
-import { changePassword, getAccountCreatedAt, signOut, updateDisplayName } from "@/lib/auth";
+import {
+  changePassword,
+  getAccountCreatedAt,
+  signOut,
+  updateAvatar,
+  updateDisplayName,
+} from "@/lib/auth";
 import { listCampaigns, listCharacters, listRolls } from "@/lib/storage";
 import { toast } from "sonner";
 
@@ -70,9 +78,11 @@ function ProfilePage() {
         {/* Identity card */}
         <div className="space-y-6">
           <section className="rounded-lg border border-border/60 bg-card p-6 text-center">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border-2 border-primary/60 bg-primary/10 font-display text-3xl text-primary shadow-[0_0_24px_-6px_rgba(217,169,77,0.5)]">
-              {user.displayName.slice(0, 1).toUpperCase()}
-            </div>
+            <PortraitPicker
+              avatarUrl={user.avatarUrl ?? null}
+              fallback={user.displayName.slice(0, 1).toUpperCase()}
+            />
+
             <h2 className="mt-4 font-display text-xl text-foreground">{user.displayName}</h2>
             <p className="mt-1 text-sm text-muted-foreground">{user.email}</p>
             {createdAt && (
@@ -311,4 +321,106 @@ function PasswordForm() {
       </form>
     </section>
   );
+}
+
+/** Upload, preview, and remove the account portrait (stored locally as a data URL). */
+function PortraitPicker({ avatarUrl, fallback }: { avatarUrl: string | null; fallback: string }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function onPick(file: File) {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const dataUrl = await resizeToDataUrl(file, 320);
+      updateAvatar(dataUrl);
+      toast.success("Portrait updated.");
+    } catch {
+      toast.error("Could not read that image.");
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-center">
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        aria-label="Change portrait"
+        className="group relative mx-auto flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-2 border-primary/60 bg-primary/10 font-display text-3xl text-primary shadow-[0_0_24px_-6px_rgba(217,169,77,0.5)]"
+      >
+        {avatarUrl ? (
+          <img src={avatarUrl} alt="Your portrait" className="h-full w-full object-cover" />
+        ) : (
+          fallback
+        )}
+        <span className="absolute inset-0 hidden items-center justify-center bg-background/70 text-xs text-primary group-hover:flex">
+          <ImagePlus className="size-5" />
+        </span>
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void onPick(file);
+        }}
+      />
+      <div className="mt-3 flex items-center gap-3 text-xs">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => inputRef.current?.click()}
+          className="text-primary hover:underline disabled:opacity-60"
+        >
+          {busy ? "Uploading…" : avatarUrl ? "Change portrait" : "Add portrait"}
+        </button>
+        {avatarUrl && (
+          <button
+            type="button"
+            onClick={() => {
+              updateAvatar(null);
+              toast.success("Portrait removed.");
+            }}
+            className="inline-flex items-center gap-1 text-muted-foreground hover:text-destructive"
+          >
+            <Trash2 className="size-3.5" /> Remove
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Downscale an image file to a square-ish JPEG data URL so local storage stays small. */
+function resizeToDataUrl(file: File, max: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("read failed"));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("decode failed"));
+      img.onload = () => {
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("no canvas"));
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
 }

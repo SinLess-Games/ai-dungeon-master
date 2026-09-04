@@ -1,15 +1,19 @@
-# D&D 3.5 Solo Play with an AI Dungeon Master
+# D&D 3.5 with an AI Dungeon Master
 
-A single-player D&D 3.5 app where an AI runs the adventure, you manage a full rules-accurate character sheet, and the game also supports party/NPC management, tactical maps with miniature-style tokens, sound, crafting, and leadership/army/faction play. Multiple characters, parties, campaigns, and worlds, all saved to your account.
+A D&D 3.5 app where an AI runs the adventure, you manage a full rules-accurate character sheet, and you can invite friends to play in the same party. Includes party/NPC management, tactical maps with miniature-style tokens, sound, crafting, leadership/army/faction play, house rules, an in-app rules wiki, and PDF character export.
 
 ## Core vision
 
-- **Character + rules:** Full 3.5 SRD character builder and live sheet, levels 1–20 plus epic 21+, multiclassing, skills, feats, spells, equipment, encumbrance.
+- **Character + rules:** Full 3.5 character builder and live sheet — every base class and prestige class, levels 1–20 plus epic 21+ using the Epic Level Handbook, multiclassing, skills, feats, spells, equipment, encumbrance.
 - **Play:** Chat with an AI DM that narrates, plays NPCs, sets DCs, and reacts to your dice. The DM can update HP, XP, loot, conditions, quest state, and scene notes through tools.
-- **Tactical play:** A 2D grid map with miniature-style tokens for your character, party, NPCs, and enemies. Move tokens, measure distance, set walls/fog/terrain, and run turn-based combat order.
+- **Multiplayer:** Invite other players to your game by link or email. Everyone shares one campaign, one map, one chat, and one initiative order, with their own character.
+- **Tactical play:** A 2D grid map with miniature-style tokens for your party, NPCs, and enemies. Move tokens, measure distance, set walls/fog/terrain, and run turn-based combat order.
 - **Sound:** Ambient music and sound effects tied to location/combat/exploration, with manual and DM-triggered playback.
-- **Systems:** Item crafting, Leadership feat with cohorts/followers, army and faction management so the player can lead forces and shape the world.
-- **Freedom:** The AI DM is a rules referee, not a railroad. The player can go anywhere, try anything, and the DM adjudicates using 3.5 mechanics.
+- **Systems:** Item crafting, Leadership feat with cohorts/followers, army and faction management so players can lead forces and shape the world.
+- **Reference:** Built-in searchable rules wiki, plus house rules you define that the AI DM actually follows.
+- **Export:** Print-ready PDF character sheets.
+- **Freedom:** The AI DM is a rules referee, not a railroad. Players can go anywhere, try anything, and the DM adjudicates using 3.5 mechanics.
+
 
 ## Accounts and saves
 

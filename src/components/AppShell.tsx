@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Dices, Scroll, Users, BookOpen, LogIn, LogOut, Swords } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
 import { signOut } from "@/lib/auth";
+import logoAsset from "@/assets/logo.png.asset.json";
 
 const NAV = [
   { to: "/", label: "Table", icon: Scroll },

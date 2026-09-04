@@ -105,6 +105,8 @@ export interface Campaign {
   quests: QuestEntry[];
   journal: { id: string; at: string; text: string }[];
   messages: StoredMessage[];
+  /** Set once the table declares the story finished. */
+  completedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -198,4 +200,17 @@ export function emptyCampaign(characterId: string): Campaign {
     createdAt: now,
     updatedAt: now,
   };
+}
+
+/**
+ * How many player-run seats are active in a campaign.
+ * The owner always counts once; extra player-controlled seats add to it.
+ */
+export function countActivePlayers(campaign: {
+  party?: { controlledBy?: string; status?: string; characterId?: string; kind?: string }[] | null;
+}): number {
+  const seats = (campaign.party ?? []).filter(
+    (m) => m?.controlledBy === "player" && (m.status ?? "active") === "active",
+  );
+  return Math.max(1, seats.length);
 }

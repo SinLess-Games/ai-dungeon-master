@@ -30,6 +30,7 @@ import { Route as CharactersIndexRouteImport } from './routes/characters.index'
 import { Route as CharactersIdRouteImport } from './routes/characters.$id'
 import { Route as CharactersNewRouteImport } from './routes/characters.new'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout/return'
+import { Route as DevBlogIndexRouteImport } from './routes/dev-blog.index'
 import { Route as MapsMapIdRouteImport } from './routes/maps.$mapId'
 import { Route as PartyCampaignIdRouteImport } from './routes/party.$campaignId'
 import { Route as WorldsIndexRouteImport } from './routes/worlds.index'
@@ -142,6 +143,11 @@ const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
   path: '/checkout/return',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DevBlogIndexRoute = DevBlogIndexRouteImport.update({
+  id: '/dev-blog/',
+  path: '/dev-blog/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MapsMapIdRoute = MapsMapIdRouteImport.update({
   id: '/maps/$mapId',
   path: '/maps/$mapId',
@@ -199,6 +205,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/campaigns/': typeof CampaignsIndexRoute
   '/characters/': typeof CharactersIndexRoute
+  '/dev-blog/': typeof DevBlogIndexRoute
   '/worlds/': typeof WorldsIndexRoute
   '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
@@ -227,6 +234,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/campaigns': typeof CampaignsIndexRoute
   '/characters': typeof CharactersIndexRoute
+  '/dev-blog': typeof DevBlogIndexRoute
   '/worlds': typeof WorldsIndexRoute
   '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
@@ -257,6 +265,7 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/campaigns/': typeof CampaignsIndexRoute
   '/characters/': typeof CharactersIndexRoute
+  '/dev-blog/': typeof DevBlogIndexRoute
   '/worlds/': typeof WorldsIndexRoute
   '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
@@ -288,6 +297,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/campaigns/'
     | '/characters/'
+    | '/dev-blog/'
     | '/worlds/'
     | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
@@ -316,6 +326,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/campaigns'
     | '/characters'
+    | '/dev-blog'
     | '/worlds'
     | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
@@ -345,6 +356,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/campaigns/'
     | '/characters/'
+    | '/dev-blog/'
     | '/worlds/'
     | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
@@ -369,6 +381,7 @@ export interface RootRouteChildren {
   WorldsWorldIdRoute: typeof WorldsWorldIdRoute
   CampaignsIndexRoute: typeof CampaignsIndexRoute
   CharactersIndexRoute: typeof CharactersIndexRoute
+  DevBlogIndexRoute: typeof DevBlogIndexRoute
   WorldsIndexRoute: typeof WorldsIndexRoute
   ApiPublicBlogMediaSplatRoute: typeof ApiPublicBlogMediaSplatRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
@@ -523,6 +536,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CheckoutReturnRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dev-blog/': {
+      id: '/dev-blog/'
+      path: '/dev-blog'
+      fullPath: '/dev-blog/'
+      preLoaderRoute: typeof DevBlogIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/maps/$mapId': {
       id: '/maps/$mapId'
       path: '/maps/$mapId'
@@ -607,6 +627,7 @@ const rootRouteChildren: RootRouteChildren = {
   WorldsWorldIdRoute: WorldsWorldIdRoute,
   CampaignsIndexRoute: CampaignsIndexRoute,
   CharactersIndexRoute: CharactersIndexRoute,
+  DevBlogIndexRoute: DevBlogIndexRoute,
   WorldsIndexRoute: WorldsIndexRoute,
   ApiPublicBlogMediaSplatRoute: ApiPublicBlogMediaSplatRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,

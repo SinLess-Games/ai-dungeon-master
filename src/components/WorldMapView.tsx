@@ -483,28 +483,39 @@ export function WorldMapView({
       <g filter="url(#wm-shadow)">
         <g filter="url(#wm-rough)">
           <g filter="url(#wm-outline)">
-            {land.map(({ region, d, feats }) => {
+            {/* terrain fills */}
+            {land.map(({ region, d }) => {
               const paint = PAINT[region.terrain] ?? PAINT.plains;
               return (
                 <g key={region.id}>
                   <path d={d} fill={paint.base} />
                   <g clipPath={`url(#wm-clip-${region.id})`}>
-                    {/* soft blend toward the region edge */}
                     <path d={d} fill="none" stroke={paint.deep} strokeWidth="4.5" opacity="0.35" />
                     <path d={d} fill="none" stroke={paint.shade} strokeWidth="1.8" opacity="0.45" />
-                    {feats.map((f, i) => (
-                      <FeatureMark key={i} f={f} ink={paint.ink} />
-                    ))}
                   </g>
                 </g>
               );
             })}
+
             {/* soften the seams between neighbouring regions */}
-            <g clipPath="url(#wm-clip-land)" filter="url(#wm-blur2)" opacity="0.6">
+            <g clipPath="url(#wm-clip-land)" filter="url(#wm-blur2)" opacity="0.55">
               {land.map(({ region, d }) => (
                 <path key={`blend-${region.id}`} d={d} fill={(PAINT[region.terrain] ?? PAINT.plains).base} />
               ))}
             </g>
+
+            {/* drawn terrain on top of the paint */}
+            {land.map(({ region, feats }) => {
+              const paint = PAINT[region.terrain] ?? PAINT.plains;
+              return (
+                <g key={`feat-${region.id}`} clipPath={`url(#wm-clip-${region.id})`}>
+                  {feats.map((f, i) => (
+                    <FeatureMark key={i} f={f} ink={paint.ink} />
+                  ))}
+                </g>
+              );
+            })}
+
 
             {/* shoreline sand shading inside the coast */}
             <g filter="url(#wm-shore)" opacity="0.5">

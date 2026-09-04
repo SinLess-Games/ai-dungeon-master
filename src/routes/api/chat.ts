@@ -152,6 +152,56 @@ const dmTools = {
     description: "Remove someone from the party roster when they leave for good.",
     inputSchema: z.object({ name: z.string() }),
   }),
+  shapeWorld: tool({
+    description:
+      "Draw or update the campaign's overland world map. Call this once at the very start of a campaign to create the setting, then again whenever new places are invented or renamed. Send only what changes.",
+    inputSchema: z.object({
+      worldName: z.string().nullable(),
+      tagline: z.string().nullable(),
+      premise: z.string().nullable(),
+      regions: z
+        .array(
+          z.object({
+            name: z.string(),
+            terrain: z
+              .enum([
+                "plains","forest","hills","mountains","desert","swamp","tundra","jungle","coast","sea","wasteland","underdark",
+              ])
+              .nullable(),
+            description: z.string().nullable(),
+          }),
+        )
+        .nullable(),
+      sites: z
+        .array(
+          z.object({
+            name: z.string(),
+            kind: z
+              .enum(["city","town","village","keep","dungeon","ruin","lair","wonder","camp","port"])
+              .nullable(),
+            regionName: z.string().nullable(),
+            description: z.string().nullable(),
+            x: z.number().nullable().describe("0-100 across; leave null to place inside the named region"),
+            y: z.number().nullable().describe("0-70 down; leave null to place inside the named region"),
+            discovered: z.boolean().nullable().describe("true if the party already knows this place exists"),
+          }),
+        )
+        .nullable(),
+    }),
+  }),
+  moveParty: tool({
+    description:
+      "Move the party marker on the world map. Use the site name when they arrive somewhere mapped, or coordinates when they are out in the wild.",
+    inputSchema: z.object({
+      siteName: z.string().nullable(),
+      x: z.number().nullable(),
+      y: z.number().nullable(),
+    }),
+  }),
+  discoverSite: tool({
+    description: "Reveal a place on the world map because the party learned it exists.",
+    inputSchema: z.object({ name: z.string() }),
+  }),
   addJournal: tool({
     description: "Write a short entry into the campaign log after something important happens.",
     inputSchema: z.object({ text: z.string() }),

@@ -3,6 +3,7 @@
  * every turn; the live game state (character sheet, scene, party, quests) is
  * appended separately by buildDmContext().
  */
+import { ECONOMY_PROMPT_SECTION } from "@/prompts/economy/system-prompt";
 import { OVERHEARD_PROMPT_SECTION } from "./overheard-tables";
 import { NPC_PROMPT_SECTION } from "@/prompts/npcs/system-prompt";
 

@@ -1,15 +1,18 @@
 import type { World, WorldSite } from "@/lib/world";
 
 const STYLE = [
-  "Hand-painted high-fantasy atlas illustration in the style of a classic tabletop campaign map.",
-  "Aged parchment paper, muted natural pigments, soft watercolour washes, fine ink linework.",
-  "Textured deep blue-green ocean with subtle wave hatching and pale shallows along every coast.",
-  "Illustrated terrain: little inked mountain ridges, clustered trees for forests, dune ripples,",
-  "marsh tufts, rolling hill bumps, and thin winding rivers with deltas.",
-  "Painted top-down, no perspective, no photographic realism, no 3D render.",
-  "IMPORTANT: absolutely no text, no words, no letters, no labels, no title, no legend,",
-  "no compass rose, no border frame, no numbers anywhere in the image.",
-  "The illustration must fill the entire frame edge to edge, landscape orientation.",
+  "Photorealistic satellite image of a planet's surface, taken straight down from orbit,",
+  "like high-resolution true-colour Earth observation imagery.",
+  "Deep blue ocean with realistic turquoise shallows over reefs and continental shelves,",
+  "sediment plumes at river mouths, and faint wave and current texture.",
+  "Land shows real biome colouring: green forest canopy, olive grassland, tan and ochre desert",
+  "with visible dune fields, grey-brown rock, snow-capped mountain ranges with sharp ridge shadows,",
+  "dark wetlands, braided river systems and lakes, eroded valleys and alluvial fans.",
+  "Natural terrain relief shading from low sun angle, subtle thin cloud wisps in a few places.",
+  "No illustration, no parchment, no painting, no watercolour, no ink lines, no fantasy map styling.",
+  "IMPORTANT: absolutely no text, no words, no letters, no labels, no legend,",
+  "no compass rose, no border frame, no grid, no numbers anywhere in the image.",
+  "The image must fill the entire frame edge to edge, landscape orientation.",
 ].join(" ");
 
 function pct(n: number) {
@@ -44,10 +47,10 @@ export function worldMapPrompt(world: World) {
     "Surround the land with open ocean. Draw irregular, organic coastlines with bays,",
     "peninsulas, inlets and a scattering of small offshore islands.",
     settlements
-      ? `Show tiny painted settlement clusters (rooftops and towers, no text) here:\n${settlements}`
+      ? `Show tiny grey-tan built-up patches, the size of towns seen from orbit, here:\n${settlements}`
       : "",
     roads > 0
-      ? `Trace about ${roads} thin winding tan roads between those settlements; roads must never cross open water.`
+      ? `Include about ${roads} faint pale threads of road between those built-up patches; roads never cross open water.`
       : "",
     world.themes.length ? `Overall mood: ${world.themes.join(", ")}.` : "",
     world.description ? `Setting flavour: ${world.description.slice(0, 400)}` : "",
@@ -73,12 +76,13 @@ export function siteMapPrompt(site: WorldSite, world?: World) {
   };
 
   return [
-    "Hand-painted top-down fantasy town plan on aged parchment, watercolour and ink,",
-    "muted earth pigments, fine linework, the kind of local map drawn inside a fantasy atlas.",
-    `Depict ${layout[kind] ?? "a small settlement of stone and timber buildings"}.`,
-    "Include surrounding terrain: roads leading out of frame, trees, streams, and fields.",
+    "Photorealistic high-resolution aerial/satellite image looking straight down from above,",
+    "true-colour drone survey imagery with natural lighting and soft shadows from a low sun.",
+    `Depict ${layout[kind] ?? "a small settlement of stone and timber buildings"}, seen from directly overhead.`,
+    "Surrounding terrain is realistic: dirt tracks leading out of frame, tree canopy, streams, tilled fields.",
+    "No illustration, no parchment, no painting, no ink lines, no fantasy map styling.",
     "IMPORTANT: no text, no words, no letters, no labels, no legend, no compass, no border frame.",
-    "Painted straight down from above, filling the whole frame, landscape orientation.",
+    "Filling the whole frame, landscape orientation.",
     site.description ? `Local flavour: ${site.description.slice(0, 300)}` : "",
     world?.themes.length ? `Overall mood: ${world.themes.join(", ")}.` : "",
   ]

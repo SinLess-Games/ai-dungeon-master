@@ -614,7 +614,7 @@ function WorldMapButton({ campaign }: { campaign: Campaign }) {
                 and click any place to open its local map.
               </p>
               <div className="flex flex-wrap items-center gap-2">
-                <PaintMapButton world={world} onPainted={() => setTick((t) => t + 1)} />
+                <PaintMapButton auto world={world} onPainted={() => setTick((t) => t + 1)} />
                 <Button asChild variant="outline" size="sm">
                   <Link to="/worlds/$worldId" params={{ worldId: world.id }}>
                     Open the full atlas

@@ -86,7 +86,7 @@ export interface Campaign {
   id: string;
   name: string;
   characterId: string;
-  /** Up to 3 campaign style tags. */
+  /** Up to 5 campaign style tags. */
   styles: CampaignStyle[];
   type: CampaignType;
   length: CampaignLength;
@@ -111,9 +111,11 @@ export interface Campaign {
 
 export const STYLE_OPTIONS: { value: CampaignStyle; label: string; blurb: string }[] = [
   { value: "heroic", label: "Heroic", blurb: "Bold deeds, clear villains, earned victories." },
+  { value: "high-fantasy", label: "High fantasy", blurb: "Grand quests, ancient evils, elves and dragons — the classic epic." },
   { value: "high-magic", label: "High magic", blurb: "Magic is common, wonders shape everyday life." },
   { value: "grim-dark", label: "Grim-dark", blurb: "Cruel worlds, scarce hope, survival costs dignity." },
-  { value: "steampunk-magitech", label: "Steampunk / magi-tech", blurb: "Gears, steam, and enchanted industry reshape civilization." },
+  { value: "steampunk", label: "Steampunk", blurb: "Gears, steam, and clockwork industry reshape civilization." },
+  { value: "magi-tech", label: "Magi-tech", blurb: "Enchanted devices and spell-driven industry replace machines." },
   { value: "low-fantasy", label: "Low fantasy", blurb: "Rare magic, grounded threats, steel and wits matter most." },
   { value: "sword-and-sorcery", label: "Sword & sorcery", blurb: "Pulp adventure, decadent cities, and eldritch relics." },
   { value: "mythic-epic", label: "Mythic epic", blurb: "Demigods, cosmic journeys, and destiny across ages." },

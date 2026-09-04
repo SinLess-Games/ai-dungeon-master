@@ -12,6 +12,9 @@ import { CLASSES } from "@/lib/rules/classes";
 import { WEAPONS, ARMORS, SHIELDS, GEAR } from "@/lib/rules/equipment";
 import { ABILITY_NAMES } from "@/lib/rules/types";
 import { DM_ARTICLES, type WikiArticle } from "@/lib/wiki/dm-guide";
+import { PLAYER_ARTICLES } from "@/lib/wiki/player-guide";
+
+const ALL_ARTICLES: WikiArticle[] = [...PLAYER_ARTICLES, ...DM_ARTICLES];
 
 export const Route = createFileRoute("/wiki")({
   head: () => ({
@@ -143,21 +146,23 @@ function Wiki() {
   const [sel, setSel] = useState<Selection>({ type: "home" });
   const paneRef = useRef<HTMLDivElement>(null);
 
-  const dmCategories = useMemo(() => {
+  const group = (list: WikiArticle[]) => {
     const map = new Map<string, WikiArticle[]>();
-    for (const a of DM_ARTICLES) {
+    for (const a of list) {
       if (!map.has(a.category)) map.set(a.category, []);
       map.get(a.category)!.push(a);
     }
     return [...map.entries()];
-  }, []);
+  };
+  const playerCategories = useMemo(() => group(PLAYER_ARTICLES), []);
+  const dmCategories = useMemo(() => group(DM_ARTICLES), []);
 
   const needle = q.trim().toLowerCase();
   const searching = needle.length > 0;
 
   const articleHits = useMemo(() => {
     if (!searching) return [];
-    return DM_ARTICLES.filter(
+    return ALL_ARTICLES.filter(
       (a) =>
         a.title.toLowerCase().includes(needle) ||
         a.summary.toLowerCase().includes(needle) ||
@@ -181,7 +186,7 @@ function Wiki() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [sel]);
 
-  const article = sel.type === "article" ? DM_ARTICLES.find((a) => a.id === sel.id) : undefined;
+  const article = sel.type === "article" ? ALL_ARTICLES.find((a) => a.id === sel.id) : undefined;
   const entry = sel.type === "entry" ? rules.find((e) => e.id === sel.id) : undefined;
 
   function open(next: Selection) {
@@ -201,7 +206,26 @@ function Wiki() {
             <BookOpen className="size-4" /> Codex wiki
           </button>
 
-          <SidebarGroup label="Dungeon Master's guide" icon={<BookOpen className="size-4" />}>
+          <SidebarGroup label="Player rules" icon={<BookOpen className="size-4" />}>
+            {playerCategories.map(([cat, arts]) => (
+              <div key={cat} className="mb-3">
+                <p className="mb-1 rounded bg-primary/10 px-2 py-1.5 font-display text-xs font-bold uppercase tracking-wide text-primary">
+                  {cat}
+                </p>
+                {arts.map((a) => (
+                  <SidebarLink
+                    key={a.id}
+                    active={sel.type === "article" && sel.id === a.id}
+                    onClick={() => open({ type: "article", id: a.id })}
+                  >
+                    {a.title}
+                  </SidebarLink>
+                ))}
+              </div>
+            ))}
+          </SidebarGroup>
+
+          <SidebarGroup label="Running the game" icon={<BookOpen className="size-4" />}>
             {dmCategories.map(([cat, arts]) => (
               <div key={cat} className="mb-3">
                 <p className="mb-1 rounded bg-primary/10 px-2 py-1.5 font-display text-xs font-bold uppercase tracking-wide text-primary">
@@ -278,6 +302,7 @@ function Wiki() {
             />
           ) : (
             <HomeView
+              playerCategories={playerCategories}
               dmCategories={dmCategories}
               rulesCount={rules.length}
               onOpenArticle={(id) => open({ type: "article", id })}
@@ -341,7 +366,7 @@ function Breadcrumb({ trail }: { trail: string[] }) {
 function ArticleView({ article }: { article: WikiArticle }) {
   return (
     <article className="max-w-3xl">
-      <Breadcrumb trail={["Codex wiki", "Dungeon Master's guide", article.category]} />
+      <Breadcrumb trail={["Codex wiki", article.category]} />
       <h1 className="font-display text-3xl text-foreground sm:text-4xl">{article.title}</h1>
       <p className="mt-3 text-lg leading-relaxed text-muted-foreground">{article.summary}</p>
       <div className="mt-3 flex flex-wrap gap-1">
@@ -458,7 +483,7 @@ function SearchResults({
 
       {articles.length > 0 && (
         <section className="mb-8">
-          <h2 className="mb-3 font-display text-lg text-primary">Dungeon Master's guide</h2>
+          <h2 className="mb-3 font-display text-lg text-primary">Guides</h2>
           <div className="space-y-2">
             {articles.map((a) => (
               <button
@@ -512,12 +537,44 @@ function SearchResults({
   );
 }
 
+function CategoryCards({
+  categories,
+  onOpenArticle,
+}: {
+  categories: [string, WikiArticle[]][];
+  onOpenArticle: (id: string) => void;
+}) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {categories.map(([cat, arts]) => (
+        <div key={cat} className="rounded-lg border border-border/60 bg-card/50 p-4">
+          <p className="font-display text-sm uppercase tracking-[0.18em] text-muted-foreground">{cat}</p>
+          <ul className="mt-2 space-y-1">
+            {arts.map((a) => (
+              <li key={a.id}>
+                <button
+                  onClick={() => onOpenArticle(a.id)}
+                  className="text-left text-sm text-foreground underline-offset-2 hover:text-primary hover:underline"
+                >
+                  {a.title}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function HomeView({
+  playerCategories,
   dmCategories,
   rulesCount,
   onOpenArticle,
   onOpenCategory,
 }: {
+  playerCategories: [string, WikiArticle[]][];
   dmCategories: [string, WikiArticle[]][];
   rulesCount: number;
   onOpenArticle: (id: string) => void;
@@ -527,33 +584,21 @@ function HomeView({
     <div>
       <h1 className="font-display text-3xl text-foreground sm:text-4xl">The Codex wiki</h1>
       <p className="mt-2 max-w-2xl text-muted-foreground">
-        {DM_ARTICLES.length} Dungeon Master chapters and {rulesCount} rules entries — everything the character
-        builder and the AI DM know, in one place.
+        {ALL_ARTICLES.length} guide articles and {rulesCount} rules entries — everything the character builder and
+        the AI DM know, in one place.
       </p>
       <div className="rune-rule my-6" />
 
       <h2 className="mb-3 flex items-center gap-2 font-display text-xl text-primary">
-        <BookOpen className="size-5" /> Dungeon Master's guide
+        <BookOpen className="size-5" /> Player rules
       </h2>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {dmCategories.map(([cat, arts]) => (
-          <div key={cat} className="rounded-lg border border-border/60 bg-card/50 p-4">
-            <p className="font-display text-sm uppercase tracking-[0.18em] text-muted-foreground">{cat}</p>
-            <ul className="mt-2 space-y-1">
-              {arts.map((a) => (
-                <li key={a.id}>
-                  <button
-                    onClick={() => onOpenArticle(a.id)}
-                    className="text-left text-sm text-foreground underline-offset-2 hover:text-primary hover:underline"
-                  >
-                    {a.title}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
+      <CategoryCards categories={playerCategories} onOpenArticle={onOpenArticle} />
+
+      <h2 className="mb-3 mt-10 flex items-center gap-2 font-display text-xl text-primary">
+        <BookOpen className="size-5" /> Running the game
+      </h2>
+      <CategoryCards categories={dmCategories} onOpenArticle={onOpenArticle} />
+
 
       <h2 className="mb-3 mt-10 flex items-center gap-2 font-display text-xl text-primary">
         <Shapes className="size-5" /> Rules reference

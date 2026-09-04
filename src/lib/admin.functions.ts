@@ -10,7 +10,10 @@ export interface AdminMetrics {
     maps: number;
     rolls: number;
     messages: number;
+    /** Player seats active across all campaigns. */
+    players: number;
   };
+  avgPlayersPerCampaign: number;
   newUsers7d: number;
   activeUsers30d: number;
   signupSeries: { date: string; users: number }[];
@@ -81,6 +84,14 @@ export const getAdminMetrics = createServerFn({ method: "GET" })
     const campMap = countBy(camps.data ?? []);
     const worldMap = countBy(worlds.data ?? []);
 
+    const playerSeats = (camps.data ?? []).reduce((sum, c) => {
+      const party = ((c.data as { party?: any[] } | null)?.party ?? []) as any[];
+      const seats = party.filter(
+        (m) => m?.controlledBy === "player" && (m?.status ?? "active") === "active",
+      ).length;
+      return sum + Math.max(1, seats);
+    }, 0);
+
     const recentUsers = [...users]
       .sort((a, b) => b.created_at.localeCompare(a.created_at))
       .slice(0, 10)
@@ -109,7 +120,12 @@ export const getAdminMetrics = createServerFn({ method: "GET" })
               : 0),
           0,
         ),
+        players: playerSeats,
       },
+      avgPlayersPerCampaign:
+        (camps.data ?? []).length > 0
+          ? Math.round((playerSeats / (camps.data ?? []).length) * 10) / 10
+          : 0,
       newUsers7d,
       activeUsers30d,
       signupSeries: days.map((d) => ({ date: d, users: signupMap.get(d) ?? 0 })),

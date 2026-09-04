@@ -274,6 +274,7 @@ function CampaignsPage() {
           );
         })}
       </div>
+      </section>
     </AppShell>
   );
 }

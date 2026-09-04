@@ -162,10 +162,17 @@ function Table({
     campaignRef.current = saveCampaign(g);
   }, [messages]);
 
-  // Keep the latest text (and thus the composer context) in view. While the
-  // DM streams we jump instantly each chunk; smooth-scroll only between turns.
+  // Keep the transcript pinned to the newest text without ever moving the
+  // page itself: scroll only the chat's own ScrollArea viewport so the
+  // composer and card frame stay exactly where they are while the DM streams.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: busy ? "auto" : "smooth", block: "end" });
+    const viewport = bottomRef.current?.closest<HTMLElement>("[data-radix-scroll-area-viewport]");
+    if (!viewport) return;
+    if (busy) {
+      viewport.scrollTop = viewport.scrollHeight;
+    } else {
+      viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
+    }
   }, [messages, busy]);
 
   // The DM always opens the campaign: fire the opening narration once when a

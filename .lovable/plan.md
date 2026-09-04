@@ -28,20 +28,33 @@ A D&D 3.5 app where an AI runs the adventure, you manage a full rules-accurate c
 ## Character creator and sheet
 
 - Step-by-step builder: ability scores (point buy, standard array, or rolled with the in-app dice roller), race, class, alignment, skills, feats, equipment, spells.
-- All SRD core races and classes, levels 1–20 and epic 21+ with epic BAB/save progression, epic feats, epic skill ranks, and epic spell slots.
+- **Every base class and prestige class:** all SRD/core base classes plus the full prestige class list, with prerequisite checking (BAB, skill ranks, feats, alignment, casting level, special requirements). Prestige classes you don't qualify for are shown greyed with the missing requirement listed, and can be force-taken if a house rule allows.
+- **Epic Level Handbook support:** levels 21+ with epic BAB/save progression, epic attack/damage bonuses, epic feats, epic skill ranks, epic spell slots and epic spellcasting, epic prestige class progressions, and divine ranks/salient abilities where applicable.
 - Multiclassing with per-class level tracking, favored class handling, and XP penalty warnings.
 - Auto-computed derived stats: BAB, saves, AC breakdown, initiative, grapple, skill totals, carrying capacity, encumbrance, spells per day, bonus spells.
 - Manual override on any derived value for homebrew or odd rulings.
 - Visual character: generated/portrait image and miniature token chosen from token art or uploaded.
 - Live sheet during play: HP current/max/temp/nonlethal, conditions, XP and level-up prompts, inventory/gold, prepared/expended slots, consumables, daily-use items.
 - Level-up flow walks each new level's choices and applies them.
+- **PDF export:** print-ready character sheet PDF in a classic 3.5 layout — page 1 core stats/combat/skills, page 2 feats/special abilities/equipment, page 3 spellbook/spells known and prepared, plus an epic-progression page for 21+ characters. Includes portrait and download button from the sheet.
+
+## Multiplayer: invite other players
+
+- Each campaign has an invite link and email invite, with a join code.
+- Roles: campaign owner (host) and players. The host controls campaign settings, house rules, and map editing rights.
+- Invited players pick or create a character and join the party.
+- Shared live session: everyone sees the same DM chat, tactical map, initiative order, and party status, updating in real time.
+- Each player rolls their own dice; rolls post to the shared log with who rolled.
+- Turn control: the initiative tracker highlights whose turn it is; a player can only move their own token unless the host grants control.
+- Presence indicators showing who is online in the session.
 
 ## Party and NPC management
 
-- Parties are collections of characters. A campaign has one active party.
+- Parties are collections of characters, from you or from invited players. A campaign has one active party.
 - Party members can be player-made characters or DM-controlled companions/henchmen with simplified sheets.
 - NPC roster per campaign: name, token, disposition, notes, stat block summary, current HP/conditions.
 - Initiative tracker in the tactical view with party and NPC tokens.
+
 
 ## Tactical map
 

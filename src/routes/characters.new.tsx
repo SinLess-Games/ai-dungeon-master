@@ -31,8 +31,8 @@ const RACE_GROUPS = [
 ] as const;
 import { CLASSES, CLASS_GROUPS } from "@/lib/rules/classes";
 import { SKILLS } from "@/lib/rules/skills";
-import { FEATS } from "@/lib/rules/feats";
-import { ARMORS, SHIELDS, WEAPONS } from "@/lib/rules/equipment";
+import { FEATS, FEAT_GROUPS } from "@/lib/rules/feats";
+import { SPELLS, POWERS, maxSpellLevel, spellLevelFor } from "@/lib/rules/spells";
 import { emptyCharacter, type Character } from "@/lib/rules/character";
 import { computeCharacter, abilityMod, formatMod } from "@/lib/rules/engine";
 import { rollAbilityScores, pointBuyCost, STANDARD_ARRAY, POINT_BUY_BUDGETS, type AbilityRollMethod } from "@/lib/dice";
@@ -45,7 +45,7 @@ export const Route = createFileRoute("/characters/new")({
       {
         name: "description",
         content:
-          "Build a D&D 3.5 character step by step: abilities, race, class, skills, feats, and gear, with every rule explained as you go.",
+          "Build a D&D 3.5 character step by step: abilities, race, class, skills, feats, and spells, with every rule explained as you go.",
       },
       { property: "og:title", content: "Create a character — Grimoire D&D 3.5" },
       { property: "og:description", content: "A guided, rules-accurate 3.5 character creator that explains every choice." },
@@ -56,7 +56,7 @@ export const Route = createFileRoute("/characters/new")({
   component: CharacterCreator,
 });
 
-const STEPS = ["Abilities", "Race", "Class", "Skills", "Feats", "Gear", "Details"] as const;
+const STEPS = ["Abilities", "Race", "Class", "Skills", "Feats", "Spells", "Details"] as const;
 
 function Explain({ children }: { children: React.ReactNode }) {
   return (
@@ -78,6 +78,8 @@ function CharacterCreator() {
   const [pointBudget, setPointBudget] = useState<number>(32);
   const [rollMethod, setRollMethod] = useState<AbilityRollMethod>("4d6-drop-lowest");
   const [rolled, setRolled] = useState<{ score: number; dice: number[] }[] | null>(null);
+  const [featGroup, setFeatGroup] = useState<(typeof FEAT_GROUPS)[number]["key"]>("all");
+  const [featSearch, setFeatSearch] = useState("");
 
   const derived = useMemo(() => computeCharacter(char), [char]);
   const patch = (p: Partial<Character>) => setChar((c) => ({ ...c, ...p }));
@@ -87,6 +89,29 @@ function CharacterCreator() {
 
   const currentClass = CLASSES.find((c) => c.id === char.classes[0]?.classId);
   const currentClassB = char.gestalt ? CLASSES.find((c) => c.id === char.classesB?.[0]?.classId) : undefined;
+  const featQuery = featSearch.trim().toLowerCase();
+  const visibleFeats = useMemo(
+    () =>
+      FEATS.filter((f) => (featGroup === "all" || f.type === featGroup))
+        .filter(
+          (f) =>
+            !featQuery ||
+            f.name.toLowerCase().includes(featQuery) ||
+            f.benefit.toLowerCase().includes(featQuery) ||
+            (f.prereq ?? "").toLowerCase().includes(featQuery),
+        ),
+    [featGroup, featQuery],
+  );
+
+  const castingTracks = useMemo(() => {
+    const tracks: { cls: NonNullable<typeof currentClass>; levels: number }[] = [];
+    for (const cl of [...char.classes, ...(char.gestalt ? char.classesB ?? [] : [])]) {
+      const cls = CLASSES.find((c) => c.id === cl.classId);
+      if (cls?.casting) tracks.push({ cls, levels: cl.levels });
+    }
+    return tracks;
+  }, [char.classes, char.classesB, char.gestalt]);
+
   const spentPoints = derived.skillPointsSpent;
   const remainingPoints = derived.skillPointsTotal - spentPoints;
 
@@ -627,8 +652,29 @@ function CharacterCreator() {
                 <Badge variant={char.featIds.length > derived.featSlots ? "destructive" : "secondary"}>
                   {char.featIds.length} / {derived.featSlots} feats chosen
                 </Badge>
+                <div className="flex flex-wrap gap-2">
+                  {FEAT_GROUPS.map((g) => (
+                    <button
+                      key={g.key}
+                      onClick={() => setFeatGroup(g.key)}
+                      className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                        featGroup === g.key
+                          ? "border-primary bg-primary/15 text-primary"
+                          : "border-border/60 text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {g.label}
+                    </button>
+                  ))}
+                </div>
+                <Input
+                  value={featSearch}
+                  onChange={(e) => setFeatSearch(e.target.value)}
+                  placeholder="Search feats by name, prerequisite, or benefit"
+                />
+                <p className="text-xs text-muted-foreground">{visibleFeats.length} feats shown of {FEATS.length}</p>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  {FEATS.map((f) => {
+                  {visibleFeats.map((f) => {
                     const active = char.featIds.includes(f.id);
                     return (
                       <button

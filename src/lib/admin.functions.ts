@@ -260,6 +260,17 @@ function textOf(parts: unknown): string {
     .trim();
 }
 
+/** A short description of a turn that only ran tools and produced no prose. */
+function toolSummary(parts: unknown): string {
+  if (!Array.isArray(parts)) return "";
+  const tools = parts
+    .filter((p: any) => typeof p?.type === "string" && p.type.startsWith("tool-"))
+    .map((p: any) => (p.type as string).slice(5));
+  if (!tools.length) return "";
+  return `(table action: ${[...new Set(tools)].join(", ")})`;
+}
+
+
 export const getAdminInbox = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<AdminInbox> => {

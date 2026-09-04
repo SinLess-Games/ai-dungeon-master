@@ -104,7 +104,7 @@ export function splitGold(total: number, shares: number) {
   return { each, remainder: total - each * shares };
 }
 
-/** Deal party-pool items out round-robin across the given hero ids. */
+/** Deal party-pool items out evenly across the given hero ids. */
 export function planEqualSplit(items: InventoryItem[], heroIds: string[]) {
   const plan = new Map<string, { itemId: string; quantity: number }[]>();
   heroIds.forEach((h) => plan.set(h, []));
@@ -115,24 +115,20 @@ export function planEqualSplit(items: InventoryItem[], heroIds: string[]) {
     let leftover = item.quantity - base * heroIds.length;
     for (const hero of heroIds) {
       let qty = base;
-      if (leftover > 0 && heroIds[cursor % heroIds.length] === hero) {
-        /* remainder handled below */
+      if (leftover > 0) {
+        const pick = heroIds[cursor % heroIds.length];
+        if (pick === hero) {
+          qty += 1;
+          leftover -= 1;
+          cursor += 1;
+        }
       }
       if (qty > 0) plan.get(hero)!.push({ itemId: item.id, quantity: qty });
-      void qty;
-    }
-    while (leftover > 0) {
-      const hero = heroIds[cursor % heroIds.length]!;
-      const bucket = plan.get(hero)!;
-      const existing = bucket.find((b) => b.itemId === item.id);
-      if (existing) existing.quantity += 1;
-      else bucket.push({ itemId: item.id, quantity: 1 });
-      leftover -= 1;
-      cursor += 1;
     }
   }
   return plan;
 }
+
 
 export function totalWeight(items: InventoryItem[]) {
   return items.reduce((sum, i) => sum + i.weight * i.quantity, 0);

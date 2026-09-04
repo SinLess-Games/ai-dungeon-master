@@ -256,7 +256,9 @@ function CampaignsPage() {
                 </button>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-2">
-                <Badge variant="secondary">{c.style}</Badge>
+              {c.styles.map((s) => (
+                <Badge key={s} variant="secondary">{s}</Badge>
+              ))}
                 <Badge variant="secondary">{c.type}</Badge>
                 <Badge variant="outline">{c.pace}</Badge>
                 {c.scene.inCombat ? <Badge>in combat</Badge> : null}

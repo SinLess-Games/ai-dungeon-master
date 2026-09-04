@@ -232,9 +232,11 @@ function CampaignsPage() {
         </Card>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {campaigns.map((c) => {
-          const char = characters.find((x) => x.id === c.characterId);
+      <section className="space-y-4">
+        <PageTitle as="h2" title="Your campaigns" />
+        <div className="grid gap-4 md:grid-cols-2">
+          {campaigns.map((c) => {
+            const char = characters.find((x) => x.id === c.characterId);
           return (
             <Card key={c.id} className="transition-colors hover:border-primary/50">
               <CardHeader className="flex-row items-start justify-between gap-3">
@@ -272,6 +274,7 @@ function CampaignsPage() {
           );
         })}
       </div>
+      </section>
     </AppShell>
   );
 }

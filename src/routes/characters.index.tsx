@@ -43,6 +43,8 @@ function CharacterList() {
         }
       />
 
+      <PageTitle as="h2" title="Character roster" />
+
       {chars.length === 0 ? (
         <Card className="card-etched bg-card/60 p-10 text-center">
           <p className="text-muted-foreground">No characters yet. The first step of any campaign is a name.</p>

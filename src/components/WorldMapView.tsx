@@ -371,11 +371,11 @@ function wanderPath(
 
   // three overlapping waves give a wandering, terrain-following line
   const waves = [0, 1, 2].map(() => ({
-    amp: (rand() - 0.5) * (kind === "river" ? 0.24 : 0.15) * len,
+    amp: (rand() - 0.5) * (kind === "river" ? 0.3 : 0.26) * len,
     freq: 1 + Math.floor(rand() * 3),
     phase: rand() * Math.PI * 2,
   }));
-  const bias = (rand() - 0.5) * (kind === "river" ? 0.2 : 0.13) * len;
+  const bias = (rand() - 0.5) * (kind === "river" ? 0.24 : 0.2) * len;
 
   const steps = Math.max(6, Math.min(16, Math.round(len / 4)));
   const pts: Pt[] = [];

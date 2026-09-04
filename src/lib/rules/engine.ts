@@ -10,8 +10,31 @@ export function abilityMod(score: number) {
   return Math.floor((score - 10) / 2);
 }
 
+function trackLevels(track: { classId: string; levels: number }[]) {
+  return track.reduce((n, cl) => n + cl.levels, 0);
+}
+
+/** The second gestalt track, or an empty track when gestalt is off. */
+export function gestaltTrack(c: Character) {
+  return c.gestalt ? c.classesB ?? [] : [];
+}
+
+/** Character level. Under gestalt the two tracks advance together, so it's the longer track. */
 export function totalLevel(c: Character) {
-  return c.classes.reduce((n, cl) => n + cl.levels, 0);
+  const a = trackLevels(c.classes);
+  const b = trackLevels(gestaltTrack(c));
+  return b > 0 ? Math.max(a, b) : a;
+}
+
+/** Expand a track into a per-character-level list of class definitions. */
+function expandTrack(track: { classId: string; levels: number }[]) {
+  const out: (typeof CLASS_BY_ID)[string][] = [];
+  for (const cl of track) {
+    const def = CLASS_BY_ID[cl.classId];
+    if (!def) continue;
+    for (let i = 0; i < cl.levels; i++) out.push(def);
+  }
+  return out;
 }
 
 export function babForClass(prog: BabProgression, level: number) {
@@ -103,21 +126,17 @@ export function computeCharacter(c: Character): DerivedStats {
   const mods = {} as Record<AbilityKey, number>;
   for (const a of ABILITIES) mods[a] = abilityMod(scores[a]!);
 
-  // Hit points: max at 1st level of the first class, average (rounded up) after.
+  const trackA = expandTrack(c.classes);
+  const trackB = expandTrack(gestaltTrack(c));
+  const isGestalt = trackB.length > 0;
+
+  // Hit points: take the better Hit Die at each level (gestalt), max at 1st level.
   let hpMax = 0;
-  let first = true;
-  for (const cl of c.classes) {
-    const def = CLASS_BY_ID[cl.classId];
-    if (!def) continue;
-    for (let i = 0; i < cl.levels; i++) {
-      if (first) {
-        hpMax += def.hitDie;
-        first = false;
-      } else {
-        hpMax += Math.floor(def.hitDie / 2) + 1;
-      }
-      hpMax += mods.con;
-    }
+  for (let i = 0; i < level; i++) {
+    const die = Math.max(trackA[i]?.hitDie ?? 0, trackB[i]?.hitDie ?? 0);
+    if (die === 0) continue;
+    hpMax += i === 0 ? die : Math.floor(die / 2) + 1;
+    hpMax += mods.con;
   }
   const rhd = race.racialHitDice;
   if (rhd) {
@@ -128,35 +147,44 @@ export function computeCharacter(c: Character): DerivedStats {
   hpMax = Math.max(level, hpMax);
   if (c.featIds.includes("toughness")) hpMax += 3;
 
-  let bab = 0;
-  let fort = 0;
-  let ref = 0;
-  let will = 0;
   const classSkillIds = new Set<string>();
-  let skillPointsTotal = 0;
-  let firstClass = true;
   let casting: DerivedStats["casting"];
 
-  for (const cl of c.classes) {
-    const def = CLASS_BY_ID[cl.classId];
-    if (!def) continue;
-    bab += babForClass(def.bab, cl.levels);
-    fort += saveForClass(def.saves.fort, cl.levels);
-    ref += saveForClass(def.saves.ref, cl.levels);
-    will += saveForClass(def.saves.will, cl.levels);
-    def.classSkills.forEach((s) => classSkillIds.add(s));
-
-    const perLevel = Math.max(1, def.skillPoints + mods.int + (race.bonusSkillPointsPerLevel ?? 0));
-    if (firstClass) {
-      skillPointsTotal += perLevel * 4;
-      skillPointsTotal += cl.levels > 1 ? perLevel * (cl.levels - 1) : 0;
+  function trackStats(track: { classId: string; levels: number }[], firstIsFirst: boolean) {
+    let bab = 0, fort = 0, ref = 0, will = 0;
+    let firstClass = firstIsFirst;
+    for (const cl of track) {
+      const def = CLASS_BY_ID[cl.classId];
+      if (!def) continue;
+      bab += babForClass(def.bab, cl.levels);
+      fort += saveForClass(def.saves.fort, cl.levels);
+      ref += saveForClass(def.saves.ref, cl.levels);
+      will += saveForClass(def.saves.will, cl.levels);
+      def.classSkills.forEach((sk) => classSkillIds.add(sk));
+      if (def.casting && !casting) {
+        casting = { label: def.casting.label, ability: def.casting.ability, dcBase: 10 + mods[def.casting.ability] };
+      }
       firstClass = false;
-    } else {
-      skillPointsTotal += perLevel * cl.levels;
     }
-    if (def.casting && !casting) {
-      casting = { label: def.casting.label, ability: def.casting.ability, dcBase: 10 + mods[def.casting.ability] };
-    }
+    return { bab, fort, ref, will };
+  }
+
+  const a = trackStats(c.classes, true);
+  const b = trackStats(gestaltTrack(c), true);
+
+  // Gestalt: keep the best of each progression.
+  let bab = Math.max(a.bab, b.bab);
+  let fort = Math.max(a.fort, b.fort);
+  let ref = Math.max(a.ref, b.ref);
+  let will = Math.max(a.will, b.will);
+
+  // Skill points: best skill-point value available at each level.
+  let skillPointsTotal = 0;
+  for (let i = 0; i < level; i++) {
+    const base = Math.max(trackA[i]?.skillPoints ?? 0, trackB[i]?.skillPoints ?? 0);
+    if (base === 0) continue;
+    const perLevel = Math.max(1, base + mods.int + (race.bonusSkillPointsPerLevel ?? 0));
+    skillPointsTotal += i === 0 ? perLevel * 4 : perLevel;
   }
 
   if (rhd) {
@@ -248,16 +276,21 @@ export function computeCharacter(c: Character): DerivedStats {
   };
 }
 
+function levelsOf(c: Character, classId: string) {
+  const all = [...c.classes, ...gestaltTrack(c)].filter((x) => x.classId === classId);
+  return all.reduce((n, x) => Math.max(n, x.levels), 0);
+}
+
 function fighterBonusFeats(c: Character) {
-  const f = c.classes.find((x) => x.classId === "fighter");
-  if (!f) return 0;
-  return 1 + Math.floor(f.levels / 2);
+  const lv = levelsOf(c, "fighter");
+  if (!lv) return 0;
+  return 1 + Math.floor(lv / 2);
 }
 
 function wizardBonusFeats(c: Character) {
-  const w = c.classes.find((x) => x.classId === "wizard");
-  if (!w) return 0;
-  return 1 + Math.floor(w.levels / 5);
+  const lv = levelsOf(c, "wizard");
+  if (!lv) return 0;
+  return 1 + Math.floor(lv / 5);
 }
 
 export function skillName(id: string) {

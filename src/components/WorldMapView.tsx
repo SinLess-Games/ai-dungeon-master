@@ -59,8 +59,9 @@ function landPath(r: WorldRegion) {
   const rand = rng(hash(r.id + r.name));
   const cx = r.x + r.w / 2;
   const cy = r.y + r.h / 2;
-  const rx = r.w / 2;
-  const ry = r.h / 2;
+  // Slightly oversized so neighbouring regions fuse into one continent.
+  const rx = (r.w / 2) * 1.24;
+  const ry = (r.h / 2) * 1.24;
   const steps = 26;
   const pts: [number, number][] = [];
   for (let i = 0; i < steps; i++) {

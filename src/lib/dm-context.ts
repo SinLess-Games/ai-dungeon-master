@@ -56,7 +56,7 @@ Abilities: ${Object.entries(d.abilityScores).map(([k, v]) => `${k.toUpperCase()}
 HP ${character.hp.current}/${d.hpMax}${character.hp.temp ? ` (+${character.hp.temp} temp)` : ""}${character.hp.nonlethal ? `, nonlethal ${character.hp.nonlethal}` : ""} · AC ${d.ac.total} (touch ${d.ac.touch}, flat-footed ${d.ac.flatFooted})
 BAB ${formatMod(d.bab)} · Attacks ${d.attacks.map(formatMod).join("/")} · Melee ${formatMod(d.melee)} · Ranged ${formatMod(d.ranged)} · Grapple ${formatMod(d.grapple)}
 Saves: Fort ${formatMod(d.saves.fort)}, Ref ${formatMod(d.saves.ref)}, Will ${formatMod(d.saves.will)} · Init ${formatMod(d.initiative)}
-Speed: ${d.speeds.map((s) => `${s.label} ${s.speed} ft.`).join(", ")}
+Speed: ${d.speeds.map((s) => `${s.mode} ${s.feet ?? "?"} ft.${s.note ? ` (${s.note})` : ""}`).join(", ")}
 Feats: ${character.featIds.join(", ") || "none"}
 Skills: ${skills || "none"}
 Spells/powers known: ${[...character.spellIds, ...character.powerIds].join(", ") || "none"}

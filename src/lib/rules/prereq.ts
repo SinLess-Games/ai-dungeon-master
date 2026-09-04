@@ -28,8 +28,8 @@ export interface PrereqContext {
 function classLevel(c: Character, name: string): number {
   const id = CLASSES.find((k) => k.name.toLowerCase() === name)?.id;
   if (!id) return 0;
-  const a = c.classes.filter((e) => e.classId === id).reduce((s, e) => s + e.level, 0);
-  const b = (c.classesB ?? []).filter((e) => e.classId === id).reduce((s, e) => s + e.level, 0);
+  const a = c.classes.filter((e) => e.classId === id).reduce((s, e) => s + e.levels, 0);
+  const b = (c.classesB ?? []).filter((e) => e.classId === id).reduce((s, e) => s + e.levels, 0);
   return Math.max(a, b);
 }
 

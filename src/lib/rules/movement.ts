@@ -47,12 +47,10 @@ export function movementModes(race: Race, landSpeed: number): MovementMode[] {
       if (seen.has(mode)) continue;
       seen.add(mode);
       const man = trait.match(/\((perfect|good|average|poor|clumsy)[^)]*\)/i);
-      out.push({
-        mode: titled(mode),
-        feet,
-        note,
-        detail: man ? `${man[1]!.toLowerCase()} maneuverability` : undefined,
-      });
+      const entry: MovementMode = { mode: titled(mode), feet };
+      if (note) entry.note = note;
+      if (man) entry.detail = `${man[1]!.toLowerCase()} maneuverability`;
+      out.push(entry);
     }
   }
   return out;

@@ -119,3 +119,89 @@ export const getAdminMetrics = createServerFn({ method: "GET" })
       recentUsers,
     };
   });
+
+export interface AdminSubscription {
+  id: string;
+  email: string;
+  displayName: string;
+  plan: string;
+  status: string;
+  environment: string;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  createdAt: string;
+}
+
+export interface AdminBilling {
+  activeCount: number;
+  monthlyCount: number;
+  yearlyCount: number;
+  canceledCount: number;
+  mrrCents: number;
+  rows: AdminSubscription[];
+}
+
+const PLAN_MONTHLY_CENTS: Record<string, number> = {
+  multiplayer_monthly: 1000,
+  multiplayer_yearly: Math.round(10000 / 12),
+};
+
+export const getAdminBilling = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<AdminBilling> => {
+    await assertAdmin(context as { supabase: any; userId: string });
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const [subsRes, usersRes] = await Promise.all([
+      supabaseAdmin
+        .from("subscriptions")
+        .select(
+          "id, user_id, price_id, status, environment, current_period_end, cancel_at_period_end, created_at",
+        )
+        .order("created_at", { ascending: false }),
+      supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
+    ]);
+
+    const users = new Map(
+      (usersRes.data?.users ?? []).map((u) => [
+        u.id,
+        {
+          email: u.email ?? "—",
+          displayName:
+            (u.user_metadata?.["display_name"] as string | undefined) ??
+            (u.email ?? "").split("@")[0] ??
+            "Adventurer",
+        },
+      ]),
+    );
+
+    const rows: AdminSubscription[] = (subsRes.data ?? []).map((s) => ({
+      id: s.id,
+      email: users.get(s.user_id)?.email ?? "—",
+      displayName: users.get(s.user_id)?.displayName ?? "Adventurer",
+      plan: s.price_id,
+      status: s.status,
+      environment: s.environment,
+      currentPeriodEnd: s.current_period_end,
+      cancelAtPeriodEnd: Boolean(s.cancel_at_period_end),
+      createdAt: s.created_at,
+    }));
+
+    const isLive = (r: AdminSubscription) => {
+      const future = !r.currentPeriodEnd || new Date(r.currentPeriodEnd).getTime() > Date.now();
+      return (
+        (["active", "trialing", "past_due"].includes(r.status) && future) ||
+        (r.status === "canceled" && future)
+      );
+    };
+    const active = rows.filter(isLive);
+
+    return {
+      activeCount: active.length,
+      monthlyCount: active.filter((r) => r.plan === "multiplayer_monthly").length,
+      yearlyCount: active.filter((r) => r.plan === "multiplayer_yearly").length,
+      canceledCount: rows.filter((r) => !isLive(r)).length,
+      mrrCents: active.reduce((sum, r) => sum + (PLAN_MONTHLY_CENTS[r.plan] ?? 0), 0),
+      rows,
+    };
+  });

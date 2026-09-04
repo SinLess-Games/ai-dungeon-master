@@ -240,20 +240,68 @@ export function partyContext(party: PartyMember[]) {
     .join("\n");
 }
 
-function unusedPartyContext(party: PartyMember[]) {
-  const active = party.filter((m) => m.status === "active");
-  return active
-    .map((m) => {
-      const gear = m.gear.length
-        ? m.gear.map((g) => `${g.name}${g.quantity > 1 ? ` x${g.quantity}` : ""}`).join(", ")
-        : "nothing notable";
-      return `- ${m.name} (${m.kind === "pc" ? "player character" : "NPC companion"}, ${m.role}, level ${m.level}${
-        m.race ? `, ${m.race}` : ""
-      }${m.classLine ? ` ${m.classLine}` : ""}) — run by ${
-        m.controlledBy === "dm" ? "YOU, the DM" : "the player"
-      }; HP ${m.hp}/${m.maxHp}, AC ${m.ac}, init ${m.initiative >= 0 ? "+" : ""}${m.initiative}, attitude ${m.attitude}. Carrying: ${gear}.${
-        m.notes ? ` Notes: ${m.notes}` : ""
-      }`;
-    })
-    .join("\n");
+
+/** DM-side roster edit: match by name, otherwise create the member. */
+export function upsertMemberByName(
+  campaign: Campaign,
+  input: {
+    name: string;
+    tier?: PartyTier;
+    kind?: PartyKind;
+    controlledBy?: PartyControl;
+    role?: string;
+    race?: string;
+    classLine?: string;
+    level?: number;
+    attitude?: string;
+    hp?: number;
+    maxHp?: number;
+    ac?: number;
+    initiative?: number;
+    gold?: number;
+    status?: PartyStatus;
+    notes?: string;
+    gear?: { name: string; quantity?: number; slot?: string; notes?: string }[];
+  },
+): { campaign: Campaign; created: boolean } {
+  const name = input.name.trim();
+  const existing = getParty(campaign).find((m) => m.name.toLowerCase() === name.toLowerCase());
+  const gear = input.gear?.map((g) => ({
+    ...emptyGear(),
+    name: g.name,
+    quantity: Math.max(1, g.quantity ?? 1),
+    slot: g.slot ?? "pack",
+    notes: g.notes ?? "",
+  }));
+  const patch: Partial<PartyMember> = {
+    name,
+    ...(input.tier ? { tier: input.tier } : {}),
+    ...(input.kind ? { kind: input.kind } : {}),
+    ...(input.controlledBy ? { controlledBy: input.controlledBy } : {}),
+    ...(input.role ? { role: input.role } : {}),
+    ...(input.race ? { race: input.race } : {}),
+    ...(input.classLine ? { classLine: input.classLine } : {}),
+    ...(typeof input.level === "number" ? { level: input.level } : {}),
+    ...(input.attitude ? { attitude: input.attitude } : {}),
+    ...(typeof input.hp === "number" ? { hp: input.hp } : {}),
+    ...(typeof input.maxHp === "number" ? { maxHp: input.maxHp } : {}),
+    ...(typeof input.ac === "number" ? { ac: input.ac } : {}),
+    ...(typeof input.initiative === "number" ? { initiative: input.initiative } : {}),
+    ...(typeof input.gold === "number" ? { gold: input.gold } : {}),
+    ...(input.status ? { status: input.status } : {}),
+    ...(input.notes ? { notes: input.notes } : {}),
+  };
+  if (existing) {
+    const merged = gear?.length ? { ...patch, gear: [...existing.gear, ...gear] } : patch;
+    return { campaign: updateMember(campaign, existing.id, merged), created: false };
+  }
+  const base = emptyMember(input.kind ?? "npc", input.tier ?? "companion");
+  const member: PartyMember = { ...base, ...patch, gear: gear ?? [] };
+  if (typeof input.maxHp !== "number" && typeof input.hp === "number") member.maxHp = input.hp;
+  return { campaign: addMember(campaign, member), created: true };
+}
+
+export function removeMemberByName(campaign: Campaign, name: string): Campaign {
+  const m = getParty(campaign).find((x) => x.name.toLowerCase() === name.trim().toLowerCase());
+  return m ? removeMember(campaign, m.id) : campaign;
 }

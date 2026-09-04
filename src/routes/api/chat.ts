@@ -117,6 +117,40 @@ const dmTools = {
       status: z.enum(["active", "done", "failed"]).default("active"),
     }),
   }),
+  upsertPartyMember: tool({
+    description:
+      "Add or update someone travelling with the player: an adventuring companion, a cohort gained through Leadership, or a low-level follower. Use this whenever an NPC joins the party, gains levels, is hurt outside the player's own sheet, or is equipped.",
+    inputSchema: z.object({
+      name: z.string(),
+      tier: z.enum(["companion", "cohort", "follower"]).default("companion"),
+      controlledBy: z.enum(["dm", "player"]).default("dm"),
+      role: z.string().nullable(),
+      race: z.string().nullable(),
+      classLine: z.string().nullable().describe("e.g. 'Cleric 4' or 'Fighter 2/Rogue 1'"),
+      level: z.number().int().nullable(),
+      attitude: z.string().nullable(),
+      hp: z.number().int().nullable(),
+      maxHp: z.number().int().nullable(),
+      ac: z.number().int().nullable(),
+      initiative: z.number().int().nullable(),
+      status: z.enum(["active", "benched", "gone"]).nullable(),
+      notes: z.string().nullable(),
+      gear: z
+        .array(
+          z.object({
+            name: z.string(),
+            quantity: z.number().int().min(1).default(1),
+            slot: z.string().default("pack"),
+            notes: z.string().default(""),
+          }),
+        )
+        .nullable(),
+    }),
+  }),
+  removePartyMember: tool({
+    description: "Remove someone from the party roster when they leave for good.",
+    inputSchema: z.object({ name: z.string() }),
+  }),
   addJournal: tool({
     description: "Write a short entry into the campaign log after something important happens.",
     inputSchema: z.object({ text: z.string() }),
@@ -145,6 +179,7 @@ HOW YOU RUN THE TABLE
 - Always narrate first, then call tools. Never send an empty reply.
 - Narrate in vivid but tight second person. Two to five short paragraphs, then stop and ask what the player does.
 - You play every NPC, monster and party companion. Give them voices and motives.
+- The party roster is yours to maintain: when an ally joins, is hired, is granted as a cohort through Leadership, or gathers followers, call upsertPartyMember with their tier (companion, cohort, or follower), stats and gear. Keep their HP and equipment current, and call removePartyMember when they leave. Only run members marked as DM-run; never act for members the player runs.
 - You are a rules-accurate 3.5 referee: call for the right checks, set DCs by the SRD guidelines, apply modifiers, track initiative and rounds in combat.
 - NEVER roll for the player. Use requestRoll and wait for the returned total. Use dmRoll for your own monsters and hidden rolls.
 - After a roll comes back, state the result plainly (total vs DC) and narrate the outcome.

@@ -468,9 +468,9 @@ export function WorldMapView({
 
       {/* ---------------- bathymetry bands around the coast ---------------- */}
       {[
-        { f: "url(#wm-blur3)", w: 5.5, o: 0.22 },
-        { f: "url(#wm-blur2)", w: 3.2, o: 0.28 },
-        { f: "url(#wm-blur1)", w: 1.4, o: 0.4 },
+        { f: "url(#wm-blur3)", w: 6.5, o: 0.34 },
+        { f: "url(#wm-blur2)", w: 3.6, o: 0.4 },
+        { f: "url(#wm-blur1)", w: 1.5, o: 0.5 },
       ].map((band, i) => (
         <g key={i} filter={band.f} opacity={band.o}>
           {land.map(({ region, d }) => (
@@ -499,6 +499,13 @@ export function WorldMapView({
                 </g>
               );
             })}
+            {/* soften the seams between neighbouring regions */}
+            <g clipPath="url(#wm-clip-land)" filter="url(#wm-blur2)" opacity="0.6">
+              {land.map(({ region, d }) => (
+                <path key={`blend-${region.id}`} d={d} fill={(PAINT[region.terrain] ?? PAINT.plains).base} />
+              ))}
+            </g>
+
             {/* shoreline sand shading inside the coast */}
             <g filter="url(#wm-shore)" opacity="0.5">
               {land.map(({ region, d }) => (

@@ -206,7 +206,19 @@ function WorldDetail() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <PaintMapButton world={world} />
+            <PaintMapButton world={world} onPainted={() => setWorld(getWorld(worldId))} />
+            {selectedSiteId ? (
+              (() => {
+                const site = world.sites.find((s) => s.id === selectedSiteId);
+                return site ? (
+                  <PaintMapButton
+                    world={world}
+                    site={site}
+                    onPainted={() => setWorld(getWorld(worldId))}
+                  />
+                ) : null;
+              })()
+            ) : null}
           </div>
 
 

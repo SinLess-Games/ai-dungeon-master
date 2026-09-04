@@ -65,7 +65,8 @@ function WorldsPage() {
       />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-4">
+        <section className="space-y-4">
+          <h2 className="font-display text-2xl text-foreground">Your worlds</h2>
           {worlds.length === 0 ? (
             <Card className="card-etched bg-card/70">
               <CardContent className="py-10 text-center text-muted-foreground">
@@ -119,9 +120,11 @@ function WorldsPage() {
               </CardContent>
             </Card>
           ))}
-        </div>
+        </section>
 
-        <Card className="card-etched h-fit bg-card/70">
+        <section className="space-y-4">
+          <h2 className="font-display text-2xl text-foreground">Create a world</h2>
+          <Card className="card-etched h-fit bg-card/70">
           <CardHeader>
             <CardTitle className="font-display text-xl">New world</CardTitle>
           </CardHeader>

@@ -78,6 +78,7 @@ function UpgradePage() {
               </p>
             </div>
 
+            <h2 className="mb-8 text-center font-display text-2xl text-foreground">Choose your plan</h2>
             <div className="grid gap-6 md:grid-cols-2">
               <Card className="card-etched">
                 <CardHeader>

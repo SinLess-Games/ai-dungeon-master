@@ -201,10 +201,12 @@ function Wiki() {
             <BookOpen className="size-4" /> Codex wiki
           </button>
 
-          <SidebarGroup label="Dungeon Master's guide">
+          <SidebarGroup label="Dungeon Master's guide" icon={<BookOpen className="size-4" />}>
             {dmCategories.map(([cat, arts]) => (
-              <div key={cat} className="mb-2">
-                <p className="px-2 py-1 text-[0.7rem] uppercase tracking-[0.2em] text-muted-foreground">{cat}</p>
+              <div key={cat} className="mb-3">
+                <p className="mb-1 rounded bg-primary/10 px-2 py-1.5 font-display text-xs font-bold uppercase tracking-wide text-primary">
+                  {cat}
+                </p>
                 {arts.map((a) => (
                   <SidebarLink
                     key={a.id}
@@ -218,7 +220,7 @@ function Wiki() {
             ))}
           </SidebarGroup>
 
-          <SidebarGroup label="Rules reference">
+          <SidebarGroup label="Rules reference" icon={<Shapes className="size-4" />}>
             {RULES_KINDS.map((k) => (
               <SidebarLink
                 key={k}
@@ -290,10 +292,11 @@ function Wiki() {
 
 /* --------------------------------------------------------------- parts --- */
 
-function SidebarGroup({ label, children }: { label: string; children: React.ReactNode }) {
+function SidebarGroup({ label, icon, children }: { label: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="mb-6">
-      <h2 className="mb-2 border-b border-primary/40 pb-1 font-display text-sm font-bold tracking-wide text-primary">
+      <h2 className="mb-3 flex items-center gap-2 rounded border border-primary/40 bg-primary/10 px-3 py-2 font-display text-sm font-bold tracking-wide text-primary shadow-sm">
+        {icon}
         {label}
       </h2>
       {children}

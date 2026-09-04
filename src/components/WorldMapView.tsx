@@ -380,6 +380,17 @@ const LAND_SITES = new Set([
   "dungeon",
   "lair",
   "wonder",
+  "wood",
+  "forest",
+  "mountain",
+  "landmark",
+  "site",
+  "port",
+  "harbor",
+  "tower",
+  "temple",
+  "mine",
+  "fort",
 ]);
 
 /** Nudge a settlement inland until it sits inside a landmass. */
@@ -821,8 +832,10 @@ export function WorldMapView({
             opacity={s.discovered ? 1 : 0.42}
           >
             <title>{`${s.name} — ${SITE_LABEL.get(s.kind) ?? s.kind}`}</title>
-            {selected && <circle cx={p.x} cy={p.y} r="3.4" fill="none" stroke={gold} strokeWidth="0.35" />}
-            <SiteGlyph kind={s.kind} x={p.x} y={p.y} gold={gold} />
+            <g transform={`translate(${p.x} ${p.y}) scale(${1 / view.z})`}>
+              {selected && <circle r="3.4" fill="none" stroke={gold} strokeWidth="0.35" />}
+              <SiteGlyph kind={s.kind} x={0} y={0} gold={gold} />
+            </g>
             <text
               x={p.x}
               y={p.y + ts(3)}

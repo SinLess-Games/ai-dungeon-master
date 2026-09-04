@@ -1,5 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { convertToModelMessages, streamText, tool, stepCountIs, type UIMessage } from "ai";
+import {
+  convertToModelMessages,
+  streamText,
+  tool,
+  stepCountIs,
+  type ToolSet,
+  type UIMessage,
+} from "ai";
 import { z } from "zod";
 import { createLovableAiGatewayProvider, DM_MODEL } from "@/lib/ai-gateway.server";
 import { roll as rollDice } from "@/lib/dice";
@@ -126,7 +133,7 @@ export const Route = createFileRoute("/api/chat")({
           const result = streamText({
             model: gateway(DM_MODEL),
             stopWhen: stepCountIs(30),
-            tools: dmTools,
+            tools: dmTools as unknown as ToolSet,
             abortSignal: request.signal,
             system: `You are the Dungeon Master for a solo Dungeons & Dragons 3.5 edition game, running by the d20 SRD.
 
@@ -143,7 +150,7 @@ HOW YOU RUN THE TABLE
 - If the player asks a rules question, answer it as the SRD does.
 
 ${body.context ?? ""}`,
-            messages: convertToModelMessages(body.messages),
+            messages: await convertToModelMessages(body.messages),
           });
 
           return result.toUIMessageStreamResponse();

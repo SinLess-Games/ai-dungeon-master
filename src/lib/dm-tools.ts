@@ -24,41 +24,42 @@ export function applyDmTool(
   character: Character,
   campaign: Campaign,
 ): ApplyResult | null {
+  const i: any = input;
   const c: Character = structuredClone(character);
   const g: Campaign = structuredClone(campaign);
 
   switch (toolName) {
     case "updateCharacter": {
       const notes: string[] = [];
-      if (num(input.hpDelta)) {
-        c.hp.current = c.hp.current + num(input.hpDelta);
-        notes.push(`HP ${input.hpDelta > 0 ? "+" : ""}${input.hpDelta} → ${c.hp.current}`);
+      if (num(i.hpDelta)) {
+        c.hp.current = c.hp.current + num(i.hpDelta);
+        notes.push(`HP ${i.hpDelta > 0 ? "+" : ""}${i.hpDelta} → ${c.hp.current}`);
       }
-      if (input.tempHp !== null && input.tempHp !== undefined) {
-        c.hp.temp = num(input.tempHp);
+      if (i.tempHp !== null && i.tempHp !== undefined) {
+        c.hp.temp = num(i.tempHp);
         notes.push(`temp HP ${c.hp.temp}`);
       }
-      if (num(input.nonlethalDelta)) {
-        c.hp.nonlethal = Math.max(0, c.hp.nonlethal + num(input.nonlethalDelta));
+      if (num(i.nonlethalDelta)) {
+        c.hp.nonlethal = Math.max(0, c.hp.nonlethal + num(i.nonlethalDelta));
         notes.push(`nonlethal ${c.hp.nonlethal}`);
       }
-      if (num(input.xpDelta)) {
-        c.xp = Math.max(0, c.xp + num(input.xpDelta));
-        notes.push(`XP ${input.xpDelta > 0 ? "+" : ""}${input.xpDelta} → ${c.xp}`);
+      if (num(i.xpDelta)) {
+        c.xp = Math.max(0, c.xp + num(i.xpDelta));
+        notes.push(`XP ${i.xpDelta > 0 ? "+" : ""}${i.xpDelta} → ${c.xp}`);
       }
-      if (num(input.goldDelta)) {
-        c.gold = Math.max(0, c.gold + num(input.goldDelta));
-        notes.push(`gold ${input.goldDelta > 0 ? "+" : ""}${input.goldDelta} → ${c.gold}`);
+      if (num(i.goldDelta)) {
+        c.gold = Math.max(0, c.gold + num(i.goldDelta));
+        notes.push(`gold ${i.goldDelta > 0 ? "+" : ""}${i.goldDelta} → ${c.gold}`);
       }
-      if (Array.isArray(input.addConditions)) {
-        for (const cond of input.addConditions as string[]) {
+      if (Array.isArray(i.addConditions)) {
+        for (const cond of i.addConditions as string[]) {
           if (cond && !c.conditions.includes(cond)) c.conditions.push(cond);
         }
-        if (input.addConditions.length) notes.push(`gained ${input.addConditions.join(", ")}`);
+        if (i.addConditions.length) notes.push(`gained ${i.addConditions.join(", ")}`);
       }
-      if (Array.isArray(input.removeConditions)) {
-        c.conditions = c.conditions.filter((x) => !input.removeConditions.includes(x));
-        if (input.removeConditions.length) notes.push(`cleared ${input.removeConditions.join(", ")}`);
+      if (Array.isArray(i.removeConditions)) {
+        c.conditions = c.conditions.filter((x) => !i.removeConditions.includes(x));
+        if (i.removeConditions.length) notes.push(`cleared ${i.removeConditions.join(", ")}`);
       }
       return { character: c, campaign: g, output: notes.join("; ") || "no change" };
     }
@@ -67,13 +68,13 @@ export function applyDmTool(
       const grant: DmGrant = {
         id: newId(),
         at: new Date().toISOString(),
-        kind: input.kind,
-        detail: String(input.detail ?? ""),
-        reason: String(input.reason ?? ""),
+        kind: i.kind,
+        detail: String(i.detail ?? ""),
+        reason: String(i.reason ?? ""),
       };
       c.grants.push(grant);
-      if (input.kind === "xp") {
-        const n = parseInt(String(input.detail).replace(/[^\d-]/g, ""), 10);
+      if (i.kind === "xp") {
+        const n = parseInt(String(i.detail).replace(/[^\d-]/g, ""), 10);
         if (Number.isFinite(n)) c.xp = Math.max(0, c.xp + n);
       }
       return { character: c, campaign: g, output: `granted ${grant.kind}: ${grant.detail}` };
@@ -81,13 +82,13 @@ export function applyDmTool(
 
     case "setAlignment": {
       const prev = c.alignment;
-      c.alignment = input.alignment as Alignment;
+      c.alignment = i.alignment as Alignment;
       c.grants.push({
         id: newId(),
         at: new Date().toISOString(),
         kind: "alignment",
         detail: `${prev} → ${c.alignment}`,
-        reason: String(input.reason ?? ""),
+        reason: String(i.reason ?? ""),
       });
       return { character: c, campaign: g, output: `alignment ${prev} → ${c.alignment}` };
     }
@@ -95,12 +96,12 @@ export function applyDmTool(
     case "addLoot": {
       const item: InventoryItem = {
         id: newId(),
-        name: String(input.name ?? "Item"),
-        quantity: Math.max(1, num(input.quantity) || 1),
-        weight: num(input.weight),
-        cost: num(input.cost),
-        location: (input.location as InventoryItem["location"]) ?? "person",
-        ...(input.note ? { note: String(input.note) } : {}),
+        name: String(i.name ?? "Item"),
+        quantity: Math.max(1, num(i.quantity) || 1),
+        weight: num(i.weight),
+        cost: num(i.cost),
+        location: (i.location as InventoryItem["location"]) ?? "person",
+        ...(i.note ? { note: String(i.note) } : {}),
       };
       c.inventory.push(item);
       return { character: c, campaign: g, output: `added ${item.quantity}× ${item.name}` };
@@ -108,54 +109,54 @@ export function applyDmTool(
 
     case "updateScene": {
       const s = g.scene;
-      if (input.location) s.location = String(input.location);
-      if (input.region) s.region = String(input.region);
-      if (input.timeOfDay) s.timeOfDay = String(input.timeOfDay);
-      if (input.weather) s.weather = String(input.weather);
-      if (typeof input.inCombat === "boolean") s.inCombat = input.inCombat;
-      if (input.round !== null && input.round !== undefined) s.round = num(input.round);
-      if (input.summary) s.summary = String(input.summary);
+      if (i.location) s.location = String(i.location);
+      if (i.region) s.region = String(i.region);
+      if (i.timeOfDay) s.timeOfDay = String(i.timeOfDay);
+      if (i.weather) s.weather = String(i.weather);
+      if (typeof i.inCombat === "boolean") s.inCombat = i.inCombat;
+      if (i.round !== null && i.round !== undefined) s.round = num(i.round);
+      if (i.summary) s.summary = String(i.summary);
       return { character: c, campaign: g, output: `scene: ${s.location} (${s.timeOfDay})` };
     }
 
     case "upsertNpc": {
-      const name = String(input.name ?? "").trim();
+      const name = String(i.name ?? "").trim();
       const existing = g.npcs.find((n) => n.name.toLowerCase() === name.toLowerCase());
       if (existing) {
-        existing.role = String(input.role ?? existing.role);
-        existing.attitude = String(input.attitude ?? existing.attitude);
-        existing.notes = String(input.notes ?? existing.notes);
+        existing.role = String(i.role ?? existing.role);
+        existing.attitude = String(i.attitude ?? existing.attitude);
+        existing.notes = String(i.notes ?? existing.notes);
       } else {
         g.npcs.push({
           id: newId(),
           name,
-          role: String(input.role ?? ""),
-          attitude: String(input.attitude ?? "indifferent"),
-          notes: String(input.notes ?? ""),
+          role: String(i.role ?? ""),
+          attitude: String(i.attitude ?? "indifferent"),
+          notes: String(i.notes ?? ""),
         });
       }
       return { character: c, campaign: g, output: `npc recorded: ${name}` };
     }
 
     case "upsertQuest": {
-      const title = String(input.title ?? "").trim();
+      const title = String(i.title ?? "").trim();
       const existing = g.quests.find((q) => q.title.toLowerCase() === title.toLowerCase());
       if (existing) {
-        existing.detail = String(input.detail ?? existing.detail);
-        existing.status = (input.status as QuestStatus) ?? existing.status;
+        existing.detail = String(i.detail ?? existing.detail);
+        existing.status = (i.status as QuestStatus) ?? existing.status;
       } else {
         g.quests.push({
           id: newId(),
           title,
-          detail: String(input.detail ?? ""),
-          status: (input.status as QuestStatus) ?? "active",
+          detail: String(i.detail ?? ""),
+          status: (i.status as QuestStatus) ?? "active",
         });
       }
-      return { character: c, campaign: g, output: `quest ${input.status ?? "active"}: ${title}` };
+      return { character: c, campaign: g, output: `quest ${i.status ?? "active"}: ${title}` };
     }
 
     case "addJournal": {
-      g.journal.unshift({ id: newId(), at: new Date().toISOString(), text: String(input.text ?? "") });
+      g.journal.unshift({ id: newId(), at: new Date().toISOString(), text: String(i.text ?? "") });
       g.journal = g.journal.slice(0, 200);
       return { character: c, campaign: g, output: "logged" };
     }

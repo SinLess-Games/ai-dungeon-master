@@ -18,11 +18,13 @@ import type { WikiArticle } from "@/lib/wiki/dm-guide";
 import { PLAYER_ARTICLES } from "@/lib/wiki/player-guide";
 import { EXPANSION_ARTICLES } from "@/lib/wiki/expansions";
 import { EXPANSION2_ARTICLES } from "@/lib/wiki/expansions2";
+import { EXPANSION3_ARTICLES } from "@/lib/wiki/expansions3";
 
 const ALL_ARTICLES: WikiArticle[] = [
   ...PLAYER_ARTICLES,
   ...EXPANSION_ARTICLES,
   ...EXPANSION2_ARTICLES,
+  ...EXPANSION3_ARTICLES,
 ];
 
 export const Route = createFileRoute("/wiki")({

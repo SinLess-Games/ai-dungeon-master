@@ -34,6 +34,7 @@ import { Route as MapsMapIdRouteImport } from './routes/maps.$mapId'
 import { Route as PartyCampaignIdRouteImport } from './routes/party.$campaignId'
 import { Route as WorldsIndexRouteImport } from './routes/worlds.index'
 import { Route as WorldsWorldIdRouteImport } from './routes/worlds.$worldId'
+import { Route as ApiPublicBlogMediaSplatRouteImport } from './routes/api/public/blog-media.$'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
 
 const IndexRoute = IndexRouteImport.update({
@@ -161,6 +162,11 @@ const WorldsWorldIdRoute = WorldsWorldIdRouteImport.update({
   path: '/worlds/$worldId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicBlogMediaSplatRoute = ApiPublicBlogMediaSplatRouteImport.update({
+  id: '/api/public/blog-media/$',
+  path: '/api/public/blog-media/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicPaymentsWebhookRoute =
   ApiPublicPaymentsWebhookRouteImport.update({
     id: '/api/public/payments/webhook',
@@ -194,6 +200,7 @@ export interface FileRoutesByFullPath {
   '/campaigns/': typeof CampaignsIndexRoute
   '/characters/': typeof CharactersIndexRoute
   '/worlds/': typeof WorldsIndexRoute
+  '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -221,6 +228,7 @@ export interface FileRoutesByTo {
   '/campaigns': typeof CampaignsIndexRoute
   '/characters': typeof CharactersIndexRoute
   '/worlds': typeof WorldsIndexRoute
+  '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
 export interface FileRoutesById {
@@ -250,6 +258,7 @@ export interface FileRoutesById {
   '/campaigns/': typeof CampaignsIndexRoute
   '/characters/': typeof CharactersIndexRoute
   '/worlds/': typeof WorldsIndexRoute
+  '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
 }
 export interface FileRouteTypes {
@@ -280,6 +289,7 @@ export interface FileRouteTypes {
     | '/campaigns/'
     | '/characters/'
     | '/worlds/'
+    | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -307,6 +317,7 @@ export interface FileRouteTypes {
     | '/campaigns'
     | '/characters'
     | '/worlds'
+    | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
   id:
     | '__root__'
@@ -335,6 +346,7 @@ export interface FileRouteTypes {
     | '/campaigns/'
     | '/characters/'
     | '/worlds/'
+    | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
   fileRoutesById: FileRoutesById
 }
@@ -358,6 +370,7 @@ export interface RootRouteChildren {
   CampaignsIndexRoute: typeof CampaignsIndexRoute
   CharactersIndexRoute: typeof CharactersIndexRoute
   WorldsIndexRoute: typeof WorldsIndexRoute
+  ApiPublicBlogMediaSplatRoute: typeof ApiPublicBlogMediaSplatRoute
   ApiPublicPaymentsWebhookRoute: typeof ApiPublicPaymentsWebhookRoute
 }
 
@@ -538,6 +551,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorldsWorldIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/blog-media/$': {
+      id: '/api/public/blog-media/$'
+      path: '/api/public/blog-media/$'
+      fullPath: '/api/public/blog-media/$'
+      preLoaderRoute: typeof ApiPublicBlogMediaSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/payments/webhook': {
       id: '/api/public/payments/webhook'
       path: '/api/public/payments/webhook'
@@ -588,6 +608,7 @@ const rootRouteChildren: RootRouteChildren = {
   CampaignsIndexRoute: CampaignsIndexRoute,
   CharactersIndexRoute: CharactersIndexRoute,
   WorldsIndexRoute: WorldsIndexRoute,
+  ApiPublicBlogMediaSplatRoute: ApiPublicBlogMediaSplatRoute,
   ApiPublicPaymentsWebhookRoute: ApiPublicPaymentsWebhookRoute,
 }
 export const routeTree = rootRouteImport

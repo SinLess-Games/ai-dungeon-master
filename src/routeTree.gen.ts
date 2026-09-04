@@ -16,6 +16,7 @@ import { Route as UpgradeRouteImport } from './routes/upgrade'
 import { Route as WikiRouteImport } from './routes/wiki'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as CampaignsIndexRouteImport } from './routes/campaigns.index'
+import { Route as CampaignsIdRouteImport } from './routes/campaigns.$id'
 import { Route as CharactersIndexRouteImport } from './routes/characters.index'
 import { Route as CharactersIdRouteImport } from './routes/characters.$id'
 import { Route as CharactersNewRouteImport } from './routes/characters.new'
@@ -56,6 +57,11 @@ const CampaignsIndexRoute = CampaignsIndexRouteImport.update({
   path: '/campaigns/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CampaignsIdRoute = CampaignsIdRouteImport.update({
+  id: '/campaigns/$id',
+  path: '/campaigns/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CharactersIndexRoute = CharactersIndexRouteImport.update({
   id: '/characters/',
   path: '/characters/',
@@ -84,6 +90,7 @@ export interface FileRoutesByFullPath {
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
   '/api/chat': typeof ApiChatRoute
+  '/campaigns/$id': typeof CampaignsIdRoute
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -97,6 +104,7 @@ export interface FileRoutesByTo {
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
   '/api/chat': typeof ApiChatRoute
+  '/campaigns/$id': typeof CampaignsIdRoute
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -111,6 +119,7 @@ export interface FileRoutesById {
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
   '/api/chat': typeof ApiChatRoute
+  '/campaigns/$id': typeof CampaignsIdRoute
   '/characters/$id': typeof CharactersIdRoute
   '/characters/new': typeof CharactersNewRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -126,6 +135,7 @@ export interface FileRouteTypes {
     | '/upgrade'
     | '/wiki'
     | '/api/chat'
+    | '/campaigns/$id'
     | '/characters/$id'
     | '/characters/new'
     | '/checkout/return'
@@ -139,6 +149,7 @@ export interface FileRouteTypes {
     | '/upgrade'
     | '/wiki'
     | '/api/chat'
+    | '/campaigns/$id'
     | '/characters/$id'
     | '/characters/new'
     | '/checkout/return'
@@ -152,6 +163,7 @@ export interface FileRouteTypes {
     | '/upgrade'
     | '/wiki'
     | '/api/chat'
+    | '/campaigns/$id'
     | '/characters/$id'
     | '/characters/new'
     | '/checkout/return'
@@ -166,6 +178,7 @@ export interface RootRouteChildren {
   UpgradeRoute: typeof UpgradeRoute
   WikiRoute: typeof WikiRoute
   ApiChatRoute: typeof ApiChatRoute
+  CampaignsIdRoute: typeof CampaignsIdRoute
   CharactersIdRoute: typeof CharactersIdRoute
   CharactersNewRoute: typeof CharactersNewRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
@@ -224,6 +237,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CampaignsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/campaigns/$id': {
+      id: '/campaigns/$id'
+      path: '/campaigns/$id'
+      fullPath: '/campaigns/$id'
+      preLoaderRoute: typeof CampaignsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/characters/': {
       id: '/characters/'
       path: '/characters'
@@ -262,6 +282,7 @@ const rootRouteChildren: RootRouteChildren = {
   UpgradeRoute: UpgradeRoute,
   WikiRoute: WikiRoute,
   ApiChatRoute: ApiChatRoute,
+  CampaignsIdRoute: CampaignsIdRoute,
   CharactersIdRoute: CharactersIdRoute,
   CharactersNewRoute: CharactersNewRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,

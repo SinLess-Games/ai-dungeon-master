@@ -1,11 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { Dices, Scroll, Users, BookOpen, LogIn, LogOut } from "lucide-react";
+import { Dices, Scroll, Users, BookOpen, LogIn, LogOut, Swords } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
 import { signOut } from "@/lib/auth";
 
 const NAV = [
   { to: "/", label: "Table", icon: Scroll },
+  { to: "/campaigns", label: "Play", icon: Swords },
   { to: "/characters", label: "Characters", icon: Users },
   { to: "/dice", label: "Dice", icon: Dices },
   { to: "/wiki", label: "Wiki", icon: BookOpen },

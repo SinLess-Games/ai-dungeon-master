@@ -291,23 +291,33 @@ export const getAdminInbox = createServerFn({ method: "GET" })
     for (const c of campsRes.data ?? []) {
       const data = (c.data ?? {}) as any;
       const list = Array.isArray(data.messages) ? data.messages : [];
+      const base = new Date(c.updated_at).getTime();
       list.forEach((m: any, index: number) => {
         if (!m || m.role === "system") return;
-        if (m.metadata?.hidden) return;
-        if (m.role === "user" && index === 0) return;
-        const text = textOf(m.parts);
+        const hidden = Boolean(m.metadata?.hidden) || (m.role === "user" && index === 0);
+        let text = textOf(m.parts);
+        if (!text) text = toolSummary(m.parts);
         if (!text) return;
         const messageId = String(m.id ?? `${index}`);
         const key = `${c.id}:${messageId}`;
+        // Older saves carry no per-message timestamp: order them by their place
+        // in the transcript so the newest turn still sorts to the top.
+        const at =
+          (m.metadata?.at as string) ??
+          new Date(base - (list.length - 1 - index) * 1000).toISOString();
         messages.push({
           key,
           messageId,
           campaignId: c.id,
           campaignName: c.name ?? "Untitled campaign",
-          sender: m.role === "user" ? names.get(c.user_id) ?? "Adventurer" : "Dungeon Master",
+          sender: hidden
+            ? "Campaign opening"
+            : m.role === "user"
+              ? names.get(c.user_id) ?? "Adventurer"
+              : "Dungeon Master",
           senderKind: m.role === "user" ? "player" : "dm",
           text: text.length > 1200 ? `${text.slice(0, 1200)}…` : text,
-          at: (m.metadata?.at as string) ?? c.updated_at,
+          at,
           read: read.has(key),
         });
       });
@@ -315,6 +325,7 @@ export const getAdminInbox = createServerFn({ method: "GET" })
 
     messages.sort((a, b) => b.at.localeCompare(a.at));
     const trimmed = messages.slice(0, 800);
+
     return {
       total: messages.length,
       unread: messages.filter((m) => !m.read).length,

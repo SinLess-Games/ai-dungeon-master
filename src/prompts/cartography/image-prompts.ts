@@ -47,10 +47,10 @@ export function worldMapPrompt(world: World) {
     "Surround the land with open ocean. Draw irregular, organic coastlines with bays,",
     "peninsulas, inlets and a scattering of small offshore islands.",
     settlements
-      ? `Show tiny painted settlement clusters (rooftops and towers, no text) here:\n${settlements}`
+      ? `Show tiny grey-tan built-up patches, the size of towns seen from orbit, here:\n${settlements}`
       : "",
     roads > 0
-      ? `Trace about ${roads} thin winding tan roads between those settlements; roads must never cross open water.`
+      ? `Include about ${roads} faint pale threads of road between those built-up patches; roads never cross open water.`
       : "",
     world.themes.length ? `Overall mood: ${world.themes.join(", ")}.` : "",
     world.description ? `Setting flavour: ${world.description.slice(0, 400)}` : "",

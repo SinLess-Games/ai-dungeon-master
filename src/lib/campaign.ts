@@ -1,4 +1,5 @@
 import { newId } from "./storage";
+import type { PartyMember } from "./party";
 
 export type CampaignStyle =
   | "heroic"
@@ -94,6 +95,8 @@ export interface Campaign {
   houseRules: string;
   scene: SceneState;
   npcs: CampaignNpc[];
+  /** Roster of heroes and NPC companions travelling with the player. */
+  party: PartyMember[];
   quests: QuestEntry[];
   journal: { id: string; at: string; text: string }[];
   messages: StoredMessage[];
@@ -181,6 +184,7 @@ export function emptyCampaign(characterId: string): Campaign {
       summary: "The adventure has not started yet.",
     },
     npcs: [],
+    party: [],
     quests: [],
     journal: [],
     messages: [],

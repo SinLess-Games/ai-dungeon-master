@@ -18,7 +18,7 @@
 - [x] Rules wiki with search + filters
 - [x] Loot tracking (on-person / stored / party) — editable pools, split/assign, item history
 - [x] PDF character sheet export
-- [ ] Party + NPC companions (DM-run or player-run)
+- [x] Party + NPC companions (roster, outfitting, DM-run or player-run)
 
 ## Phase 3 — Maps & atmosphere
 - [x] World map with travel + exploration

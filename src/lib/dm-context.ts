@@ -4,6 +4,7 @@ import { computeCharacter, formatMod } from "./rules/engine";
 import { CLASS_BY_ID } from "./rules/classes";
 import { ALIGNMENTS } from "./rules/types";
 import { STYLE_OPTIONS, TYPE_OPTIONS, DM_STYLE_OPTIONS } from "./campaign";
+import { getParty, partyContext } from "./party";
 
 function classLine(c: Character) {
   const track = (t: { classId: string; levels: number }[]) =>
@@ -42,6 +43,9 @@ Location: ${campaign.scene.location}${campaign.scene.region ? ` (${campaign.scen
 Time: ${campaign.scene.timeOfDay} · Weather: ${campaign.scene.weather}
 Combat: ${campaign.scene.inCombat ? `yes, round ${campaign.scene.round}` : "no"}
 Situation: ${campaign.scene.summary}
+
+PARTY ROSTER (run each companion marked as yours; never puppet the player's own characters)
+${partyContext(getParty(campaign))}
 
 KNOWN NPCS
 ${campaign.npcs.map((n) => `- ${n.name} (${n.role}, ${n.attitude}): ${n.notes}`).join("\n") || "- none yet"}

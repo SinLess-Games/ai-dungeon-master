@@ -6,7 +6,7 @@ import {
   lastAssistantMessageIsCompleteWithToolCalls,
   type UIMessage,
 } from "ai";
-import { Dices, Send, Swords, Heart, Coins, Scroll, Sparkles, User } from "lucide-react";
+import { Dices, Send, Swords, Heart, Coins, Scroll, Sparkles, User, Users } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { Markdown } from "@/components/Markdown";
 import { Button } from "@/components/ui/button";
@@ -424,6 +424,40 @@ function Table({
                   </span>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 font-display text-lg">
+                <Users className="size-4" /> Party
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              {(campaign.party ?? []).filter((m) => m.status === "active").length ? (
+                (campaign.party ?? [])
+                  .filter((m) => m.status === "active")
+                  .map((m) => (
+                    <div key={m.id} className="flex items-center justify-between gap-2">
+                      <span className="truncate">
+                        {m.name}{" "}
+                        <span className="text-xs text-muted-foreground">
+                          {m.role} · {m.hp}/{m.maxHp} HP
+                        </span>
+                      </span>
+                      <Badge variant={m.controlledBy === "dm" ? "default" : "secondary"}>
+                        {m.controlledBy === "dm" ? "DM" : "You"}
+                      </Badge>
+                    </div>
+                  ))
+              ) : (
+                <p className="text-muted-foreground">Travelling alone.</p>
+              )}
+              <Button variant="secondary" size="sm" className="w-full" asChild>
+                <Link to="/party/$campaignId" params={{ campaignId: campaign.id }}>
+                  Manage party &amp; companions
+                </Link>
+              </Button>
             </CardContent>
           </Card>
 

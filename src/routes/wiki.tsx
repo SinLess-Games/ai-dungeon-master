@@ -162,7 +162,7 @@ function Wiki() {
 
   const articleHits = useMemo(() => {
     if (!searching) return [];
-    return DM_ARTICLES.filter(
+    return ALL_ARTICLES.filter(
       (a) =>
         a.title.toLowerCase().includes(needle) ||
         a.summary.toLowerCase().includes(needle) ||

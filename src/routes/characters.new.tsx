@@ -25,7 +25,7 @@ import { FEATS } from "@/lib/rules/feats";
 import { ARMORS, SHIELDS, WEAPONS } from "@/lib/rules/equipment";
 import { emptyCharacter, type Character } from "@/lib/rules/character";
 import { computeCharacter, abilityMod, formatMod } from "@/lib/rules/engine";
-import { rollAbilityScores, pointBuyCost, STANDARD_ARRAY } from "@/lib/dice";
+import { rollAbilityScores, pointBuyCost, STANDARD_ARRAY, POINT_BUY_BUDGETS, type AbilityRollMethod } from "@/lib/dice";
 import { saveCharacter, newId } from "@/lib/storage";
 
 export const Route = createFileRoute("/characters/new")({
@@ -62,13 +62,15 @@ function CharacterCreator() {
   const [step, setStep] = useState(0);
   const [char, setChar] = useState<Character>(() => emptyCharacter(newId()));
   const [pointBuyMode, setPointBuyMode] = useState(true);
+  const [pointBudget, setPointBudget] = useState<number>(32);
+  const [rollMethod, setRollMethod] = useState<AbilityRollMethod>("4d6-drop-lowest");
   const [rolled, setRolled] = useState<{ score: number; dice: number[] }[] | null>(null);
 
   const derived = useMemo(() => computeCharacter(char), [char]);
   const patch = (p: Partial<Character>) => setChar((c) => ({ ...c, ...p }));
 
   const pointsSpent = ABILITIES.reduce((n, a) => n + pointBuyCost(char.abilities[a]), 0);
-  const pointsLeft = 32 - pointsSpent;
+  const pointsLeft = pointBudget - pointsSpent;
 
   const currentClass = CLASSES.find((c) => c.id === char.classes[0]?.classId);
   const spentPoints = derived.skillPointsSpent;
@@ -123,7 +125,7 @@ function CharacterCreator() {
 
                 <div className="flex flex-wrap items-center gap-2">
                   <Button size="sm" variant={pointBuyMode ? "default" : "outline"} onClick={() => setPointBuyMode(true)}>
-                    Point buy (32)
+                    Point buy ({pointBudget})
                   </Button>
                   <Button
                     size="sm"
@@ -150,10 +152,46 @@ function CharacterCreator() {
                   ) : null}
                 </div>
 
+                {pointBuyMode ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs uppercase tracking-wide text-muted-foreground">Budget</span>
+                    {POINT_BUY_BUDGETS.map((b) => (
+                      <Button
+                        key={b}
+                        size="sm"
+                        variant={pointBudget === b ? "secondary" : "ghost"}
+                        onClick={() => setPointBudget(b)}
+                      >
+                        {b}
+                        {b === 72 ? " (epic)" : ""}
+                      </Button>
+                    ))}
+                  </div>
+                ) : null}
+
                 {!pointBuyMode ? (
                   <div className="space-y-2">
-                    <Button size="sm" variant="secondary" onClick={() => setRolled(rollAbilityScores())}>
-                      <Dices className="mr-1.5 size-4" /> Roll six sets of 4d6, drop lowest
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant={rollMethod === "4d6-drop-lowest" ? "secondary" : "ghost"}
+                        onClick={() => setRollMethod("4d6-drop-lowest")}
+                      >
+                        4d6 drop lowest
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={rollMethod === "4d6-drop-none" ? "secondary" : "ghost"}
+                        onClick={() => setRollMethod("4d6-drop-none")}
+                      >
+                        4d6 drop none
+                      </Button>
+                    </div>
+                    <Button size="sm" variant="secondary" onClick={() => setRolled(rollAbilityScores(rollMethod))}>
+                      <Dices className="mr-1.5 size-4" />{" "}
+                      {rollMethod === "4d6-drop-none"
+                        ? "Roll six sets of 4d6, keep all four"
+                        : "Roll six sets of 4d6, drop lowest"}
                     </Button>
                     {rolled ? (
                       <div className="flex flex-wrap gap-2">

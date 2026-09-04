@@ -77,16 +77,28 @@ export function parseNotation(input: string): { count: number; sides: number; mo
 }
 
 /** 4d6 drop lowest, six times — the classic ability score roll. */
-export function rollAbilityScores(): { score: number; dice: number[] }[] {
+export type AbilityRollMethod = "4d6-drop-lowest" | "4d6-drop-none";
+
+export function rollAbilityScores(
+  method: AbilityRollMethod = "4d6-drop-lowest",
+): { score: number; dice: number[] }[] {
   return Array.from({ length: 6 }, () => {
     const dice = [randomInt(6), randomInt(6), randomInt(6), randomInt(6)].sort((a, b) => b - a);
-    return { score: dice[0]! + dice[1]! + dice[2]!, dice };
+    const score =
+      method === "4d6-drop-none"
+        ? dice.reduce((n, d) => n + d, 0)
+        : dice[0]! + dice[1]! + dice[2]!;
+    return { score, dice };
   });
 }
 
 export const POINT_BUY_COST: Record<number, number> = {
   8: 0, 9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 6, 15: 8, 16: 10, 17: 13, 18: 16,
+  // High-powered / epic continuation of the 3.5 buy table (+4 per point past 18)
+  19: 20, 20: 24, 21: 28, 22: 32, 23: 36, 24: 40, 25: 44, 26: 48,
 };
+
+export const POINT_BUY_BUDGETS = [22, 25, 28, 32, 72] as const;
 
 export function pointBuyCost(score: number) {
   return POINT_BUY_COST[score] ?? 0;

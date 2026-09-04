@@ -35,10 +35,7 @@ const PLAY_SUB = [
   { to: "/dice", label: "Dice", icon: Dices },
 ] as const;
 
-const NAV = [
-  { to: "/", label: "Home", icon: Home },
-  { to: "/wiki", label: "Wiki", icon: BookOpen },
-] as const;
+const NAV = [{ to: "/", label: "Home", icon: Home }] as const;
 
 function isPlayActive(pathname: string) {
   return PLAY_SUB.some((s) => pathname.startsWith(s.to));

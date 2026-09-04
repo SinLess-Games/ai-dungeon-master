@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   SITE_KINDS,
   type TerrainKind,
@@ -336,7 +336,66 @@ function SiteGlyph({ kind, x, y, gold }: { kind: WorldSite["kind"]; x: number; y
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* meandering roads / rivers: never a straight line                     */
+/* ------------------------------------------------------------------ */
+
+/** Catmull-Rom through an open list of points, rendered as smooth beziers. */
+function curveThrough(pts: Pt[]): string {
+  if (pts.length < 2) return "";
+  let d = `M ${pts[0]![0].toFixed(2)} ${pts[0]![1].toFixed(2)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)]!;
+    const p1 = pts[i]!;
+    const p2 = pts[i + 1]!;
+    const p3 = pts[Math.min(pts.length - 1, i + 2)]!;
+    const c1: Pt = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+    const c2: Pt = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    d += ` C ${c1[0].toFixed(2)} ${c1[1].toFixed(2)}, ${c2[0].toFixed(2)} ${c2[1].toFixed(2)}, ${p2[0].toFixed(2)} ${p2[1].toFixed(2)}`;
+  }
+  return d;
+}
+
+function wanderPath(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  seed: string,
+  kind: string,
+): string {
+  const rand = rng(hash(seed + kind));
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len;
+  const ny = dx / len;
+
+  // three overlapping waves give a wandering, terrain-following line
+  const waves = [0, 1, 2].map(() => ({
+    amp: (rand() - 0.5) * (kind === "river" ? 0.3 : 0.26) * len,
+    freq: 1 + Math.floor(rand() * 3),
+    phase: rand() * Math.PI * 2,
+  }));
+  const bias = (rand() - 0.5) * (kind === "river" ? 0.24 : 0.2) * len;
+
+  const steps = Math.max(6, Math.min(16, Math.round(len / 4)));
+  const pts: Pt[] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const taper = Math.sin(Math.PI * t); // pinned at both settlements
+    let off = bias * taper;
+    for (const w of waves) off += w.amp * taper * Math.sin(w.freq * Math.PI * t + w.phase);
+    // small along-track jitter so the line is not evenly paced
+    const jitter = i === 0 || i === steps ? 0 : (rand() - 0.5) * 0.9;
+    pts.push([
+      a.x + dx * t + nx * off + (dx / len) * jitter,
+      a.y + dy * t + ny * off + (dy / len) * jitter,
+    ]);
+  }
+  return curveThrough(pts);
+}
+
 export interface WorldMapViewProps {
+
   world: World;
   selectedSiteId?: string | null;
   onSelectSite?: (site: WorldSite) => void;
@@ -357,6 +416,9 @@ export function WorldMapView({
   const ref = useRef<SVGSVGElement | null>(null);
   const gold = "#9c7c34";
 
+  const [view, setView] = useState({ z: 1, x: 0, y: 0 });
+  const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
+
   const land = useMemo(
     () =>
       world.regions.map((r) => {
@@ -366,11 +428,76 @@ export function WorldMapView({
     [world.regions],
   );
 
+  const clampView = (z: number, x: number, y: number) => ({
+    z,
+    x: Math.min(0, Math.max(100 * (1 - z), x)),
+    y: Math.min(0, Math.max(70 * (1 - z), y)),
+  });
+
+  /** Zoom around a point given in map units. */
+  const zoomAt = (mx: number, my: number, factor: number) => {
+    setView((v) => {
+      const z = Math.min(10, Math.max(1, v.z * factor));
+      const k = z / v.z;
+      return clampView(z, mx - (mx - v.x) * k, my - (my - v.y) * k);
+    });
+  };
+
+  const toMap = (clientX: number, clientY: number) => {
+    const rect = ref.current!.getBoundingClientRect();
+    return {
+      x: ((clientX - rect.left) / rect.width) * 100,
+      y: ((clientY - rect.top) / rect.height) * 70,
+    };
+  };
+
+  const zoomRef = useRef(zoomAt);
+  zoomRef.current = zoomAt;
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1);
+      const rect = el.getBoundingClientRect();
+      const mx = ((e.clientX - rect.left) / rect.width) * 100;
+      const my = ((e.clientY - rect.top) / rect.height) * 70;
+      zoomRef.current(mx, my, Math.exp(-dy * 0.0018));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  function handlePointerDown(e: React.PointerEvent<SVGSVGElement>) {
+    drag.current = { x: e.clientX, y: e.clientY, moved: false };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function handlePointerMove(e: React.PointerEvent<SVGSVGElement>) {
+    const d = drag.current;
+    if (!d || !ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const dx = ((e.clientX - d.x) / rect.width) * 100;
+    const dy = ((e.clientY - d.y) / rect.height) * 70;
+    if (Math.abs(e.clientX - d.x) + Math.abs(e.clientY - d.y) > 3) d.moved = true;
+    d.x = e.clientX;
+    d.y = e.clientY;
+    setView((v) => clampView(v.z, v.x + dx, v.y + dy));
+  }
+
+  function handlePointerUp(e: React.PointerEvent<SVGSVGElement>) {
+    const moved = drag.current?.moved;
+    drag.current = null;
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+    if (moved) return;
+  }
+
   function handleClick(e: React.MouseEvent<SVGSVGElement>) {
     if (!onMapClick || !ref.current) return;
-    const rect = ref.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    const p = toMap(e.clientX, e.clientY);
+    const x = (p.x - view.x) / view.z;
+    const y = (p.y - view.y) / view.z;
     onMapClick(Math.round(x * 10) / 10, Math.round(y * 10) / 10);
   }
 
@@ -378,15 +505,20 @@ export function WorldMapView({
   const siteById = new Map(world.sites.map((s) => [s.id, s]));
 
   return (
+    <div className={`relative overflow-hidden ${className ?? "h-full w-full"}`}>
     <svg
       ref={ref}
       viewBox="0 0 100 70"
       onClick={handleClick}
-      className={className ?? "h-full w-full rounded-lg border border-border"}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      className="h-full w-full touch-none rounded-lg border border-border"
+      style={{ fontFamily: "'Cinzel', 'EB Garamond', serif", cursor: drag.current ? "grabbing" : "grab" }}
       role="img"
-      aria-label={`Map of ${world.name}`}
-      style={{ fontFamily: "'Cinzel', 'EB Garamond', serif" }}
+      aria-label="World map"
     >
+
       <defs>
         <radialGradient id="wm-ocean" cx="50%" cy="42%" r="80%">
           <stop offset="0%" stopColor="#6f96aa" />
@@ -461,6 +593,9 @@ export function WorldMapView({
         </clipPath>
       </defs>
 
+      <g transform={`translate(${view.x} ${view.y}) scale(${view.z})`}>
+
+
       {/* ---------------- ocean ---------------- */}
       <rect x="0" y="0" width="100" height="70" fill="url(#wm-ocean)" />
       <rect x="0" y="0" width="100" height="70" filter="url(#wm-water)" opacity="0.5" />
@@ -532,25 +667,12 @@ export function WorldMapView({
         const a = siteById.get(route.fromSiteId);
         const b = siteById.get(route.toSiteId);
         if (!a || !b) return null;
-        const rand = rng(hash(route.id));
-        const segs = 6;
-        let d = `M ${a.x} ${a.y}`;
-        for (let i = 1; i <= segs; i++) {
-          const t = i / segs;
-          const px = a.x + (b.x - a.x) * t;
-          const py = a.y + (b.y - a.y) * t;
-          const amp = Math.sin(Math.PI * t) * (route.kind === "river" ? 3 : 1.8);
-          const nx = -(b.y - a.y);
-          const ny = b.x - a.x;
-          const len = Math.hypot(nx, ny) || 1;
-          const off = (rand() - 0.5) * amp;
-          d += ` L ${(px + (nx / len) * off).toFixed(2)} ${(py + (ny / len) * off).toFixed(2)}`;
-        }
+        const d = wanderPath(a, b, route.id, route.kind);
         const water = route.kind === "river" || route.kind === "sea";
         return (
           <g key={route.id}>
             {route.kind === "road" && (
-              <path d={d} fill="none" stroke="#f2e8cd" strokeWidth="0.7" opacity="0.5" strokeLinecap="round" />
+              <path d={d} fill="none" stroke="#f2e8cd" strokeWidth="0.85" opacity="0.55" strokeLinecap="round" />
             )}
             <path
               d={d}
@@ -560,10 +682,12 @@ export function WorldMapView({
               strokeDasharray={route.kind === "trail" ? "0.8 0.9" : route.kind === "sea" ? "1.6 1.1" : undefined}
               opacity={0.85}
               strokeLinecap="round"
+              strokeLinejoin="round"
             />
           </g>
         );
       })}
+
 
       {/* ---------------- region names ---------------- */}
       {world.regions.map((r) => (
@@ -634,9 +758,10 @@ export function WorldMapView({
           Party
         </text>
       </g>
+      </g>
 
-      {/* ---------------- compass rose ---------------- */}
-      <g transform="translate(92.5,10)" opacity="0.9">
+      {/* ---------------- compass rose (fixed) ---------------- */}
+      <g transform="translate(92.5,10)" opacity="0.9" pointerEvents="none">
         <circle r="5" fill="#f4ecd6" fillOpacity="0.85" stroke={gold} strokeWidth="0.3" />
         <circle r="3.6" fill="none" stroke={gold} strokeWidth="0.12" opacity="0.7" />
         <path d="M 0 -4.2 L 0.9 0 L 0 4.2 L -0.9 0 Z" fill="#3c3427" />
@@ -645,21 +770,41 @@ export function WorldMapView({
         <text y="-5.4" textAnchor="middle" fontSize="1.7" fill="#3c3427">N</text>
       </g>
 
-      {/* ---------------- title cartouche ---------------- */}
-      <g transform="translate(2.5,2.5)">
-        <rect width="36" height="7.6" rx="0.5" fill="#f6eed8" fillOpacity="0.95" stroke={gold} strokeWidth="0.35" />
-        <rect x="0.7" y="0.7" width="34.6" height="6.2" rx="0.3" fill="none" stroke={gold} strokeWidth="0.13" opacity="0.8" />
-        <text x="18" y="5" textAnchor="middle" fontSize="3.2" fill="#3c3427" letterSpacing="0.5">
-          {world.name}
-        </text>
-      </g>
-
       {/* ---------------- neat map border ---------------- */}
-      <rect x="0.6" y="0.6" width="98.8" height="68.8" fill="none" stroke="#2f4a55" strokeWidth="0.5" opacity="0.7" />
-      <rect x="1.5" y="1.5" width="97" height="67" fill="none" stroke="#f4ecd6" strokeWidth="0.18" opacity="0.35" />
+      <rect x="0.6" y="0.6" width="98.8" height="68.8" fill="none" stroke="#2f4a55" strokeWidth="0.5" opacity="0.7" pointerEvents="none" />
+      <rect x="1.5" y="1.5" width="97" height="67" fill="none" stroke="#f4ecd6" strokeWidth="0.18" opacity="0.35" pointerEvents="none" />
 
       {/* ---------------- paper grain ---------------- */}
       <rect x="0" y="0" width="100" height="70" filter="url(#wm-paper)" opacity="0.4" pointerEvents="none" />
     </svg>
+
+      <div className="pointer-events-auto absolute bottom-2 left-2 flex gap-1">
+        <button
+          type="button"
+          aria-label="Zoom in"
+          onClick={() => zoomAt(50, 35, 1.4)}
+          className="size-7 rounded border border-border bg-background/85 text-sm font-semibold leading-none shadow-sm hover:bg-background"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          aria-label="Zoom out"
+          onClick={() => zoomAt(50, 35, 1 / 1.4)}
+          className="size-7 rounded border border-border bg-background/85 text-sm font-semibold leading-none shadow-sm hover:bg-background"
+        >
+          −
+        </button>
+        <button
+          type="button"
+          aria-label="Reset the view"
+          onClick={() => setView({ z: 1, x: 0, y: 0 })}
+          className="h-7 rounded border border-border bg-background/85 px-2 text-xs shadow-sm hover:bg-background"
+        >
+          Reset
+        </button>
+      </div>
+    </div>
   );
 }
+

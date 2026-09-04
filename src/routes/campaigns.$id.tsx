@@ -17,6 +17,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { getCampaign, getCharacter, getWorld, saveCampaign, saveCharacter, pushRoll } from "@/lib/storage";
 import { ensureCampaignWorld } from "@/lib/campaign-world";
 import { WorldMapView } from "@/components/WorldMapView";
+import { LocalMapView } from "@/components/LocalMapView";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { regionAt } from "@/lib/world";
 import { buildDmContext } from "@/lib/dm-context";
@@ -548,36 +549,58 @@ function Table({
  */
 function WorldMapButton({ campaign }: { campaign: Campaign }) {
   const [open, setOpen] = useState(false);
+  const [siteId, setSiteId] = useState<string | null>(null);
   const world = open || campaign.worldId ? getWorld(campaign.worldId ?? "") : undefined;
   const here = world?.sites.find((s) => s.id === world.party.siteId);
   const region = world ? regionAt(world, world.party.x, world.party.y) : undefined;
+  const openSite = world?.sites.find((s) => s.id === siteId);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setSiteId(null); }}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           <MapIcon className="mr-2 size-4" /> World map
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-h-[95vh] w-[98vw] max-w-[1600px] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display text-2xl">
-            {world?.name ?? "The world"}
+            {openSite ? openSite.name : "The world"}
           </DialogTitle>
         </DialogHeader>
         {world ? (
-          <div className="space-y-4">
-            <WorldMapView world={world} showUndiscovered={false} className="w-full rounded-lg border" />
-            <p className="text-sm text-muted-foreground">
-              You are at <strong className="text-foreground">{here?.name ?? "open country"}</strong>
-              {region ? ` in ${region.name} (${region.terrain})` : ""}. Places you have not heard of stay off the map.
-            </p>
-            <Button asChild variant="outline" size="sm">
-              <Link to="/worlds/$worldId" params={{ worldId: world.id }}>
-                Open the full atlas
-              </Link>
-            </Button>
-          </div>
+          openSite ? (
+            <div className="space-y-4">
+              <LocalMapView site={openSite} className="h-[72vh] w-full rounded-lg border" />
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm text-muted-foreground">
+                  {openSite.description || "A local plan of the place, drawn as the party knows it."}
+                </p>
+                <Button variant="outline" size="sm" onClick={() => setSiteId(null)}>
+                  Back to the world
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <WorldMapView
+                world={world}
+                showUndiscovered={false}
+                onSelectSite={(s) => setSiteId(s.id)}
+                className="h-[74vh] w-full"
+              />
+              <p className="text-sm text-muted-foreground">
+                You are at <strong className="text-foreground">{here?.name ?? "open country"}</strong>
+                {region ? ` in ${region.name} (${region.terrain})` : ""}. Drag to move the map, scroll to zoom,
+                and click any place to open its local map.
+              </p>
+              <Button asChild variant="outline" size="sm">
+                <Link to="/worlds/$worldId" params={{ worldId: world.id }}>
+                  Open the full atlas
+                </Link>
+              </Button>
+            </div>
+          )
         ) : (
           <p className="text-sm text-muted-foreground">
             The DM is still drawing this world. Check back after the opening scene.
@@ -587,3 +610,4 @@ function WorldMapButton({ campaign }: { campaign: Campaign }) {
     </Dialog>
   );
 }
+

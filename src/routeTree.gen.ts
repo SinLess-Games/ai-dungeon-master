@@ -38,12 +38,14 @@ import { Route as MapsMapIdRouteImport } from './routes/maps.$mapId'
 import { Route as PartyCampaignIdRouteImport } from './routes/party.$campaignId'
 import { Route as WorldsIndexRouteImport } from './routes/worlds.index'
 import { Route as WorldsWorldIdRouteImport } from './routes/worlds.$worldId'
+import { Route as AdminCampaignsIndexRouteImport } from './routes/admin.campaigns.index'
 import { Route as AdminDevBlogIndexRouteImport } from './routes/admin.dev-blog.index'
 import { Route as AdminDevBlogNewRouteImport } from './routes/admin.dev-blog.new'
 import { Route as AdminDevBlogIdEditRouteImport } from './routes/admin.dev-blog.$id.edit'
 import { Route as AdminDevBlogIdPreviewRouteImport } from './routes/admin.dev-blog.$id.preview'
 import { Route as ApiPublicBlogMediaSplatRouteImport } from './routes/api/public/blog-media.$'
 import { Route as ApiPublicPaymentsWebhookRouteImport } from './routes/api/public/payments/webhook'
+import { Route as AdminCampaignsIdPlayersPlayerKeyRouteImport } from './routes/admin.campaigns.$id.players.$playerKey'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -190,6 +192,11 @@ const WorldsWorldIdRoute = WorldsWorldIdRouteImport.update({
   path: '/worlds/$worldId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminCampaignsIndexRoute = AdminCampaignsIndexRouteImport.update({
+  id: '/campaigns/',
+  path: '/campaigns/',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminDevBlogIndexRoute = AdminDevBlogIndexRouteImport.update({
   id: '/dev-blog/',
   path: '/dev-blog/',
@@ -220,6 +227,12 @@ const ApiPublicPaymentsWebhookRoute =
     id: '/api/public/payments/webhook',
     path: '/api/public/payments/webhook',
     getParentRoute: () => rootRouteImport,
+  } as any)
+const AdminCampaignsIdPlayersPlayerKeyRoute =
+  AdminCampaignsIdPlayersPlayerKeyRouteImport.update({
+    id: '/campaigns/$id/players/$playerKey',
+    path: '/campaigns/$id/players/$playerKey',
+    getParentRoute: () => AdminRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -253,11 +266,13 @@ export interface FileRoutesByFullPath {
   '/dev-blog/': typeof DevBlogIndexRoute
   '/worlds/': typeof WorldsIndexRoute
   '/admin/dev-blog/new': typeof AdminDevBlogNewRoute
+  '/admin/campaigns/': typeof AdminCampaignsIndexRoute
   '/admin/dev-blog/': typeof AdminDevBlogIndexRoute
   '/admin/dev-blog/$id/edit': typeof AdminDevBlogIdEditRoute
   '/admin/dev-blog/$id/preview': typeof AdminDevBlogIdPreviewRoute
   '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
+  '/admin/campaigns/$id/players/$playerKey': typeof AdminCampaignsIdPlayersPlayerKeyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -289,11 +304,13 @@ export interface FileRoutesByTo {
   '/dev-blog': typeof DevBlogIndexRoute
   '/worlds': typeof WorldsIndexRoute
   '/admin/dev-blog/new': typeof AdminDevBlogNewRoute
+  '/admin/campaigns': typeof AdminCampaignsIndexRoute
   '/admin/dev-blog': typeof AdminDevBlogIndexRoute
   '/admin/dev-blog/$id/edit': typeof AdminDevBlogIdEditRoute
   '/admin/dev-blog/$id/preview': typeof AdminDevBlogIdPreviewRoute
   '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
+  '/admin/campaigns/$id/players/$playerKey': typeof AdminCampaignsIdPlayersPlayerKeyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -327,11 +344,13 @@ export interface FileRoutesById {
   '/dev-blog/': typeof DevBlogIndexRoute
   '/worlds/': typeof WorldsIndexRoute
   '/admin/dev-blog/new': typeof AdminDevBlogNewRoute
+  '/admin/campaigns/': typeof AdminCampaignsIndexRoute
   '/admin/dev-blog/': typeof AdminDevBlogIndexRoute
   '/admin/dev-blog/$id/edit': typeof AdminDevBlogIdEditRoute
   '/admin/dev-blog/$id/preview': typeof AdminDevBlogIdPreviewRoute
   '/api/public/blog-media/$': typeof ApiPublicBlogMediaSplatRoute
   '/api/public/payments/webhook': typeof ApiPublicPaymentsWebhookRoute
+  '/admin/campaigns/$id/players/$playerKey': typeof AdminCampaignsIdPlayersPlayerKeyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -366,11 +385,13 @@ export interface FileRouteTypes {
     | '/dev-blog/'
     | '/worlds/'
     | '/admin/dev-blog/new'
+    | '/admin/campaigns/'
     | '/admin/dev-blog/'
     | '/admin/dev-blog/$id/edit'
     | '/admin/dev-blog/$id/preview'
     | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
+    | '/admin/campaigns/$id/players/$playerKey'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -402,11 +423,13 @@ export interface FileRouteTypes {
     | '/dev-blog'
     | '/worlds'
     | '/admin/dev-blog/new'
+    | '/admin/campaigns'
     | '/admin/dev-blog'
     | '/admin/dev-blog/$id/edit'
     | '/admin/dev-blog/$id/preview'
     | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
+    | '/admin/campaigns/$id/players/$playerKey'
   id:
     | '__root__'
     | '/'
@@ -439,11 +462,13 @@ export interface FileRouteTypes {
     | '/dev-blog/'
     | '/worlds/'
     | '/admin/dev-blog/new'
+    | '/admin/campaigns/'
     | '/admin/dev-blog/'
     | '/admin/dev-blog/$id/edit'
     | '/admin/dev-blog/$id/preview'
     | '/api/public/blog-media/$'
     | '/api/public/payments/webhook'
+    | '/admin/campaigns/$id/players/$playerKey'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -678,6 +703,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorldsWorldIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/campaigns/': {
+      id: '/admin/campaigns/'
+      path: '/campaigns'
+      fullPath: '/admin/campaigns/'
+      preLoaderRoute: typeof AdminCampaignsIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/dev-blog/': {
       id: '/admin/dev-blog/'
       path: '/dev-blog'
@@ -720,6 +752,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicPaymentsWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/campaigns/$id/players/$playerKey': {
+      id: '/admin/campaigns/$id/players/$playerKey'
+      path: '/campaigns/$id/players/$playerKey'
+      fullPath: '/admin/campaigns/$id/players/$playerKey'
+      preLoaderRoute: typeof AdminCampaignsIdPlayersPlayerKeyRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
@@ -732,9 +771,11 @@ interface AdminRouteChildren {
   AdminTitlesRoute: typeof AdminTitlesRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminDevBlogNewRoute: typeof AdminDevBlogNewRoute
+  AdminCampaignsIndexRoute: typeof AdminCampaignsIndexRoute
   AdminDevBlogIndexRoute: typeof AdminDevBlogIndexRoute
   AdminDevBlogIdEditRoute: typeof AdminDevBlogIdEditRoute
   AdminDevBlogIdPreviewRoute: typeof AdminDevBlogIdPreviewRoute
+  AdminCampaignsIdPlayersPlayerKeyRoute: typeof AdminCampaignsIdPlayersPlayerKeyRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -746,9 +787,11 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminTitlesRoute: AdminTitlesRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminDevBlogNewRoute: AdminDevBlogNewRoute,
+  AdminCampaignsIndexRoute: AdminCampaignsIndexRoute,
   AdminDevBlogIndexRoute: AdminDevBlogIndexRoute,
   AdminDevBlogIdEditRoute: AdminDevBlogIdEditRoute,
   AdminDevBlogIdPreviewRoute: AdminDevBlogIdPreviewRoute,
+  AdminCampaignsIdPlayersPlayerKeyRoute: AdminCampaignsIdPlayersPlayerKeyRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)

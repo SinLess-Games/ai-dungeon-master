@@ -331,3 +331,250 @@ export const getCampaignPlayers = createServerFn({ method: "GET" })
       };
     });
   });
+
+/* --------------------------------------------- campaign dashboard */
+
+function textOf(parts: unknown): string {
+  if (!Array.isArray(parts)) return "";
+  return parts
+    .filter((p: any) => p?.type === "text" && typeof p.text === "string")
+    .map((p: any) => p.text as string)
+    .join("\n")
+    .trim();
+}
+
+export interface CampaignPlayerRow {
+  key: string;
+  name: string;
+  /** "hero" for player-run seats, "companion" for DM-run ones. */
+  kind: "hero" | "companion";
+  isOwner: boolean;
+  race: string;
+  classLine: string;
+  level: number;
+  status: string;
+  hp: number;
+  maxHp: number;
+  messages: number;
+  titles: { name: string; rarity: string; awardedAt: string }[];
+}
+
+export interface CampaignDashboardRow {
+  id: string;
+  name: string;
+  owner: string;
+  ownerId: string;
+  updatedAt: string;
+  completed: boolean;
+  questsDone: number;
+  questsTotal: number;
+  messages: number;
+  playerMessages: number;
+  players: CampaignPlayerRow[];
+}
+
+function questCounts(data: any) {
+  const quests = Array.isArray(data?.quests) ? data.quests : [];
+  return {
+    total: quests.length,
+    done: quests.filter((q: any) => q?.status === "done").length,
+  };
+}
+
+function playerMessageCount(data: any) {
+  const list = Array.isArray(data?.messages) ? data.messages : [];
+  return list.filter(
+    (m: any, i: number) => m?.role === "user" && !m?.metadata?.hidden && i !== 0,
+  ).length;
+}
+
+async function loadTitlesByUser(supabaseAdmin: any, userIds: string[]) {
+  const map = new Map<string, { name: string; rarity: string; awardedAt: string }[]>();
+  if (!userIds.length) return map;
+  const { data } = await supabaseAdmin
+    .from("player_titles")
+    .select("user_id, awarded_at, titles(name, rarity)")
+    .in("user_id", userIds);
+  for (const row of (data ?? []) as any[]) {
+    const list = map.get(row.user_id) ?? [];
+    list.push({
+      name: row.titles?.name ?? "Unknown title",
+      rarity: row.titles?.rarity ?? "common",
+      awardedAt: row.awarded_at,
+    });
+    map.set(row.user_id, list);
+  }
+  return map;
+}
+
+function buildPlayers(
+  data: any,
+  ownerName: string,
+  ownerTitles: { name: string; rarity: string; awardedAt: string }[],
+  playerMessages: number,
+): CampaignPlayerRow[] {
+  const party = Array.isArray(data?.party) ? data.party : [];
+  const rows: CampaignPlayerRow[] = [];
+  let ownerSeatUsed = false;
+
+  for (const m of party as any[]) {
+    if (!m) continue;
+    const isHero = m.controlledBy === "player";
+    const isOwner = isHero && !ownerSeatUsed;
+    if (isOwner) ownerSeatUsed = true;
+    rows.push({
+      key: String(m.id ?? m.name ?? rows.length),
+      name: m.name ?? "Unnamed",
+      kind: isHero ? "hero" : "companion",
+      isOwner,
+      race: m.race ?? "",
+      classLine: m.classLine ?? "",
+      level: Number(m.level ?? 1),
+      status: m.status ?? "active",
+      hp: Number(m.hp ?? 0),
+      maxHp: Number(m.maxHp ?? 0),
+      messages: isOwner ? playerMessages : 0,
+      titles: isOwner ? ownerTitles : [],
+    });
+  }
+
+  if (!ownerSeatUsed) {
+    rows.unshift({
+      key: "owner",
+      name: ownerName,
+      kind: "hero",
+      isOwner: true,
+      race: "",
+      classLine: "",
+      level: 1,
+      status: "active",
+      hp: 0,
+      maxHp: 0,
+      messages: playerMessages,
+      titles: ownerTitles,
+    });
+  }
+  return rows;
+}
+
+export const getCampaignDashboard = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<CampaignDashboardRow[]> => {
+    const ctx = context as unknown as { supabase: any; userId: string };
+    await assertAdmin(ctx);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const [campsRes, profilesRes] = await Promise.all([
+      supabaseAdmin
+        .from("campaigns")
+        .select("id, name, user_id, data, updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(200),
+      supabaseAdmin.from("profiles").select("id, display_name"),
+    ]);
+    const names = new Map<string, string>(
+      (profilesRes.data ?? []).map((p: any) => [p.id, p.display_name ?? "Adventurer"]),
+    );
+    const camps = (campsRes.data ?? []) as any[];
+    const titles = await loadTitlesByUser(
+      supabaseAdmin,
+      Array.from(new Set(camps.map((c) => c.user_id))),
+    );
+
+    return camps.map((c) => {
+      const data = (c.data ?? {}) as any;
+      const q = questCounts(data);
+      const playerMessages = playerMessageCount(data);
+      const ownerName = names.get(c.user_id) ?? "Adventurer";
+      return {
+        id: c.id,
+        name: c.name ?? "Untitled campaign",
+        owner: ownerName,
+        ownerId: c.user_id,
+        updatedAt: c.updated_at,
+        completed: Boolean(data.completedAt),
+        questsDone: q.done,
+        questsTotal: q.total,
+        messages: Array.isArray(data.messages) ? data.messages.length : 0,
+        playerMessages,
+        players: buildPlayers(data, ownerName, titles.get(c.user_id) ?? [], playerMessages),
+      };
+    });
+  });
+
+export interface CampaignPlayerProfile {
+  campaign: { id: string; name: string; owner: string; updatedAt: string; completed: boolean };
+  player: CampaignPlayerRow;
+  gear: { slot: string; name: string; notes?: string }[];
+  notes: string;
+  questsDone: number;
+  questsTotal: number;
+  journalEntries: number;
+  recentMessages: { id: string; text: string }[];
+}
+
+export const getCampaignPlayerProfile = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { campaignId: string; playerKey: string }) => {
+    if (!input?.campaignId || !input?.playerKey) throw new Error("Missing player");
+    return input;
+  })
+  .handler(async ({ data: input, context }): Promise<CampaignPlayerProfile> => {
+    const ctx = context as unknown as { supabase: any; userId: string };
+    await assertAdmin(ctx);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: camp, error } = await supabaseAdmin
+      .from("campaigns")
+      .select("id, name, user_id, data, updated_at")
+      .eq("id", input.campaignId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!camp) throw new Error("Campaign not found");
+
+    const data = (camp.data ?? {}) as any;
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("display_name")
+      .eq("id", camp.user_id)
+      .maybeSingle();
+    const ownerName = profile?.display_name ?? "Adventurer";
+    const titles = await loadTitlesByUser(supabaseAdmin, [camp.user_id]);
+    const playerMessages = playerMessageCount(data);
+    const players = buildPlayers(data, ownerName, titles.get(camp.user_id) ?? [], playerMessages);
+    const player = players.find((p) => p.key === input.playerKey) ?? players[0];
+    if (!player) throw new Error("Player not found");
+
+    const seat = (Array.isArray(data.party) ? data.party : []).find(
+      (m: any) => String(m?.id ?? m?.name) === player.key,
+    );
+    const q = questCounts(data);
+    const messages = Array.isArray(data.messages) ? data.messages : [];
+    const recent = player.isOwner
+      ? messages
+          .filter((m: any, i: number) => m?.role === "user" && !m?.metadata?.hidden && i !== 0)
+          .slice(-10)
+          .reverse()
+          .map((m: any, i: number) => ({ id: String(m.id ?? i), text: textOf(m.parts).slice(0, 600) }))
+          .filter((m: any) => m.text)
+      : [];
+
+    return {
+      campaign: {
+        id: camp.id,
+        name: camp.name ?? "Untitled campaign",
+        owner: ownerName,
+        updatedAt: camp.updated_at,
+        completed: Boolean(data.completedAt),
+      },
+      player,
+      gear: Array.isArray(seat?.gear)
+        ? seat.gear.map((g: any) => ({ slot: g?.slot ?? "", name: g?.name ?? "", notes: g?.notes }))
+        : [],
+      notes: seat?.notes ?? "",
+      questsDone: q.done,
+      questsTotal: q.total,
+      journalEntries: Array.isArray(data.journal) ? data.journal.length : 0,
+      recentMessages: recent,
+    };
+  });

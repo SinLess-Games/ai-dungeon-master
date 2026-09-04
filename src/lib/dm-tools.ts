@@ -2,6 +2,7 @@ import type { Character, InventoryItem, DmGrant } from "./rules/character";
 import type { Campaign } from "./campaign";
 import type { Alignment } from "./rules/types";
 import { newId } from "./storage";
+import { removeMemberByName, upsertMemberByName } from "./party";
 
 type Any = Record<string, any>;
 
@@ -153,6 +154,40 @@ export function applyDmTool(
         });
       }
       return { character: c, campaign: g, output: `quest ${i.status ?? "active"}: ${title}` };
+    }
+
+    case "upsertPartyMember": {
+      const res = upsertMemberByName(g, {
+        name: String(i.name ?? "Companion"),
+        tier: i.tier ?? "companion",
+        kind: "npc",
+        controlledBy: i.controlledBy ?? "dm",
+        role: i.role ?? undefined,
+        race: i.race ?? undefined,
+        classLine: i.classLine ?? undefined,
+        level: i.level ?? undefined,
+        attitude: i.attitude ?? undefined,
+        hp: i.hp ?? undefined,
+        maxHp: i.maxHp ?? undefined,
+        ac: i.ac ?? undefined,
+        initiative: i.initiative ?? undefined,
+        status: i.status ?? undefined,
+        notes: i.notes ?? undefined,
+        gear: Array.isArray(i.gear) ? i.gear : undefined,
+      });
+      return {
+        character: c,
+        campaign: res.campaign,
+        output: `${res.created ? "joined the party" : "roster updated"}: ${i.name} (${i.tier ?? "companion"})`,
+      };
+    }
+
+    case "removePartyMember": {
+      return {
+        character: c,
+        campaign: removeMemberByName(g, String(i.name ?? "")),
+        output: `left the party: ${i.name}`,
+      };
     }
 
     case "addJournal": {

@@ -200,7 +200,7 @@ export function computeCharacter(c: Character): DerivedStats {
       skillPointsTotal += points;
       const className = src.def?.name ?? "Class";
       const parts = [`${className} ${src.base}`];
-      if (intMod !== 0) parts.push(`Int ${formatModStr(intMod)}`);
+      if (intMod !== 0) parts.push(`Int ${formatMod(intMod)}`);
       if (raceSkillBonus !== 0) parts.push(`${race.name} +${raceSkillBonus}`);
       skillPointBreakdown.push({
         label:
@@ -221,7 +221,7 @@ export function computeCharacter(c: Character): DerivedStats {
     const rhdPoints = perHd * (rhd.count + 3);
     skillPointsTotal += rhdPoints;
     skillPointBreakdown.push({
-      label: `${race.name} racial Hit Dice: (${rhd.skillPointsPerHd ?? 2} + Int ${formatModStr(intMod)}) × (${rhd.count} HD + 3)`,
+      label: `${race.name} racial Hit Dice: (${rhd.skillPointsPerHd ?? 2} + Int ${formatMod(intMod)}) × (${rhd.count} HD + 3)`,
       points: rhdPoints,
     });
   }
@@ -296,6 +296,7 @@ export function computeCharacter(c: Character): DerivedStats {
     spellFailure: armor.spellFailure + shield.spellFailure,
     maxDex,
     skillPointsTotal,
+    skillPointBreakdown,
     skillPointsSpent,
     maxRanks: { classSkill: maxClassRanks, crossClass: maxCrossRanks },
     classSkillIds,

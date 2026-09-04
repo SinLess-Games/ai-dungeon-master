@@ -100,6 +100,7 @@ export interface DerivedStats {
   spellFailure: number;
   maxDex: number | null;
   skillPointsTotal: number;
+  skillPointBreakdown: { label: string; points: number }[];
   skillPointsSpent: number;
   maxRanks: { classSkill: number; crossClass: number };
   classSkillIds: Set<string>;

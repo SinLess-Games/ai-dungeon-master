@@ -1,0 +1,81 @@
+import type { AbilityKey, Alignment } from "./types";
+
+export interface ClassLevel {
+  classId: string;
+  levels: number;
+}
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  quantity: number;
+  weight: number;
+  cost: number;
+  note?: string;
+  /** where the item lives: carried on the character, in a stash, or the party pool */
+  location: "person" | "stored" | "party";
+  container?: string;
+}
+
+export interface DmGrant {
+  id: string;
+  at: string;
+  kind: "feat" | "skill-points" | "ability" | "ability-score" | "alignment" | "xp";
+  detail: string;
+  reason: string;
+}
+
+export interface Character {
+  id: string;
+  name: string;
+  portraitUrl?: string;
+  raceId: string;
+  classes: ClassLevel[];
+  alignment: Alignment;
+  deity?: string;
+  abilities: Record<AbilityKey, number>;
+  /** ability increases taken at 4th, 8th, 12th ... */
+  abilityIncreases: AbilityKey[];
+  skillRanks: Record<string, number>;
+  featIds: string[];
+  armorId: string;
+  shieldId: string;
+  weaponIds: string[];
+  inventory: InventoryItem[];
+  gold: number;
+  xp: number;
+  hp: { current: number; max: number; temp: number; nonlethal: number };
+  conditions: string[];
+  notes: string;
+  grants: DmGrant[];
+  encumbranceEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function emptyCharacter(id: string): Character {
+  return {
+    id,
+    name: "",
+    raceId: "human",
+    classes: [{ classId: "fighter", levels: 1 }],
+    alignment: "NG",
+    abilities: { str: 13, dex: 13, con: 13, int: 12, wis: 12, cha: 10 },
+    abilityIncreases: [],
+    skillRanks: {},
+    featIds: [],
+    armorId: "none",
+    shieldId: "no-shield",
+    weaponIds: [],
+    inventory: [],
+    gold: 0,
+    xp: 0,
+    hp: { current: 0, max: 0, temp: 0, nonlethal: 0 },
+    conditions: [],
+    notes: "",
+    grants: [],
+    encumbranceEnabled: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}

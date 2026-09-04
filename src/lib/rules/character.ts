@@ -5,6 +5,15 @@ export interface ClassLevel {
   levels: number;
 }
 
+export interface ItemEvent {
+  id: string;
+  at: string;
+  /** plain-language description: "Found in the crypt", "Moved to party pool" */
+  text: string;
+}
+
+export type LootLocation = "person" | "stored" | "party";
+
 export interface InventoryItem {
   id: string;
   name: string;
@@ -13,9 +22,12 @@ export interface InventoryItem {
   cost: number;
   note?: string;
   /** where the item lives: carried on the character, in a stash, or the party pool */
-  location: "person" | "stored" | "party";
+  location: LootLocation;
   container?: string;
+  /** provenance: where it came from, who held it, when it moved */
+  history?: ItemEvent[];
 }
+
 
 export interface DmGrant {
   id: string;

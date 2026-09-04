@@ -4,9 +4,18 @@ import { type StripeEnv, createStripeClient, getStripeErrorMessage } from "@/lib
 
 type CheckoutSessionResult = { clientSecret: string } | { error: string };
 
+interface CheckoutInput {
+  priceId: string;
+  quantity?: number | undefined;
+  customerEmail?: string | undefined;
+  userId?: string | undefined;
+  returnUrl: string;
+  environment: StripeEnv;
+}
+
 async function resolveOrCreateCustomer(
   stripe: ReturnType<typeof createStripeClient>,
-  options: { email?: string; userId?: string },
+  options: { email?: string | undefined; userId?: string | undefined },
 ): Promise<string> {
   if (options.userId && !/^[a-zA-Z0-9_-]+$/.test(options.userId)) {
     throw new Error("Invalid userId");
@@ -16,13 +25,13 @@ async function resolveOrCreateCustomer(
       query: `metadata['userId']:'${options.userId}'`,
       limit: 1,
     });
-    if (found.data.length) return found.data[0].id;
+    if (found.data.length) return found.data[0]!.id;
   }
   if (options.email) {
     const existing = await stripe.customers.list({ email: options.email, limit: 1 });
-    if (existing.data.length) {
-      const customer = existing.data[0];
-      if (options.userId && customer.metadata?.userId !== options.userId) {
+    const customer = existing.data[0];
+    if (customer) {
+      if (options.userId && customer.metadata?.["userId"] !== options.userId) {
         await stripe.customers.update(customer.id, {
           metadata: { ...customer.metadata, userId: options.userId },
         });
@@ -31,33 +40,24 @@ async function resolveOrCreateCustomer(
     }
   }
   const created = await stripe.customers.create({
-    ...(options.email && { email: options.email }),
-    ...(options.userId && { metadata: { userId: options.userId } }),
+    ...(options.email ? { email: options.email } : {}),
+    ...(options.userId ? { metadata: { userId: options.userId } } : {}),
   });
   return created.id;
 }
 
 export const createCheckoutSession = createServerFn({ method: "POST" })
-  .inputValidator(
-    (data: {
-      priceId: string;
-      quantity?: number;
-      customerEmail?: string;
-      userId?: string;
-      returnUrl: string;
-      environment: StripeEnv;
-    }) => {
-      if (!/^[a-zA-Z0-9_-]+$/.test(data.priceId)) throw new Error("Invalid priceId");
-      return data;
-    },
-  )
+  .inputValidator((data: CheckoutInput) => {
+    if (!/^[a-zA-Z0-9_-]+$/.test(data.priceId)) throw new Error("Invalid priceId");
+    return data;
+  })
   .handler(async ({ data }): Promise<CheckoutSessionResult> => {
     try {
       const stripe = createStripeClient(data.environment);
 
       const prices = await stripe.prices.list({ lookup_keys: [data.priceId] });
-      if (!prices.data.length) throw new Error("Price not found");
       const stripePrice = prices.data[0];
+      if (!stripePrice) throw new Error("Price not found");
       const isRecurring = stripePrice.type === "recurring";
 
       const customerId =
@@ -76,8 +76,8 @@ export const createCheckoutSession = createServerFn({ method: "POST" })
         // Full compliance handling: tax, fraud, disputes, receipts for
         // buyers in ~80 countries. Falls back to tax calculation elsewhere.
         managed_payments: { enabled: true },
-        metadata: { managed_payments: "true", ...(data.userId && { userId: data.userId }) },
-        ...(customerId && { customer: customerId }),
+        metadata: { managed_payments: "true", ...(data.userId ? { userId: data.userId } : {}) },
+        ...(customerId ? { customer: customerId } : {}),
         ...(data.userId && isRecurring
           ? { subscription_data: { metadata: { userId: data.userId } } }
           : {}),

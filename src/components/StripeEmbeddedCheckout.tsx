@@ -4,10 +4,10 @@ import { createCheckoutSession } from "@/utils/payments.functions";
 
 interface StripeEmbeddedCheckoutProps {
   priceId: string;
-  quantity?: number;
-  customerEmail?: string;
-  userId?: string;
-  returnUrl?: string;
+  quantity?: number | undefined;
+  customerEmail?: string | undefined;
+  userId?: string | undefined;
+  returnUrl?: string | undefined;
 }
 
 export function StripeEmbeddedCheckout({

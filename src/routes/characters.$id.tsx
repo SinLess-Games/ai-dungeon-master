@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Heart, Shield, Swords, Backpack, ScrollText } from "lucide-react";
+import { Heart, Shield, Swords, Backpack, ScrollText, FileDown } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

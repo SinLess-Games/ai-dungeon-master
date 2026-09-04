@@ -33,201 +33,303 @@ function rng(seed: number) {
   };
 }
 
+type Pt = [number, number];
+
 /* ------------------------------------------------------------------ */
-/* terrain palette — painted-map look                                   */
+/* terrain palette — painted atlas look                                 */
 /* ------------------------------------------------------------------ */
 
-type Paint = { base: string; shade: string; ink: string };
+type Paint = { base: string; shade: string; ink: string; deep: string };
 
 const PAINT: Record<TerrainKind, Paint> = {
-  plains: { base: "#cfd39a", shade: "#b6bd80", ink: "#6f7742" },
-  forest: { base: "#9fbb86", shade: "#7ea169", ink: "#3d6136" },
-  hills: { base: "#cbc188", shade: "#b3a86e", ink: "#7a6c39" },
-  mountains: { base: "#cfc7b6", shade: "#b1a795", ink: "#5c5449" },
-  desert: { base: "#eddfae", shade: "#e0cd92", ink: "#a08a4d" },
-  swamp: { base: "#a7b487", shade: "#8b9a6d", ink: "#4d5b3a" },
-  tundra: { base: "#e4ecef", shade: "#cbd8de", ink: "#7d919b" },
-  jungle: { base: "#8bb377", shade: "#679358", ink: "#2f5a30" },
-  coast: { base: "#dcd7ac", shade: "#c8c295", ink: "#8a8355" },
-  sea: { base: "#8fb4c4", shade: "#7aa2b5", ink: "#4d7488" },
-  wasteland: { base: "#d9c3a4", shade: "#c3aa88", ink: "#7d6448" },
-  underdark: { base: "#b6aec2", shade: "#9c93ab", ink: "#584f68" },
+  plains: { base: "#d3d29a", shade: "#bcbc7f", ink: "#79803f", deep: "#a8ab6c" },
+  forest: { base: "#a8bf88", shade: "#8aa96c", ink: "#3f6234", deep: "#7c9c60" },
+  hills: { base: "#cfc48a", shade: "#b8aa6d", ink: "#7d6c35", deep: "#ad9d61" },
+  mountains: { base: "#cec6b4", shade: "#b0a795", ink: "#5b5348", deep: "#9d9484" },
+  desert: { base: "#efe0ad", shade: "#e1cd8e", ink: "#a48c4b", deep: "#d8c07f" },
+  swamp: { base: "#adb888", shade: "#909d6b", ink: "#4f5c38", deep: "#84925f" },
+  tundra: { base: "#e8eef0", shade: "#cfdadf", ink: "#7f939d", deep: "#c4d2d8" },
+  jungle: { base: "#93b878", shade: "#6f9a58", ink: "#2f5a2f", deep: "#628c4d" },
+  coast: { base: "#e0d8ac", shade: "#cbc294", ink: "#8b8355", deep: "#c0b684" },
+  sea: { base: "#9dbdcb", shade: "#84a7b8", ink: "#4d7488", deep: "#7fa2b4" },
+  wasteland: { base: "#ddc7a5", shade: "#c6ab86", ink: "#7f6547", deep: "#bda07c" },
+  underdark: { base: "#bab2c5", shade: "#a096ae", ink: "#584f68", deep: "#968ba6" },
 };
 
-/** Organic coastline polygon inscribed in a region rect. */
-function landPath(r: WorldRegion) {
+/* ------------------------------------------------------------------ */
+/* coastline: fractal midpoint displacement around an ellipse           */
+/* ------------------------------------------------------------------ */
+
+function coastPoints(r: WorldRegion): Pt[] {
   const rand = rng(hash(r.id + r.name));
   const cx = r.x + r.w / 2;
   const cy = r.y + r.h / 2;
-  // Slightly oversized so neighbouring regions fuse into one continent.
-  const rx = (r.w / 2) * 1.24;
-  const ry = (r.h / 2) * 1.24;
-  const steps = 26;
-  const pts: [number, number][] = [];
-  for (let i = 0; i < steps; i++) {
-    const a = (i / steps) * Math.PI * 2;
-    const wobble = 0.78 + rand() * 0.34;
+  // oversized so neighbouring regions fuse into a single continent
+  const rx = (r.w / 2) * 1.34;
+  const ry = (r.h / 2) * 1.34;
+
+  let pts: Pt[] = [];
+  const base = 16;
+  for (let i = 0; i < base; i++) {
+    const a = (i / base) * Math.PI * 2;
+    const wobble = 0.72 + rand() * 0.4;
     pts.push([cx + Math.cos(a) * rx * wobble, cy + Math.sin(a) * ry * wobble]);
   }
-  // Catmull-Rom -> cubic bezier for smooth coast
+
+  // 4 rounds of midpoint displacement => fjords, headlands, bays
+  let rough = 0.5;
+  for (let pass = 0; pass < 5; pass++) {
+    const next: Pt[] = [];
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i]!;
+      const q = pts[(i + 1) % pts.length]!;
+      next.push(p);
+      const mx = (p[0] + q[0]) / 2;
+      const my = (p[1] + q[1]) / 2;
+      const dx = q[0] - p[0];
+      const dy = q[1] - p[1];
+      const len = Math.hypot(dx, dy) || 0.001;
+      const off = (rand() - 0.5) * len * rough;
+      next.push([mx + (-dy / len) * off, my + (dx / len) * off]);
+    }
+    pts = next;
+    rough *= 0.66;
+  }
+  return pts;
+}
+
+/** Smooth closed path through points (Catmull-Rom → cubic bezier). */
+function smoothPath(pts: Pt[], tension = 14) {
+  if (!pts.length) return "";
   let d = `M ${pts[0]![0].toFixed(2)} ${pts[0]![1].toFixed(2)}`;
   for (let i = 0; i < pts.length; i++) {
     const p0 = pts[(i - 1 + pts.length) % pts.length]!;
     const p1 = pts[i]!;
     const p2 = pts[(i + 1) % pts.length]!;
     const p3 = pts[(i + 2) % pts.length]!;
-    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
-    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
-    d += ` C ${c1[0]!.toFixed(2)} ${c1[1]!.toFixed(2)}, ${c2[0]!.toFixed(2)} ${c2[1]!.toFixed(2)}, ${p2[0].toFixed(2)} ${p2[1].toFixed(2)}`;
+    const c1: Pt = [p1[0] + (p2[0] - p0[0]) / tension, p1[1] + (p2[1] - p0[1]) / tension];
+    const c2: Pt = [p2[0] - (p3[0] - p1[0]) / tension, p2[1] - (p3[1] - p1[1]) / tension];
+    d += ` C ${c1[0].toFixed(2)} ${c1[1].toFixed(2)}, ${c2[0].toFixed(2)} ${c2[1].toFixed(2)}, ${p2[0].toFixed(2)} ${p2[1].toFixed(2)}`;
   }
   return d + " Z";
 }
 
-/** Scatter terrain doodads (mountains, trees, dunes…) inside a region. */
-function doodads(r: WorldRegion) {
-  const rand = rng(hash("dd" + r.id));
-  const count = Math.round(Math.min(26, Math.max(6, (r.w * r.h) / 26)));
-  const out: { x: number; y: number; s: number }[] = [];
-  for (let i = 0; i < count; i++) {
-    out.push({
-      x: r.x + r.w * (0.12 + rand() * 0.76),
-      y: r.y + r.h * (0.18 + rand() * 0.7),
-      s: 0.8 + rand() * 0.55,
-    });
-  }
-  return out;
-}
+/* ------------------------------------------------------------------ */
+/* terrain features: ridges, woods, dunes                               */
+/* ------------------------------------------------------------------ */
 
-function Doodad({
-  terrain,
-  x,
-  y,
-  s,
-  ink,
-}: {
-  terrain: TerrainKind;
+interface Feature {
+  kind: "peak" | "hill" | "tree" | "dune" | "marsh" | "ice" | "grass";
   x: number;
   y: number;
   s: number;
-  ink: string;
-}) {
-  if (terrain === "mountains" || terrain === "hills") {
-    const h = (terrain === "mountains" ? 2.1 : 1.1) * s;
-    const w = 1.5 * s;
-    return (
-      <g>
-        <path
-          d={`M ${x - w} ${y} L ${x} ${y - h} L ${x + w} ${y} Z`}
-          fill={terrain === "mountains" ? "#efe9dd" : "none"}
-          stroke={ink}
-          strokeWidth={0.18}
-          strokeLinejoin="round"
-        />
-        {terrain === "mountains" && (
-          <path d={`M ${x - 0.45 * s} ${y - h * 0.45} L ${x} ${y - h} L ${x + 0.45 * s} ${y - h * 0.45}`} fill="#fff" stroke="none" />
-        )}
-      </g>
-    );
-  }
-  if (terrain === "forest" || terrain === "jungle" || terrain === "swamp") {
-    return (
-      <g stroke={ink} strokeWidth={0.16} fill={terrain === "swamp" ? "none" : ink} fillOpacity={0.5}>
-        <path d={`M ${x} ${y - 1.6 * s} L ${x + 0.75 * s} ${y} L ${x - 0.75 * s} ${y} Z`} />
-        <path d={`M ${x} ${y} L ${x} ${y + 0.45 * s}`} />
-      </g>
-    );
-  }
-  if (terrain === "desert" || terrain === "wasteland") {
-    return (
-      <path
-        d={`M ${x - 1.2 * s} ${y} q ${0.6 * s} ${-0.7 * s} ${1.2 * s} 0 q ${0.6 * s} ${0.7 * s} ${1.2 * s} 0`}
-        fill="none"
-        stroke={ink}
-        strokeWidth={0.16}
-        strokeLinecap="round"
-        opacity={0.7}
-      />
-    );
-  }
-  if (terrain === "tundra") {
-    return (
-      <g stroke={ink} strokeWidth={0.14} opacity={0.7}>
-        <path d={`M ${x - 0.8 * s} ${y} L ${x + 0.8 * s} ${y}`} />
-        <path d={`M ${x} ${y - 0.8 * s} L ${x} ${y + 0.8 * s}`} />
-      </g>
-    );
-  }
-  return (
-    <path
-      d={`M ${x - 0.9 * s} ${y} q ${0.45 * s} ${-0.4 * s} ${0.9 * s} 0`}
-      fill="none"
-      stroke={ink}
-      strokeWidth={0.13}
-      opacity={0.55}
-    />
-  );
 }
 
-/** Hand-drawn settlement / dungeon marks. */
+function features(r: WorldRegion): Feature[] {
+  const rand = rng(hash("feat" + r.id));
+  const out: Feature[] = [];
+  const area = r.w * r.h;
+
+  const push = (kind: Feature["kind"], x: number, y: number, s: number) =>
+    out.push({ kind, x, y, s });
+
+  const inX = (t: number) => r.x + r.w * (0.1 + t * 0.8);
+  const inY = (t: number) => r.y + r.h * (0.12 + t * 0.76);
+
+  if (r.terrain === "mountains" || r.terrain === "hills") {
+    // ridges: chains of peaks following a wandering spine
+    const chains = Math.max(2, Math.round(area / 130));
+    for (let c = 0; c < chains; c++) {
+      let x = inX(rand());
+      let y = inY(rand());
+      const dir = rand() * Math.PI;
+      const n = 4 + Math.floor(rand() * 6);
+      for (let i = 0; i < n; i++) {
+        push(r.terrain === "mountains" ? "peak" : "hill", x, y, 0.75 + rand() * 0.6);
+        x += Math.cos(dir + (rand() - 0.5) * 0.9) * (1.6 + rand());
+        y += Math.sin(dir + (rand() - 0.5) * 0.9) * (0.9 + rand() * 0.6);
+      }
+    }
+  } else if (r.terrain === "forest" || r.terrain === "jungle" || r.terrain === "swamp") {
+    const clumps = Math.max(3, Math.round(area / 85));
+    for (let c = 0; c < clumps; c++) {
+      const cx = inX(rand());
+      const cy = inY(rand());
+      const n = 4 + Math.floor(rand() * 7);
+      for (let i = 0; i < n; i++) {
+        push(
+          r.terrain === "swamp" && rand() > 0.5 ? "marsh" : "tree",
+          cx + (rand() - 0.5) * 5,
+          cy + (rand() - 0.5) * 3.4,
+          0.7 + rand() * 0.5,
+        );
+      }
+    }
+  } else if (r.terrain === "desert" || r.terrain === "wasteland") {
+    const n = Math.max(6, Math.round(area / 55));
+    for (let i = 0; i < n; i++) push("dune", inX(rand()), inY(rand()), 0.8 + rand() * 0.7);
+  } else if (r.terrain === "tundra") {
+    const n = Math.max(6, Math.round(area / 55));
+    for (let i = 0; i < n; i++) push("ice", inX(rand()), inY(rand()), 0.8 + rand() * 0.6);
+  } else {
+    const n = Math.max(6, Math.round(area / 60));
+    for (let i = 0; i < n; i++) push("grass", inX(rand()), inY(rand()), 0.8 + rand() * 0.5);
+    // a few lonely copses on open ground
+    for (let i = 0; i < Math.round(n / 3); i++)
+      push("tree", inX(rand()), inY(rand()), 0.6 + rand() * 0.3);
+  }
+
+  return out.sort((a, b) => a.y - b.y);
+}
+
+function FeatureMark({ f, ink }: { f: Feature; ink: string }) {
+  const { x, y, s } = f;
+  switch (f.kind) {
+    case "peak": {
+      const h = 2.5 * s;
+      const w = 1.7 * s;
+      return (
+        <g>
+          <path d={`M ${x - w} ${y} L ${x - w * 0.2} ${y - h} L ${x + w} ${y} Z`} fill="#efe9dd" stroke={ink} strokeWidth={0.16} strokeLinejoin="round" />
+          <path d={`M ${x - w * 0.2} ${y - h} L ${x + w} ${y} L ${x + w * 0.15} ${y} Z`} fill={ink} opacity={0.32} />
+          <path d={`M ${x - w * 0.55} ${y - h * 0.52} L ${x - w * 0.2} ${y - h} L ${x + w * 0.2} ${y - h * 0.5} L ${x} ${y - h * 0.62} Z`} fill="#ffffff" opacity={0.9} />
+        </g>
+      );
+    }
+    case "hill":
+      return (
+        <g>
+          <path d={`M ${x - 1.5 * s} ${y} q ${0.75 * s} ${-1.5 * s} ${1.5 * s} 0 Z`} fill="#e3dcc6" stroke={ink} strokeWidth={0.14} />
+          <path d={`M ${x + 0.1 * s} ${y - 0.75 * s} q ${0.5 * s} ${0.35 * s} ${0.65 * s} ${0.75 * s} L ${x + 0.1 * s} ${y} Z`} fill={ink} opacity={0.22} />
+        </g>
+      );
+    case "tree":
+      return (
+        <g>
+          <path d={`M ${x} ${y + 0.4 * s} L ${x} ${y - 0.3 * s}`} stroke={ink} strokeWidth={0.16} />
+          <path
+            d={`M ${x} ${y - 1.9 * s} L ${x + 0.85 * s} ${y - 0.2 * s} L ${x - 0.85 * s} ${y - 0.2 * s} Z`}
+            fill={ink}
+            fillOpacity={0.55}
+            stroke={ink}
+            strokeWidth={0.14}
+            strokeLinejoin="round"
+          />
+        </g>
+      );
+    case "marsh":
+      return (
+        <g stroke={ink} strokeWidth={0.15} opacity={0.75}>
+          <path d={`M ${x - 1.1 * s} ${y} h ${1.4 * s}`} />
+          <path d={`M ${x - 0.5 * s} ${y + 0.6 * s} h ${1.4 * s}`} />
+        </g>
+      );
+    case "dune":
+      return (
+        <path
+          d={`M ${x - 1.4 * s} ${y} q ${0.7 * s} ${-0.8 * s} ${1.4 * s} 0 q ${0.7 * s} ${0.8 * s} ${1.4 * s} 0`}
+          fill="none"
+          stroke={ink}
+          strokeWidth={0.15}
+          strokeLinecap="round"
+          opacity={0.65}
+        />
+      );
+    case "ice":
+      return (
+        <g stroke={ink} strokeWidth={0.13} opacity={0.6}>
+          <path d={`M ${x - 0.9 * s} ${y} h ${1.8 * s}`} />
+          <path d={`M ${x - 0.45 * s} ${y + 0.55 * s} h ${1.2 * s}`} />
+        </g>
+      );
+    default:
+      return (
+        <g stroke={ink} strokeWidth={0.12} opacity={0.45}>
+          <path d={`M ${x - 0.8 * s} ${y} q ${0.4 * s} ${-0.45 * s} ${0.8 * s} 0`} />
+          <path d={`M ${x + 0.3 * s} ${y + 0.5 * s} q ${0.35 * s} ${-0.4 * s} ${0.7 * s} 0`} />
+        </g>
+      );
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* settlement marks                                                     */
+/* ------------------------------------------------------------------ */
+
 function SiteGlyph({ kind, x, y, gold }: { kind: WorldSite["kind"]; x: number; y: number; gold: string }) {
   const ink = "#3c3427";
   switch (kind) {
     case "city":
+      return (
+        <g stroke={ink} strokeWidth={0.16} strokeLinejoin="round">
+          <rect x={x - 1.7} y={y - 1.1} width={3.4} height={1.7} fill="#f0e3c2" />
+          <rect x={x - 1.5} y={y - 2.3} width={0.8} height={1.2} fill="#e7d8b3" />
+          <rect x={x - 0.4} y={y - 2.8} width={0.9} height={1.7} fill="#e7d8b3" />
+          <rect x={x + 0.8} y={y - 2.2} width={0.8} height={1.1} fill="#e7d8b3" />
+          <path d={`M ${x - 1.5} ${y - 2.3} l 0.4 -0.7 l 0.4 0.7 Z`} fill="#a4442b" />
+          <path d={`M ${x - 0.4} ${y - 2.8} l 0.45 -0.8 l 0.45 0.8 Z`} fill="#a4442b" />
+          <path d={`M ${x + 0.8} ${y - 2.2} l 0.4 -0.7 l 0.4 0.7 Z`} fill="#a4442b" />
+        </g>
+      );
     case "town":
       return (
-        <g stroke={ink} strokeWidth={0.18} fill="#f2e6c6">
-          <rect x={x - 1.3} y={y - 1.1} width={2.6} height={1.6} />
-          <path d={`M ${x - 1.3} ${y - 1.1} L ${x} ${y - 2.1} L ${x + 1.3} ${y - 1.1}`} fill="#c0562f" />
-          {kind === "city" && <rect x={x + 0.4} y={y - 2.4} width={0.6} height={1.3} fill="#c0562f" />}
+        <g stroke={ink} strokeWidth={0.16} strokeLinejoin="round">
+          <rect x={x - 1.2} y={y - 0.9} width={2.4} height={1.4} fill="#f0e3c2" />
+          <path d={`M ${x - 1.4} ${y - 0.9} L ${x} ${y - 2} L ${x + 1.4} ${y - 0.9} Z`} fill="#a4442b" />
         </g>
       );
     case "village":
     case "camp":
       return (
-        <g stroke={ink} strokeWidth={0.16} fill="#f2e6c6">
-          <path d={`M ${x - 1} ${y + 0.4} L ${x} ${y - 1.2} L ${x + 1} ${y + 0.4} Z`} />
+        <g stroke={ink} strokeWidth={0.15} strokeLinejoin="round" fill="#f0e3c2">
+          <path d={`M ${x - 1.1} ${y + 0.4} L ${x - 0.35} ${y - 1.1} L ${x + 0.4} ${y + 0.4} Z`} />
+          <path d={`M ${x + 0.1} ${y + 0.4} L ${x + 0.8} ${y - 0.7} L ${x + 1.4} ${y + 0.4} Z`} />
         </g>
       );
     case "keep":
       return (
-        <g stroke={ink} strokeWidth={0.18} fill="#e8dcc0">
-          <rect x={x - 1.2} y={y - 1.4} width={2.4} height={1.9} />
-          <rect x={x - 1.5} y={y - 2.1} width={0.7} height={0.9} />
-          <rect x={x + 0.8} y={y - 2.1} width={0.7} height={0.9} />
+        <g stroke={ink} strokeWidth={0.16} strokeLinejoin="round" fill="#e6d9bb">
+          <rect x={x - 1.4} y={y - 1.4} width={2.8} height={2} />
+          <rect x={x - 1.8} y={y - 2.3} width={0.85} height={1} />
+          <rect x={x + 0.95} y={y - 2.3} width={0.85} height={1} />
+          <path d={`M ${x - 0.35} ${y - 2.4} l 1.2 0.4 l -1.2 0.4 Z`} fill="#a4442b" stroke="none" />
+          <path d={`M ${x - 0.35} ${y - 2.5} v 1.1`} />
         </g>
       );
     case "ruin":
       return (
-        <g stroke={ink} strokeWidth={0.18} fill="none">
-          <path d={`M ${x - 1.2} ${y + 0.4} L ${x - 1.2} ${y - 1.2} M ${x} ${y + 0.4} L ${x} ${y - 1.6} M ${x + 1.2} ${y + 0.4} L ${x + 1.2} ${y - 0.9}`} />
-          <path d={`M ${x - 1.5} ${y + 0.5} L ${x + 1.5} ${y + 0.5}`} />
+        <g stroke={ink} strokeWidth={0.18} fill="none" strokeLinecap="round">
+          <path d={`M ${x - 1.3} ${y + 0.5} L ${x - 1.3} ${y - 1.1} M ${x - 0.2} ${y + 0.5} L ${x - 0.2} ${y - 1.7} M ${x + 1.1} ${y + 0.5} L ${x + 1.1} ${y - 0.7}`} />
+          <path d={`M ${x - 1.6} ${y - 1.4} L ${x + 0.1} ${y - 1.9}`} opacity={0.8} />
+          <path d={`M ${x - 1.7} ${y + 0.55} L ${x + 1.6} ${y + 0.55}`} />
         </g>
       );
     case "dungeon":
       return (
-        <g stroke={ink} strokeWidth={0.18} fill="#2f2a22">
-          <path d={`M ${x - 1.1} ${y + 0.5} L ${x - 1.1} ${y - 0.5} A 1.1 1.1 0 0 1 ${x + 1.1} ${y - 0.5} L ${x + 1.1} ${y + 0.5} Z`} />
+        <g stroke={ink} strokeWidth={0.18}>
+          <path d={`M ${x - 1.6} ${y + 0.6} q ${1.6} ${-2.6} ${3.2} 0 Z`} fill="#cfc3a8" />
+          <path d={`M ${x - 0.65} ${y + 0.6} q ${0.65} ${-1.3} ${1.3} 0 Z`} fill="#241f18" />
         </g>
       );
     case "lair":
       return (
-        <g stroke={ink} strokeWidth={0.16} fill="#8d3a2c">
-          <path d={`M ${x - 1.3} ${y + 0.3} q ${1.3} ${-1.9} ${2.6} 0 q ${-1.3} ${0.9} ${-2.6} 0 Z`} />
+        <g stroke={ink} strokeWidth={0.15} fill="#8d3a2c" strokeLinejoin="round">
+          <path d={`M ${x - 1.7} ${y + 0.5} q ${0.9} ${-1.6} ${1.9} ${-0.9} q ${0.7} ${-1.1} ${1.5} ${-0.2} q ${-0.5} ${1.6} ${-1.6} ${1.5} q ${-1} ${0.6} ${-1.8} ${-0.4} Z`} />
         </g>
       );
     case "port":
       return (
-        <g stroke={ink} strokeWidth={0.2} fill="none">
-          <path d={`M ${x} ${y - 1.5} L ${x} ${y + 0.8}`} />
-          <path d={`M ${x - 0.8} ${y - 1} L ${x + 0.8} ${y - 1}`} />
-          <path d={`M ${x - 1.1} ${y + 0.1} q ${1.1} ${1.4} ${2.2} 0`} />
+        <g stroke={ink} strokeWidth={0.2} fill="none" strokeLinecap="round">
+          <path d={`M ${x} ${y - 1.7} L ${x} ${y + 0.9}`} />
+          <path d={`M ${x - 0.9} ${y - 1.1} L ${x + 0.9} ${y - 1.1}`} />
+          <path d={`M ${x - 1.2} ${y + 0.1} q ${1.2} ${1.5} ${2.4} 0`} />
         </g>
       );
     default:
       return (
-        <g stroke={gold} strokeWidth={0.2} fill="#f5e7bd">
+        <g stroke={gold} strokeWidth={0.18} fill="#f5e7bd" strokeLinejoin="round">
           <path
-            d={`M ${x} ${y - 1.6} L ${x + 0.5} ${y - 0.5} L ${x + 1.6} ${y - 0.4} L ${x + 0.8} ${y + 0.4} L ${x + 1} ${y + 1.5} L ${x} ${y + 0.9} L ${x - 1} ${y + 1.5} L ${x - 0.8} ${y + 0.4} L ${x - 1.6} ${y - 0.4} L ${x - 0.5} ${y - 0.5} Z`}
+            d={`M ${x} ${y - 1.7} L ${x + 0.55} ${y - 0.55} L ${x + 1.7} ${y - 0.4} L ${x + 0.85} ${y + 0.45} L ${x + 1.05} ${y + 1.6} L ${x} ${y + 1} L ${x - 1.05} ${y + 1.6} L ${x - 0.85} ${y + 0.45} L ${x - 1.7} ${y - 0.4} L ${x - 0.55} ${y - 0.55} Z`}
           />
         </g>
       );
@@ -243,7 +345,7 @@ export interface WorldMapViewProps {
   className?: string;
 }
 
-/** Illustrated overland map. Coordinates are normalised 0-100. */
+/** Illustrated overland atlas map. Coordinates are normalised 0-100. */
 export function WorldMapView({
   world,
   selectedSiteId,
@@ -253,10 +355,14 @@ export function WorldMapView({
   className,
 }: WorldMapViewProps) {
   const ref = useRef<SVGSVGElement | null>(null);
-  const gold = "#b08d3f";
+  const gold = "#9c7c34";
 
   const land = useMemo(
-    () => world.regions.map((r) => ({ region: r, d: landPath(r), dd: doodads(r) })),
+    () =>
+      world.regions.map((r) => {
+        const pts = coastPoints(r);
+        return { region: r, d: smoothPath(pts), feats: features(r) };
+      }),
     [world.regions],
   );
 
@@ -282,83 +388,196 @@ export function WorldMapView({
       style={{ fontFamily: "'Cinzel', 'EB Garamond', serif" }}
     >
       <defs>
-        <radialGradient id="wm-ocean" cx="50%" cy="45%" r="75%">
-          <stop offset="0%" stopColor="#8fb6c6" />
-          <stop offset="70%" stopColor="#6f9bad" />
-          <stop offset="100%" stopColor="#527d92" />
+        <radialGradient id="wm-ocean" cx="50%" cy="42%" r="80%">
+          <stop offset="0%" stopColor="#6f96aa" />
+          <stop offset="60%" stopColor="#5b8296" />
+          <stop offset="100%" stopColor="#3f6376" />
         </radialGradient>
         <pattern id="wm-grid" width="6.25" height="6.25" patternUnits="userSpaceOnUse">
-          <path d="M 6.25 0 L 0 0 0 6.25" fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth="0.1" />
+          <path d="M 6.25 0 L 0 0 0 6.25" fill="none" stroke="rgba(233,244,247,0.13)" strokeWidth="0.09" />
         </pattern>
-        <filter id="wm-coast" x="-30%" y="-30%" width="160%" height="160%">
-          <feGaussianBlur stdDeviation="0.9" />
+
+        {/* ocean water texture */}
+        <filter id="wm-water" x="0" y="0" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.035 0.09" numOctaves="4" seed="7" result="n" />
+          <feColorMatrix in="n" type="saturate" values="0" />
+          <feComponentTransfer>
+            <feFuncA type="linear" slope="0.18" />
+          </feComponentTransfer>
         </filter>
-        {/* single outline around the merged continent silhouette */}
+
+        {/* paper grain over everything */}
+        <filter id="wm-paper" x="0" y="0" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency="1.6" numOctaves="4" seed="3" result="n" />
+          <feColorMatrix in="n" type="saturate" values="0" />
+          <feComponentTransfer>
+            <feFuncA type="linear" slope="0.16" />
+          </feComponentTransfer>
+        </filter>
+
+        {/* ragged, hand-inked edges on the whole landmass */}
+        <filter id="wm-rough" x="-10%" y="-10%" width="120%" height="120%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="3" seed="11" result="warp" />
+          <feDisplacementMap in="SourceGraphic" in2="warp" scale="0.55" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+
+        <filter id="wm-shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0.5" dy="0.7" stdDeviation="0.7" floodColor="#1d3440" floodOpacity="0.45" />
+        </filter>
+
+        <filter id="wm-blur1"><feGaussianBlur stdDeviation="0.5" /></filter>
+        <filter id="wm-blur2"><feGaussianBlur stdDeviation="1.1" /></filter>
+        <filter id="wm-blur3"><feGaussianBlur stdDeviation="2" /></filter>
+
+        {/* coastal ink line drawn once around the merged silhouette */}
         <filter id="wm-outline" x="-20%" y="-20%" width="140%" height="140%">
-          <feMorphology in="SourceAlpha" operator="dilate" radius="0.35" result="fat" />
-          <feFlood floodColor="#3f5a63" result="ink" />
+          <feMorphology in="SourceAlpha" operator="dilate" radius="0.3" result="fat" />
+          <feFlood floodColor="#2f4a55" result="ink" />
           <feComposite in="ink" in2="fat" operator="in" result="edge" />
           <feMerge>
             <feMergeNode in="edge" />
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
-        <filter id="wm-paper" x="0" y="0" width="100%" height="100%">
-          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" result="n" />
-          <feColorMatrix in="n" type="saturate" values="0" />
-          <feComponentTransfer>
-            <feFuncA type="linear" slope="0.12" />
-          </feComponentTransfer>
+
+        {/* inner shore shading: darker where land meets water */}
+        <filter id="wm-shore" x="-20%" y="-20%" width="140%" height="140%">
+          <feMorphology in="SourceAlpha" operator="erode" radius="1.1" result="core" />
+          <feComposite in="SourceAlpha" in2="core" operator="out" result="rim" />
+          <feGaussianBlur in="rim" stdDeviation="0.7" result="soft" />
+          <feFlood floodColor="#6b5a34" result="c" />
+          <feComposite in="c" in2="soft" operator="in" />
         </filter>
+
         {world.regions.map((r) => (
           <clipPath key={r.id} id={`wm-clip-${r.id}`}>
-            <path d={landPath(r)} />
+            <path d={smoothPath(coastPoints(r))} />
           </clipPath>
         ))}
+        <clipPath id="wm-clip-land">
+          {land.map(({ region, d }) => (
+            <path key={region.id} d={d} />
+          ))}
+        </clipPath>
       </defs>
 
-      {/* ocean */}
+      {/* ---------------- ocean ---------------- */}
       <rect x="0" y="0" width="100" height="70" fill="url(#wm-ocean)" />
+      <rect x="0" y="0" width="100" height="70" filter="url(#wm-water)" opacity="0.5" />
       <rect x="0" y="0" width="100" height="70" fill="url(#wm-grid)" />
 
-      {/* coastal shelf glow behind the continent */}
-      <g filter="url(#wm-coast)" opacity="0.5">
-        {land.map(({ region, d }) => (
-          <path key={`glow-${region.id}`} d={d} fill="#e7f1f4" stroke="#e7f1f4" strokeWidth="2.8" />
-        ))}
-      </g>
+      {/* ---------------- bathymetry bands around the coast ---------------- */}
+      {[
+        { f: "url(#wm-blur3)", w: 6.5, o: 0.34 },
+        { f: "url(#wm-blur2)", w: 3.6, o: 0.4 },
+        { f: "url(#wm-blur1)", w: 1.5, o: 0.5 },
+      ].map((band, i) => (
+        <g key={i} filter={band.f} opacity={band.o}>
+          {land.map(({ region, d }) => (
+            <path key={region.id} d={d} fill="#cfe6ec" stroke="#cfe6ec" strokeWidth={band.w} />
+          ))}
+        </g>
+      ))}
 
-      {/* continent: terrain fills merged under one coastline */}
-      <g filter="url(#wm-outline)">
-        {land.map(({ region, d, dd }) => {
-          const paint = PAINT[region.terrain] ?? PAINT.plains;
-          return (
-            <g key={region.id}>
-              <path d={d} fill={paint.base} />
-              <g clipPath={`url(#wm-clip-${region.id})`}>
-                <path d={d} fill="none" stroke={paint.shade} strokeWidth="3.2" opacity="0.45" />
-                {dd.map((p, i) => (
-                  <Doodad key={i} terrain={region.terrain} x={p.x} y={p.y} s={p.s} ink={paint.ink} />
-                ))}
-              </g>
+      {/* ---------------- continent ---------------- */}
+      <g filter="url(#wm-shadow)">
+        <g filter="url(#wm-rough)">
+          <g filter="url(#wm-outline)">
+            {/* terrain fills */}
+            {land.map(({ region, d }) => {
+              const paint = PAINT[region.terrain] ?? PAINT.plains;
+              return (
+                <g key={region.id}>
+                  <path d={d} fill={paint.base} />
+                  <g clipPath={`url(#wm-clip-${region.id})`}>
+                    <path d={d} fill="none" stroke={paint.deep} strokeWidth="4.5" opacity="0.35" />
+                    <path d={d} fill="none" stroke={paint.shade} strokeWidth="1.8" opacity="0.45" />
+                  </g>
+                </g>
+              );
+            })}
+
+            {/* soften the seams between neighbouring regions */}
+            <g clipPath="url(#wm-clip-land)" filter="url(#wm-blur2)" opacity="0.55">
+              {land.map(({ region, d }) => (
+                <path key={`blend-${region.id}`} d={d} fill={(PAINT[region.terrain] ?? PAINT.plains).base} />
+              ))}
             </g>
-          );
-        })}
+
+            {/* drawn terrain on top of the paint */}
+            {land.map(({ region, feats }) => {
+              const paint = PAINT[region.terrain] ?? PAINT.plains;
+              return (
+                <g key={`feat-${region.id}`} clipPath={`url(#wm-clip-${region.id})`}>
+                  {feats.map((f, i) => (
+                    <FeatureMark key={i} f={f} ink={paint.ink} />
+                  ))}
+                </g>
+              );
+            })}
+
+
+            {/* shoreline sand shading inside the coast */}
+            <g filter="url(#wm-shore)" opacity="0.5">
+              {land.map(({ region, d }) => (
+                <path key={`shore-${region.id}`} d={d} fill="#000" />
+              ))}
+            </g>
+          </g>
+        </g>
       </g>
 
-      {/* region names */}
+      {/* ---------------- roads, rivers, sea lanes ---------------- */}
+      {world.routes.map((route) => {
+        const a = siteById.get(route.fromSiteId);
+        const b = siteById.get(route.toSiteId);
+        if (!a || !b) return null;
+        const rand = rng(hash(route.id));
+        const segs = 6;
+        let d = `M ${a.x} ${a.y}`;
+        for (let i = 1; i <= segs; i++) {
+          const t = i / segs;
+          const px = a.x + (b.x - a.x) * t;
+          const py = a.y + (b.y - a.y) * t;
+          const amp = Math.sin(Math.PI * t) * (route.kind === "river" ? 3 : 1.8);
+          const nx = -(b.y - a.y);
+          const ny = b.x - a.x;
+          const len = Math.hypot(nx, ny) || 1;
+          const off = (rand() - 0.5) * amp;
+          d += ` L ${(px + (nx / len) * off).toFixed(2)} ${(py + (ny / len) * off).toFixed(2)}`;
+        }
+        const water = route.kind === "river" || route.kind === "sea";
+        return (
+          <g key={route.id}>
+            {route.kind === "road" && (
+              <path d={d} fill="none" stroke="#f2e8cd" strokeWidth="0.7" opacity="0.5" strokeLinecap="round" />
+            )}
+            <path
+              d={d}
+              fill="none"
+              stroke={water ? "#4d7f96" : "#6b5636"}
+              strokeWidth={route.kind === "river" ? 0.4 : route.kind === "road" ? 0.32 : 0.24}
+              strokeDasharray={route.kind === "trail" ? "0.8 0.9" : route.kind === "sea" ? "1.6 1.1" : undefined}
+              opacity={0.85}
+              strokeLinecap="round"
+            />
+          </g>
+        );
+      })}
+
+      {/* ---------------- region names ---------------- */}
       {world.regions.map((r) => (
         <text
           key={`label-${r.id}`}
           x={r.x + r.w / 2}
-          y={r.y + r.h * 0.26}
+          y={r.y + r.h * 0.24}
           textAnchor="middle"
-          fontSize="2.5"
-          letterSpacing="0.35"
-          fill="#4a3d27"
-          opacity="0.8"
-          stroke="#f4ecd6"
-          strokeWidth="0.55"
+          fontSize="2.6"
+          letterSpacing="0.45"
+          fill="#4c3f28"
+          opacity="0.85"
+          stroke="#f6efd9"
+          strokeWidth="0.6"
           paintOrder="stroke"
           style={{ textTransform: "uppercase" }}
         >
@@ -366,30 +585,7 @@ export function WorldMapView({
         </text>
       ))}
 
-      {/* routes */}
-      {world.routes.map((route) => {
-        const a = siteById.get(route.fromSiteId);
-        const b = siteById.get(route.toSiteId);
-        if (!a || !b) return null;
-        const mx = (a.x + b.x) / 2 + (b.y - a.y) * 0.08;
-        const my = (a.y + b.y) / 2 - (b.x - a.x) * 0.08;
-        const d = `M ${a.x} ${a.y} Q ${mx} ${my} ${b.x} ${b.y}`;
-        const water = route.kind === "river" || route.kind === "sea";
-        return (
-          <path
-            key={route.id}
-            d={d}
-            fill="none"
-            stroke={water ? "#5b8ea3" : "#6b5636"}
-            strokeWidth={route.kind === "road" ? 0.35 : 0.26}
-            strokeDasharray={route.kind === "trail" ? "0.9 0.9" : route.kind === "sea" ? "1.6 1" : undefined}
-            opacity={0.8}
-            strokeLinecap="round"
-          />
-        );
-      })}
-
-      {/* sites */}
+      {/* ---------------- sites ---------------- */}
       {sites.map((s) => {
         const selected = s.id === selectedSiteId;
         return (
@@ -400,19 +596,19 @@ export function WorldMapView({
               onSelectSite?.(s);
             }}
             style={{ cursor: onSelectSite ? "pointer" : "default" }}
-            opacity={s.discovered ? 1 : 0.45}
+            opacity={s.discovered ? 1 : 0.42}
           >
             <title>{`${s.name} — ${SITE_LABEL.get(s.kind) ?? s.kind}`}</title>
-            {selected && <circle cx={s.x} cy={s.y} r="3.2" fill="none" stroke={gold} strokeWidth="0.35" />}
+            {selected && <circle cx={s.x} cy={s.y} r="3.4" fill="none" stroke={gold} strokeWidth="0.35" />}
             <SiteGlyph kind={s.kind} x={s.x} y={s.y} gold={gold} />
             <text
               x={s.x}
-              y={s.y + 3.1}
+              y={s.y + 3}
               textAnchor="middle"
-              fontSize="1.75"
-              fill="#33291b"
-              stroke="#f6efdc"
-              strokeWidth="0.45"
+              fontSize="1.7"
+              fill="#2e2418"
+              stroke="#f7f0dc"
+              strokeWidth="0.5"
               paintOrder="stroke"
             >
               {s.name}
@@ -421,43 +617,49 @@ export function WorldMapView({
         );
       })}
 
-      {/* party marker */}
+      {/* ---------------- party ---------------- */}
       <g>
-        <circle cx={world.party.x} cy={world.party.y} r="1.5" fill="#b8322e" stroke="#f6efdc" strokeWidth="0.35" />
-        <circle cx={world.party.x} cy={world.party.y} r="2.6" fill="none" stroke="#b8322e" strokeWidth="0.2" opacity="0.6" />
+        <circle cx={world.party.x} cy={world.party.y} r="1.4" fill="#a72b27" stroke="#f7f0dc" strokeWidth="0.35" />
+        <circle cx={world.party.x} cy={world.party.y} r="2.7" fill="none" stroke="#a72b27" strokeWidth="0.2" opacity="0.55" />
         <text
           x={world.party.x}
-          y={world.party.y - 3}
+          y={world.party.y - 3.2}
           textAnchor="middle"
           fontSize="1.8"
           fill="#7d1f1c"
-          stroke="#f6efdc"
-          strokeWidth="0.5"
+          stroke="#f7f0dc"
+          strokeWidth="0.55"
           paintOrder="stroke"
         >
           Party
         </text>
       </g>
 
-      {/* compass rose */}
-      <g transform="translate(92,9)" opacity="0.85">
-        <circle r="4.6" fill="#f4ecd6" stroke={gold} strokeWidth="0.3" opacity="0.9" />
-        <path d="M 0 -4 L 1 0 L 0 4 L -1 0 Z" fill="#3c3427" />
-        <path d="M -4 0 L 0 -1 L 4 0 L 0 1 Z" fill={gold} />
-        <text y="-4.9" textAnchor="middle" fontSize="1.6" fill="#3c3427">N</text>
+      {/* ---------------- compass rose ---------------- */}
+      <g transform="translate(92.5,10)" opacity="0.9">
+        <circle r="5" fill="#f4ecd6" fillOpacity="0.85" stroke={gold} strokeWidth="0.3" />
+        <circle r="3.6" fill="none" stroke={gold} strokeWidth="0.12" opacity="0.7" />
+        <path d="M 0 -4.2 L 0.9 0 L 0 4.2 L -0.9 0 Z" fill="#3c3427" />
+        <path d="M -4.2 0 L 0 -0.9 L 4.2 0 L 0 0.9 Z" fill={gold} />
+        <path d="M -2.6 -2.6 L 0.5 -0.5 L 2.6 2.6 L -0.5 0.5 Z" fill="#3c3427" opacity="0.45" />
+        <text y="-5.4" textAnchor="middle" fontSize="1.7" fill="#3c3427">N</text>
       </g>
 
-      {/* title cartouche */}
-      <g transform="translate(3,3)">
-        <rect width="34" height="7" rx="0.6" fill="#f4ecd6" stroke={gold} strokeWidth="0.35" opacity="0.95" />
-        <rect x="0.8" y="0.8" width="32.4" height="5.4" rx="0.4" fill="none" stroke={gold} strokeWidth="0.15" opacity="0.7" />
-        <text x="17" y="4.7" textAnchor="middle" fontSize="3.1" fill="#3c3427" letterSpacing="0.4">
+      {/* ---------------- title cartouche ---------------- */}
+      <g transform="translate(2.5,2.5)">
+        <rect width="36" height="7.6" rx="0.5" fill="#f6eed8" fillOpacity="0.95" stroke={gold} strokeWidth="0.35" />
+        <rect x="0.7" y="0.7" width="34.6" height="6.2" rx="0.3" fill="none" stroke={gold} strokeWidth="0.13" opacity="0.8" />
+        <text x="18" y="5" textAnchor="middle" fontSize="3.2" fill="#3c3427" letterSpacing="0.5">
           {world.name}
         </text>
       </g>
 
-      {/* paper grain */}
-      <rect x="0" y="0" width="100" height="70" filter="url(#wm-paper)" opacity="0.35" pointerEvents="none" />
+      {/* ---------------- neat map border ---------------- */}
+      <rect x="0.6" y="0.6" width="98.8" height="68.8" fill="none" stroke="#2f4a55" strokeWidth="0.5" opacity="0.7" />
+      <rect x="1.5" y="1.5" width="97" height="67" fill="none" stroke="#f4ecd6" strokeWidth="0.18" opacity="0.35" />
+
+      {/* ---------------- paper grain ---------------- */}
+      <rect x="0" y="0" width="100" height="70" filter="url(#wm-paper)" opacity="0.4" pointerEvents="none" />
     </svg>
   );
 }

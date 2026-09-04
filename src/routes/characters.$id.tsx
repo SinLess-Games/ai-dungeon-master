@@ -260,31 +260,8 @@ function Sheet() {
                 </CardContent>
               </Card>
 
-              {(["person", "stored", "party"] as const).map((loc) => (
-                <Card key={loc} className="card-etched bg-card/70">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base capitalize">
-                      {loc === "person" ? "On person" : loc === "stored" ? "Stored loot" : "Party loot"}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 text-sm">
-                    {char.inventory.filter((i) => i.location === loc).length === 0 ? (
-                      <p className="text-muted-foreground">Nothing here yet.</p>
-                    ) : (
-                      char.inventory
-                        .filter((i) => i.location === loc)
-                        .map((i) => (
-                          <div key={i.id} className="flex justify-between rounded border border-border/40 px-2 py-1">
-                            <span>
-                              {i.name} ×{i.quantity}
-                            </span>
-                            <span className="font-mono text-muted-foreground">{i.weight * i.quantity} lb</span>
-                          </div>
-                        ))
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+              <LootManager character={char} onChange={(next) => update(next)} />
+
             </TabsContent>
 
             <TabsContent value="log" className="mt-4">

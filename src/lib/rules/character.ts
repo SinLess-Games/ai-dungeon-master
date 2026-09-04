@@ -41,6 +41,9 @@ export interface Character {
   abilityIncreases: AbilityKey[];
   skillRanks: Record<string, number>;
   featIds: string[];
+  /** spells or powers chosen at creation and on level up */
+  spellIds: string[];
+  powerIds: string[];
   armorId: string;
   shieldId: string;
   weaponIds: string[];
@@ -69,6 +72,8 @@ export function emptyCharacter(id: string): Character {
     abilityIncreases: [],
     skillRanks: {},
     featIds: [],
+    spellIds: [],
+    powerIds: [],
     armorId: "none",
     shieldId: "no-shield",
     weaponIds: [],

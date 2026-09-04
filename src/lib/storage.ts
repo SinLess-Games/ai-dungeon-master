@@ -153,6 +153,7 @@ export function getWorld(id: string): World | undefined {
 
 
 export function saveWorld(world: World) {
+  if (isDeleted("worlds", world.id)) return world;
   const all = read<World[]>(KEY_WORLDS, []);
   const next = { ...world, updatedAt: new Date().toISOString() };
   const i = all.findIndex((w) => w.id === world.id);
@@ -181,6 +182,7 @@ export function getMap(id: string): TacticalMap | undefined {
 }
 
 export function saveMap(map: TacticalMap) {
+  if (isDeleted("game_maps", map.id)) return map;
   const all = read<TacticalMap[]>(KEY_MAPS, []);
   const next = { ...map, updatedAt: new Date().toISOString() };
   const i = all.findIndex((m) => m.id === map.id);

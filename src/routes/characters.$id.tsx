@@ -78,7 +78,7 @@ function Sheet() {
     <AppShell>
       <PageTitle
         title={char.name || "Unnamed Adventurer"}
-        subtitle={`${derived.race.name} · ${char.classes.map((c) => `${CLASS_BY_ID[c.classId]?.name ?? c.classId} ${c.levels}`).join(" / ")} · ${char.alignment}${char.deity ? ` · ${char.deity}` : ""}${derived.ecl !== derived.level ? ` · ECL ${derived.ecl}${derived.racialHd ? ` (${derived.racialHd} racial HD` : " ("}${derived.levelAdjustment ? `${derived.racialHd ? ", " : ""}LA +${derived.levelAdjustment}` : ""})` : ""}`}
+        subtitle={`${derived.race.name} · ${char.classes.map((c) => `${CLASS_BY_ID[c.classId]?.name ?? c.classId} ${c.levels}`).join(" / ")}${derived.gestalt ? ` // ${(char.classesB ?? []).map((c) => `${CLASS_BY_ID[c.classId]?.name ?? c.classId} ${c.levels}`).join(" / ")} (gestalt)` : ""} · ${char.alignment}${char.deity ? ` · ${char.deity}` : ""}${derived.ecl !== derived.level ? ` · ECL ${derived.ecl}${derived.racialHd ? ` (${derived.racialHd} racial HD` : " ("}${derived.levelAdjustment ? `${derived.racialHd ? ", " : ""}LA +${derived.levelAdjustment}` : ""})` : ""}`}
         action={
           <Button variant="outline" asChild>
             <Link to="/characters">All characters</Link>
@@ -210,7 +210,7 @@ function Sheet() {
               <Card className="card-etched bg-card/70">
                 <CardHeader className="pb-2"><CardTitle className="text-base">Class features</CardTitle></CardHeader>
                 <CardContent className="space-y-2">
-                  {char.classes.flatMap((cl) => {
+                  {[...char.classes, ...(derived.gestalt ? char.classesB ?? [] : [])].flatMap((cl) => {
                     const def = CLASS_BY_ID[cl.classId];
                     return (def?.features ?? [])
                       .filter((f) => f.level <= cl.levels)

@@ -31,16 +31,21 @@ function AdminInboxPage() {
 
   useEffect(() => {
     let live = true;
-    load({})
-      .then((d) => live && setMessages(d.messages))
-      .catch((e: any) => {
-        if (live) toast.error(e?.message ?? "Could not load the inbox.");
-        if (live) setMessages([]);
-      });
+    const pull = () =>
+      load({})
+        .then((d) => live && setMessages(d.messages))
+        .catch((e: any) => {
+          if (live) toast.error(e?.message ?? "Could not load the inbox.");
+          if (live) setMessages((prev) => prev ?? []);
+        });
+    void pull();
+    const timer = setInterval(() => void pull(), 30_000);
     return () => {
       live = false;
+      clearInterval(timer);
     };
   }, [load]);
+
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();

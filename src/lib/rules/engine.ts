@@ -55,6 +55,10 @@ export const SIZE_CARRY_MULT: Record<string, number> = {
 
 export interface DerivedStats {
   level: number;
+  /** Class levels + racial Hit Dice + level adjustment. */
+  ecl: number;
+  levelAdjustment: number;
+  racialHd: number;
   race: ReturnType<typeof raceOf>;
   abilityScores: Record<AbilityKey, number>;
   abilityMods: Record<AbilityKey, number>;
@@ -65,7 +69,7 @@ export interface DerivedStats {
   ranged: number;
   grapple: number;
   initiative: number;
-  ac: { total: number; touch: number; flatFooted: number; armor: number; shield: number; dex: number; size: number };
+  ac: { total: number; touch: number; flatFooted: number; armor: number; shield: number; dex: number; size: number; natural: number };
   saves: { fort: number; ref: number; will: number };
   speed: number;
   armorCheckPenalty: number;
@@ -115,6 +119,12 @@ export function computeCharacter(c: Character): DerivedStats {
       hpMax += mods.con;
     }
   }
+  const rhd = race.racialHitDice;
+  if (rhd) {
+    for (let i = 0; i < rhd.count; i++) {
+      hpMax += Math.floor(rhd.hitDie / 2) + 1 + mods.con;
+    }
+  }
   hpMax = Math.max(level, hpMax);
   if (c.featIds.includes("toughness")) hpMax += 3;
 
@@ -149,6 +159,15 @@ export function computeCharacter(c: Character): DerivedStats {
     }
   }
 
+  if (rhd) {
+    bab += babForClass(rhd.bab, rhd.count);
+    fort += saveForClass(rhd.saves.fort, rhd.count);
+    ref += saveForClass(rhd.saves.ref, rhd.count);
+    will += saveForClass(rhd.saves.will, rhd.count);
+    const perHd = Math.max(1, (rhd.skillPointsPerHd ?? 2) + mods.int);
+    skillPointsTotal += perHd * (rhd.count + 3);
+  }
+
   const armor = ARMORS.find((a) => a.id === c.armorId) ?? ARMORS[0]!;
   const shield = SHIELDS.find((s) => s.id === c.shieldId) ?? SHIELDS[0]!;
   const maxDex =
@@ -158,9 +177,10 @@ export function computeCharacter(c: Character): DerivedStats {
   const dexToAc = maxDex === null ? mods.dex : Math.min(mods.dex, maxDex);
   const sizeMod = SIZE_AC_MOD[race.size] ?? 0;
 
-  const acTotal = 10 + armor.acBonus + shield.acBonus + dexToAc + sizeMod;
+  const natural = race.naturalArmor ?? 0;
+  const acTotal = 10 + armor.acBonus + shield.acBonus + dexToAc + sizeMod + natural;
   const acTouch = 10 + dexToAc + sizeMod;
-  const acFlat = 10 + armor.acBonus + shield.acBonus + sizeMod;
+  const acFlat = 10 + armor.acBonus + shield.acBonus + sizeMod + natural;
 
   const initiative = mods.dex + (c.featIds.includes("improved-initiative") ? 4 : 0);
   if (c.featIds.includes("great-fortitude")) fort += 2;
@@ -183,8 +203,9 @@ export function computeCharacter(c: Character): DerivedStats {
     return { id: s.id, name: s.name, ability: s.ability, total, ranks, isClassSkill, trainedOnly: s.trainedOnly };
   });
 
+  const totalHd = level + (rhd?.count ?? 0);
   const featSlots =
-    1 + Math.floor(level / 3) + (race.bonusFeatsAtFirst ?? 0) + fighterBonusFeats(c) + wizardBonusFeats(c);
+    1 + Math.floor(totalHd / 3) + (race.bonusFeatsAtFirst ?? 0) + fighterBonusFeats(c) + wizardBonusFeats(c);
   const abilityIncreaseSlots = Math.floor(level / 4);
 
   const carried = c.inventory
@@ -196,6 +217,9 @@ export function computeCharacter(c: Character): DerivedStats {
 
   return {
     level,
+    ecl: level + (rhd?.count ?? 0) + (race.levelAdjustment ?? 0),
+    levelAdjustment: race.levelAdjustment ?? 0,
+    racialHd: rhd?.count ?? 0,
     race,
     abilityScores: scores,
     abilityMods: mods,
@@ -206,7 +230,7 @@ export function computeCharacter(c: Character): DerivedStats {
     ranged: bab + mods.dex + (["Small", "Tiny", "Diminutive", "Fine"].includes(race.size) ? 1 : 0),
     grapple: bab + mods.str - sizeMod,
     initiative,
-    ac: { total: acTotal, touch: acTouch, flatFooted: acFlat, armor: armor.acBonus, shield: shield.acBonus, dex: dexToAc, size: sizeMod },
+    ac: { total: acTotal, touch: acTouch, flatFooted: acFlat, armor: armor.acBonus, shield: shield.acBonus, dex: dexToAc, size: sizeMod, natural },
     saves: { fort: fort + mods.con, ref: ref + mods.dex, will: will + mods.wis },
     speed: race.speed,
     armorCheckPenalty: acp,

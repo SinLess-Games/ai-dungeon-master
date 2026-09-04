@@ -78,7 +78,7 @@ function Sheet() {
     <AppShell>
       <PageTitle
         title={char.name || "Unnamed Adventurer"}
-        subtitle={`${derived.race.name} · ${char.classes.map((c) => `${CLASS_BY_ID[c.classId]?.name ?? c.classId} ${c.levels}`).join(" / ")} · ${char.alignment}${char.deity ? ` · ${char.deity}` : ""}`}
+        subtitle={`${derived.race.name} · ${char.classes.map((c) => `${CLASS_BY_ID[c.classId]?.name ?? c.classId} ${c.levels}`).join(" / ")} · ${char.alignment}${char.deity ? ` · ${char.deity}` : ""}${derived.ecl !== derived.level ? ` · ECL ${derived.ecl}${derived.racialHd ? ` (${derived.racialHd} racial HD` : " ("}${derived.levelAdjustment ? `${derived.racialHd ? ", " : ""}LA +${derived.levelAdjustment}` : ""})` : ""}`}
         action={
           <Button variant="outline" asChild>
             <Link to="/characters">All characters</Link>

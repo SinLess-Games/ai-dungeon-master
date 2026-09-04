@@ -293,7 +293,7 @@ function Wiki() {
 function SidebarGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="mb-6">
-      <h2 className="mb-2 border-b border-border/60 pb-1 font-display text-sm tracking-wide text-foreground">
+      <h2 className="mb-2 border-b border-primary/40 pb-1 font-display text-sm font-bold tracking-wide text-primary">
         {label}
       </h2>
       {children}

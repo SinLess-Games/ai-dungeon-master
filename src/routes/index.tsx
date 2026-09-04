@@ -51,13 +51,13 @@ function Home() {
     <AppShell>
       <section className="mb-14 text-center">
         <p className="mt-8 text-xs uppercase tracking-[0.4em] text-primary">Third Edition · Revised</p>
-        <div className="mt-4 flex items-center justify-center gap-3">
+        <div className="mt-4 grid w-full grid-cols-1 items-center gap-4 sm:grid-cols-2 sm:gap-6">
           <img
             src={logoAsset.url}
-            alt=""
-            className="h-12 w-auto rounded-md border border-border/60 shadow-lg sm:h-16"
+            alt="The Endless Codex"
+            className="mx-auto w-full max-w-md rounded-md border border-border/60 shadow-lg sm:mx-0"
           />
-          <h1 className="max-w-3xl font-display text-4xl leading-tight sm:text-6xl">
+          <h1 className="text-center font-display text-4xl leading-tight sm:text-left sm:text-5xl lg:text-6xl">
             The dungeon master that never cancels
           </h1>
         </div>

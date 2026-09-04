@@ -213,7 +213,7 @@ function Wiki() {
             <BookOpen className="size-4" /> Codex wiki
           </button>
 
-          <SidebarGroup label="Player rules" icon={<BookOpen className="size-4" />}>
+          <div className="mb-6">
             {playerCategories.map(([cat, arts]) => (
               <div key={cat} className="mb-3">
                 <p className="mb-1 rounded bg-primary/10 px-2 py-1.5 font-display text-xs font-bold uppercase tracking-wide text-primary">
@@ -230,7 +230,8 @@ function Wiki() {
                 ))}
               </div>
             ))}
-          </SidebarGroup>
+          </div>
+
 
           <SidebarGroup label="Rules reference" icon={<Shapes className="size-4" />}>
             {RULES_KINDS.map((k) => (

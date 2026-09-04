@@ -50,11 +50,6 @@ function Home() {
   return (
     <AppShell>
       <section className="mb-14 text-center">
-        <img
-          src={logoAsset.url}
-          alt="The Endless Codex — an open tome beneath an infinite starfield"
-          className="mx-auto w-full max-w-xl rounded-lg border border-border/60 shadow-2xl"
-        />
         <p className="mt-8 text-xs uppercase tracking-[0.4em] text-primary">Third Edition · Revised</p>
         <div className="mt-4 flex items-center justify-center gap-3">
           <img

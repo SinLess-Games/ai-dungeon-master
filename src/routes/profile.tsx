@@ -70,9 +70,11 @@ function ProfilePage() {
         {/* Identity card */}
         <div className="space-y-6">
           <section className="rounded-lg border border-border/60 bg-card p-6 text-center">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border-2 border-primary/60 bg-primary/10 font-display text-3xl text-primary shadow-[0_0_24px_-6px_rgba(217,169,77,0.5)]">
-              {user.displayName.slice(0, 1).toUpperCase()}
-            </div>
+            <PortraitPicker
+              avatarUrl={user.avatarUrl ?? null}
+              fallback={user.displayName.slice(0, 1).toUpperCase()}
+            />
+
             <h2 className="mt-4 font-display text-xl text-foreground">{user.displayName}</h2>
             <p className="mt-1 text-sm text-muted-foreground">{user.email}</p>
             {createdAt && (

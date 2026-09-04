@@ -422,6 +422,141 @@ function ArticleView({ article }: { article: WikiArticle }) {
   );
 }
 
+const BAB_LABEL = { full: "Good (+1/level)", threeQuarter: "Average (+3/4 level)", half: "Poor (+1/2 level)" } as const;
+
+function ClassView({ classId, onBack }: { classId: string; onBack: () => void }) {
+  const cls = CLASSES.find((c) => c.id === classId);
+  if (!cls) return null;
+  const detail = CLASS_DETAILS[cls.id];
+  const skillNames = cls.classSkills
+    .map((id) => SKILLS.find((s) => s.id === id)?.name ?? id)
+    .sort((a, b) => a.localeCompare(b));
+  const levels = Array.from({ length: 20 }, (_, i) => i + 1);
+  const featuresByLevel = new Map<number, string[]>();
+  for (const f of cls.features) {
+    if (!featuresByLevel.has(f.level)) featuresByLevel.set(f.level, []);
+    featuresByLevel.get(f.level)!.push(f.name);
+  }
+
+  return (
+    <article className="max-w-3xl">
+      <Breadcrumb trail={["Codex wiki", "Rules reference", "Classes"]} />
+      <h1 className="font-display text-3xl text-foreground">{cls.name}</h1>
+      <p className="mt-3 text-lg leading-relaxed text-muted-foreground">{detail?.role ?? cls.blurb}</p>
+      <div className="mt-3 flex flex-wrap gap-1">
+        <Badge variant="outline" className="text-xs font-normal">{`d${cls.hitDie} hit die`}</Badge>
+        <Badge variant="outline" className="text-xs font-normal">{`${cls.skillPoints} + Int skill points`}</Badge>
+        <Badge variant="outline" className="text-xs font-normal">{cls.casting ? cls.casting.label : "No spellcasting"}</Badge>
+        {cls.alignmentRequirement ? (
+          <Badge variant="outline" className="text-xs font-normal">{cls.alignmentRequirement}</Badge>
+        ) : null}
+      </div>
+
+      <div className="rune-rule my-6" />
+
+      <section className="mb-8">
+        <h2 className="mb-3 font-display text-xl text-primary">Game rule information</h2>
+        <dl className="grid gap-x-6 gap-y-2 rounded-lg border border-border/60 bg-card/50 p-4 text-sm sm:grid-cols-[10rem_1fr]">
+          <Fact label="Key abilities" value={detail?.keyAbilities ?? "—"} />
+          <Fact label="Alignment" value={cls.alignmentRequirement ?? "Any"} />
+          <Fact label="Hit die" value={`d${cls.hitDie}`} />
+          <Fact label="Skill points" value={`(${cls.skillPoints} + Int modifier) per level, x4 at 1st level`} />
+          <Fact label="Base attack" value={BAB_LABEL[cls.bab]} />
+          <Fact
+            label="Saving throws"
+            value={`Fort ${cls.saves.fort}, Ref ${cls.saves.ref}, Will ${cls.saves.will}`}
+          />
+          <Fact label="Proficiencies" value={detail?.proficiencies ?? "See class features."} />
+          <Fact label="Starting gold" value={detail?.startingGold ?? "As your DM rules."} />
+          {detail?.casting ? <Fact label="Spellcasting" value={detail.casting} /> : null}
+        </dl>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="mb-3 font-display text-xl text-primary">Class skills</h2>
+        <p className="text-sm text-foreground/90">{skillNames.join(", ")}.</p>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="mb-3 font-display text-xl text-primary">Advancement</h2>
+        <div className="overflow-x-auto rounded-lg border border-border/60">
+          <table className="w-full text-sm">
+            <thead className="bg-primary/10 text-primary">
+              <tr>
+                <th className="px-3 py-2 text-left font-display text-xs uppercase tracking-wide">Level</th>
+                <th className="px-3 py-2 text-left font-display text-xs uppercase tracking-wide">BAB</th>
+                <th className="px-3 py-2 text-left font-display text-xs uppercase tracking-wide">Fort</th>
+                <th className="px-3 py-2 text-left font-display text-xs uppercase tracking-wide">Ref</th>
+                <th className="px-3 py-2 text-left font-display text-xs uppercase tracking-wide">Will</th>
+                <th className="px-3 py-2 text-left font-display text-xs uppercase tracking-wide">Special</th>
+              </tr>
+            </thead>
+            <tbody>
+              {levels.map((lv) => {
+                const bab = babForClass(cls.bab, lv);
+                const extra = [bab - 5, bab - 10, bab - 15].filter((b) => b >= 1);
+                return (
+                  <tr key={lv} className="border-t border-border/50">
+                    <td className="px-3 py-1.5">{lv}</td>
+                    <td className="px-3 py-1.5">+{[bab, ...extra].join("/+")}</td>
+                    <td className="px-3 py-1.5">+{saveForClass(cls.saves.fort, lv)}</td>
+                    <td className="px-3 py-1.5">+{saveForClass(cls.saves.ref, lv)}</td>
+                    <td className="px-3 py-1.5">+{saveForClass(cls.saves.will, lv)}</td>
+                    <td className="px-3 py-1.5 text-foreground/90">
+                      {featuresByLevel.get(lv)?.join(", ") ?? "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="mb-3 font-display text-xl text-primary">Class features</h2>
+        <ul className="space-y-2 text-sm">
+          {cls.features.map((f) => (
+            <li key={`${f.level}-${f.name}`}>
+              <span className="font-semibold text-foreground">
+                {f.name} <span className="text-muted-foreground">({f.level}
+                {f.level === 1 ? "st" : f.level === 2 ? "nd" : f.level === 3 ? "rd" : "th"} level)
+                </span>
+              </span>
+              <span className="text-foreground/90"> — {f.text}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {detail?.sections.map((s) => (
+        <section key={s.heading} className="mb-8">
+          <h2 className="mb-3 font-display text-xl text-primary">{s.heading}</h2>
+          <Markdown text={s.body} className="text-[0.95rem] leading-relaxed text-foreground/90" />
+        </section>
+      ))}
+
+      <section className="mb-2">
+        <h2 className="mb-3 font-display text-xl text-primary">At the table</h2>
+        <p className="text-sm text-foreground/90">{cls.playsLike}</p>
+      </section>
+
+      <button onClick={onBack} className="mt-8 text-sm text-primary underline-offset-2 hover:underline">
+        ← Back to all classes
+      </button>
+    </article>
+  );
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <>
+      <dt className="font-display text-xs uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className="text-foreground/90">{value}</dd>
+    </>
+  );
+}
+
 function EntryView({ entry, onBack }: { entry: RulesEntry; onBack: () => void }) {
   return (
     <article className="max-w-3xl">

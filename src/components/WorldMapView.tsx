@@ -416,6 +416,9 @@ export function WorldMapView({
   const ref = useRef<SVGSVGElement | null>(null);
   const gold = "#9c7c34";
 
+  const [view, setView] = useState({ z: 1, x: 0, y: 0 });
+  const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
+
   const land = useMemo(
     () =>
       world.regions.map((r) => {
@@ -425,11 +428,76 @@ export function WorldMapView({
     [world.regions],
   );
 
+  const clampView = (z: number, x: number, y: number) => ({
+    z,
+    x: Math.min(0, Math.max(100 * (1 - z), x)),
+    y: Math.min(0, Math.max(70 * (1 - z), y)),
+  });
+
+  /** Zoom around a point given in map units. */
+  const zoomAt = (mx: number, my: number, factor: number) => {
+    setView((v) => {
+      const z = Math.min(10, Math.max(1, v.z * factor));
+      const k = z / v.z;
+      return clampView(z, mx - (mx - v.x) * k, my - (my - v.y) * k);
+    });
+  };
+
+  const toMap = (clientX: number, clientY: number) => {
+    const rect = ref.current!.getBoundingClientRect();
+    return {
+      x: ((clientX - rect.left) / rect.width) * 100,
+      y: ((clientY - rect.top) / rect.height) * 70,
+    };
+  };
+
+  const zoomRef = useRef(zoomAt);
+  zoomRef.current = zoomAt;
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1);
+      const rect = el.getBoundingClientRect();
+      const mx = ((e.clientX - rect.left) / rect.width) * 100;
+      const my = ((e.clientY - rect.top) / rect.height) * 70;
+      zoomRef.current(mx, my, Math.exp(-dy * 0.0018));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  function handlePointerDown(e: React.PointerEvent<SVGSVGElement>) {
+    drag.current = { x: e.clientX, y: e.clientY, moved: false };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function handlePointerMove(e: React.PointerEvent<SVGSVGElement>) {
+    const d = drag.current;
+    if (!d || !ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const dx = ((e.clientX - d.x) / rect.width) * 100;
+    const dy = ((e.clientY - d.y) / rect.height) * 70;
+    if (Math.abs(e.clientX - d.x) + Math.abs(e.clientY - d.y) > 3) d.moved = true;
+    d.x = e.clientX;
+    d.y = e.clientY;
+    setView((v) => clampView(v.z, v.x + dx, v.y + dy));
+  }
+
+  function handlePointerUp(e: React.PointerEvent<SVGSVGElement>) {
+    const moved = drag.current?.moved;
+    drag.current = null;
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+    if (moved) return;
+  }
+
   function handleClick(e: React.MouseEvent<SVGSVGElement>) {
     if (!onMapClick || !ref.current) return;
-    const rect = ref.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    const p = toMap(e.clientX, e.clientY);
+    const x = (p.x - view.x) / view.z;
+    const y = (p.y - view.y) / view.z;
     onMapClick(Math.round(x * 10) / 10, Math.round(y * 10) / 10);
   }
 
@@ -437,15 +505,20 @@ export function WorldMapView({
   const siteById = new Map(world.sites.map((s) => [s.id, s]));
 
   return (
+    <div className={`relative overflow-hidden ${className ?? "h-full w-full"}`}>
     <svg
       ref={ref}
       viewBox="0 0 100 70"
       onClick={handleClick}
-      className={className ?? "h-full w-full rounded-lg border border-border"}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      className="h-full w-full touch-none rounded-lg border border-border"
+      style={{ fontFamily: "'Cinzel', 'EB Garamond', serif", cursor: drag.current ? "grabbing" : "grab" }}
       role="img"
-      aria-label={`Map of ${world.name}`}
-      style={{ fontFamily: "'Cinzel', 'EB Garamond', serif" }}
+      aria-label="World map"
     >
+
       <defs>
         <radialGradient id="wm-ocean" cx="50%" cy="42%" r="80%">
           <stop offset="0%" stopColor="#6f96aa" />

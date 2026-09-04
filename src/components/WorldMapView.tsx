@@ -593,6 +593,9 @@ export function WorldMapView({
         </clipPath>
       </defs>
 
+      <g transform={`translate(${view.x} ${view.y}) scale(${view.z})`}>
+
+
       {/* ---------------- ocean ---------------- */}
       <rect x="0" y="0" width="100" height="70" fill="url(#wm-ocean)" />
       <rect x="0" y="0" width="100" height="70" filter="url(#wm-water)" opacity="0.5" />

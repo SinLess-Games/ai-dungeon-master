@@ -23,13 +23,15 @@ export function buildDmContext(character: Character, campaign: Campaign) {
     .join(", ");
 
   const align = ALIGNMENTS.find((a) => a.key === character.alignment)?.name ?? character.alignment;
-  const style = STYLE_OPTIONS.find((s) => s.value === campaign.style)?.label;
+  const styles = campaign.styles
+    .map((s) => STYLE_OPTIONS.find((o) => o.value === s)?.label ?? s)
+    .join(" / ");
   const type = TYPE_OPTIONS.find((s) => s.value === campaign.type)?.label;
   const dmStyle = DM_STYLE_OPTIONS.find((s) => s.value === campaign.dmStyle);
 
   return `CAMPAIGN
 Name: ${campaign.name}
-Style: ${style} · Type: ${type} · Length: ${campaign.length} · Pace: ${campaign.pace}
+Style: ${styles} · Type: ${type} · Length: ${campaign.length} · Pace: ${campaign.pace}
 DM style: ${dmStyle?.label} — ${dmStyle?.blurb}
 Epic levels allowed: ${campaign.allowEpic ? "yes" : "no"}
 World: ${campaign.worldName || "unnamed"} — ${campaign.worldSummary || "improvise a fitting world"}

@@ -2,11 +2,25 @@ import { newId } from "./storage";
 
 export type CampaignStyle =
   | "heroic"
-  | "gritty"
-  | "high-fantasy"
-  | "horror"
-  | "intrigue"
-  | "comedic";
+  | "high-magic"
+  | "grim-dark"
+  | "steampunk-magitech"
+  | "low-fantasy"
+  | "sword-and-sorcery"
+  | "mythic-epic"
+  | "gothic-horror"
+  | "cosmic-horror"
+  | "political-intrigue"
+  | "dungeon-delving"
+  | "wilderness-exploration"
+  | "nautical-pirate"
+  | "planar-adventure"
+  | "post-apocalyptic"
+  | "fairytale-whimsy"
+  | "noir-mystery"
+  | "wuxia-martial"
+  | "science-fantasy"
+  | "sandbox";
 
 export type CampaignType =
   | "dungeon-crawl"
@@ -68,7 +82,8 @@ export interface Campaign {
   id: string;
   name: string;
   characterId: string;
-  style: CampaignStyle;
+  /** Up to 3 campaign style tags. */
+  styles: CampaignStyle[];
   type: CampaignType;
   length: CampaignLength;
   pace: CampaignPace;
@@ -88,11 +103,25 @@ export interface Campaign {
 
 export const STYLE_OPTIONS: { value: CampaignStyle; label: string; blurb: string }[] = [
   { value: "heroic", label: "Heroic", blurb: "Bold deeds, clear villains, earned victories." },
-  { value: "gritty", label: "Gritty", blurb: "Scarce resources, real consequences, dirty fights." },
-  { value: "high-fantasy", label: "High fantasy", blurb: "Wonders, archmages, and world-shaking stakes." },
-  { value: "horror", label: "Horror", blurb: "Dread, corruption, and things best left buried." },
-  { value: "intrigue", label: "Intrigue", blurb: "Courts, spies, and knives behind smiles." },
-  { value: "comedic", label: "Comedic", blurb: "Light-hearted chaos with real rules underneath." },
+  { value: "high-magic", label: "High magic", blurb: "Magic is common, wonders shape everyday life." },
+  { value: "grim-dark", label: "Grim-dark", blurb: "Cruel worlds, scarce hope, survival costs dignity." },
+  { value: "steampunk-magitech", label: "Steampunk / magi-tech", blurb: "Gears, steam, and enchanted industry reshape civilization." },
+  { value: "low-fantasy", label: "Low fantasy", blurb: "Rare magic, grounded threats, steel and wits matter most." },
+  { value: "sword-and-sorcery", label: "Sword & sorcery", blurb: "Pulp adventure, decadent cities, and eldritch relics." },
+  { value: "mythic-epic", label: "Mythic epic", blurb: "Demigods, cosmic journeys, and destiny across ages." },
+  { value: "gothic-horror", label: "Gothic horror", blurb: "Ruined castles, cursed bloodlines, and creeping dread." },
+  { value: "cosmic-horror", label: "Cosmic horror", blurb: "Ancient truths that break minds and unravel reality." },
+  { value: "political-intrigue", label: "Political intrigue", blurb: "Courts, spies, and knives behind smiles." },
+  { value: "dungeon-delving", label: "Dungeon delving", blurb: "Torchlit ruins, traps, and treasure beneath the world." },
+  { value: "wilderness-exploration", label: "Wilderness exploration", blurb: "Untamed frontiers, survival, and lost places." },
+  { value: "nautical-pirate", label: "Nautical / pirate", blurb: "High seas, privateers, buried secrets, and krakens." },
+  { value: "planar-adventure", label: "Planar adventure", blurb: "Travel the Outer Planes and bargain with outsiders." },
+  { value: "post-apocalyptic", label: "Post-apocalyptic", blurb: "Civilizations fell; scavengers pick through the wreckage." },
+  { value: "fairytale-whimsy", label: "Fairytale whimsy", blurb: "Talking beasts, fae bargains, and moral tests in twilight woods." },
+  { value: "noir-mystery", label: "Noir mystery", blurb: "Rain-slick streets, hard choices, and conspiracies within conspiracies." },
+  { value: "wuxia-martial", label: "Wuxia martial", blurb: "Impossible leaps, rival schools, and honor-bound duels." },
+  { value: "science-fantasy", label: "Science fantasy", blurb: "Lost technology, alien ruins, and magic mistaken for science." },
+  { value: "sandbox", label: "Sandbox", blurb: "No rails. Go where you want, live with the consequences." },
 ];
 
 export const TYPE_OPTIONS: { value: CampaignType; label: string; blurb: string }[] = [
@@ -133,7 +162,7 @@ export function emptyCampaign(characterId: string): Campaign {
     id: newId(),
     name: "New campaign",
     characterId,
-    style: "heroic",
+    styles: ["heroic"],
     type: "heroes",
     length: "standard",
     pace: "measured",

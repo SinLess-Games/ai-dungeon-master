@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Swords, Trash2, Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { AppShell, PageTitle } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +26,7 @@ import {
   PACE_OPTIONS,
   DM_STYLE_OPTIONS,
   type Campaign,
+  type CampaignStyle,
 } from "@/lib/campaign";
 import type { Character } from "@/lib/rules/character";
 
@@ -133,11 +135,9 @@ function CampaignsPage() {
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <PickField
-                label="Style"
-                value={draft.style}
-                onChange={(v) => set("style", v as Campaign["style"])}
-                options={STYLE_OPTIONS}
+              <StylePicker
+                values={draft.styles}
+                onChange={(v) => set("styles", v)}
               />
               <PickField
                 label="Campaign type"
@@ -258,7 +258,9 @@ function CampaignsPage() {
                 </button>
               </CardHeader>
               <CardContent className="flex flex-wrap gap-2">
-                <Badge variant="secondary">{c.style}</Badge>
+              {c.styles.map((s) => (
+                <Badge key={s} variant="secondary">{s}</Badge>
+              ))}
                 <Badge variant="secondary">{c.type}</Badge>
                 <Badge variant="outline">{c.pace}</Badge>
                 {c.scene.inCombat ? <Badge>in combat</Badge> : null}
@@ -301,6 +303,53 @@ function PickField({
       {active?.blurb ? (
         <p className="mt-1 text-xs text-muted-foreground">{active.blurb}</p>
       ) : null}
+    </div>
+  );
+}
+
+function StylePicker({
+  values,
+  onChange,
+}: {
+  values: CampaignStyle[];
+  onChange: (v: CampaignStyle[]) => void;
+}) {
+  function toggle(value: CampaignStyle) {
+    if (values.includes(value)) {
+      onChange(values.filter((v) => v !== value));
+    } else if (values.length < 3) {
+      onChange([...values, value]);
+    }
+  }
+
+  return (
+    <div>
+      <Label>Campaign style</Label>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Pick up to 3 styles that shape the DM's tone and world.
+      </p>
+      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {STYLE_OPTIONS.map((o) => {
+          const active = values.includes(o.value);
+          return (
+            <button
+              key={o.value}
+              type="button"
+              disabled={!active && values.length >= 3}
+              onClick={() => toggle(o.value)}
+              className={cn(
+                "rounded-md border px-3 py-2 text-left text-sm transition-colors",
+                active
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-card text-card-foreground hover:bg-accent disabled:opacity-40",
+              )}
+              title={o.blurb}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

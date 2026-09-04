@@ -26,6 +26,7 @@ import {
   PACE_OPTIONS,
   DM_STYLE_OPTIONS,
   type Campaign,
+  type CampaignStyle,
 } from "@/lib/campaign";
 import type { Character } from "@/lib/rules/character";
 

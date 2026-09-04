@@ -22,6 +22,15 @@ import { EXPANSION3_ARTICLES } from "@/lib/wiki/expansions3";
 import { EXPANSION4_ARTICLES } from "@/lib/wiki/expansions4";
 import { EXPANSION5_ARTICLES } from "@/lib/wiki/expansions5";
 import { EXPANSION6_ARTICLES } from "@/lib/wiki/expansions6";
+import { LEADERSHIP_ARTICLES } from "@/lib/wiki/leadership";
+import {
+  LEADERSHIP_TABLE,
+  LEADERSHIP_MIN_SCORE,
+  LEADERSHIP_MAX_SCORE,
+  MAX_FOLLOWER_LEVEL,
+  leadershipLookup,
+  totalFollowers,
+} from "@/lib/rules/leadership";
 import { SOURCE_BOOK_COUNT, SOURCE_WEBSITE_COUNT } from "@/lib/wiki/sources";
 
 const ALL_ARTICLES: WikiArticle[] = [
@@ -32,6 +41,7 @@ const ALL_ARTICLES: WikiArticle[] = [
   ...EXPANSION4_ARTICLES,
   ...EXPANSION5_ARTICLES,
   ...EXPANSION6_ARTICLES,
+  ...LEADERSHIP_ARTICLES,
 ];
 
 export const Route = createFileRoute("/wiki")({
@@ -396,6 +406,86 @@ function Breadcrumb({ trail }: { trail: string[] }) {
   );
 }
 
+function LeadershipCalculator() {
+  const [score, setScore] = useState(15);
+  const row = leadershipLookup(score);
+  const levels = Array.from({ length: MAX_FOLLOWER_LEVEL }, (_, i) => i + 1);
+  const min = LEADERSHIP_MIN_SCORE;
+  const max = LEADERSHIP_MAX_SCORE;
+
+  return (
+    <section className="mb-8">
+      <h2 className="mb-3 font-display text-xl text-primary">Leadership table</h2>
+
+      <div className="rounded-lg border border-primary/30 bg-card/60 p-4">
+        <label className="font-display text-xs uppercase tracking-[0.2em] text-muted-foreground" htmlFor="lscore">
+          Leadership score
+        </label>
+        <div className="mt-2 flex items-center gap-3">
+          <Input
+            id="lscore"
+            type="number"
+            min={min}
+            max={max}
+            value={score}
+            onChange={(e) => setScore(Number(e.target.value) || min)}
+            className="w-28"
+          />
+          <div className="text-sm">
+            <span className="text-muted-foreground">Cohort level </span>
+            <span className="font-display text-lg text-primary">{row[1]}</span>
+            <span className="mx-2 text-muted-foreground">·</span>
+            <span className="text-muted-foreground">Total followers </span>
+            <span className="font-display text-lg text-primary">{totalFollowers(row).toLocaleString()}</span>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {row[2].map((n, i) =>
+            n > 0 ? (
+              <Badge key={i} variant="outline" className="font-normal">
+                Level {i + 1}: {n.toLocaleString()}
+              </Badge>
+            ) : null,
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4 max-h-[26rem] overflow-auto rounded-lg border border-border/60">
+        <table className="w-full min-w-[40rem] text-left text-xs">
+          <thead className="sticky top-0 bg-card">
+            <tr className="border-b border-border/60 font-display text-primary">
+              <th className="px-2 py-2">Score</th>
+              <th className="px-2 py-2">Cohort</th>
+              {levels.map((l) => (
+                <th key={l} className="px-2 py-2 text-right">
+                  {l}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {LEADERSHIP_TABLE.map((r) => (
+              <tr
+                key={r[0]}
+                className={`border-b border-border/30 ${r[0] === row[0] ? "bg-primary/10 text-foreground" : "text-foreground/80"}`}
+              >
+                <td className="px-2 py-1 font-medium">{r[0]}</td>
+                <td className="px-2 py-1">{r[1]}</td>
+                {levels.map((l) => (
+                  <td key={l} className="px-2 py-1 text-right tabular-nums">
+                    {r[2][l - 1] ? r[2][l - 1]!.toLocaleString() : "—"}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">Columns are follower levels; scores of 26 and up are epic.</p>
+    </section>
+  );
+}
+
 function ArticleView({ article }: { article: WikiArticle }) {
   return (
     <article className="max-w-3xl">
@@ -435,6 +525,8 @@ function ArticleView({ article }: { article: WikiArticle }) {
           <Markdown text={s.body} className="text-[0.95rem] leading-relaxed text-foreground/90" />
         </section>
       ))}
+
+      {article.id === "leadership-followers" ? <LeadershipCalculator /> : null}
 
       <p className="mt-10 border-t border-border/60 pt-4 text-xs text-muted-foreground">
         Original summaries of d20/3.5 procedures and open SRD material, written for this table.

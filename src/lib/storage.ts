@@ -56,6 +56,7 @@ export function deleteCharacter(id: string) {
     KEY_CHARACTERS,
     read<Character[]>(KEY_CHARACTERS, []).filter((c) => c.id !== id),
   );
+  recordDeletion("characters", id);
 }
 
 export function duplicateCharacter(id: string) {
@@ -128,6 +129,7 @@ export function deleteCampaign(id: string) {
     KEY_CAMPAIGNS,
     read<CampaignRecord[]>(KEY_CAMPAIGNS, []).filter((c) => c.id !== id),
   );
+  recordDeletion("campaigns", id);
 }
 
 /* --------------------------------------------------------- worlds and maps */
@@ -155,7 +157,10 @@ export function saveWorld(world: World) {
 
 export function deleteWorld(id: string) {
   write(KEY_WORLDS, read<World[]>(KEY_WORLDS, []).filter((w) => w.id !== id));
+  const doomed = read<TacticalMap[]>(KEY_MAPS, []).filter((m) => m.worldId === id);
   write(KEY_MAPS, read<TacticalMap[]>(KEY_MAPS, []).filter((m) => m.worldId !== id));
+  recordDeletion("worlds", id);
+  for (const m of doomed) recordDeletion("game_maps", m.id);
 }
 
 export function listMaps(worldId?: string): TacticalMap[] {
@@ -180,6 +185,7 @@ export function saveMap(map: TacticalMap) {
 
 export function deleteMap(id: string) {
   write(KEY_MAPS, read<TacticalMap[]>(KEY_MAPS, []).filter((m) => m.id !== id));
+  recordDeletion("game_maps", id);
 }
 
 /** Keys used by the cloud sync layer. */
@@ -199,3 +205,34 @@ export function writeCollection<T>(key: string, rows: T[]) {
   write(key, rows);
 }
 
+
+/* -------------------------------------------------------------- tombstones */
+
+const KEY_DELETED = "dnd35:deleted";
+
+export type SyncTable = "characters" | "campaigns" | "worlds" | "game_maps";
+export interface Tombstone {
+  table: SyncTable;
+  id: string;
+  at: string;
+}
+
+/** Remember a delete so the cloud sync can remove the row remotely. */
+export function recordDeletion(table: SyncTable, id: string) {
+  const all = read<Tombstone[]>(KEY_DELETED, []);
+  if (all.some((t) => t.table === table && t.id === id)) return;
+  all.push({ table, id, at: new Date().toISOString() });
+  write(KEY_DELETED, all);
+}
+
+export function listDeletions(): Tombstone[] {
+  return read<Tombstone[]>(KEY_DELETED, []);
+}
+
+export function clearDeletions(done: Tombstone[]) {
+  const gone = new Set(done.map((t) => `${t.table}:${t.id}`));
+  write(
+    KEY_DELETED,
+    read<Tombstone[]>(KEY_DELETED, []).filter((t) => !gone.has(`${t.table}:${t.id}`)),
+  );
+}

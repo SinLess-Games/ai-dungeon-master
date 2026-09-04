@@ -7,7 +7,7 @@ export const Route = createFileRoute("/checkout/return")({
     session_id: typeof search["session_id"] === "string" ? (search["session_id"] as string) : undefined,
   }),
   head: () => ({
-    meta: [{ title: "Purchase complete — AI Dungeon Master" }],
+    meta: [{ title: "Purchase complete — The Endless Codex" }],
   }),
   component: CheckoutReturn,
 });

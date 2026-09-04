@@ -8,13 +8,13 @@ import { Badge } from "@/components/ui/badge";
 export const Route = createFileRoute("/upgrade")({
   head: () => ({
     meta: [
-      { title: "Multiplayer Pass — AI Dungeon Master" },
+      { title: "Multiplayer Pass — The Endless Codex" },
       {
         name: "description",
         content:
           "Unlock multiplayer campaigns, party invites, shared game state, and raised save limits.",
       },
-      { property: "og:title", content: "Multiplayer Pass — AI Dungeon Master" },
+      { property: "og:title", content: "Multiplayer Pass — The Endless Codex" },
       {
         property: "og:description",
         content:

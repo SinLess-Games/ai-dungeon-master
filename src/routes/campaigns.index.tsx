@@ -33,16 +33,16 @@ import type { Character } from "@/lib/rules/character";
 export const Route = createFileRoute("/campaigns/")({
   head: () => ({
     meta: [
-      { title: "Campaigns — Play D&D 3.5 with an AI Dungeon Master" },
+      { title: "Campaigns — Play D&D 3.5 with The Endless Codex" },
       {
         name: "description",
         content:
-          "Start a solo D&D 3.5 campaign: pick a style, campaign type, pace and DM temperament, then sit down at the table with an AI Dungeon Master.",
+          "Start a solo D&D 3.5 campaign with The Endless Codex: pick a style, campaign type, pace and DM temperament, then sit down at the table.",
       },
-      { property: "og:title", content: "Campaigns — Play with an AI Dungeon Master" },
+      { property: "og:title", content: "Campaigns — Play D&D 3.5 with The Endless Codex" },
       {
         property: "og:description",
-        content: "Create a campaign, choose its style and pace, and play D&D 3.5 solo.",
+        content: "Create a campaign, choose its style and pace, and play D&D 3.5 solo with The Endless Codex.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

@@ -240,7 +240,7 @@ export const CLASSES: CharClass[] = [
     skillPoints: 2,
     bab: "half",
     saves: { fort: "poor", ref: "poor", will: "good" },
-    classSkills: ["concentration", "craft", "knowledge-arcana", "knowledge-history", "knowledge-planes", "profession", "sense-motive"],
+    classSkills: ["autohypnosis", "concentration", "craft", "knowledge-arcana", "knowledge-dungeoneering", "knowledge-geography", "knowledge-history", "knowledge-local", "knowledge-nature", "knowledge-nobility", "knowledge-psionics", "knowledge-planes", "knowledge-religion", "profession", "psicraft"],
     casting: { ability: "int", type: "psionic", label: "Powers known (power points, Int)" },
     features: [
       { level: 1, name: "Discipline", text: "Choose egoist, kineticist, nomad, seer, shaper, or telepath for an exclusive power list." },
@@ -260,7 +260,7 @@ export const CLASSES: CharClass[] = [
     skillPoints: 2,
     bab: "threeQuarter",
     saves: { fort: "good", ref: "poor", will: "poor" },
-    classSkills: ["autohypnosis", "climb", "concentration", "craft", "jump", "knowledge-psionics", "profession", "ride", "swim"],
+    classSkills: ["autohypnosis", "climb", "concentration", "craft", "jump", "knowledge-psionics", "profession", "psicraft", "ride", "swim", "use-psionic-device"],
     casting: { ability: "wis", type: "psionic", label: "Powers known (power points, Wis)" },
     features: [
       { level: 1, name: "Bonus Feat", text: "A combat or psionic feat at 1st, 2nd, 5th, and every three levels after." },
@@ -279,7 +279,7 @@ export const CLASSES: CharClass[] = [
     skillPoints: 4,
     bab: "half",
     saves: { fort: "poor", ref: "poor", will: "good" },
-    classSkills: ["bluff", "concentration", "craft", "intimidate", "knowledge-psionics", "listen", "profession", "sense-motive", "spot"],
+    classSkills: ["autohypnosis", "bluff", "concentration", "craft", "intimidate", "knowledge-psionics", "listen", "profession", "psicraft", "sense-motive", "spot"],
     casting: { ability: "cha", type: "psionic", label: "Powers known (power points, Cha)" },
     features: [
       { level: 1, name: "Wild Surge", text: "Boost a power's manifester level at the risk of psychic enervation." },
@@ -299,7 +299,7 @@ export const CLASSES: CharClass[] = [
     skillPoints: 4,
     bab: "threeQuarter",
     saves: { fort: "poor", ref: "good", will: "good" },
-    classSkills: ["autohypnosis", "climb", "concentration", "craft", "hide", "jump", "knowledge-psionics", "listen", "move-silently", "profession", "spot", "tumble"],
+    classSkills: ["autohypnosis", "climb", "concentration", "craft", "hide", "jump", "knowledge-psionics", "listen", "move-silently", "profession", "psicraft", "spot", "tumble", "use-psionic-device"],
     features: [
       { level: 1, name: "Mind Blade", text: "Form a weapon of pure psychic energy as a move action; it can never be disarmed for long." },
       { level: 3, name: "Psychic Strike", text: "Charge the blade to add extra damage on a strike." },
@@ -319,7 +319,7 @@ export const CLASSES: CharClass[] = [
     skillPoints: 2,
     bab: "threeQuarter",
     saves: { fort: "poor", ref: "poor", will: "good" },
-    classSkills: ["concentration", "craft", "diplomacy", "knowledge-psionics", "knowledge-religion", "profession", "sense-motive"],
+    classSkills: ["autohypnosis", "concentration", "craft", "diplomacy", "knowledge-psionics", "knowledge-religion", "profession", "psicraft", "sense-motive"],
     casting: { ability: "wis", type: "psionic", label: "Powers known (power points, Wis)" },
     features: [
       { level: 1, name: "Mantles", text: "Choose philosophical mantles that define your power list and grant abilities." },
@@ -338,7 +338,7 @@ export const CLASSES: CharClass[] = [
     skillPoints: 2,
     bab: "full",
     saves: { fort: "good", ref: "poor", will: "good" },
-    classSkills: ["concentration", "craft", "diplomacy", "knowledge-psionics", "knowledge-religion", "profession", "ride", "sense-motive"],
+    classSkills: ["autohypnosis", "concentration", "craft", "diplomacy", "knowledge-psionics", "knowledge-religion", "profession", "psicraft", "ride", "sense-motive"],
     casting: { ability: "wis", type: "psionic", label: "Limited powers (power points, Wis)" },
     features: [
       { level: 1, name: "Psionic Aura", text: "Project an aura from your mantle that helps allies within range." },
@@ -357,7 +357,7 @@ export const CLASSES: CharClass[] = [
     skillPoints: 6,
     bab: "threeQuarter",
     saves: { fort: "poor", ref: "good", will: "good" },
-    classSkills: ["balance", "bluff", "climb", "concentration", "craft", "disable-device", "escape-artist", "hide", "jump", "knowledge-psionics", "listen", "move-silently", "open-lock", "profession", "search", "sense-motive", "sleight-of-hand", "spot", "tumble", "use-rope"],
+    classSkills: ["autohypnosis", "balance", "bluff", "climb", "concentration", "craft", "disable-device", "escape-artist", "hide", "jump", "knowledge-psionics", "listen", "move-silently", "open-lock", "profession", "psicraft", "search", "sense-motive", "sleight-of-hand", "spot", "tumble", "use-psionic-device", "use-rope"],
     casting: { ability: "wis", type: "psionic", label: "Few powers (power points, Wis)" },
     features: [
       { level: 1, name: "Lurk Augment", text: "Spend power points to add special effects to a sneak attack." },
@@ -376,7 +376,7 @@ export const CLASSES: CharClass[] = [
     skillPoints: 2,
     bab: "half",
     saves: { fort: "poor", ref: "poor", will: "good" },
-    classSkills: ["concentration", "craft", "decipher-script", "knowledge-arcana", "knowledge-psionics", "knowledge-planes", "profession", "spellcraft"],
+    classSkills: ["autohypnosis", "concentration", "craft", "decipher-script", "knowledge-arcana", "knowledge-psionics", "knowledge-planes", "profession", "psicraft", "spellcraft", "use-psionic-device"],
     casting: { ability: "int", type: "psionic", label: "Learned powers (power points, Int)" },
     features: [
       { level: 1, name: "Learn Power", text: "Add powers to your repertoire from any list you can study, like a psionic wizard." },

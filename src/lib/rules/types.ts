@@ -82,6 +82,8 @@ export interface CharClass {
   id: string;
   name: string;
   kind: "base" | "prestige";
+  category?: "core" | "psionic" | "arcane" | "divine" | "martial" | "expanded" | "npc";
+  source?: string;
   hitDie: number;
   skillPoints: number;
   bab: BabProgression;

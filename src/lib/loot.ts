@@ -108,26 +108,26 @@ export function splitGold(total: number, shares: number) {
 export function planEqualSplit(items: InventoryItem[], heroIds: string[]) {
   const plan = new Map<string, { itemId: string; quantity: number }[]>();
   heroIds.forEach((h) => plan.set(h, []));
-  if (heroIds.length === 0) return plan;
+  const n = heroIds.length;
+  if (n === 0) return plan;
   let cursor = 0;
   for (const item of items) {
-    const base = Math.floor(item.quantity / heroIds.length);
-    let leftover = item.quantity - base * heroIds.length;
-    for (const hero of heroIds) {
+    const base = Math.floor(item.quantity / n);
+    let leftover = item.quantity - base * n;
+    for (let step = 0; step < n; step += 1) {
+      const hero = heroIds[(cursor + step) % n]!;
       let qty = base;
       if (leftover > 0) {
-        const pick = heroIds[cursor % heroIds.length];
-        if (pick === hero) {
-          qty += 1;
-          leftover -= 1;
-          cursor += 1;
-        }
+        qty += 1;
+        leftover -= 1;
       }
       if (qty > 0) plan.get(hero)!.push({ itemId: item.id, quantity: qty });
     }
+    cursor = (cursor + 1) % n;
   }
   return plan;
 }
+
 
 
 export function totalWeight(items: InventoryItem[]) {

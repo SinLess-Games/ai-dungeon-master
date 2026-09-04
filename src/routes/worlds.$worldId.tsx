@@ -196,11 +196,17 @@ function WorldDetail() {
           <div className="aspect-[10/7] w-full">
             <WorldMapView
               world={world}
+              artUrl={worldArt}
               selectedSiteId={selectedSiteId}
               onSelectSite={(s) => setSelectedSiteId(s.id)}
               onMapClick={handleMapClick}
             />
           </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <PaintMapButton world={world} />
+          </div>
+
 
           <p className="text-xs text-muted-foreground">
             Scale: {world.scaleMilesPerUnit} miles per map unit. Party is in{" "}

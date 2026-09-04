@@ -30,7 +30,11 @@ describe("wiki content", () => {
     expect(ids.size).toBe(ALL.length);
     for (const a of ALL) {
       expect(a.title.trim().length).toBeGreaterThan(0);
-      expect(a.body.trim().length).toBeGreaterThan(40);
+      expect(a.sections.length).toBeGreaterThan(0);
+      for (const sec of a.sections) {
+        expect(sec.heading.trim().length).toBeGreaterThan(0);
+        expect(sec.body.trim().length).toBeGreaterThan(20);
+      }
       expect(a.category.trim().length).toBeGreaterThan(0);
     }
   });

@@ -321,43 +321,50 @@ export function WorldMapView({
       <rect x="0" y="0" width="100" height="70" fill="url(#wm-ocean)" />
       <rect x="0" y="0" width="100" height="70" fill="url(#wm-grid)" />
 
-      {/* coastal glow behind every landmass */}
-      <g filter="url(#wm-coast)" opacity="0.55">
+      {/* coastal shelf glow behind the continent */}
+      <g filter="url(#wm-coast)" opacity="0.5">
         {land.map(({ region, d }) => (
-          <path key={`glow-${region.id}`} d={d} fill="none" stroke="#e7f1f4" strokeWidth="2.6" />
+          <path key={`glow-${region.id}`} d={d} fill="#e7f1f4" stroke="#e7f1f4" strokeWidth="2.8" />
         ))}
       </g>
 
-      {/* landmasses */}
-      {land.map(({ region, d, dd }) => {
-        const paint = PAINT[region.terrain] ?? PAINT.plains;
-        return (
-          <g key={region.id}>
-            <path d={d} fill={paint.base} stroke="#3f5a63" strokeWidth="0.28" />
-            <g clipPath={`url(#wm-clip-${region.id})`}>
-              <path d={d} fill="none" stroke={paint.shade} strokeWidth="3" opacity="0.5" />
-              {dd.map((p, i) => (
-                <Doodad key={i} terrain={region.terrain} x={p.x} y={p.y} s={p.s} ink={paint.ink} />
-              ))}
+      {/* continent: terrain fills merged under one coastline */}
+      <g filter="url(#wm-outline)">
+        {land.map(({ region, d, dd }) => {
+          const paint = PAINT[region.terrain] ?? PAINT.plains;
+          return (
+            <g key={region.id}>
+              <path d={d} fill={paint.base} />
+              <g clipPath={`url(#wm-clip-${region.id})`}>
+                <path d={d} fill="none" stroke={paint.shade} strokeWidth="3.2" opacity="0.45" />
+                {dd.map((p, i) => (
+                  <Doodad key={i} terrain={region.terrain} x={p.x} y={p.y} s={p.s} ink={paint.ink} />
+                ))}
+              </g>
             </g>
-            <text
-              x={region.x + region.w / 2}
-              y={region.y + region.h / 2}
-              textAnchor="middle"
-              fontSize="2.6"
-              letterSpacing="0.35"
-              fill="#4a3d27"
-              opacity="0.75"
-              stroke="#f4ecd6"
-              strokeWidth="0.5"
-              paintOrder="stroke"
-              style={{ textTransform: "uppercase" }}
-            >
-              {region.name}
-            </text>
-          </g>
-        );
-      })}
+          );
+        })}
+      </g>
+
+      {/* region names */}
+      {world.regions.map((r) => (
+        <text
+          key={`label-${r.id}`}
+          x={r.x + r.w / 2}
+          y={r.y + r.h * 0.26}
+          textAnchor="middle"
+          fontSize="2.5"
+          letterSpacing="0.35"
+          fill="#4a3d27"
+          opacity="0.8"
+          stroke="#f4ecd6"
+          strokeWidth="0.55"
+          paintOrder="stroke"
+          style={{ textTransform: "uppercase" }}
+        >
+          {r.name}
+        </text>
+      ))}
 
       {/* routes */}
       {world.routes.map((route) => {

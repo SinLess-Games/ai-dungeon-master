@@ -703,6 +703,9 @@ export function WorldMapView({
           </g>
         );
       })}
+        </>
+      )}
+
 
 
       {/* ---------------- region names ---------------- */}

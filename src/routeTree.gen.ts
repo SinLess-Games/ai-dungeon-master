@@ -21,6 +21,7 @@ import { Route as AdminBillingRouteImport } from './routes/admin.billing'
 import { Route as AdminContentRouteImport } from './routes/admin.content'
 import { Route as AdminFeedbackRouteImport } from './routes/admin.feedback'
 import { Route as AdminPlayersRouteImport } from './routes/admin.players'
+import { Route as AdminTitlesRouteImport } from './routes/admin.titles'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiGenerateMapRouteImport } from './routes/api/generate-map'
 import { Route as CampaignsIndexRouteImport } from './routes/campaigns.index'
@@ -93,6 +94,11 @@ const AdminFeedbackRoute = AdminFeedbackRouteImport.update({
 const AdminPlayersRoute = AdminPlayersRouteImport.update({
   id: '/players',
   path: '/players',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminTitlesRoute = AdminTitlesRouteImport.update({
+  id: '/titles',
+  path: '/titles',
   getParentRoute: () => AdminRoute,
 } as any)
 const ApiChatRoute = ApiChatRouteImport.update({
@@ -174,6 +180,7 @@ export interface FileRoutesByFullPath {
   '/admin/content': typeof AdminContentRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/players': typeof AdminPlayersRoute
+  '/admin/titles': typeof AdminTitlesRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-map': typeof ApiGenerateMapRoute
   '/campaigns/$id': typeof CampaignsIdRoute
@@ -200,6 +207,7 @@ export interface FileRoutesByTo {
   '/admin/content': typeof AdminContentRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/players': typeof AdminPlayersRoute
+  '/admin/titles': typeof AdminTitlesRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-map': typeof ApiGenerateMapRoute
   '/campaigns/$id': typeof CampaignsIdRoute
@@ -228,6 +236,7 @@ export interface FileRoutesById {
   '/admin/content': typeof AdminContentRoute
   '/admin/feedback': typeof AdminFeedbackRoute
   '/admin/players': typeof AdminPlayersRoute
+  '/admin/titles': typeof AdminTitlesRoute
   '/api/chat': typeof ApiChatRoute
   '/api/generate-map': typeof ApiGenerateMapRoute
   '/campaigns/$id': typeof CampaignsIdRoute
@@ -257,6 +266,7 @@ export interface FileRouteTypes {
     | '/admin/content'
     | '/admin/feedback'
     | '/admin/players'
+    | '/admin/titles'
     | '/api/chat'
     | '/api/generate-map'
     | '/campaigns/$id'
@@ -283,6 +293,7 @@ export interface FileRouteTypes {
     | '/admin/content'
     | '/admin/feedback'
     | '/admin/players'
+    | '/admin/titles'
     | '/api/chat'
     | '/api/generate-map'
     | '/campaigns/$id'
@@ -310,6 +321,7 @@ export interface FileRouteTypes {
     | '/admin/content'
     | '/admin/feedback'
     | '/admin/players'
+    | '/admin/titles'
     | '/api/chat'
     | '/api/generate-map'
     | '/campaigns/$id'
@@ -435,6 +447,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPlayersRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/titles': {
+      id: '/admin/titles'
+      path: '/titles'
+      fullPath: '/admin/titles'
+      preLoaderRoute: typeof AdminTitlesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/api/chat': {
       id: '/api/chat'
       path: '/api/chat'
@@ -534,6 +553,7 @@ interface AdminRouteChildren {
   AdminContentRoute: typeof AdminContentRoute
   AdminFeedbackRoute: typeof AdminFeedbackRoute
   AdminPlayersRoute: typeof AdminPlayersRoute
+  AdminTitlesRoute: typeof AdminTitlesRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
@@ -542,6 +562,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminContentRoute: AdminContentRoute,
   AdminFeedbackRoute: AdminFeedbackRoute,
   AdminPlayersRoute: AdminPlayersRoute,
+  AdminTitlesRoute: AdminTitlesRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
 

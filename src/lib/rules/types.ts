@@ -44,7 +44,7 @@ export const ALIGNMENTS: { key: Alignment; name: string; blurb: string }[] = [
 
 export type Size = "Fine" | "Diminutive" | "Tiny" | "Small" | "Medium" | "Large" | "Huge" | "Gargantuan" | "Colossal";
 
-export type RaceCategory = "core" | "planetouched" | "monstrous" | "savage" | "powerful";
+export type RaceCategory = "core" | "planetouched" | "monstrous" | "savage" | "powerful" | "epic";
 
 export interface RacialHitDice {
   count: number;

@@ -200,8 +200,9 @@ function CampaignsPage() {
             </div>
 
             <div>
-              <Label>World notes</Label>
+              <Label htmlFor="campaign-world-notes">World notes</Label>
               <Textarea
+                id="campaign-world-notes"
                 className="mt-2"
                 rows={3}
                 placeholder="Tone, geography, factions, anything you want true about this world."
@@ -211,8 +212,9 @@ function CampaignsPage() {
             </div>
 
             <div>
-              <Label>House rules</Label>
+              <Label htmlFor="campaign-house-rules">House rules</Label>
               <Textarea
+                id="campaign-house-rules"
                 className="mt-2"
                 rows={2}
                 placeholder="e.g. massive damage threshold is 50, criticals auto-confirm"
@@ -304,7 +306,7 @@ function PickField({
     <div>
       <Label>{label}</Label>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="mt-2">
+        <SelectTrigger className="mt-2" aria-label={`Select ${label.toLowerCase()}`}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

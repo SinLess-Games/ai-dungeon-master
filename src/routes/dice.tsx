@@ -16,7 +16,9 @@ export const Route = createFileRoute("/dice")({
       { property: "og:description", content: "A fast d20 dice roller that handles enormous dice pools honestly." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
+      { property: "og:url", content: "https://endless-codex.sinlessindustries.com/dice" },
     ],
+    links: [{ rel: "canonical", href: "https://endless-codex.sinlessindustries.com/dice" }],
   }),
   component: DicePage,
 });

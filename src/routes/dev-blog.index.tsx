@@ -27,7 +27,9 @@ export const Route = createFileRoute("/dev-blog/")({
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:url", content: "https://endless-codex.sinlessindustries.com/dev-blog" },
     ],
+    links: [{ rel: "canonical", href: "https://endless-codex.sinlessindustries.com/dev-blog" }],
   }),
   component: DevBlogIndex,
 });

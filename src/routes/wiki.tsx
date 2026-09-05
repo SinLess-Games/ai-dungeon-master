@@ -62,7 +62,9 @@ export const Route = createFileRoute("/wiki")({
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
+      { property: "og:url", content: "https://endless-codex.sinlessindustries.com/wiki" },
     ],
+    links: [{ rel: "canonical", href: "https://endless-codex.sinlessindustries.com/wiki" }],
   }),
   component: Wiki,
 });

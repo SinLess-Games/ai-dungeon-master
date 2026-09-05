@@ -74,7 +74,7 @@ export function PostCard({ post, featured = false }: { post: BlogPost; featured?
         <div>
           <Button asChild variant="outline" size="sm" className="border-primary/50 text-primary">
             <Link to="/dev-blog/$slug" params={{ slug: post.slug }}>
-              Read more
+              Read entire post
             </Link>
           </Button>
         </div>

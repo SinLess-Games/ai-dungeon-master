@@ -20,7 +20,9 @@ export const Route = createFileRoute("/characters/")({
       { property: "og:description", content: "Manage your rules-accurate D&D 3.5 characters and jump back into play." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
+      { property: "og:url", content: "https://endless-codex.sinlessindustries.com/characters" },
     ],
+    links: [{ rel: "canonical", href: "https://endless-codex.sinlessindustries.com/characters" }],
   }),
   component: CharacterList,
 });

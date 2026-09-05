@@ -14,6 +14,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as DiceRouteImport } from './routes/dice'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as UpgradeRouteImport } from './routes/upgrade'
 import { Route as WikiRouteImport } from './routes/wiki'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
@@ -70,6 +71,11 @@ const DiceRoute = DiceRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UpgradeRoute = UpgradeRouteImport.update({
@@ -241,6 +247,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/dice': typeof DiceRoute
   '/profile': typeof ProfileRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
   '/admin/billing': typeof AdminBillingRoute
@@ -279,6 +286,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/dice': typeof DiceRoute
   '/profile': typeof ProfileRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
   '/admin/billing': typeof AdminBillingRoute
@@ -319,6 +327,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/dice': typeof DiceRoute
   '/profile': typeof ProfileRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/upgrade': typeof UpgradeRoute
   '/wiki': typeof WikiRoute
   '/admin/billing': typeof AdminBillingRoute
@@ -360,6 +369,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dice'
     | '/profile'
+    | '/sitemap.xml'
     | '/upgrade'
     | '/wiki'
     | '/admin/billing'
@@ -398,6 +408,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dice'
     | '/profile'
+    | '/sitemap.xml'
     | '/upgrade'
     | '/wiki'
     | '/admin/billing'
@@ -437,6 +448,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dice'
     | '/profile'
+    | '/sitemap.xml'
     | '/upgrade'
     | '/wiki'
     | '/admin/billing'
@@ -477,6 +489,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   DiceRoute: typeof DiceRoute
   ProfileRoute: typeof ProfileRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   UpgradeRoute: typeof UpgradeRoute
   WikiRoute: typeof WikiRoute
   ApiChatRoute: typeof ApiChatRoute
@@ -533,6 +546,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/upgrade': {
@@ -802,6 +822,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   DiceRoute: DiceRoute,
   ProfileRoute: ProfileRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   UpgradeRoute: UpgradeRoute,
   WikiRoute: WikiRoute,
   ApiChatRoute: ApiChatRoute,

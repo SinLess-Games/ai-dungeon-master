@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { readSubscription } from "@/lib/database.functions";
 import { useSession } from "@/hooks/useSession";
 import { getStripeEnvironment } from "@/lib/stripe";
 
@@ -33,7 +33,7 @@ export function useSubscription() {
       setLoading(false);
       return;
     }
-    let environment: string;
+    let environment: "sandbox" | "live";
     try {
       environment = getStripeEnvironment();
     } catch {
@@ -41,31 +41,26 @@ export function useSubscription() {
       setLoading(false);
       return;
     }
-    const { data } = await supabase
-      .from("subscriptions")
-      .select("id, status, price_id, current_period_end, cancel_at_period_end")
-      .eq("user_id", user.id)
-      .eq("environment", environment)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    setSubscription((data as SubscriptionRow | null) ?? null);
+    try {
+      const data = await readSubscription({ data: environment });
+      setSubscription((data as SubscriptionRow | null) ?? null);
+    } catch {
+      setSubscription(null);
+    }
     setLoading(false);
   }, [user?.id]);
 
   useEffect(() => {
     void load();
     if (!user) return;
-    const channel = supabase
-      .channel(`subscriptions:${user.id}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "subscriptions", filter: `user_id=eq.${user.id}` },
-        () => void load(),
-      )
-      .subscribe();
+    const timer = window.setInterval(() => {
+      if (!document.hidden) void load();
+    }, 30_000);
+    const refresh = () => void load();
+    window.addEventListener("focus", refresh);
     return () => {
-      void supabase.removeChannel(channel);
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
     };
   }, [user?.id, load]);
 

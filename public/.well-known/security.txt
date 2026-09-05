@@ -1,0 +1,32 @@
+# Endless Codex Security Policy
+# https://endless-codex.sinlessindustries.com
+
+Contact: https://endless-codex.sinlessindustries.com/
+Canonical: https://endless-codex.sinlessindustries.com/.well-known/security.txt
+
+Preferred-Languages: en
+
+Policy: https://endless-codex.sinlessindustries.com/security
+
+Expires: 2027-09-04T23:59:59Z
+
+# Please report suspected security vulnerabilities responsibly.
+# Do not publicly disclose vulnerabilities before they have been
+# investigated and, where appropriate, remediated.
+#
+# Include enough information to reproduce the issue, including:
+# - A description of the vulnerability
+# - Affected URL, endpoint, or component
+# - Steps to reproduce
+# - Expected versus actual behavior
+# - Proof-of-concept details where appropriate
+# - Potential impact
+#
+# Please avoid:
+# - Accessing or modifying data belonging to other users
+# - Destructive testing
+# - Denial-of-service testing
+# - Social engineering
+# - Automated high-volume scanning
+# - Persistence after demonstrating the vulnerability
+

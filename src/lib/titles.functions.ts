@@ -54,10 +54,10 @@ export interface TitleProgress {
   earned: boolean;
 }
 
-type Ctx = { supabase: any; userId: string };
+type Ctx = { db: any; userId: string };
 
 async function assertAdmin(ctx: Ctx) {
-  const { data, error } = await ctx.supabase.rpc("has_role", {
+  const { data, error } = await ctx.db.rpc("has_role", {
     _user_id: ctx.userId,
     _role: "admin",
   });
@@ -95,8 +95,8 @@ export const listTitles = createServerFn({ method: "GET" })
     const ctx = context as unknown as Ctx;
     await assertAdmin(ctx);
     const [{ data, error }, held] = await Promise.all([
-      ctx.supabase.from("titles").select("*").order("created_at", { ascending: true }),
-      ctx.supabase.from("player_titles").select("title_id"),
+      ctx.db.from("titles").select("*").order("created_at", { ascending: true }),
+      ctx.db.from("player_titles").select("title_id"),
     ]);
     if (error) throw new Error(error.message);
     const counts = new Map<string, number>();
@@ -123,10 +123,7 @@ export const saveTitle = createServerFn({ method: "POST" })
       if (input.rarity && !TITLE_RARITIES.includes(input.rarity as TitleRarity)) {
         throw new Error("Unknown rarity");
       }
-      if (
-        input.criteriaKind &&
-        !CRITERIA_KINDS.some((c) => c.value === input.criteriaKind)
-      ) {
+      if (input.criteriaKind && !CRITERIA_KINDS.some((c) => c.value === input.criteriaKind)) {
         throw new Error("Unknown earning rule");
       }
       return input;
@@ -145,11 +142,11 @@ export const saveTitle = createServerFn({ method: "POST" })
       criteria_target: Math.max(0, Math.round(data.criteriaTarget ?? 0)),
     };
     if (data.id) {
-      const { error } = await ctx.supabase.from("titles").update(patch).eq("id", data.id);
+      const { error } = await ctx.db.from("titles").update(patch).eq("id", data.id);
       if (error) throw new Error(error.message);
       return { ok: true };
     }
-    const { error } = await ctx.supabase
+    const { error } = await ctx.db
       .from("titles")
       .insert({ ...patch, slug: slugify(patch.name) || `title-${Date.now()}` });
     if (error) throw new Error(error.message);
@@ -165,7 +162,7 @@ export const deleteTitle = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const ctx = context as unknown as Ctx;
     await assertAdmin(ctx);
-    const { error } = await ctx.supabase.from("titles").delete().eq("id", data.id);
+    const { error } = await ctx.db.from("titles").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -182,8 +179,8 @@ export const listTitleHolders = createServerFn({ method: "GET" })
     const ctx = context as unknown as Ctx;
     await assertAdmin(ctx);
     const [{ data: profiles }, { data: held }] = await Promise.all([
-      ctx.supabase.from("profiles").select("id, display_name").order("display_name").limit(500),
-      ctx.supabase.from("player_titles").select("user_id, title_id"),
+      ctx.db.from("profiles").select("id, display_name").order("display_name").limit(500),
+      ctx.db.from("player_titles").select("user_id, title_id"),
     ]);
     const byUser = new Map<string, string[]>();
     for (const r of (held ?? []) as any[]) {
@@ -206,7 +203,7 @@ export const grantTitle = createServerFn({ method: "POST" })
     const ctx = context as unknown as Ctx;
     await assertAdmin(ctx);
     if (data.grant) {
-      const { error } = await ctx.supabase
+      const { error } = await ctx.db
         .from("player_titles")
         .upsert(
           { user_id: data.userId, title_id: data.titleId },
@@ -214,7 +211,7 @@ export const grantTitle = createServerFn({ method: "POST" })
         );
       if (error) throw new Error(error.message);
     } else {
-      const { error } = await ctx.supabase
+      const { error } = await ctx.db
         .from("player_titles")
         .delete()
         .eq("user_id", data.userId)
@@ -227,7 +224,7 @@ export const grantTitle = createServerFn({ method: "POST" })
 /* --------------------------------------------------------------- player */
 
 async function countFor(ctx: Ctx, table: string) {
-  const { count } = await ctx.supabase
+  const { count } = await ctx.db
     .from(table)
     .select("id", { count: "exact", head: true })
     .eq("user_id", ctx.userId);
@@ -247,9 +244,9 @@ export const syncMyTitles = createServerFn({ method: "POST" })
     const ctx = context as unknown as Ctx;
 
     const [{ data: titles }, { data: mine }, { data: profile }] = await Promise.all([
-      ctx.supabase.from("titles").select("*").eq("is_active", true),
-      ctx.supabase.from("player_titles").select("title_id, awarded_at").eq("user_id", ctx.userId),
-      ctx.supabase.from("profiles").select("title, created_at").eq("id", ctx.userId).maybeSingle(),
+      ctx.db.from("titles").select("*").eq("is_active", true),
+      ctx.db.from("player_titles").select("title_id, awarded_at").eq("user_id", ctx.userId),
+      ctx.db.from("profiles").select("title, created_at").eq("id", ctx.userId).maybeSingle(),
     ]);
 
     const all = (titles ?? []) as any[];
@@ -258,8 +255,10 @@ export const syncMyTitles = createServerFn({ method: "POST" })
 
     const needs = new Set(all.map((t) => t.criteria_kind));
     const stats: Record<string, number> = {};
-    if (needs.has("characters_created")) stats["characters_created"] = await countFor(ctx, "characters");
-    if (needs.has("campaigns_created")) stats["campaigns_created"] = await countFor(ctx, "campaigns");
+    if (needs.has("characters_created"))
+      stats["characters_created"] = await countFor(ctx, "characters");
+    if (needs.has("campaigns_created"))
+      stats["campaigns_created"] = await countFor(ctx, "campaigns");
     if (needs.has("worlds_created")) stats["worlds_created"] = await countFor(ctx, "worlds");
     if (needs.has("maps_created")) stats["maps_created"] = await countFor(ctx, "game_maps");
     if (needs.has("dice_rolled")) stats["dice_rolled"] = await countFor(ctx, "dice_rolls");
@@ -271,7 +270,7 @@ export const syncMyTitles = createServerFn({ method: "POST" })
       "sites_discovered",
     ];
     if (campaignKinds.some((k) => needs.has(k))) {
-      const { data: camps } = await ctx.supabase
+      const { data: camps } = await ctx.db
         .from("campaigns")
         .select("data")
         .eq("user_id", ctx.userId);
@@ -320,12 +319,10 @@ export const syncMyTitles = createServerFn({ method: "POST" })
         (stats[t.criteria_kind] ?? 0) >= t.criteria_target,
     );
     if (toAward.length) {
-      const { error } = await ctx.supabase
-        .from("player_titles")
-        .upsert(
-          toAward.map((t) => ({ user_id: ctx.userId, title_id: t.id })),
-          { onConflict: "user_id,title_id" },
-        );
+      const { error } = await ctx.db.from("player_titles").upsert(
+        toAward.map((t) => ({ user_id: ctx.userId, title_id: t.id })),
+        { onConflict: "user_id,title_id" },
+      );
       if (!error) for (const t of toAward) ownedAt.set(t.id, new Date().toISOString());
     }
 
@@ -368,13 +365,13 @@ export const setActiveTitle = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const ctx = context as unknown as Ctx;
     if (data.slug) {
-      const { data: match } = await ctx.supabase
+      const { data: match } = await ctx.db
         .from("titles")
         .select("id")
         .eq("slug", data.slug)
         .maybeSingle();
       if (!match) throw new Error("Unknown title");
-      const { data: owned } = await ctx.supabase
+      const { data: owned } = await ctx.db
         .from("player_titles")
         .select("id")
         .eq("user_id", ctx.userId)
@@ -382,7 +379,7 @@ export const setActiveTitle = createServerFn({ method: "POST" })
         .maybeSingle();
       if (!owned) throw new Error("You have not earned that title yet");
     }
-    const { error } = await ctx.supabase
+    const { error } = await ctx.db
       .from("profiles")
       .update({ title: data.slug })
       .eq("id", ctx.userId);

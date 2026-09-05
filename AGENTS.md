@@ -1,4 +1,5 @@
 <!-- LOVABLE:BEGIN -->
+
 # Repository guide
 
 > [!IMPORTANT]
@@ -9,6 +10,7 @@
 >
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
+
 <!-- LOVABLE:END -->
 
 <!-- CODEX:BEGIN -->
@@ -18,16 +20,19 @@
 - The Endless Codex is a D&D 3.5 game with an AI dungeon master, character
   management, campaigns, worlds, maps, and a rules wiki. Preserve the 3.5 ruleset.
 - Stack: React 19, TypeScript, TanStack Start/Router, Vite, Tailwind CSS 4,
-  shadcn/Radix UI, Supabase, and Stripe. This is a TanStack Start app.
+  shadcn/Radix UI, Cloudflare D1, Supabase Auth/Storage, and Stripe. This is a TanStack Start app.
 - `src/routes/`: file-based pages and API handlers. Follow `src/routes/README.md`;
   keep the root layout in `__root.tsx` and do not hand-edit `src/routeTree.gen.ts`.
 - `src/components/`: application UI; `src/components/ui/`: shared UI primitives.
 - `src/lib/rules/`: game rules and character calculations; `src/lib/wiki/`: reference data.
 - `src/prompts/`: DM, world-building, NPC, dungeon, economy, and cartography prompts.
 - `src/lib/storage.ts`: local persistence; `src/lib/cloud-sync.ts`: offline-first
-  Supabase synchronization. Preserve saved-data compatibility and deletion handling.
-- `src/integrations/supabase/`: auth, clients, and database types;
-  `supabase/migrations/`: database migrations.
+  D1 synchronization through authenticated server functions. Preserve saved-data compatibility
+  and deletion handling.
+- `src/integrations/d1/`: server-only queries and ownership/admin enforcement;
+  `migrations/`: active D1 migrations. `wrangler.toml` defines the `DB` binding.
+- `src/integrations/supabase/`: retained auth/storage clients and row types;
+  `supabase/migrations/`: historical PostgreSQL migrations, not applied to D1.
 - `src/lib/ai-gateway.server.ts`: Lovable AI provider; `src/routes/api/chat.ts`: DM API.
 - `src/server.ts`: SSR error wrapper. `roadmap.md` and `.lovable/plan/` provide
   product context; check the code before assuming a roadmap item is implemented.
@@ -37,7 +42,8 @@
 Use npm, as documented in the README. Both npm and Bun lockfiles exist; avoid
 incidental dependency or lockfile churn and preserve unrelated working-tree edits.
 
-- `npm run dev`: local development server.
+- `npm run db:migrate:local`: initialize/update the local D1 database.
+- `npm run dev`: local development server with a local D1 proxy.
 - `npm run build`: production build; `npm run build:dev`: development-mode build.
 - `npm run lint`: ESLint, including Prettier rules.
 - `npx tsc --noEmit`: TypeScript check (there is no dedicated script).
@@ -66,4 +72,5 @@ Avoid repository-wide `npm run format` for focused changes; format touched files
 - Preserve SSR-safe access to browser APIs and the offline-first storage flow.
 - Reuse the existing UI primitives and theme in `src/styles.css`.
 - Do not print or commit secret values from environment files or session variables.
+
 <!-- CODEX:END -->

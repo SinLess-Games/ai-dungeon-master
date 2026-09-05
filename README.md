@@ -1242,7 +1242,7 @@ Development can continue using the [Lovable editor](https://lovable.dev/projects
 
 You will need:
 
-- Node.js.
+- Node.js 22.13 or newer (Node.js 24 LTS recommended).
 - npm.
 
 Using [nvm](https://github.com/nvm-sh/nvm#installing-and-updating) is recommended for managing Node.js versions.
@@ -1265,6 +1265,128 @@ Start the development server:
 ```bash
 npm run dev
 ```
+
+## Cloudflare Workers
+
+The TanStack Start server, API routes, and static assets deploy together as the
+`the-endless-codex` Worker. The existing Lovable Vite wrapper builds Nitro's
+`cloudflare-module` target; do not add a second Cloudflare or TanStack Vite plugin.
+Cloudflare D1 stores application data. Supabase continues to provide authentication
+and file storage. Subscription status refreshes every 30 seconds and on window focus.
+AI and payment requests still use the existing Lovable gateways and credentials.
+
+### Environment setup
+
+Set these public build variables in `.env.local` (or in Workers Builds):
+
+```dotenv
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+VITE_PAYMENTS_CLIENT_TOKEN=your-stripe-publishable-key
+```
+
+The payment token is optional if checkout is unused. Public variables are compiled
+into the browser bundle; rebuild after changing them. Never put server secrets in
+variables prefixed with `VITE_`.
+
+Copy `.dev.vars.example` to `.dev.vars` and supply your server credentials for
+local Worker previews. For `npm run dev`, supply the same server variables in
+`.env.local` or the shell environment. `.dev.vars` is read by Wrangler, not Vite.
+
+For production, configure the server variables listed in `.dev.vars.example` in
+the Worker's **Settings → Variables and Secrets**, or use
+`npx wrangler secret put VARIABLE_NAME` after building. At minimum, configure
+`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and
+`LOVABLE_API_KEY`. Configure payment keys and webhook secrets for each payment
+environment in use. These are runtime bindings, separate from build variables.
+Node compatibility exposes runtime bindings to the existing `process.env` reads.
+The `DB` binding in `wrangler.toml` connects the Worker to D1 database
+`dc744f5a-7c53-4d37-b695-97b2527ef06a`; it needs no database password.
+
+### D1 database setup and existing data
+
+Apply the SQLite schema locally before development:
+
+```bash
+npm run db:migrate:local
+npm run dev
+```
+
+Vite development uses Wrangler's local D1 proxy and the same persisted database as
+Worker previews. `npm run build` never applies migrations to the remote database.
+Before deploying, authenticate Wrangler and apply the remote schema:
+
+```bash
+npx wrangler login
+npm run db:migrate:remote
+```
+
+The SQLite migration is in `migrations/`. The old `supabase/migrations/` files are
+historical PostgreSQL migrations and must not be applied to D1. Server queries
+verify Supabase tokens and enforce ownership and admin permissions before accessing
+D1. Browser requests never contain SQL or arbitrary database query plans. New users
+get a D1 profile on their first authenticated request, using their Supabase Auth
+metadata. Supabase Auth user IDs and existing local save formats are preserved.
+
+**Existing cloud data must be imported before switching production traffic.** Stop
+writes to the old application during export/import (including payment webhooks),
+then export application tables using a Supabase service-role credential:
+
+```bash
+# Supply SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY through your environment.
+node scripts/export-supabase-data.mjs
+# Test the export against a fresh local database first.
+npx wrangler d1 execute DB --local --file .data-migration/supabase.sql
+# After reviewing the local result, import into the fresh remote database.
+npx wrangler d1 execute DB --remote --file .data-migration/supabase.sql
+```
+
+The export retains profile IDs, admin roles, subscriptions, JSON game saves, blog
+posts, titles, and timestamps. It contains private data and is gitignored. Import
+only into a fresh database after schema migration; the script adds a guard against
+importing over application records and replaces initial title seeds with exported
+titles. Keep the old Supabase tables available until the cutover is verified.
+Auth users and Storage objects stay in Supabase and are not exported or deleted.
+For a new installation without an export, grant the first administrator a row in
+D1's `user_roles` table using their verified Supabase user UUID.
+
+Blog media uploads go through the Worker so D1 admin roles authorize uploads into
+Supabase Storage. Map-art uploads keep the existing Supabase folder-ownership
+policies. Continue managing Auth and Storage in Supabase; deleting an Auth account
+no longer cascades into D1, so account removal must also clean up that user's D1
+records. No remote data is migrated by a build or deploy command.
+
+### Preview and deploy
+
+```bash
+npm run build
+npm run preview
+```
+
+Preview runs the built app locally in the Workers runtime. Rebuild after source
+changes; use `npm run dev` for Vite hot reload. To validate the upload without
+publishing, run `npm run deploy:check`.
+
+```bash
+npx wrangler login
+npm run deploy
+```
+
+Change the Worker name in `wrangler.toml` before deploying if needed. Nitro merges
+this source configuration into `.output/server/wrangler.json` and writes
+`.wrangler/deploy/config.json` so Wrangler discovers the built entry and assets.
+Do not edit or commit those generated files. Always build before running Wrangler.
+This follows [Nitro's Workers deployment flow](https://nitro.build/deploy/providers/cloudflare).
+
+For Cloudflare Workers Builds, use `npm ci` to install, `npm run build` as the build
+command, and `npx wrangler deploy` as the deploy command. Set the public build
+variables there and the server secrets on the Worker.
+
+After deploying, add the new application origin to Supabase's auth redirect URLs
+and any existing OAuth provider allowlists. Update the payment webhook destination
+to `/api/public/payments/webhook` on the new origin, preserving its existing
+environment query parameter and matching signing secret. Existing external cron
+callers must also use the new origin; this configuration does not schedule jobs.
 
 ## Repository
 

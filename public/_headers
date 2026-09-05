@@ -1,0 +1,141 @@
+# ============================================================
+# Endless Codex - HTTP Security & Cache Headers
+# https://endless-codex.sinlessindustries.com
+# ============================================================
+
+/*
+  # ----------------------------------------------------------
+  # Security
+  # ----------------------------------------------------------
+
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+
+  Referrer-Policy: strict-origin-when-cross-origin
+
+  Permissions-Policy: accelerometer=(), ambient-light-sensor=(), autoplay=(), battery=(), camera=(), display-capture=(), document-domain=(), encrypted-media=(), fullscreen=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(self), screen-wake-lock=(), serial=(), usb=(), web-share=(self), xr-spatial-tracking=()
+
+  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+
+  Cross-Origin-Opener-Policy: same-origin
+
+  X-Permitted-Cross-Domain-Policies: none
+  X-DNS-Prefetch-Control: off
+
+  # ----------------------------------------------------------
+  # Content Security Policy
+  #
+  # Allows:
+  # - resources hosted by Endless Codex
+  # - HTTPS API connections
+  # - secure WebSocket connections
+  # - data/blob images where required by the application
+  #
+  # If you later know every external service Endless Codex
+  # communicates with, connect-src should be tightened further.
+  # ----------------------------------------------------------
+
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data: https:; connect-src 'self' https: wss:; media-src 'self' blob: https:; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests
+
+  # ----------------------------------------------------------
+  # Default caching
+  # ----------------------------------------------------------
+
+  Cache-Control: public, max-age=0, must-revalidate
+
+
+# ============================================================
+# HTML
+# Never permanently cache application HTML.
+# ============================================================
+
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+
+# ============================================================
+# JavaScript
+#
+# Vite normally emits fingerprinted assets. These files can
+# safely be cached aggressively when their names contain hashes.
+# ============================================================
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+
+# ============================================================
+# Images
+# ============================================================
+
+/*.png
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+/*.jpg
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+/*.jpeg
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+/*.webp
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+/*.avif
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+/*.svg
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+
+# ============================================================
+# Fonts
+# ============================================================
+
+/*.woff
+  Cache-Control: public, max-age=31536000, immutable
+
+/*.woff2
+  Cache-Control: public, max-age=31536000, immutable
+
+
+# ============================================================
+# Site Metadata
+#
+# Keep these relatively fresh so crawler/browser changes are
+# picked up quickly.
+# ============================================================
+
+/robots.txt
+  Cache-Control: public, max-age=3600, must-revalidate
+
+/sitemap.xml
+  Cache-Control: public, max-age=3600, must-revalidate
+
+/site.webmanifest
+  Cache-Control: public, max-age=86400, must-revalidate
+
+/manifest.json
+  Cache-Control: public, max-age=86400, must-revalidate
+
+
+# ============================================================
+# Service Worker
+#
+# A service worker should always be checked for updates.
+# ============================================================
+
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+  Service-Worker-Allowed: /
+
+
+# ============================================================
+# Sensitive / source artifacts
+#
+# Tell crawlers not to index common accidentally exposed files.
+# This does NOT replace proper access controls.
+# ============================================================
+
+/*.map
+  X-Robots-Tag: noindex, nofollow
+  Cache-Control: no-store

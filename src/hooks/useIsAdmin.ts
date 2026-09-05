@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { readAdminRole } from "@/lib/database.functions";
 import { useSession } from "@/hooks/useSession";
 
 /** True when the signed-in account holds the admin role. */
@@ -16,16 +16,17 @@ export function useIsAdmin() {
       return;
     }
     setLoading(true);
-    void supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
-      .maybeSingle()
-      .then(({ data }) => {
+    void readAdminRole()
+      .then((isAdmin) => {
         if (!active) return;
-        setIsAdmin(Boolean(data));
+        setIsAdmin(isAdmin);
         setLoading(false);
+      })
+      .catch(() => {
+        if (active) {
+          setIsAdmin(false);
+          setLoading(false);
+        }
       });
     return () => {
       active = false;

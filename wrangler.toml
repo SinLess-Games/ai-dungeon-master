@@ -1,0 +1,16 @@
+name = "the-endless-codex"
+compatibility_date = "2026-09-04"
+compatibility_flags = ["nodejs_compat"]
+
+domain = "endless-codex.sinlessindustries.com"
+
+# Nitro generates main, assets, and module rules when npm run build completes.
+# Wrangler discovers that configuration through .wrangler/deploy/config.json.
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_id = "dc744f5a-7c53-4d37-b695-97b2527ef06a"
+migrations_dir = "migrations"

@@ -1,16 +1,45 @@
+# Endless Codex
+# https://endless-codex.sinlessindustries.com/
+#
+# Public content may be crawled and indexed by search engines,
+# social media preview crawlers, and AI discovery services.
+
+# Google
 User-agent: Googlebot
 Allow: /
 
+# Microsoft Bing
 User-agent: Bingbot
 Allow: /
 
+# OpenAI
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+# Anthropic
+User-agent: ClaudeBot
+Allow: /
+
+# Perplexity
+User-agent: PerplexityBot
+Allow: /
+
+# Social previews
 User-agent: Twitterbot
 Allow: /
 
 User-agent: facebookexternalhit
 Allow: /
 
+# All other crawlers
 User-agent: *
 Allow: /
 
+# Sitemap
 Sitemap: https://endless-codex.sinlessindustries.com/sitemap.xml

@@ -97,8 +97,8 @@ export const createPortalSession = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { returnUrl?: string | undefined; environment: StripeEnv }) => data)
   .handler(async ({ data, context }): Promise<PortalSessionResult> => {
-    const { supabase, userId } = context;
-    const { data: sub } = await supabase
+    const { db, userId } = context;
+    const { data: sub } = await db
       .from("subscriptions")
       .select("stripe_customer_id")
       .eq("user_id", userId)

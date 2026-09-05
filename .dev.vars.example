@@ -1,0 +1,11 @@
+# Copy to .dev.vars for npm run preview. Never commit real credentials.
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+
+# Required only for the payment environments you use.
+STRIPE_SANDBOX_API_KEY=
+STRIPE_LIVE_API_KEY=
+PAYMENTS_SANDBOX_WEBHOOK_SECRET=
+PAYMENTS_LIVE_WEBHOOK_SECRET=
+

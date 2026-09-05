@@ -2,11 +2,15 @@
  * Offline-first cloud sync.
  *
  * The UI keeps talking to the synchronous local store. This layer mirrors those
- * collections into Lovable Cloud for the signed-in user: it pulls on sign-in,
+ * collections into Cloudflare D1 for the signed-in user: it pulls on sign-in,
  * merges by `updatedAt` (last write wins), and pushes changed rows afterwards.
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import {
+  readCollectionRows,
+  writeCollectionRows,
+  deleteCollectionRow,
+} from "@/lib/database.functions";
 import {
   STORE_KEYS,
   clearDeletions,
@@ -58,11 +62,7 @@ async function syncSpec(userId: string, spec: (typeof SPECS)[number]) {
   const local = readCollection<SyncRow>(spec.key).filter(
     (r) => r && UUID.test(r.id) && !gone.has(r.id),
   );
-  const { data: remote, error } = await supabase
-    .from(spec.table)
-    .select("id, data, updated_at")
-    .eq("user_id", userId);
-  if (error) throw new Error(error.message);
+  const remote = await readCollectionRows({ data: spec.table });
 
   const byId = new Map<string, SyncRow>();
   for (const row of local) byId.set(row.id, row);
@@ -90,17 +90,14 @@ async function syncSpec(userId: string, spec: (typeof SPECS)[number]) {
   if (pushes.length) {
     const payload = pushes.map((row) => ({
       id: row.id,
-      user_id: userId,
       name: row.name ?? "Untitled",
-      data: row as unknown,
+      data: row,
       ...(spec.hasWorld && row.worldId && UUID.test(row.worldId) ? { world_id: row.worldId } : {}),
       updated_at: row.updatedAt ?? new Date().toISOString(),
     }));
-    const table = supabase.from(spec.table) as unknown as {
-      upsert: (rows: unknown[]) => Promise<{ error: { message: string } | null }>;
-    };
-    const { error: upErr } = await table.upsert(payload);
-    if (upErr) throw new Error(upErr.message);
+    for (let i = 0; i < payload.length; i += 50) {
+      await writeCollectionRows({ data: { table: spec.table, rows: payload.slice(i, i + 50) } });
+    }
   }
 }
 
@@ -115,7 +112,7 @@ async function flushDeletions(userId: string) {
       continue;
     }
     try {
-      const { error } = await supabase.from(t.table).delete().eq("id", t.id).eq("user_id", userId);
+      const { error } = await deleteCollectionRow({ data: { table: t.table, id: t.id } });
       // A failed delete keeps its tombstone so we try again next sync.
       if (!error) done.push(t);
     } catch {

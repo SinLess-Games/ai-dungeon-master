@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { uploadBlogMedia } from "@/lib/database.functions";
 
 const BUCKET = "blog-media";
 const MAX_WIDTH = 1600;
@@ -27,11 +27,7 @@ async function optimize(file: File): Promise<Blob> {
 /** Uploads an image for a blog post and returns the shareable URL to embed. */
 export async function uploadBlogImage(file: File): Promise<string> {
   const blob = await optimize(file);
-  const ext = blob.type === "image/webp" ? "webp" : (file.name.split(".").pop() || "png");
-  const path = `posts/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const { error } = await supabase.storage
-    .from(BUCKET)
-    .upload(path, blob, { contentType: blob.type, upsert: false });
-  if (error) throw new Error(error.message);
-  return `/api/public/blog-media/${path}`;
+  const data = new FormData();
+  data.set("file", new File([blob], file.name, { type: blob.type }));
+  return uploadBlogMedia({ data });
 }

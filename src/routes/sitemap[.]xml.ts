@@ -29,26 +29,12 @@ export const Route = createFileRoute("/sitemap.xml")({
         const entries: SitemapEntry[] = [...STATIC_ENTRIES];
 
         try {
-          const { createClient } = await import("@supabase/supabase-js");
-          const key = process.env['SUPABASE_PUBLISHABLE_KEY'] ?? process.env['VITE_SUPABASE_PUBLISHABLE_KEY']!;
-          const url = process.env['SUPABASE_URL'] ?? process.env['VITE_SUPABASE_URL']!;
-          const supabase = createClient(url, key, {
-            auth: { persistSession: false, autoRefreshToken: false },
-            global: {
-              fetch: (input, init) => {
-                const headers = new Headers(init?.headers);
-                if (key.startsWith("sb_") && headers.get("Authorization") === "Bearer " + key) {
-                  headers.delete("Authorization");
-                }
-                headers.set("apikey", key);
-                return fetch(input, { ...init, headers });
-              },
-            },
-          });
+          const { publicDatabase } = await import("@/integrations/d1/client.server");
+          const db = await publicDatabase();
 
           const pageSize = 1000;
           for (let offset = 0; ; offset += pageSize) {
-            const { data, error } = await supabase
+            const { data, error } = await db
               .from("dev_blog_posts")
               .select("slug, updated_at, published_at")
               .eq("status", "published")

@@ -8,6 +8,8 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
+import { readProfile, writeProfile } from "@/lib/database.functions";
+
 const KEY_SESSION = "codex:session-cache";
 
 export interface SessionUser {
@@ -54,11 +56,7 @@ interface ProfileRow {
 }
 
 async function loadProfile(userId: string, email: string): Promise<SessionUser> {
-  const { data } = await supabase
-    .from("profiles")
-    .select("display_name, avatar_url, created_at")
-    .eq("id", userId)
-    .maybeSingle<ProfileRow>();
+  const data = (await readProfile()) as ProfileRow | null;
 
   const user: SessionUser = {
     id: userId,
@@ -157,11 +155,7 @@ export async function updateDisplayName(displayName: string): Promise<SessionUse
   if (!session) throw new Error("You are not signed in.");
   const name = displayName.trim();
   if (name.length < 2) throw new Error("Display name must be at least 2 characters.");
-  const { error } = await supabase
-    .from("profiles")
-    .update({ display_name: name })
-    .eq("id", session.id);
-  if (error) throw new Error(error.message);
+  await writeProfile({ data: { display_name: name } });
   const next = { ...session, displayName: name };
   writeCache(next);
   return next;
@@ -171,11 +165,7 @@ export async function updateDisplayName(displayName: string): Promise<SessionUse
 export async function updateAvatar(avatarUrl: string | null): Promise<SessionUser> {
   const session = getSession();
   if (!session) throw new Error("You are not signed in.");
-  const { error } = await supabase
-    .from("profiles")
-    .update({ avatar_url: avatarUrl })
-    .eq("id", session.id);
-  if (error) throw new Error(error.message);
+  await writeProfile({ data: { avatar_url: avatarUrl } });
   const next: SessionUser = { ...session };
   if (avatarUrl) next.avatarUrl = avatarUrl;
   else delete next.avatarUrl;

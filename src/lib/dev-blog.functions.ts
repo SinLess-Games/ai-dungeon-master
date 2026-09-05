@@ -1,30 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
-import { createClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import {
-  BLOG_STATUSES,
-  type BlogPost,
-  type BlogStatus,
-  mapRow,
-  slugify,
-} from "@/lib/dev-blog";
+import { BLOG_STATUSES, type BlogPost, type BlogStatus, mapRow, slugify } from "@/lib/dev-blog";
 
 const COLUMNS =
   "id, title, slug, subtitle, excerpt, content, cover_image_url, cover_image_alt, author_id, author_name, status, category, tags, seo_title, seo_description, og_image_url, featured_as_update, published_at, scheduled_at, created_at, updated_at";
-
-function publicClient() {
-  return createClient(
-    process.env["SUPABASE_URL"]!,
-    process.env["SUPABASE_PUBLISHABLE_KEY"]!,
-    { auth: { storage: undefined, persistSession: false, autoRefreshToken: false } },
-  );
-}
-
-/** Rows readable by anyone: published, or scheduled with the time already passed. */
-function liveFilter(query: any) {
-  const now = new Date().toISOString();
-  return query.or(`status.eq.published,and(status.eq.scheduled,scheduled_at.lte.${now})`);
-}
 
 function sortKey(p: BlogPost) {
   return new Date(p.publishedAt ?? p.scheduledAt ?? p.createdAt).getTime();
@@ -34,9 +13,13 @@ function sortKey(p: BlogPost) {
 
 export const listPublicPosts = createServerFn({ method: "GET" }).handler(
   async (): Promise<BlogPost[]> => {
-    const { data, error } = await liveFilter(
-      publicClient().from("dev_blog_posts").select(COLUMNS),
-    ).limit(300);
+    const { publicDatabase } = await import("@/integrations/d1/client.server");
+    const { data, error } = await (
+      await publicDatabase()
+    )
+      .from("dev_blog_posts")
+      .select(COLUMNS)
+      .limit(300);
     if (error) throw new Error(error.message);
     return ((data ?? []) as any[]).map(mapRow).sort((a, b) => sortKey(b) - sortKey(a));
   },
@@ -55,10 +38,10 @@ export const getPublicPost = createServerFn({ method: "GET" })
 
 /* ------------------------------------------------------------------- admin */
 
-type Ctx = { supabase: any; userId: string };
+type Ctx = { db: any; userId: string };
 
 async function assertAdmin(ctx: Ctx) {
-  const { data, error } = await ctx.supabase.rpc("has_role", {
+  const { data, error } = await ctx.db.rpc("has_role", {
     _user_id: ctx.userId,
     _role: "admin",
   });
@@ -66,7 +49,7 @@ async function assertAdmin(ctx: Ctx) {
 }
 
 async function actorName(ctx: Ctx) {
-  const { data } = await ctx.supabase
+  const { data } = await ctx.db
     .from("profiles")
     .select("display_name")
     .eq("id", ctx.userId)
@@ -75,7 +58,7 @@ async function actorName(ctx: Ctx) {
 }
 
 async function audit(ctx: Ctx, action: string, postId: string | null, title: string) {
-  await ctx.supabase.from("dev_blog_audit").insert({
+  await ctx.db.from("dev_blog_audit").insert({
     post_id: postId,
     post_title: title,
     action,
@@ -89,7 +72,7 @@ export const listAllPosts = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<BlogPost[]> => {
     const ctx = context as unknown as Ctx;
     await assertAdmin(ctx);
-    const { data, error } = await ctx.supabase
+    const { data, error } = await ctx.db
       .from("dev_blog_posts")
       .select(COLUMNS)
       .order("updated_at", { ascending: false })
@@ -107,7 +90,7 @@ export const getPostById = createServerFn({ method: "GET" })
   .handler(async ({ data, context }): Promise<BlogPost | null> => {
     const ctx = context as unknown as Ctx;
     await assertAdmin(ctx);
-    const { data: row, error } = await ctx.supabase
+    const { data: row, error } = await ctx.db
       .from("dev_blog_posts")
       .select(COLUMNS)
       .eq("id", data.id)
@@ -140,7 +123,7 @@ async function uniqueSlug(ctx: Ctx, wanted: string, ignoreId?: string) {
   const base = slugify(wanted) || `entry-${Date.now()}`;
   let candidate = base;
   for (let n = 2; n < 60; n++) {
-    let q = ctx.supabase.from("dev_blog_posts").select("id").eq("slug", candidate);
+    let q = ctx.db.from("dev_blog_posts").select("id").eq("slug", candidate);
     if (ignoreId) q = q.neq("id", ignoreId);
     const { data } = await q.maybeSingle();
     if (!data) return candidate;
@@ -177,7 +160,10 @@ export const savePost = createServerFn({ method: "POST" })
       author_name: data.authorName?.trim() || (await actorName(ctx)),
       status,
       category: data.category || "Development",
-      tags: (data.tags ?? []).map((t) => t.trim()).filter(Boolean).slice(0, 12),
+      tags: (data.tags ?? [])
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .slice(0, 12),
       seo_title: data.seoTitle?.trim() || null,
       seo_description: data.seoDescription?.trim() || null,
       og_image_url: data.ogImageUrl || null,
@@ -186,7 +172,7 @@ export const savePost = createServerFn({ method: "POST" })
     };
 
     if (data.id) {
-      const { data: before } = await ctx.supabase
+      const { data: before } = await ctx.db
         .from("dev_blog_posts")
         .select("status, published_at")
         .eq("id", data.id)
@@ -197,18 +183,20 @@ export const savePost = createServerFn({ method: "POST" })
       } else if (status !== "scheduled") {
         patch["published_at"] = null;
       }
-      const { error } = await ctx.supabase
-        .from("dev_blog_posts")
-        .update(patch)
-        .eq("id", data.id);
+      const { error } = await ctx.db.from("dev_blog_posts").update(patch).eq("id", data.id);
       if (error) throw new Error(error.message);
-      await audit(ctx, prev?.status !== status ? `status:${status}` : "updated", data.id, patch["title"] as string);
+      await audit(
+        ctx,
+        prev?.status !== status ? `status:${status}` : "updated",
+        data.id,
+        patch["title"] as string,
+      );
       return { id: data.id, slug };
     }
 
     if (status === "published") patch["published_at"] = new Date().toISOString();
     patch["author_id"] = ctx.userId;
-    const { data: created, error } = await ctx.supabase
+    const { data: created, error } = await ctx.db
       .from("dev_blog_posts")
       .insert(patch)
       .select("id")
@@ -228,7 +216,7 @@ export const setPostStatus = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const ctx = context as unknown as Ctx;
     await assertAdmin(ctx);
-    const { data: before } = await ctx.supabase
+    const { data: before } = await ctx.db
       .from("dev_blog_posts")
       .select("title, published_at")
       .eq("id", data.id)
@@ -239,7 +227,7 @@ export const setPostStatus = createServerFn({ method: "POST" })
       patch["scheduled_at"] = null;
     }
     if (data.status === "draft") patch["published_at"] = null;
-    const { error } = await ctx.supabase.from("dev_blog_posts").update(patch).eq("id", data.id);
+    const { error } = await ctx.db.from("dev_blog_posts").update(patch).eq("id", data.id);
     if (error) throw new Error(error.message);
     await audit(ctx, `status:${data.status}`, data.id, (before as any)?.title ?? "");
     return { ok: true };
@@ -254,7 +242,7 @@ export const duplicatePost = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<{ id: string }> => {
     const ctx = context as unknown as Ctx;
     await assertAdmin(ctx);
-    const { data: row, error } = await ctx.supabase
+    const { data: row, error } = await ctx.db
       .from("dev_blog_posts")
       .select(COLUMNS)
       .eq("id", data.id)
@@ -262,7 +250,7 @@ export const duplicatePost = createServerFn({ method: "POST" })
     if (error || !row) throw new Error(error?.message ?? "Post not found");
     const src = row as any;
     const title = `${src.title} (copy)`;
-    const { data: created, error: insErr } = await ctx.supabase
+    const { data: created, error: insErr } = await ctx.db
       .from("dev_blog_posts")
       .insert({
         title,
@@ -298,12 +286,12 @@ export const deletePost = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const ctx = context as unknown as Ctx;
     await assertAdmin(ctx);
-    const { data: before } = await ctx.supabase
+    const { data: before } = await ctx.db
       .from("dev_blog_posts")
       .select("title")
       .eq("id", data.id)
       .maybeSingle();
-    const { error } = await ctx.supabase.from("dev_blog_posts").delete().eq("id", data.id);
+    const { error } = await ctx.db.from("dev_blog_posts").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     await audit(ctx, "deleted", null, (before as any)?.title ?? "");
     return { ok: true };
@@ -322,7 +310,7 @@ export const listAudit = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<AuditEntry[]> => {
     const ctx = context as unknown as Ctx;
     await assertAdmin(ctx);
-    const { data, error } = await ctx.supabase
+    const { data, error } = await ctx.db
       .from("dev_blog_audit")
       .select("id, action, post_title, actor_name, created_at")
       .order("created_at", { ascending: false })

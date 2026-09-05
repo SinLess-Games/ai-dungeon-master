@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { listCharacters } from "@/lib/storage";
 import { computeCharacter } from "@/lib/rules/engine";
 import { CLASS_BY_ID } from "@/lib/rules/classes";
-import logoAsset from "@/assets/endless-codex-logo.png.asset.json";
+import logoAsset from "@/assets/logo.png";
 import { RACE_BY_ID } from "@/lib/rules/races";
 import type { Character } from "@/lib/rules/character";
 
@@ -56,7 +56,7 @@ function Home() {
         <p className="mt-8 text-xs uppercase tracking-[0.4em] text-primary">Third Edition · Revised</p>
         <div className="mt-4 grid w-full grid-cols-1 items-center gap-4 sm:grid-cols-2 sm:gap-6">
           <img
-            src={logoAsset.url}
+            src={logoAsset}
             alt="The Endless Codex"
             className="mx-auto w-full max-w-md rounded-md border border-border/60 shadow-lg sm:mx-0"
           />

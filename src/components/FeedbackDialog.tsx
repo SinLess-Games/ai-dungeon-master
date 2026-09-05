@@ -14,7 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/integrations/supabase/client";
+import { submitFeedback } from "@/lib/database.functions";
 import { useSession } from "@/hooks/useSession";
 import { cn } from "@/lib/utils";
 
@@ -40,13 +40,14 @@ export function FeedbackDialog({ trigger }: { trigger: ReactNode }) {
       return;
     }
     setSaving(true);
-    const { error } = await supabase.from("feedback").insert({
-      user_id: user.id,
-      kind,
-      title: trimmedTitle.slice(0, 140),
-      details: trimmedDetails.slice(0, 4000),
-      page_url: typeof window === "undefined" ? null : window.location.pathname,
-    });
+    const { error } = await submitFeedback({
+      data: {
+        kind,
+        title: trimmedTitle.slice(0, 140),
+        details: trimmedDetails.slice(0, 4000),
+        page_url: typeof window === "undefined" ? null : window.location.pathname,
+      },
+    }).catch(() => ({ error: true }));
     setSaving(false);
     if (error) {
       toast.error("That did not send. Please try again in a moment.");
@@ -99,7 +100,9 @@ export function FeedbackDialog({ trigger }: { trigger: ReactNode }) {
             value={title}
             maxLength={140}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder={kind === "bug" ? "Dice tray freezes after a roll" : "Let me rename my party"}
+            placeholder={
+              kind === "bug" ? "Dice tray freezes after a roll" : "Let me rename my party"
+            }
           />
         </div>
 
@@ -115,9 +118,7 @@ export function FeedbackDialog({ trigger }: { trigger: ReactNode }) {
           />
         </div>
 
-        {!user ? (
-          <p className="text-sm text-muted-foreground">Sign in to send feedback.</p>
-        ) : null}
+        {!user ? <p className="text-sm text-muted-foreground">Sign in to send feedback.</p> : null}
 
         <DialogFooter>
           <Button onClick={() => void submit()} disabled={saving || !user}>

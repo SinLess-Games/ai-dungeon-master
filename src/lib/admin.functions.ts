@@ -19,7 +19,13 @@ export interface AdminMetrics {
   signupSeries: { date: string; users: number }[];
   contentSeries: { date: string; characters: number; campaigns: number; worlds: number }[];
   contentMix: { name: string; value: number }[];
-  recentUsers: { id: string; email: string; displayName: string; createdAt: string; isAdmin: boolean }[];
+  recentUsers: {
+    id: string;
+    email: string;
+    displayName: string;
+    createdAt: string;
+    isAdmin: boolean;
+  }[];
 }
 
 function dayKey(iso: string) {
@@ -36,8 +42,8 @@ function lastDays(n: number) {
   return out;
 }
 
-async function assertAdmin(context: { supabase: any; userId: string }) {
-  const { data, error } = await context.supabase.rpc("has_role", {
+async function assertAdmin(context: { db: any; userId: string }) {
+  const { data, error } = await context.db.rpc("has_role", {
     _user_id: context.userId,
     _role: "admin",
   });
@@ -47,17 +53,19 @@ async function assertAdmin(context: { supabase: any; userId: string }) {
 export const getAdminMetrics = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<AdminMetrics> => {
-    await assertAdmin(context as { supabase: any; userId: string });
+    await assertAdmin(context as { db: any; userId: string });
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { serviceDatabase } = await import("@/integrations/d1/client.server");
+    const dbAdmin = await serviceDatabase();
 
     const [usersRes, chars, camps, worlds, maps, rolls, roles] = await Promise.all([
       supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
-      supabaseAdmin.from("characters").select("id, created_at, user_id"),
-      supabaseAdmin.from("campaigns").select("id, created_at, user_id, data"),
-      supabaseAdmin.from("worlds").select("id, created_at, user_id"),
-      supabaseAdmin.from("game_maps").select("id, created_at"),
-      supabaseAdmin.from("dice_rolls").select("id, created_at"),
-      supabaseAdmin.from("user_roles").select("user_id, role"),
+      dbAdmin.from("characters").select("id, created_at, user_id"),
+      dbAdmin.from("campaigns").select("id, created_at, user_id, data"),
+      dbAdmin.from("worlds").select("id, created_at, user_id"),
+      dbAdmin.from("game_maps").select("id, created_at"),
+      dbAdmin.from("dice_rolls").select("id, created_at"),
+      dbAdmin.from("user_roles").select("user_id, role"),
     ]);
 
     const users = usersRes.data?.users ?? [];
@@ -76,7 +84,8 @@ export const getAdminMetrics = createServerFn({ method: "GET" })
     const days = lastDays(30);
     const countBy = (rows: { created_at: string }[] | null) => {
       const m = new Map<string, number>();
-      for (const r of rows ?? []) m.set(dayKey(r.created_at), (m.get(dayKey(r.created_at)) ?? 0) + 1);
+      for (const r of rows ?? [])
+        m.set(dayKey(r.created_at), (m.get(dayKey(r.created_at)) ?? 0) + 1);
       return m;
     };
     const signupMap = countBy(users.map((u) => ({ created_at: u.created_at })));
@@ -99,7 +108,9 @@ export const getAdminMetrics = createServerFn({ method: "GET" })
         id: u.id,
         email: u.email ?? "—",
         displayName:
-          (u.user_metadata?.["display_name"] as string | undefined) ?? (u.email ?? "").split("@")[0] ?? "Adventurer",
+          (u.user_metadata?.["display_name"] as string | undefined) ??
+          (u.email ?? "").split("@")[0] ??
+          "Adventurer",
         createdAt: u.created_at,
         isAdmin: adminIds.has(u.id),
       }));
@@ -116,7 +127,7 @@ export const getAdminMetrics = createServerFn({ method: "GET" })
           (sum, c) =>
             sum +
             (Array.isArray((c.data as { messages?: unknown[] } | null)?.messages)
-              ? ((c.data as { messages: unknown[] }).messages.length)
+              ? (c.data as { messages: unknown[] }).messages.length
               : 0),
           0,
         ),
@@ -174,11 +185,13 @@ const PLAN_MONTHLY_CENTS: Record<string, number> = {
 export const getAdminBilling = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<AdminBilling> => {
-    await assertAdmin(context as { supabase: any; userId: string });
+    await assertAdmin(context as { db: any; userId: string });
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { serviceDatabase } = await import("@/integrations/d1/client.server");
+    const dbAdmin = await serviceDatabase();
 
     const [subsRes, usersRes] = await Promise.all([
-      supabaseAdmin
+      dbAdmin
         .from("subscriptions")
         .select(
           "id, user_id, price_id, status, environment, current_period_end, cancel_at_period_end, created_at",
@@ -251,11 +264,10 @@ export interface AdminInbox {
   messages: InboxMessage[];
 }
 
-
 export const getAdminInbox = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<AdminInbox> => {
-    const ctx = context as unknown as { supabase: any; userId: string };
+    const ctx = context as unknown as { db: any; userId: string };
     await assertAdmin(ctx);
     // Nothing is routed to the admin inbox at this time.
     return { total: 0, unread: 0, messages: [] };
@@ -268,16 +280,18 @@ export const setMessageRead = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data, context }) => {
-    const ctx = context as unknown as { supabase: any; userId: string };
+    const ctx = context as unknown as { db: any; userId: string };
     await assertAdmin(ctx);
     if (data.read) {
-      const { error } = await ctx.supabase.from("admin_message_reads").upsert(
-        { admin_id: ctx.userId, campaign_id: data.campaignId, message_id: data.messageId },
-        { onConflict: "admin_id,campaign_id,message_id" },
-      );
+      const { error } = await ctx.db
+        .from("admin_message_reads")
+        .upsert(
+          { admin_id: ctx.userId, campaign_id: data.campaignId, message_id: data.messageId },
+          { onConflict: "admin_id,campaign_id,message_id" },
+        );
       if (error) throw new Error(error.message);
     } else {
-      const { error } = await ctx.supabase
+      const { error } = await ctx.db
         .from("admin_message_reads")
         .delete()
         .eq("admin_id", ctx.userId)
@@ -302,18 +316,19 @@ export interface CampaignPlayers {
 export const getCampaignPlayers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<CampaignPlayers[]> => {
-    const ctx = context as unknown as { supabase: any; userId: string };
+    const ctx = context as unknown as { db: any; userId: string };
     await assertAdmin(ctx);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { serviceDatabase } = await import("@/integrations/d1/client.server");
+    const dbAdmin = await serviceDatabase();
     const { countActivePlayers } = await import("@/lib/campaign");
 
     const [campsRes, profilesRes] = await Promise.all([
-      supabaseAdmin
+      dbAdmin
         .from("campaigns")
         .select("id, name, user_id, data, updated_at")
         .order("updated_at", { ascending: false })
         .limit(500),
-      supabaseAdmin.from("profiles").select("id, display_name"),
+      dbAdmin.from("profiles").select("id, display_name"),
     ]);
     const names = new Map<string, string>(
       (profilesRes.data ?? []).map((p: any) => [p.id, p.display_name ?? "Adventurer"]),
@@ -383,15 +398,14 @@ function questCounts(data: any) {
 
 function playerMessageCount(data: any) {
   const list = Array.isArray(data?.messages) ? data.messages : [];
-  return list.filter(
-    (m: any, i: number) => m?.role === "user" && !m?.metadata?.hidden && i !== 0,
-  ).length;
+  return list.filter((m: any, i: number) => m?.role === "user" && !m?.metadata?.hidden && i !== 0)
+    .length;
 }
 
-async function loadTitlesByUser(supabaseAdmin: any, userIds: string[]) {
+async function loadTitlesByUser(dbAdmin: any, userIds: string[]) {
   const map = new Map<string, { name: string; rarity: string; awardedAt: string }[]>();
   if (!userIds.length) return map;
-  const { data } = await supabaseAdmin
+  const { data } = await dbAdmin
     .from("player_titles")
     .select("user_id, awarded_at, titles(name, rarity)")
     .in("user_id", userIds);
@@ -460,24 +474,25 @@ function buildPlayers(
 export const getCampaignDashboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<CampaignDashboardRow[]> => {
-    const ctx = context as unknown as { supabase: any; userId: string };
+    const ctx = context as unknown as { db: any; userId: string };
     await assertAdmin(ctx);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { serviceDatabase } = await import("@/integrations/d1/client.server");
+    const dbAdmin = await serviceDatabase();
 
     const [campsRes, profilesRes] = await Promise.all([
-      supabaseAdmin
+      dbAdmin
         .from("campaigns")
         .select("id, name, user_id, data, updated_at")
         .order("updated_at", { ascending: false })
         .limit(200),
-      supabaseAdmin.from("profiles").select("id, display_name"),
+      dbAdmin.from("profiles").select("id, display_name"),
     ]);
     const names = new Map<string, string>(
       (profilesRes.data ?? []).map((p: any) => [p.id, p.display_name ?? "Adventurer"]),
     );
     const camps = (campsRes.data ?? []) as any[];
     const titles = await loadTitlesByUser(
-      supabaseAdmin,
+      dbAdmin,
       Array.from(new Set(camps.map((c) => c.user_id))),
     );
 
@@ -520,11 +535,12 @@ export const getCampaignPlayerProfile = createServerFn({ method: "GET" })
     return input;
   })
   .handler(async ({ data: input, context }): Promise<CampaignPlayerProfile> => {
-    const ctx = context as unknown as { supabase: any; userId: string };
+    const ctx = context as unknown as { db: any; userId: string };
     await assertAdmin(ctx);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { serviceDatabase } = await import("@/integrations/d1/client.server");
+    const dbAdmin = await serviceDatabase();
 
-    const { data: camp, error } = await supabaseAdmin
+    const { data: camp, error } = await dbAdmin
       .from("campaigns")
       .select("id, name, user_id, data, updated_at")
       .eq("id", input.campaignId)
@@ -533,13 +549,13 @@ export const getCampaignPlayerProfile = createServerFn({ method: "GET" })
     if (!camp) throw new Error("Campaign not found");
 
     const data = (camp.data ?? {}) as any;
-    const { data: profile } = await supabaseAdmin
+    const { data: profile } = await dbAdmin
       .from("profiles")
       .select("display_name")
       .eq("id", camp.user_id)
       .maybeSingle();
     const ownerName = profile?.display_name ?? "Adventurer";
-    const titles = await loadTitlesByUser(supabaseAdmin, [camp.user_id]);
+    const titles = await loadTitlesByUser(dbAdmin, [camp.user_id]);
     const playerMessages = playerMessageCount(data);
     const players = buildPlayers(data, ownerName, titles.get(camp.user_id) ?? [], playerMessages);
     const player = players.find((p) => p.key === input.playerKey) ?? players[0];
@@ -555,7 +571,10 @@ export const getCampaignPlayerProfile = createServerFn({ method: "GET" })
           .filter((m: any, i: number) => m?.role === "user" && !m?.metadata?.hidden && i !== 0)
           .slice(-10)
           .reverse()
-          .map((m: any, i: number) => ({ id: String(m.id ?? i), text: textOf(m.parts).slice(0, 600) }))
+          .map((m: any, i: number) => ({
+            id: String(m.id ?? i),
+            text: textOf(m.parts).slice(0, 600),
+          }))
           .filter((m: any) => m.text)
       : [];
 

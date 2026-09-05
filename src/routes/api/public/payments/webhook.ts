@@ -1,17 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { createClient } from "@supabase/supabase-js";
+import { serviceDatabase } from "@/integrations/d1/client.server";
 import { type StripeEnv, verifyWebhook } from "@/lib/stripe.server";
-
-let _supabase: any = null;
-function getSupabase(): any {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env["SUPABASE_URL"]!,
-      process.env["SUPABASE_SERVICE_ROLE_KEY"]!,
-    );
-  }
-  return _supabase;
-}
 
 function priceOf(item: any): string {
   return (
@@ -33,31 +22,31 @@ async function upsertSubscription(subscription: any, env: StripeEnv) {
   const periodStart = item?.current_period_start ?? subscription.current_period_start;
   const periodEnd = item?.current_period_end ?? subscription.current_period_end;
 
-  await getSupabase()
-    .from("subscriptions")
-    .upsert(
-      {
-        user_id: userId,
-        stripe_subscription_id: subscription.id,
-        stripe_customer_id:
-          typeof subscription.customer === "string"
-            ? subscription.customer
-            : subscription.customer?.id,
-        product_id: item?.price?.product ?? "",
-        price_id: priceOf(item),
-        status: subscription.status,
-        current_period_start: iso(periodStart),
-        current_period_end: iso(periodEnd),
-        cancel_at_period_end: subscription.cancel_at_period_end ?? false,
-        environment: env,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "stripe_subscription_id" },
-    );
+  await (await serviceDatabase()).from("subscriptions").upsert(
+    {
+      user_id: userId,
+      stripe_subscription_id: subscription.id,
+      stripe_customer_id:
+        typeof subscription.customer === "string"
+          ? subscription.customer
+          : subscription.customer?.id,
+      product_id: item?.price?.product ?? "",
+      price_id: priceOf(item),
+      status: subscription.status,
+      current_period_start: iso(periodStart),
+      current_period_end: iso(periodEnd),
+      cancel_at_period_end: subscription.cancel_at_period_end ?? false,
+      environment: env,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "stripe_subscription_id" },
+  );
 }
 
 async function markCanceled(subscription: any, env: StripeEnv) {
-  await getSupabase()
+  await (
+    await serviceDatabase()
+  )
     .from("subscriptions")
     .update({ status: "canceled", updated_at: new Date().toISOString() })
     .eq("stripe_subscription_id", subscription.id)

@@ -15,8 +15,8 @@ export interface FeedbackItem {
 
 export const FEEDBACK_STATUSES = ["new", "planned", "in progress", "done", "declined"] as const;
 
-async function assertAdmin(context: { supabase: any; userId: string }) {
-  const { data, error } = await context.supabase.rpc("has_role", {
+async function assertAdmin(context: { db: any; userId: string }) {
+  const { data, error } = await context.db.rpc("has_role", {
     _user_id: context.userId,
     _role: "admin",
   });
@@ -26,10 +26,10 @@ async function assertAdmin(context: { supabase: any; userId: string }) {
 export const listFeedback = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<FeedbackItem[]> => {
-    const ctx = context as unknown as { supabase: any; userId: string };
+    const ctx = context as unknown as { db: any; userId: string };
     await assertAdmin(ctx);
 
-    const { data, error } = await ctx.supabase
+    const { data, error } = await ctx.db
       .from("feedback")
       .select("id, kind, title, details, status, admin_note, page_url, created_at, user_id")
       .order("created_at", { ascending: false })
@@ -40,7 +40,7 @@ export const listFeedback = createServerFn({ method: "GET" })
     const ids = [...new Set(rows.map((r) => r.user_id))];
     const names = new Map<string, string>();
     if (ids.length) {
-      const { data: profiles } = await ctx.supabase
+      const { data: profiles } = await ctx.db
         .from("profiles")
         .select("id, display_name")
         .in("id", ids);
@@ -74,12 +74,12 @@ export const updateFeedback = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data, context }) => {
-    const ctx = context as unknown as { supabase: any; userId: string };
+    const ctx = context as unknown as { db: any; userId: string };
     await assertAdmin(ctx);
     const patch: Record<string, unknown> = {};
     if (data.status !== undefined) patch["status"] = data.status;
     if (data.adminNote !== undefined) patch["admin_note"] = data.adminNote;
-    const { error } = await ctx.supabase.from("feedback").update(patch).eq("id", data.id);
+    const { error } = await ctx.db.from("feedback").update(patch).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -91,9 +91,9 @@ export const deleteFeedback = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data, context }) => {
-    const ctx = context as unknown as { supabase: any; userId: string };
+    const ctx = context as unknown as { db: any; userId: string };
     await assertAdmin(ctx);
-    const { error } = await ctx.supabase.from("feedback").delete().eq("id", data.id);
+    const { error } = await ctx.db.from("feedback").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

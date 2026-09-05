@@ -32,7 +32,7 @@ import { useTitleSync } from "@/hooks/useTitleSync";
 import { signOut } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
-import headerBgAsset from "@/assets/header-bg.png.asset.json";
+import headerBgAsset from "@/assets/header-bg.png";
 
 const PLAY_SUB = [
   { to: "/campaigns", label: "Campaigns", icon: Swords },
@@ -59,7 +59,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* Atmospheric banner: castle art with logo block on the left */}
         <div className="relative h-24 overflow-hidden border-b-2 border-primary/50 sm:h-28">
           <img
-            src={headerBgAsset.url}
+            src={headerBgAsset}
             alt=""
             className="absolute inset-0 h-full w-full object-cover"
           />

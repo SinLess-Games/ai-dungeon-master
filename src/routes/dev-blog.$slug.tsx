@@ -59,6 +59,7 @@ export const Route = createFileRoute("/dev-blog/$slug")({
               { name: "twitter:image", content: absolute },
             ]
           : []),
+        { property: "og:url", content: `${origin}/dev-blog/${post.slug}` },
       ],
       links: [{ rel: "canonical", href: `${origin}/dev-blog/${post.slug}` }],
     };

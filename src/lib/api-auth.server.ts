@@ -10,7 +10,12 @@ import { createClient } from "@supabase/supabase-js";
 export async function requireApiUser(
   request: Request,
 ): Promise<{ userId: string } | { response: Response }> {
-  const unauthorized = { response: new Response("Unauthorized", { status: 401 }) };
+  const unauthorized = {
+    response: new Response(
+      JSON.stringify({ error: "Sign in to use the AI Dungeon Master." }),
+      { status: 401, headers: { "Content-Type": "application/json" } },
+    ),
+  };
 
   const url = process.env["SUPABASE_URL"];
   const key = process.env["SUPABASE_PUBLISHABLE_KEY"];

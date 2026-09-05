@@ -5,7 +5,7 @@ const BASE_URL = "https://endless-codex.sinlessindustries.com";
 
 interface SitemapEntry {
   path: string;
-  lastmod?: string;
+  lastmod?: string | undefined;
   changefreq?: "always" | "hourly" | "daily" | "weekly" | "monthly" | "yearly" | "never";
   priority?: string;
 }

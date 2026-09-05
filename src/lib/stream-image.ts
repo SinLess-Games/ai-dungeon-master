@@ -1,5 +1,6 @@
 import { createParser } from "eventsource-parser";
 import { flushSync } from "react-dom";
+import { authHeaders } from "@/lib/api-token";
 
 type ImageEventPayload =
   | { type: "image_generation.partial_image"; b64_json: string; partial_image_index: number }
@@ -12,9 +13,10 @@ export async function streamImage(
   prompt: string,
   onFrame: (dataUrl: string, isFinal: boolean) => void,
 ): Promise<void> {
+  const headers = { "Content-Type": "application/json", ...(await authHeaders()) };
   const res = await fetch(endpoint, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ prompt }),
   });
   if (!res.ok || !res.body) {
@@ -73,7 +75,7 @@ export async function streamImage(
   if (!sawAnyEvent) {
     const replay = await fetch(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ prompt, stream: false }),
     });
     if (!replay.ok) {

@@ -128,7 +128,8 @@ function Table({
     () =>
       new DefaultChatTransport({
         api: "/api/chat",
-        prepareSendMessagesRequest: ({ messages }) => ({
+        prepareSendMessagesRequest: async ({ messages }) => ({
+          headers: await authHeaders(),
           body: {
             messages,
             context: buildDmContext(characterRef.current, campaignRef.current),

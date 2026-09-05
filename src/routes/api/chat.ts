@@ -11,6 +11,7 @@ import { z } from "zod";
 import { createLovableAiGatewayProvider, DM_MODEL } from "@/lib/ai-gateway.server";
 import { roll as rollDice } from "@/lib/dice";
 import { DM_SYSTEM_PROMPT } from "@/prompts/dungeon-master/system-prompt";
+import { requireApiUser } from "@/lib/api-auth.server";
 
 /**
  * Tools with no `execute` are executed on the client, which owns the local
@@ -212,6 +213,9 @@ export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const auth = await requireApiUser(request);
+        if ("response" in auth) return auth.response;
+
         const key = process.env["LOVABLE_API_KEY"];
         if (!key) return new Response("Missing LOVABLE_API_KEY", { status: 500 });
 

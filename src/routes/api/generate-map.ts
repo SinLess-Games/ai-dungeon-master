@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { requireApiUser } from "@/lib/api-auth.server";
 
 /**
  * Streams an AI-painted map image back to the browser as SSE frames.

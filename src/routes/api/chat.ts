@@ -11,6 +11,7 @@ import { z } from "zod";
 import { createLovableAiGatewayProvider, DM_MODEL } from "@/lib/ai-gateway.server";
 import { roll as rollDice } from "@/lib/dice";
 import { DM_SYSTEM_PROMPT } from "@/prompts/dungeon-master/system-prompt";
+import { requireApiUser } from "@/lib/api-auth.server";
 
 /**
  * Tools with no `execute` are executed on the client, which owns the local

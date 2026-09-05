@@ -27,6 +27,7 @@ import { pickOpening } from "@/prompts/dungeon-master/openings";
 import { computeCharacter, formatMod } from "@/lib/rules/engine";
 import { parseNotation, roll as rollDice } from "@/lib/dice";
 import { ABILITY_NAMES, type AbilityKey } from "@/lib/rules/types";
+import { authHeaders } from "@/lib/api-token";
 import type { Campaign } from "@/lib/campaign";
 import type { Character } from "@/lib/rules/character";
 

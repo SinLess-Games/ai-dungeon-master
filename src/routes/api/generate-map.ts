@@ -9,6 +9,9 @@ export const Route = createFileRoute("/api/generate-map")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const auth = await requireApiUser(request);
+        if ("response" in auth) return auth.response;
+
         const { prompt, stream = true } = (await request.json()) as {
           prompt: string;
           stream?: boolean;

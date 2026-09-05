@@ -30,7 +30,9 @@ export const Route = createFileRoute("/")({
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:url", content: "https://endless-codex.sinlessindustries.com/" },
     ],
+    links: [{ rel: "canonical", href: "https://endless-codex.sinlessindustries.com/" }],
   }),
   component: Home,
 });

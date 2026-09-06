@@ -1,0 +1,403 @@
+.codex-home {
+  position: relative;
+  isolation: isolate;
+  min-height: calc(100svh - 86px);
+  color: #eeeae3;
+  background-color: #03090d;
+  background-size: 100% 100%;
+  background-position: center top;
+  font-family: Georgia, "Times New Roman", serif;
+}
+.codex-home::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 55%, #02070bc9 85%, #02070bf5);
+}
+.codex-home-inner {
+  max-width: 1450px;
+  margin: auto;
+  padding: 0 26px;
+}
+.codex-hero {
+  min-height: 625px;
+  display: grid;
+  grid-template-columns: 43% 57%;
+  align-items: center;
+  gap: 18px;
+  padding: 40px 0 48px;
+}
+.codex-hero-emblem {
+  margin-left: -32px;
+  margin-right: -18px;
+}
+.codex-hero-emblem img {
+  width: 100%;
+  height: auto;
+  mask-image: radial-gradient(ellipse, #000 58%, transparent 75%);
+}
+.codex-hero-copy {
+  padding: 15px 0;
+  max-width: 640px;
+  text-shadow: 0 2px 9px #000;
+  background: radial-gradient(ellipse, #02080dc9 20%, transparent 72%);
+}
+.codex-eyebrow {
+  color: #ffe0a0;
+  font-size: 16px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.28em;
+  text-shadow:
+    0 2px 4px #000,
+    0 0 12px #000;
+  margin-bottom: 16px;
+}
+.codex-hero h1 {
+  font-weight: 600;
+  font-size: clamp(35px, 3.15vw, 55px);
+  line-height: 1.12;
+  letter-spacing: 0.005em;
+}
+.codex-hero h1 span {
+  display: block;
+  color: #f0c375;
+}
+.codex-hero-rule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0;
+  color: #e9bb64;
+}
+.codex-hero-rule::before,
+.codex-hero-rule::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, #c3984d, #edc26e);
+}
+.codex-hero-rule::after {
+  background: linear-gradient(90deg, #edc26e, transparent);
+}
+.codex-hero-rule span {
+  font-size: 35px;
+  line-height: 1;
+}
+.codex-hero-description {
+  color: #c1c4cc;
+  font-size: 21px;
+  line-height: 1.4;
+  max-width: 570px;
+}
+.codex-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-top: 30px;
+}
+.codex-hero-actions a,
+.codex-hero-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  padding: 16px 23px;
+  border-radius: 6px;
+  font-size: 17px;
+  min-height: 55px;
+  text-shadow: none;
+  cursor: pointer;
+}
+.codex-cta-primary {
+  background: linear-gradient(115deg, #f7cf6b, #bc821e);
+  color: #171004;
+  border: 1px solid #f9d577;
+  box-shadow:
+    inset 0 0 12px #ffe7a04d,
+    0 0 22px #c48b2426;
+}
+.codex-cta-secondary {
+  background: #030a10c9;
+  border: 1px solid #71849b;
+  color: #eeede8;
+}
+.codex-hero-actions a:hover,
+.codex-hero-actions button:hover {
+  filter: brightness(1.15);
+}
+.codex-features {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  scroll-margin-top: 24px;
+}
+.codex-feature {
+  min-height: 145px;
+  display: flex;
+  align-items: center;
+  gap: 23px;
+  padding: 24px;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid #dfb55e;
+  border-radius: 10px;
+  box-shadow:
+    inset 0 0 0 3px #a8843520,
+    0 12px 25px #0005;
+}
+.codex-feature-icon {
+  flex-shrink: 0;
+  width: 76px;
+  height: 82px;
+  border: 3px solid #c39a51;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #d7ab59;
+  background: #03090dcc;
+  box-shadow:
+    inset 0 0 0 3px #473924,
+    0 0 15px #a8782526;
+}
+.codex-feature-icon svg {
+  width: 34px;
+  height: 34px;
+  stroke-width: 1.5;
+}
+.codex-feature h2 {
+  font-size: 21px;
+  line-height: 1.2;
+  margin-bottom: 7px;
+}
+.codex-feature p {
+  color: #c2c4cb;
+  font-size: 17px;
+  line-height: 1.5;
+}
+.codex-home-footer {
+  text-align: center;
+  padding: 24px 0 16px;
+}
+.codex-home-footer p {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  color: #bbb5a9;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.55em;
+}
+.codex-home-footer p span {
+  font-size: 31px;
+  color: #d3a953;
+  letter-spacing: 0;
+}
+.codex-home-footer a {
+  color: #a9aaa9;
+  font-size: 12px;
+  text-underline-offset: 4px;
+}
+.codex-home-footer a:hover {
+  text-decoration: underline;
+}
+.codex-home :focus-visible {
+  outline: 2px solid #f0c375;
+  outline-offset: 5px;
+}
+.codex-welcome {
+  margin: auto;
+  max-width: 480px;
+  width: calc(100% - 32px);
+  padding: 30px;
+  border: 1px solid #c39a51;
+  border-radius: 10px;
+  background: #080f16;
+  color: #eeeae3;
+}
+.codex-welcome::backdrop {
+  background: #000b;
+  backdrop-filter: blur(4px);
+}
+.codex-welcome > button {
+  float: right;
+  cursor: pointer;
+  padding: 3px;
+}
+.codex-welcome h2 {
+  font-size: 26px;
+  color: #f0c375;
+  margin: 12px 0;
+}
+.codex-welcome p {
+  line-height: 1.6;
+  color: #c2c4cb;
+}
+.codex-welcome a {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #f0c375;
+  margin-top: 20px;
+}
+@media (min-width: 1600px) {
+  .codex-hero {
+    min-height: 625px;
+  }
+}
+@media (max-width: 1100px) {
+  .codex-hero {
+    min-height: 540px;
+  }
+  .codex-feature {
+    padding: 18px;
+    gap: 14px;
+  }
+  .codex-feature-icon {
+    width: 52px;
+    height: 58px;
+  }
+  .codex-feature h2 {
+    font-size: 18px;
+  }
+  .codex-feature p {
+    font-size: 15px;
+  }
+}
+@media (max-width: 700px) {
+  .codex-home {
+    background-size: auto 850px;
+    background-repeat: no-repeat;
+    background-position: 60% top;
+  }
+  .codex-home-inner {
+    padding: 0 20px;
+  }
+  .codex-hero {
+    grid-template-columns: 1fr;
+    gap: 0;
+    padding: 20px 0 36px;
+    text-align: center;
+  }
+  .codex-hero-emblem {
+    max-width: 430px;
+    margin: 0 auto -8px;
+  }
+  .codex-hero-copy {
+    padding: 0;
+  }
+  .codex-eyebrow {
+    font-size: 14px;
+  }
+  .codex-hero h1 {
+    font-size: clamp(30px, 7.5vw, 46px);
+  }
+  .codex-hero-description {
+    font-size: 18px;
+  }
+  .codex-hero-actions {
+    gap: 12px;
+    justify-content: center;
+  }
+  .codex-hero-actions a,
+  .codex-hero-actions button {
+    padding: 14px;
+    font-size: 15px;
+    gap: 8px;
+  }
+  .codex-features {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .codex-feature {
+    min-height: 130px;
+    padding: 22px;
+    gap: 20px;
+  }
+  .codex-feature h2 {
+    font-size: 21px;
+  }
+  .codex-feature p {
+    font-size: 17px;
+  }
+  .codex-feature-icon {
+    width: 64px;
+    height: 70px;
+  }
+  .codex-home-footer p {
+    letter-spacing: 0.25em;
+    gap: 10px;
+  }
+}
+
+/* Let the hero use the space left after the actual header, cards, and footer. */
+@media (min-width: 951px) {
+  #root:has(.codex-home) {
+    min-height: 100svh;
+    display: grid;
+    grid-template-rows: auto 1fr;
+  }
+  #main-content:has(.codex-home) {
+    display: flex;
+    min-height: 0;
+  }
+  .codex-home {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+  }
+  .codex-home-inner {
+    width: 100%;
+    margin-block: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .codex-hero {
+    flex: 1;
+    min-height: 0;
+    grid-template-columns: minmax(0, 43fr) minmax(0, 57fr);
+    padding-block: clamp(12px, 3svh, 40px);
+  }
+  .codex-hero-emblem img {
+    max-height: clamp(210px, calc(100svh - 300px), 570px);
+    object-fit: contain;
+  }
+  .codex-hero-copy {
+    padding-block: 0;
+  }
+  .codex-hero h1 {
+    font-size: clamp(30px, min(3.15vw, 5.7svh), 55px);
+  }
+  .codex-eyebrow {
+    margin-bottom: clamp(8px, 1.5svh, 16px);
+  }
+  .codex-hero-rule {
+    margin-block: clamp(6px, 1.5svh, 16px);
+  }
+  .codex-hero-description {
+    font-size: clamp(16px, 2.3svh, 21px);
+  }
+  .codex-hero-actions {
+    margin-top: clamp(14px, 2.5svh, 30px);
+  }
+  .codex-feature {
+    min-height: clamp(108px, 16svh, 145px);
+    padding: clamp(14px, 2.3svh, 24px);
+    gap: clamp(14px, 1.5vw, 23px);
+  }
+  .codex-feature-icon {
+    width: clamp(48px, 8svh, 76px);
+    height: clamp(54px, 9svh, 82px);
+  }
+  .codex-feature h2 {
+    font-size: clamp(17px, 2.4svh, 21px);
+  }
+  .codex-feature p {
+    font-size: clamp(14px, 1.95svh, 17px);
+  }
+  .codex-home-footer {
+    padding-block: clamp(6px, 1.4svh, 16px);
+  }
+}

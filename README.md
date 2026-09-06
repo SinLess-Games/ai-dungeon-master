@@ -1240,153 +1240,98 @@ Development can continue using the [Lovable editor](https://lovable.dev/projects
 
 ## Local Development
 
-You will need:
+The current rebuild runs React and Hono as **one application** with one origin and
+one Cloudflare Worker deployment. React pages live in `src/app/routes/`; Hono
+endpoints live in `src/server/app.ts` under `/api`.
 
-- Node.js 22.13 or newer (Node.js 24 LTS recommended).
-- npm.
-
-Using [nvm](https://github.com/nvm-sh/nvm#installing-and-updating) is recommended for managing Node.js versions.
-
-Clone the repository:
-
-```bash
-git clone https://github.com/SinLess-Games/ai-dungeon-master.git
-cd ai-dungeon-master
-```
-
-Install dependencies:
+Use Node.js 22.13 or newer and npm:
 
 ```bash
 npm install
-```
-
-Start the development server:
-
-```bash
 npm run dev
 ```
 
-## Cloudflare Workers
+Open the URL printed by Vite (normally `http://localhost:5173`). The same server
+provides React hot reload and the Hono API in Cloudflare's local Workers runtime.
+No second backend process, proxy configuration or frontend API URL is needed.
 
-The TanStack Start server, API routes, and static assets deploy together as the
-`the-endless-codex` Worker. The existing Lovable Vite wrapper builds Nitro's
-`cloudflare-module` target; do not add a second Cloudflare or TanStack Vite plugin.
-Cloudflare D1 stores application data. Supabase continues to provide authentication
-and file storage. Subscription status refreshes every 30 seconds and on window focus.
-AI and payment requests still use the existing Lovable gateways and credentials.
+The **Service status** link on the home page opens `/status`, which calls the
+same-origin `/api/health` endpoint through the typed Hono client and TanStack Query.
 
-### Environment setup
+| Request | Handled by |
+| --- | --- |
+| `/`, `/status`, other frontend paths | React and TanStack Router |
+| `/api`, `/api/*` | Hono, including JSON 404 responses |
+| Built JavaScript, CSS and fonts | Cloudflare static assets |
 
-Set these public build variables in `.env.local` (or in Workers Builds):
+### Environment and database
 
-```dotenv
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
-VITE_PAYMENTS_CLIENT_TOKEN=your-stripe-publishable-key
-```
-
-The payment token is optional if checkout is unused. Public variables are compiled
-into the browser bundle; rebuild after changing them. Never put server secrets in
-variables prefixed with `VITE_`.
-
-Copy `.dev.vars.example` to `.dev.vars` and supply your server credentials for
-local Worker previews. For `npm run dev`, supply the same server variables in
-`.env.local` or the shell environment. `.dev.vars` is read by Wrangler, not Vite.
-
-For production, configure the server variables listed in `.dev.vars.example` in
-the Worker's **Settings → Variables and Secrets**, or use
-`npx wrangler secret put VARIABLE_NAME` after building. At minimum, configure
-`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and
-`LOVABLE_API_KEY`. Configure payment keys and webhook secrets for each payment
-environment in use. These are runtime bindings, separate from build variables.
-Node compatibility exposes runtime bindings to the existing `process.env` reads.
-The `DB` binding in `wrangler.toml` connects the Worker to D1 database
-`dc744f5a-7c53-4d37-b695-97b2527ef06a`; it needs no database password.
-
-### D1 database setup and existing data
-
-Apply the SQLite schema locally before development:
+Cloudflare bindings are configured in `wrangler.jsonc`. Local development uses
+local D1 and R2 resources. Apply database migrations before using database-backed
+features:
 
 ```bash
 npm run db:migrate:local
-npm run dev
 ```
 
-Vite development uses Wrangler's local D1 proxy and the same persisted database as
-Worker previews. `npm run build` never applies migrations to the remote database.
-Before deploying, authenticate Wrangler and apply the remote schema:
+Server-only development variables belong in `.dev.vars` (see
+`.dev.vars.example`); the Cloudflare Vite plugin loads them for the Worker.
+Public browser build variables, when needed, belong in `.env.local` and must use
+`VITE_` names. Never place secrets in `VITE_` variables.
 
-```bash
-npx wrangler login
-npm run db:migrate:remote
-```
+Better Auth provides same-origin email/username login, signup, cookie sessions, and Google/Discord OAuth through a shared modal. See [authentication setup](docs/authentication.md) for secrets, migrations, administrator seeding, and provider callback URLs. Existing D&D schema details and migration
+considerations are in [the D&D database handoff](docs/dnd35-database-schema.md).
 
-The SQLite migration is in `migrations/`. The old `supabase/migrations/` files are
-historical PostgreSQL migrations and must not be applied to D1. Server queries
-verify Supabase tokens and enforce ownership and admin permissions before accessing
-D1. Browser requests never contain SQL or arbitrary database query plans. New users
-get a D1 profile on their first authenticated request, using their Supabase Auth
-metadata. Supabase Auth user IDs and existing local save formats are preserved.
-
-**Existing cloud data must be imported before switching production traffic.** Stop
-writes to the old application during export/import (including payment webhooks),
-then export application tables using a Supabase service-role credential:
-
-```bash
-# Supply SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY through your environment.
-node scripts/export-supabase-data.mjs
-# Test the export against a fresh local database first.
-npx wrangler d1 execute DB --local --file .data-migration/supabase.sql
-# After reviewing the local result, import into the fresh remote database.
-npx wrangler d1 execute DB --remote --file .data-migration/supabase.sql
-```
-
-The export retains profile IDs, admin roles, subscriptions, JSON game saves, blog
-posts, titles, and timestamps. It contains private data and is gitignored. Import
-only into a fresh database after schema migration; the script adds a guard against
-importing over application records and replaces initial title seeds with exported
-titles. Keep the old Supabase tables available until the cutover is verified.
-Auth users and Storage objects stay in Supabase and are not exported or deleted.
-For a new installation without an export, grant the first administrator a row in
-D1's `user_roles` table using their verified Supabase user UUID.
-
-Blog media uploads go through the Worker so D1 admin roles authorize uploads into
-Supabase Storage. Map-art uploads keep the existing Supabase folder-ownership
-policies. Continue managing Auth and Storage in Supabase; deleting an Auth account
-no longer cascades into D1, so account removal must also clean up that user's D1
-records. No remote data is migrated by a build or deploy command.
-
-### Preview and deploy
+### Build, preview and deploy
 
 ```bash
 npm run build
 npm run preview
 ```
 
-Preview runs the built app locally in the Workers runtime. Rebuild after source
-changes; use `npm run dev` for Vite hot reload. To validate the upload without
-publishing, run `npm run deploy:check`.
+Vite builds both the Worker and React assets and generates the TanStack route tree
+before the TypeScript check. Preview serves that combined build locally; rebuild
+after source changes. `src/routeTree.gen.ts` is generated, not hand-edited.
 
 ```bash
-npx wrangler login
-npm run deploy
+npm run deploy:check  # build and validate a dry-run upload
+npm run deploy       # build and publish the Worker plus its static assets
 ```
 
-Change the Worker name in `wrangler.toml` before deploying if needed. Nitro merges
-this source configuration into `.output/server/wrangler.json` and writes
-`.wrangler/deploy/config.json` so Wrangler discovers the built entry and assets.
-Do not edit or commit those generated files. Always build before running Wrangler.
-This follows [Nitro's Workers deployment flow](https://nitro.build/deploy/providers/cloudflare).
+The Cloudflare Vite plugin writes the deployment configuration under `dist/` and
+`.wrangler/deploy/`; Wrangler discovers it automatically. Source configuration
+stays in `wrangler.jsonc`. No separate frontend deployment is needed, and builds
+or deploys do not apply remote database migrations.
 
-For Cloudflare Workers Builds, use `npm ci` to install, `npm run build` as the build
-command, and `npx wrangler deploy` as the deploy command. Set the public build
-variables there and the server secrets on the Worker.
+### Extending the application
 
-After deploying, add the new application origin to Supabase's auth redirect URLs
-and any existing OAuth provider allowlists. Update the payment webhook destination
-to `/api/public/payments/webhook` on the new origin, preserving its existing
-environment query parameter and matching signing secret. Existing external cron
-callers must also use the new origin; this configuration does not schedule jobs.
+- Add a React page in `src/app/routes/`; the Vite router plugin generates its route.
+- Register Hono endpoints on the typed route chain in `src/server/app.ts`. Future
+  feature routers can be mounted with `.route()` on that chain.
+- Import `api` from `src/infrastructure/api/client.ts` in browser data-access code.
+  Its `AppType` import is type-only; server code and credentials stay out of the browser.
+- Put TanStack Query options alongside API access, as demonstrated by
+  `src/infrastructure/api/service-status.ts`.
+- Keep binding access, authentication and database operations in the server or
+  server infrastructure. Browser code calls `/api`; it never accesses D1 directly.
+
+This follows Cloudflare's [React SPA with an API](https://developers.cloudflare.com/workers/vite-plugin/tutorial/)
+pattern and Hono's [typed RPC client](https://hono.dev/docs/guides/rpc).
+
+### Checks
+
+```bash
+npm run typecheck
+npm run lint
+npm run test:unit
+npx playwright install chromium  # once, if no browser is installed
+npm run test:e2e -- tests/e2e/monolith.spec.ts
+```
+
+Playwright normally starts the development server itself. To test an already
+running development or production-preview server, set `E2E_BASE_URL` to its URL.
+The monolith tests cover desktop/mobile navigation, deep-link reloads, same-origin
+API calls, API 404s, and unavailable/recovered service states.
 
 ## Repository
 

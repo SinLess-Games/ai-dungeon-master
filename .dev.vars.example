@@ -1,11 +1,185 @@
-# Copy to .dev.vars for npm run preview. Never commit real credentials.
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
-SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+# =============================================================================
+# Endless Codex - Environment Variable Template
+# =============================================================================
+#
+# Copy this file to the appropriate local environment file and fill in values.
+#
+# IMPORTANT:
+# - Never commit real secrets.
+# - Variables prefixed with VITE_ are bundled into browser code.
+# - NEVER place passwords, OAuth client secrets, API secrets, or database
+#   credentials in VITE_ variables.
+#
+# Local Cloudflare Worker secrets should normally live in:
+#   .dev.vars
+#
+# Production secrets should be configured through Cloudflare.
+#
+# =============================================================================
 
-# Required only for the payment environments you use.
-STRIPE_SANDBOX_API_KEY=
-STRIPE_LIVE_API_KEY=
-PAYMENTS_SANDBOX_WEBHOOK_SECRET=
-PAYMENTS_LIVE_WEBHOOK_SECRET=
 
+# -----------------------------------------------------------------------------
+# Application - server
+# -----------------------------------------------------------------------------
+
+# Canonical public URL for Endless Codex.
+#
+# Local:
+#   http://localhost:5173
+#
+# Production:
+#   https://endless-codex.sinlessindustries.com
+APP_URL=http://localhost:5173
+
+# Runtime environment identifier.
+#
+# Expected values:
+#   development
+#   preview
+#   production
+ENVIRONMENT=development
+
+# Application/build metadata.
+#
+# These are optional locally and may be populated automatically by CI/CD.
+APP_VERSION=
+BUILD_ID=
+GIT_COMMIT_SHA=
+
+NODE_ENV=development
+
+
+# -----------------------------------------------------------------------------
+# Application - browser-safe
+# -----------------------------------------------------------------------------
+#
+# WARNING:
+# Every VITE_ variable is exposed to the browser.
+# Never place secrets in this section.
+#
+
+# API origin used by the React application.
+#
+# Web:
+# Leave empty to use the current origin:
+#   /api/...
+#
+# Android / Tauri:
+# Set to the hosted Endless Codex origin:
+#   https://endless-codex.sinlessindustries.com
+VITE_API_BASE_URL=
+
+
+# -----------------------------------------------------------------------------
+# Cloudflare / Drizzle tooling - server/tooling only
+# -----------------------------------------------------------------------------
+#
+# Used by local Node-based tooling such as Drizzle Kit.
+#
+# These values must NEVER be exposed through VITE_ variables.
+#
+
+CLOUDFLARE_ACCOUNT_ID=
+
+# Endless Codex D1 database ID.
+CLOUDFLARE_DATABASE_ID=dc744f5a-7c53-4d37-b695-97b2527ef06a
+
+# Cloudflare API token with only the permissions required for D1 tooling.
+CLOUDFLARE_D1_TOKEN=
+
+
+# -----------------------------------------------------------------------------
+# Better Auth - server-only
+# -----------------------------------------------------------------------------
+#
+# NEVER prefix these values with VITE_.
+#
+
+# Strong secret used by Better Auth for cryptographic operations.
+#
+# Generate a secure random value for each environment.
+BETTER_AUTH_SECRET=
+
+# Base URL Better Auth should use when constructing authentication URLs.
+#
+# Local:
+#   http://localhost:5173
+#
+# Production:
+#   https://endless-codex.sinlessindustries.com
+BETTER_AUTH_URL=http://localhost:5173
+
+
+# -----------------------------------------------------------------------------
+# Google OAuth - server-only
+# -----------------------------------------------------------------------------
+#
+# Configure these in Google Cloud Console.
+#
+# Do not expose GOOGLE_CLIENT_SECRET to the browser.
+#
+
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+
+# -----------------------------------------------------------------------------
+# Discord OAuth - server-only
+# -----------------------------------------------------------------------------
+#
+# Configure these in the Discord Developer Portal.
+#
+# Do not expose DISCORD_CLIENT_SECRET to the browser.
+#
+
+DISCORD_CLIENT_ID=
+DISCORD_CLIENT_SECRET=
+
+
+# -----------------------------------------------------------------------------
+# Seed administrator - server/tooling only
+# -----------------------------------------------------------------------------
+#
+# Used only by the administrator seed command.
+#
+# The seed must be idempotent and must never print the password.
+#
+
+SEED_ADMIN_EMAIL=timothy.pierce444@gmail.com
+SEED_ADMIN_USERNAME=Sinless777
+
+# Intentionally blank.
+#
+# Set this only in the local/private environment used when running the seed.
+# Never commit the real administrator password.
+SEED_ADMIN_PASSWORD=
+
+
+# -----------------------------------------------------------------------------
+# Stripe - browser-safe
+# -----------------------------------------------------------------------------
+#
+# Stripe publishable keys are safe to expose to browser code.
+#
+# Local/development:
+#   Use a Stripe test/sandbox publishable key.
+#
+# Production:
+#   Supply the live publishable key through the deployment environment.
+#
+
+VITE_STRIPE_PUBLISHABLE_KEY=
+
+
+# -----------------------------------------------------------------------------
+# Stripe - server-only
+# -----------------------------------------------------------------------------
+#
+# NEVER prefix these values with VITE_.
+#
+
+# Secret API key used by server-side Stripe operations.
+STRIPE_API_KEY=
+
+# Secret used to verify incoming Stripe webhook signatures.
+STRIPE_WEBHOOK_SECRET=

@@ -1,0 +1,44 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "the-endless-codex",
+  "main": "./src/server/worker.ts",
+
+  "compatibility_date": "2026-09-05",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "workers_dev": true,
+  "preview_urls": true,
+
+  "routes": [
+    {
+      "pattern": "endless-codex.sinlessindustries.com",
+      "custom_domain": true
+    }
+  ],
+
+  "observability": {
+    "enabled": true
+  },
+
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api", "/api/*"]
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "endless-codex",
+      "database_id": "dc744f5a-7c53-4d37-b695-97b2527ef06a",
+      "migrations_dir": "drizzle",
+      "migrations_pattern": "drizzle/**/*.sql"
+    }
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "R2_BUCKET",
+      "bucket_name": "endless-codex"
+    }
+  ]
+}

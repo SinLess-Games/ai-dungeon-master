@@ -6,6 +6,10 @@ import { secureHeaders } from "hono/secure-headers";
 
 import { errorHandler, notFoundHandler } from "@/server/middleware/errors";
 
+import { devblogRoutes } from "@/modules/devblog/server/routes";
+import { devblogAdminRoutes } from "@/modules/devblog/server/adminRoutes";
+import { feedbackRoutes } from "@/modules/feedback/server/routes";
+import { adminRoutes } from "@/modules/admin/server/routes";
 import { authRoutes, authHandler } from "@/modules/auth/server/routes";
 import type { AuthEnv } from "@/modules/auth/server/auth";
 
@@ -199,7 +203,11 @@ function determineHealthStatus(checks: DependencyHealth[]): HealthStatus {
 const app = new Hono<AppEnv>();
 
 const requestLogger = logger();
-app.use("*", (c, next) => (c.req.path.startsWith("/api/auth/") ? next() : requestLogger(c, next)));
+app.use("*", (c, next) =>
+  c.req.path.startsWith("/api/auth/") || c.req.path.startsWith("/api/admin/")
+    ? next()
+    : requestLogger(c, next),
+);
 
 app.use(
   "*",
@@ -217,6 +225,10 @@ app.route("/", authRoutes);
 app.route("/", authHandler);
 
 const routes = app
+  .route("/", adminRoutes)
+  .route("/", feedbackRoutes)
+  .route("/", devblogRoutes)
+  .route("/", devblogAdminRoutes)
   .get("/api", (c) => {
     return c.json({
       name: "The Endless Codex API",

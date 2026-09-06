@@ -76,6 +76,23 @@ export function authOptions(env: AuthEnv) {
     ] satisfies [ReturnType<typeof admin>, ReturnType<typeof username>],
     databaseHooks: {
       user: {
+        update: {
+          before: async (
+            user: { image?: string | null | undefined },
+            context: { path?: string } | null,
+          ) => {
+            if (context?.path === "/update-user" && user.image != null) {
+              if (
+                typeof user.image !== "string" ||
+                user.image.length > 32768 ||
+                !/^data:image\/webp;base64,[A-Za-z0-9+/]+={0,2}$/.test(user.image)
+              ) {
+                throw new APIError("BAD_REQUEST", { message: "Upload a valid profile thumbnail." });
+              }
+            }
+            return { data: user };
+          },
+        },
         create: {
           before: async (user: { name: string }, context: { path?: string } | null) => {
             if (

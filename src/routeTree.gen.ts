@@ -11,6 +11,11 @@
 import { Route as rootRouteImport } from './app/routes/__root'
 import { Route as IndexRouteImport } from './app/routes/index'
 import { Route as StatusRouteImport } from './app/routes/status'
+import { Route as DevblogIndexRouteImport } from './app/routes/devblog/index'
+import { Route as DevblogSlugRouteImport } from './app/routes/devblog/$slug'
+import { Route as DevblogAdminRouteImport } from './app/routes/devblog/admin'
+import { Route as UserAdminRouteImport } from './app/routes/user/admin'
+import { Route as UserProfileRouteImport } from './app/routes/user/profile'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +27,98 @@ const StatusRoute = StatusRouteImport.update({
   path: '/status',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DevblogIndexRoute = DevblogIndexRouteImport.update({
+  id: '/devblog/',
+  path: '/devblog/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevblogSlugRoute = DevblogSlugRouteImport.update({
+  id: '/devblog/$slug',
+  path: '/devblog/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevblogAdminRoute = DevblogAdminRouteImport.update({
+  id: '/devblog/admin',
+  path: '/devblog/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UserAdminRoute = UserAdminRouteImport.update({
+  id: '/user/admin',
+  path: '/user/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UserProfileRoute = UserProfileRouteImport.update({
+  id: '/user/profile',
+  path: '/user/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/status': typeof StatusRoute
+  '/devblog/$slug': typeof DevblogSlugRoute
+  '/devblog/admin': typeof DevblogAdminRoute
+  '/user/admin': typeof UserAdminRoute
+  '/user/profile': typeof UserProfileRoute
+  '/devblog/': typeof DevblogIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/status': typeof StatusRoute
+  '/devblog/$slug': typeof DevblogSlugRoute
+  '/devblog/admin': typeof DevblogAdminRoute
+  '/user/admin': typeof UserAdminRoute
+  '/user/profile': typeof UserProfileRoute
+  '/devblog': typeof DevblogIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/status': typeof StatusRoute
+  '/devblog/$slug': typeof DevblogSlugRoute
+  '/devblog/admin': typeof DevblogAdminRoute
+  '/user/admin': typeof UserAdminRoute
+  '/user/profile': typeof UserProfileRoute
+  '/devblog/': typeof DevblogIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/status'
+  fullPaths:
+    | '/'
+    | '/status'
+    | '/devblog/$slug'
+    | '/devblog/admin'
+    | '/user/admin'
+    | '/user/profile'
+    | '/devblog/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/status'
-  id: '__root__' | '/' | '/status'
+  to:
+    | '/'
+    | '/status'
+    | '/devblog/$slug'
+    | '/devblog/admin'
+    | '/user/admin'
+    | '/user/profile'
+    | '/devblog'
+  id:
+    | '__root__'
+    | '/'
+    | '/status'
+    | '/devblog/$slug'
+    | '/devblog/admin'
+    | '/user/admin'
+    | '/user/profile'
+    | '/devblog/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   StatusRoute: typeof StatusRoute
+  DevblogSlugRoute: typeof DevblogSlugRoute
+  DevblogAdminRoute: typeof DevblogAdminRoute
+  UserAdminRoute: typeof UserAdminRoute
+  UserProfileRoute: typeof UserProfileRoute
+  DevblogIndexRoute: typeof DevblogIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +137,52 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StatusRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/devblog/': {
+      id: '/devblog/'
+      path: '/devblog'
+      fullPath: '/devblog/'
+      preLoaderRoute: typeof DevblogIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/devblog/$slug': {
+      id: '/devblog/$slug'
+      path: '/devblog/$slug'
+      fullPath: '/devblog/$slug'
+      preLoaderRoute: typeof DevblogSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/devblog/admin': {
+      id: '/devblog/admin'
+      path: '/devblog/admin'
+      fullPath: '/devblog/admin'
+      preLoaderRoute: typeof DevblogAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/user/admin': {
+      id: '/user/admin'
+      path: '/user/admin'
+      fullPath: '/user/admin'
+      preLoaderRoute: typeof UserAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/user/profile': {
+      id: '/user/profile'
+      path: '/user/profile'
+      fullPath: '/user/profile'
+      preLoaderRoute: typeof UserProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   StatusRoute: StatusRoute,
+  DevblogSlugRoute: DevblogSlugRoute,
+  DevblogAdminRoute: DevblogAdminRoute,
+  UserAdminRoute: UserAdminRoute,
+  UserProfileRoute: UserProfileRoute,
+  DevblogIndexRoute: DevblogIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

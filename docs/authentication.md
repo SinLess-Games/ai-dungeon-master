@@ -71,7 +71,7 @@ Usernames accept ASCII letters, numbers, underscore, and hyphen, 3–32 characte
 
 The small `src/shared/stores/authModal.store.ts` stores only visibility and mode. Header and homepage open the same modal. Forms use Zod, correct autocomplete values, field errors, a form-level alert, pending states, duplicate-submission guards, and safe server error messages. Successful login/signup preserves the page, closes the modal, refreshes identity, and shows a toast.
 
-`UserMenu.tsx` shows a loading state before the initial session resolves; errors offer retry rather than pretending the user is signed out. Guests get Sign In/Create Account. Signed-in users get display username/avatar/email, a profile placeholder, and Sign Out. Admin-only status is visible only for admins. No admin page exists yet, so no broken admin link or dashboard was invented; `/api/admin/access` is the secured integration point.
+`UserMenu.tsx` shows a loading state before the initial session resolves; errors offer retry rather than pretending the user is signed out. Guests get Sign In/Create Account. Signed-in users get display username/avatar/email, a profile placeholder, and Sign Out. Admin-only status is visible only for admins. The Admin panel link opens `/admin`, with live account/session counts, account search and filters, pagination, and confirmed suspend/restore actions. Admin data endpoints independently enforce `requireAdmin`; account changes use the official Better Auth Admin APIs. `/api/admin/access` remains available as a secured integration point.
 
 ## Files and validation
 

@@ -9,12 +9,13 @@ import {
   Newspaper,
   Moon,
   Search,
-  Settings,
+  Bell,
   Sun,
   Swords,
   Users,
   X,
 } from "lucide-react";
+import { FeedbackModal } from "@/modules/feedback/ui/FeedbackModal";
 import { UserMenu } from "@/modules/auth/ui/UserMenu";
 import logo from "@/assets/favicon.png";
 import "./site-header.css";
@@ -27,11 +28,12 @@ const sections = [
 ];
 
 export function SiteHeader() {
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const [dark, setDark] = useState(
     () => typeof document !== "undefined" && document.documentElement.classList.contains("dark"),
   );
-  const [panel, setPanel] = useState<"search" | "settings" | "account">("search");
+  const [panel, setPanel] = useState<"search" | "notifications">("search");
   const [search, setSearch] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
@@ -106,170 +108,161 @@ export function SiteHeader() {
   );
 
   return (
-    <header className="codex-header">
-      <a href="#main-content" className="codex-skip">
-        Skip to content
-      </a>
-      <div className="codex-toolbar">
-        <div className="codex-toolbar-inner">
-          <Link to="/" className="codex-brand" aria-label="Endless Codex home">
-            <img src={logo} alt="" width={60} height={60} className="codex-logo" />
-            <span className="codex-wordmark">
-              <small>The</small>
-              <span>Endless</span>
-              <strong>Codex</strong>
-            </span>
-          </Link>
-          <nav className="codex-nav" aria-label="Main navigation">
-            <Link
-              to="/"
-              className={`codex-nav-item ${pathname === "/" ? "is-active" : ""}`}
-              aria-current={pathname === "/" ? "page" : undefined}
-            >
-              <House aria-hidden="true" />
-              <span>Home</span>
+    <>
+      <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+      <header className="codex-header">
+        <a href="#main-content" className="codex-skip">
+          Skip to content
+        </a>
+        <div className="codex-toolbar">
+          <div className="codex-toolbar-inner">
+            <Link to="/" className="codex-brand" aria-label="Endless Codex home">
+              <img src={logo} alt="" width={60} height={60} className="codex-logo" />
+              <span className="codex-wordmark">
+                <small>The</small>
+                <span>Endless</span>
+                <strong>Codex</strong>
+              </span>
             </Link>
-            <button
-              type="button"
-              className="codex-nav-item"
-              aria-disabled="true"
-              title="Devblog — coming soon"
-            >
-              <Newspaper aria-hidden="true" />
-              <span>Devblog</span>
-              <span className="sr-only"> (coming soon)</span>
-            </button>
-            <details ref={playDropdown} className="codex-play-dropdown">
-              <summary className="codex-nav-item">
-                <Swords aria-hidden="true" />
-                <span>Play</span>
-                <ChevronDown className="codex-play-chevron" aria-hidden="true" />
-              </summary>
-              <div className="codex-play-options">
-                {sections.map(({ label, icon: Icon }) => (
-                  <button
-                    key={label}
-                    type="button"
-                    aria-disabled="true"
-                    title={`${label} — coming soon`}
-                  >
-                    <Icon aria-hidden="true" />
-                    <span>{label}</span>
-                    <small>Coming soon</small>
-                  </button>
-                ))}
-              </div>
-            </details>
-            <button
-              type="button"
-              className="codex-nav-item"
-              aria-disabled="true"
-              title="Give feedback — coming soon"
-            >
-              <MessageSquare aria-hidden="true" />
-              <span>Give feedback</span>
-              <span className="sr-only"> (coming soon)</span>
-            </button>
-          </nav>
-          <div className="codex-tools">
-            <button
-              type="button"
-              className="codex-search-trigger"
-              onClick={() => openPanel("search")}
-              aria-label="Search Codex"
-              aria-haspopup="dialog"
-            >
-              <Search aria-hidden="true" />
-              <span>Search…</span>
-              <kbd>⌘ K</kbd>
-            </button>
-            <button
-              type="button"
-              className="codex-icon-button"
-              onClick={toggleTheme}
-              aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
-              title="Toggle theme"
-            >
-              {dark ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
-            </button>
-            <button
-              type="button"
-              className="codex-icon-button"
-              aria-label="Settings"
-              aria-haspopup="dialog"
-              onClick={() => openPanel("settings")}
-            >
-              <Settings aria-hidden="true" />
-            </button>
-            <UserMenu />
+            <nav className="codex-nav" aria-label="Main navigation">
+              <Link
+                to="/"
+                className={`codex-nav-item ${pathname === "/" ? "is-active" : ""}`}
+                aria-current={pathname === "/" ? "page" : undefined}
+              >
+                <House aria-hidden="true" />
+                <span>Home</span>
+              </Link>
+              <Link
+                to="/devblog"
+                className="codex-nav-item"
+                activeProps={{ className: "codex-nav-item is-active" }}
+              >
+                <Newspaper aria-hidden="true" />
+                <span>Devblog</span>
+              </Link>
+              <details ref={playDropdown} className="codex-play-dropdown">
+                <summary className="codex-nav-item">
+                  <Swords aria-hidden="true" />
+                  <span>Play</span>
+                  <ChevronDown className="codex-play-chevron" aria-hidden="true" />
+                </summary>
+                <div className="codex-play-options">
+                  {sections.map(({ label, icon: Icon }) => (
+                    <button
+                      key={label}
+                      type="button"
+                      aria-disabled="true"
+                      title={`${label} — coming soon`}
+                    >
+                      <Icon aria-hidden="true" />
+                      <span>{label}</span>
+                      <small>Coming soon</small>
+                    </button>
+                  ))}
+                </div>
+              </details>
+              <button
+                type="button"
+                className="codex-nav-item"
+                onClick={() => setFeedbackOpen(true)}
+                aria-haspopup="dialog"
+              >
+                <MessageSquare aria-hidden="true" />
+                <span>Give feedback</span>
+              </button>
+            </nav>
+            <div className="codex-tools">
+              <button
+                type="button"
+                className="codex-search-trigger"
+                onClick={() => openPanel("search")}
+                aria-label="Search Codex"
+                aria-haspopup="dialog"
+              >
+                <Search aria-hidden="true" />
+                <span>Search…</span>
+                <kbd>⌘ K</kbd>
+              </button>
+              <button
+                type="button"
+                className="codex-icon-button"
+                onClick={toggleTheme}
+                aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
+                title="Toggle theme"
+              >
+                {dark ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
+              </button>
+              <button
+                type="button"
+                className="codex-icon-button"
+                aria-label="Notifications"
+                aria-haspopup="dialog"
+                onClick={() => openPanel("notifications")}
+              >
+                <Bell aria-hidden="true" />
+              </button>
+              <UserMenu />
+            </div>
           </div>
         </div>
-      </div>
-      <dialog
-        ref={dialog}
-        className="codex-dialog"
-        aria-labelledby="codex-dialog-title"
-        onClick={(event) => {
-          if (event.target === event.currentTarget) dialog.current?.close();
-        }}
-      >
-        <div className="codex-dialog-content">
-          <div className="codex-dialog-heading">
-            <h2 id="codex-dialog-title">
-              {panel === "search"
-                ? "Search the Codex"
-                : panel === "settings"
-                  ? "Settings"
-                  : "Welcome, adventurer"}
-            </h2>
-            <button
-              type="button"
-              className="codex-icon-button"
-              aria-label="Close dialog"
-              onClick={() => dialog.current?.close()}
-            >
-              <X />
-            </button>
-          </div>
-          {panel === "search" ? (
-            <>
-              <label className="sr-only" htmlFor="codex-search">
-                Search pages
-              </label>
-              <input
-                ref={searchInput}
-                id="codex-search"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Find a page…"
-                autoComplete="off"
-              />
-              <div className="codex-search-results">
-                {pages.map((page) => (
-                  <Link key={page.to} to={page.to} onClick={() => dialog.current?.close()}>
-                    <strong>{page.name}</strong>
-                    <span>{page.description}</span>
-                  </Link>
-                ))}
-                {pages.length === 0 && (
-                  <p>No pages found. Play, Characters, Dice, and Wiki are coming soon.</p>
-                )}
-              </div>
-            </>
-          ) : panel === "settings" ? (
-            <div className="codex-preference">
-              <span>
-                Appearance <small>{dark ? "Dark" : "Light"} theme</small>
-              </span>
-              <button type="button" onClick={toggleTheme}>
-                Use {dark ? "light" : "dark"} theme
+        <dialog
+          ref={dialog}
+          className="codex-dialog"
+          aria-labelledby="codex-dialog-title"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) dialog.current?.close();
+          }}
+        >
+          <div className="codex-dialog-content">
+            <div className="codex-dialog-heading">
+              <h2 id="codex-dialog-title">
+                {panel === "search" ? "Search the Codex" : "Notifications"}
+              </h2>
+              <button
+                type="button"
+                className="codex-icon-button"
+                aria-label="Close dialog"
+                onClick={() => dialog.current?.close()}
+              >
+                <X />
               </button>
             </div>
-          ) : (
-            <p>You’re browsing as a guest. Account sign-in is coming soon.</p>
-          )}
-        </div>
-      </dialog>
-    </header>
+            {panel === "search" ? (
+              <>
+                <label className="sr-only" htmlFor="codex-search">
+                  Search pages
+                </label>
+                <input
+                  ref={searchInput}
+                  id="codex-search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Find a page…"
+                  autoComplete="off"
+                />
+                <div className="codex-search-results">
+                  {pages.map((page) => (
+                    <Link key={page.to} to={page.to} onClick={() => dialog.current?.close()}>
+                      <strong>{page.name}</strong>
+                      <span>{page.description}</span>
+                    </Link>
+                  ))}
+                  {pages.length === 0 && (
+                    <p>No pages found. Play, Characters, Dice, and Wiki are coming soon.</p>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="py-6 text-center">
+                <Bell aria-hidden="true" className="mx-auto mb-4 h-8 w-8 text-gold" />
+                <p className="text-lg">You’re all caught up</p>
+                <p className="mt-2 text-sm text-muted-foreground">No notifications yet.</p>
+              </div>
+            )}
+          </div>
+        </dialog>
+      </header>
+    </>
   );
 }

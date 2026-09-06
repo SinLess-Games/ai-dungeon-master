@@ -29,6 +29,13 @@
       "when": 1788639671170,
       "tag": "0003_rainy_dracula",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1788722172781,
+      "tag": "0004_devblog",
+      "breakpoints": true
     }
   ]
 }

@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { UserRound, ChevronDown } from "lucide-react";
@@ -88,9 +89,17 @@ export function UserMenu() {
       <div className="auth-user-options">
         <strong>{name}</strong>
         <span>{data.user.email}</span>
-        <p>Account / Profile — coming soon</p>
+        <Link to="/user/profile" onClick={() => menu.current?.removeAttribute("open")}>
+          My profile
+        </Link>
         {data.user.role === "admin" && (
-          <p className="auth-admin-label">Admin · administration tools coming soon</p>
+          <Link
+            className="auth-admin-label"
+            to="/user/admin"
+            onClick={() => menu.current?.removeAttribute("open")}
+          >
+            Admin panel
+          </Link>
         )}
         <button type="button" onClick={() => void signOut()} disabled={busy}>
           {busy ? "Signing out…" : "Sign Out"}

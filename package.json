@@ -39,7 +39,8 @@
     "db:seed:admin": "node scripts/seed-admin.mjs",
     "test:auth:integration": "node scripts/verify-auth.mjs",
     "test:auth:browser": "node scripts/verify-auth-browser.mjs",
-    "db:seed:admin:remote": "node scripts/seed-admin.mjs --remote"
+    "db:seed:admin:remote": "node --env-file=.prod.vars scripts/seed-admin.mjs --remote",
+    "test:devblog": "node scripts/verify-devblog.mjs"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.44",

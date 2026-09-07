@@ -1,7 +1,8 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import type { Database } from "@/infrastructure/database/client";
-import { loadActiveGameContext } from "./d1Dnd35State";
+import { consciousnessState, type Dnd35HealthPool } from "@/rulesets/dnd35";
+import { loadActiveGameContext, loadHealthSnapshot } from "./d1Dnd35State";
 
 export interface GameReadModelDependencies {
   db: Database;
@@ -16,11 +17,12 @@ interface ActorRow {
   name: string;
   status: string;
   metadata: string;
-  maximum_hit_points: number | null;
-  current_hit_points: number | null;
-  temporary_hit_points: number | null;
-  nonlethal_damage: number | null;
-  stable: number | null;
+  character_stable: number | null;
+  monster_maximum_hit_points: number | null;
+  monster_current_hit_points: number | null;
+  monster_temporary_hit_points: number | null;
+  monster_nonlethal_damage: number | null;
+  monster_stable: number | null;
 }
 
 interface EncounterRow {
@@ -79,6 +81,59 @@ function json<T>(value: string | null, fallback: T): T {
   }
 }
 
+function healthView(pool: Dnd35HealthPool) {
+  return {
+    maximumHitPoints: pool.maximumHitPoints,
+    currentHitPoints: pool.currentHitPoints,
+    temporaryHitPoints: pool.temporaryHitPoints,
+    nonlethalDamage: pool.nonlethalDamage,
+    stable: pool.stable,
+    state: consciousnessState(pool),
+  };
+}
+
+async function actorHealth(
+  deps: GameReadModelDependencies,
+  campaignId: string,
+  row: ActorRow,
+) {
+  if (row.kind === "character") {
+    if (!row.character_id) return null;
+    const snapshot = await loadHealthSnapshot({
+      db: deps.db,
+      campaignId,
+      characterId: row.character_id,
+    });
+    if (!snapshot || row.character_stable === null) return null;
+    return healthView({
+      maximumHitPoints: snapshot.maximumHitPoints,
+      currentHitPoints: snapshot.currentHitPoints,
+      temporaryHitPoints: snapshot.temporaryHitPoints,
+      nonlethalDamage: snapshot.nonlethalDamage,
+      stable: row.character_stable !== 0,
+    });
+  }
+
+  if (row.kind === "monster") {
+    if (
+      row.monster_maximum_hit_points === null ||
+      row.monster_current_hit_points === null ||
+      row.monster_stable === null
+    ) {
+      return null;
+    }
+    return healthView({
+      maximumHitPoints: row.monster_maximum_hit_points,
+      currentHitPoints: row.monster_current_hit_points,
+      temporaryHitPoints: row.monster_temporary_hit_points ?? 0,
+      nonlethalDamage: row.monster_nonlethal_damage ?? 0,
+      stable: row.monster_stable !== 0,
+    });
+  }
+
+  return null;
+}
+
 /**
  * Stable hydration/reconnect projection for UI and AI consumers.
  * D1 is read directly so a hibernated/missing Durable Object can never block
@@ -105,15 +160,17 @@ export async function getCampaignGameReadModel(
       .prepare(
         `SELECT actor.id, actor.kind, actor.character_id, actor.controller_user_id,
                 actor.name, actor.status, actor.metadata,
-                COALESCE(dnd.maximum_hit_points, monster.maximum_hit_points) AS maximum_hit_points,
-                COALESCE(dnd.current_hit_points, monster.current_hit_points) AS current_hit_points,
-                COALESCE(dnd.temporary_hit_points, monster.temporary_hit_points) AS temporary_hit_points,
-                COALESCE(dnd.nonlethal_damage, monster.nonlethal_damage) AS nonlethal_damage,
-                COALESCE(dnd.stable, monster.stable) AS stable
+                dnd.stable AS character_stable,
+                monster.maximum_hit_points AS monster_maximum_hit_points,
+                monster.current_hit_points AS monster_current_hit_points,
+                monster.temporary_hit_points AS monster_temporary_hit_points,
+                monster.nonlethal_damage AS monster_nonlethal_damage,
+                monster.stable AS monster_stable
          FROM game_actors actor
          LEFT JOIN dnd35_characters dnd ON dnd.character_id = actor.character_id
          LEFT JOIN runtime_dnd35_monster_instances monster ON monster.actor_id = actor.id
          WHERE actor.campaign_id = ? AND actor.world_id = ?
+           AND actor.status IN ('active', 'defeated')
          ORDER BY actor.created_at ASC, actor.id ASC`,
       )
       .bind(context.campaignId, context.worldId)
@@ -144,25 +201,18 @@ export async function getCampaignGameReadModel(
       .all<EventRow>(),
   ]);
 
-  const actors = actorResult.results.map((row) => ({
-    id: row.id,
-    kind: row.kind,
-    characterId: row.character_id,
-    controllerUserId: row.controller_user_id,
-    name: row.name,
-    status: row.status,
-    metadata: json<Record<string, unknown>>(row.metadata, {}),
-    health:
-      row.maximum_hit_points === null || row.current_hit_points === null
-        ? null
-        : {
-            maximumHitPoints: row.maximum_hit_points,
-            currentHitPoints: row.current_hit_points,
-            temporaryHitPoints: row.temporary_hit_points ?? 0,
-            nonlethalDamage: row.nonlethal_damage ?? 0,
-            stable: row.stable !== 0,
-          },
-  }));
+  const actors = await Promise.all(
+    actorResult.results.map(async (row) => ({
+      id: row.id,
+      kind: row.kind,
+      characterId: row.character_id,
+      controllerUserId: row.controller_user_id,
+      name: row.name,
+      status: row.status,
+      metadata: json<Record<string, unknown>>(row.metadata, {}),
+      health: await actorHealth(deps, context.campaignId, row),
+    })),
+  );
 
   let activeEncounter: null | {
     id: string;
@@ -213,7 +263,10 @@ export async function getCampaignGameReadModel(
               duration_kind, remaining_rounds, encounter_id, expires_encounter_round,
               expires_turn_order, expires_at, state
        FROM runtime_dnd35_actor_conditions
-       WHERE actor_id IN (SELECT id FROM game_actors WHERE campaign_id = ?)
+       WHERE actor_id IN (
+         SELECT id FROM game_actors
+         WHERE campaign_id = ? AND status IN ('active', 'defeated')
+       )
        UNION ALL
        SELECT condition.id, actor.id AS actor_id, condition.condition_id,
               condition.source_character_id AS source_actor_id, condition.source_description,
@@ -222,7 +275,7 @@ export async function getCampaignGameReadModel(
               condition.expires_at, condition.state
        FROM dnd35_character_conditions condition
        JOIN game_actors actor ON actor.character_id = condition.character_id
-       WHERE actor.campaign_id = ?`,
+       WHERE actor.campaign_id = ? AND actor.status IN ('active', 'defeated')`,
     )
     .bind(context.campaignId, context.campaignId)
     .all<ConditionRow>();

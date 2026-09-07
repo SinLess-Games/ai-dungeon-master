@@ -20,7 +20,7 @@ export interface Dnd35ModifierResolution {
   modifiers: readonly ResolvedDnd35Modifier[];
 }
 
-const ALWAYS_STACKING_BONUS_TYPES = new Set(["circumstance", "dodge", "untyped", "unnamed"]);
+const ALWAYS_STACKING_MODIFIER_TYPES = new Set(["circumstance", "dodge", "untyped", "unnamed"]);
 
 /** Normalize persisted snake_case bonus types and runtime kebab-case aliases. */
 export function normalizeDnd35ModifierKind(kind: string): string {
@@ -38,13 +38,35 @@ function validateModifier(modifier: Dnd35Modifier): void {
   }
 }
 
+function selectBestPositive(group: readonly Dnd35Modifier[]): Dnd35Modifier | undefined {
+  let best: Dnd35Modifier | undefined;
+  for (const modifier of group) {
+    if (modifier.value <= 0) continue;
+    if (!best || modifier.value > best.value) best = modifier;
+  }
+  return best;
+}
+
+function selectWorstPenalty(group: readonly Dnd35Modifier[]): Dnd35Modifier | undefined {
+  let worst: Dnd35Modifier | undefined;
+  for (const modifier of group) {
+    if (modifier.value >= 0) continue;
+    if (!worst || modifier.value < worst.value) worst = modifier;
+  }
+  return worst;
+}
+
 /**
- * Resolve the default D&D 3.5 stacking rule.
+ * Resolve the default D&D 3.5 stacking rules.
  *
- * Positive bonuses of the same type overlap; only the highest applies. Dodge,
- * circumstance, and untyped/unnamed bonuses stack. Penalties stack unless a
- * specific rules effect says otherwise. Exceptional effects may explicitly
- * request `stack` or `overlap`.
+ * Typed modifiers that do not stack keep the best positive bonus and the worst
+ * penalty of that type. Dodge, circumstance, and untyped/unnamed modifiers
+ * normally stack, while exceptional rules text can explicitly force either
+ * stacking or overlap behavior.
+ *
+ * Callers should avoid emitting duplicate untyped/circumstance modifiers from
+ * the same underlying source; the content/effect layer owns same-source
+ * deduplication because display `source` text is not a stable source identity.
  */
 export function resolveDnd35Modifiers(
   input: readonly Dnd35Modifier[],
@@ -60,34 +82,30 @@ export function resolveDnd35Modifiers(
   }
 
   const selectedIds = new Set<string>();
-  const overlappingPositiveGroups = new Map<string, Dnd35Modifier[]>();
+  const overlapGroups = new Map<string, Dnd35Modifier[]>();
 
   for (const modifier of input) {
     if (modifier.enabled === false) continue;
 
     const kind = normalizeDnd35ModifierKind(modifier.kind);
-    const stacks =
-      modifier.stacking === "stack" ||
-      (modifier.stacking !== "overlap" && ALWAYS_STACKING_BONUS_TYPES.has(kind));
+    const stacksByDefault = ALWAYS_STACKING_MODIFIER_TYPES.has(kind);
+    const stacks = modifier.stacking === "stack" || (modifier.stacking !== "overlap" && stacksByDefault);
 
-    // D&D penalties normally stack. Zero-value entries are harmless and retained
-    // for auditability. Explicit `overlap` can still force overlap behavior.
-    if ((modifier.value <= 0 && modifier.stacking !== "overlap") || stacks) {
+    if (stacks || modifier.value === 0) {
       selectedIds.add(modifier.id);
       continue;
     }
 
-    const group = overlappingPositiveGroups.get(kind);
+    const group = overlapGroups.get(kind);
     if (group) group.push(modifier);
-    else overlappingPositiveGroups.set(kind, [modifier]);
+    else overlapGroups.set(kind, [modifier]);
   }
 
-  for (const group of overlappingPositiveGroups.values()) {
-    let best = group[0];
-    for (const modifier of group.slice(1)) {
-      if (best === undefined || modifier.value > best.value) best = modifier;
-    }
-    if (best) selectedIds.add(best.id);
+  for (const group of overlapGroups.values()) {
+    const bestPositive = selectBestPositive(group);
+    const worstPenalty = selectWorstPenalty(group);
+    if (bestPositive) selectedIds.add(bestPositive.id);
+    if (worstPenalty) selectedIds.add(worstPenalty.id);
   }
 
   const modifiers: ResolvedDnd35Modifier[] = input.map((modifier) => {

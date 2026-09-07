@@ -7,7 +7,9 @@ import { adminBlogQuery } from "../client/queries";
 import { BlogError, Pagination } from "./BlogShared";
 import { DevBlogEditor } from "./DevBlogEditor";
 import { CommentModeration } from "./CommentModeration";
+import { DevBlogAI } from "./DevBlogAI";
 import "./devblog.css";
+
 export function DevBlogAdmin() {
   const session = authClient.useSession();
   return (
@@ -36,12 +38,14 @@ export function DevBlogAdmin() {
     </main>
   );
 }
+
 function Studio({ userId }: { userId: string }) {
   const [id, setId] = useState<string | null>(null);
-  const [tab, setTab] = useState<"posts" | "comments">("posts");
+  const [tab, setTab] = useState<"posts" | "comments" | "ai">("posts");
   const [status, setStatus] = useState<"all" | "draft" | "published" | "archived">("all");
   const [page, setPage] = useState(0);
   const query = useQuery(adminBlogQuery(userId, status, page));
+
   if (id)
     return (
       <DevBlogEditor
@@ -54,6 +58,7 @@ function Studio({ userId }: { userId: string }) {
         }}
       />
     );
+
   return (
     <>
       <div className="blog-tabs">
@@ -63,10 +68,16 @@ function Studio({ userId }: { userId: string }) {
         <button type="button" aria-pressed={tab === "comments"} onClick={() => setTab("comments")}>
           Comments
         </button>
+        <button type="button" aria-pressed={tab === "ai"} onClick={() => setTab("ai")}>
+          AI Writer
+        </button>
         <Link to="/devblog">View public blog ↗</Link>
       </div>
+
       {tab === "comments" ? (
         <CommentModeration userId={userId} />
+      ) : tab === "ai" ? (
+        <DevBlogAI userId={userId} editPost={setId} />
       ) : (
         <>
           <div className="blog-actions">

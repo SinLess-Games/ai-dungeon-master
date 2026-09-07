@@ -12,6 +12,7 @@ import {
   characterClassLevels,
   characters,
   dnd35Characters,
+  type CharacterMetadata,
 } from "@/infrastructure/database/schema";
 import { createAuth, type AuthEnv } from "@/modules/auth/server/auth";
 import { requireUser } from "@/modules/auth/server/requireAuth";
@@ -38,6 +39,17 @@ const characterMetadataSchema = z.object({
   playerNotes: z.string().max(20000).optional(),
   extensions: z.record(z.string(), z.unknown()).optional(),
 });
+
+type CharacterMetadataInput = z.infer<typeof characterMetadataSchema>;
+
+function normalizeMetadata(value: CharacterMetadataInput): CharacterMetadata {
+  const metadata: CharacterMetadata = {};
+  if (value.portraitObjectKey !== undefined) metadata.portraitObjectKey = value.portraitObjectKey;
+  if (value.pronouns !== undefined) metadata.pronouns = value.pronouns;
+  if (value.playerNotes !== undefined) metadata.playerNotes = value.playerNotes;
+  if (value.extensions !== undefined) metadata.extensions = value.extensions;
+  return metadata;
+}
 
 const createCharacterSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -127,7 +139,11 @@ async function requireCharacterEditor(input: {
   if (row.campaign.status !== "draft" && row.campaign.status !== "ready") {
     throw new ConflictError("Characters cannot be edited after campaign start begins.");
   }
-  if (row.character.status === "active" || row.character.status === "retired" || row.character.status === "archived") {
+  if (
+    row.character.status === "active" ||
+    row.character.status === "retired" ||
+    row.character.status === "archived"
+  ) {
     throw new ConflictError("This character is no longer editable as a pre-start draft.");
   }
   return row;
@@ -167,7 +183,7 @@ export const characterRoutes = new Hono<CharacterEnv>()
           rulesetVersion: campaign.rulesetVersion,
           name: input.name,
           status: "draft",
-          metadata: input.metadata ?? {},
+          metadata: input.metadata === undefined ? {} : normalizeMetadata(input.metadata),
         }),
         db.insert(dnd35Characters).values({
           characterId: id,
@@ -238,7 +254,7 @@ export const characterRoutes = new Hono<CharacterEnv>()
 
       const genericUpdate = {
         ...(input.name === undefined ? {} : { name: input.name }),
-        ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
+        ...(input.metadata === undefined ? {} : { metadata: normalizeMetadata(input.metadata) }),
         updatedAt: new Date(),
       };
       const dndUpdate = {
@@ -254,7 +270,9 @@ export const characterRoutes = new Hono<CharacterEnv>()
           .set(dndUpdate)
           .where(eq(dnd35Characters.characterId, row.character.id)),
       ]);
-      return c.json(await db.select().from(characters).where(eq(characters.id, row.character.id)).get());
+      return c.json(
+        await db.select().from(characters).where(eq(characters.id, row.character.id)).get(),
+      );
     },
   )
   .put(
@@ -271,15 +289,19 @@ export const characterRoutes = new Hono<CharacterEnv>()
       });
       const now = new Date();
       await db.batch([
-        db.delete(characterAbilityScores).where(eq(characterAbilityScores.characterId, row.character.id)),
+        db
+          .delete(characterAbilityScores)
+          .where(eq(characterAbilityScores.characterId, row.character.id)),
         db.insert(characterAbilityScores).values(
-          (Object.entries(input) as Array<[keyof typeof input, number]>).map(([ability, baseScore]) => ({
-            characterId: row.character.id,
-            ability,
-            baseScore,
-            createdAt: now,
-            updatedAt: now,
-          })),
+          (Object.entries(input) as Array<[keyof typeof input, number]>).map(
+            ([ability, baseScore]) => ({
+              characterId: row.character.id,
+              ability,
+              baseScore,
+              createdAt: now,
+              updatedAt: now,
+            }),
+          ),
         ),
       ]);
       return c.json({ characterId: row.character.id, abilityScores: input });
@@ -338,7 +360,10 @@ export const characterRoutes = new Hono<CharacterEnv>()
         .where(eq(dnd35Characters.characterId, row.character.id))
         .get(),
       db
-        .select({ ability: characterAbilityScores.ability, baseScore: characterAbilityScores.baseScore })
+        .select({
+          ability: characterAbilityScores.ability,
+          baseScore: characterAbilityScores.baseScore,
+        })
         .from(characterAbilityScores)
         .where(eq(characterAbilityScores.characterId, row.character.id))
         .all(),
@@ -359,7 +384,9 @@ export const characterRoutes = new Hono<CharacterEnv>()
       classLevelCount: classRows.length,
     });
     if (!readiness.ok) {
-      throw new ValidationError("Character is not ready to play.", { issues: readiness.errors });
+      throw new ValidationError("Character is not ready to play.", {
+        issues: readiness.errors,
+      });
     }
 
     const conScore = abilityScores.con;

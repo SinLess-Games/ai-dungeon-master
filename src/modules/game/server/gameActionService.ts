@@ -24,6 +24,7 @@ import {
   loadWeaponSnapshot,
 } from "./d1Dnd35State";
 import { D1GameEventStore } from "./d1GameEventStore";
+import { prepareEncounterAction } from "./encounterActionState";
 
 export interface GameActionDependencies {
   db: Database;
@@ -176,6 +177,16 @@ export async function performAttack(
   },
 ) {
   const context = await requireContext(deps, input.campaignId);
+  const encounterAction = await prepareEncounterAction(
+    { db: deps.db, binding: deps.binding },
+    {
+      campaignId: input.campaignId,
+      actorId: input.attackerId,
+      kind: "standard",
+      requiredParticipantIds: [input.attackerId, input.targetId],
+    },
+  );
+
   const snapshot = await loadAttackActionSnapshot({
     db: deps.db,
     campaignId: input.campaignId,
@@ -204,7 +215,7 @@ export async function performAttack(
   const eventId = rt.ids();
   const occurredAt = rt.now();
   if (!resolution.attackRoll.hit) {
-    await rt.events.append({
+    const event = {
       id: eventId,
       campaignId: context.campaignId,
       sessionId: context.sessionId,
@@ -225,7 +236,14 @@ export async function performAttack(
         criticalConfirmed: false,
         damage: 0,
       },
-    });
+    };
+
+    if (encounterAction) {
+      const persisted = await rt.events.commitEncounterAction({ event, action: encounterAction });
+      if (!persisted) throw new Error("GAME_STATE_CONFLICT");
+    } else {
+      await rt.events.append(event);
+    }
     return { ...resolution, damage: null, eventId, sessionId: context.sessionId };
   }
 
@@ -258,10 +276,7 @@ export async function performAttack(
   const diceSubtotal = diceRolls.reduce((sum, roll) => sum + roll, 0);
   const strengthScore = await loadEffectiveStrength(deps.db, input.attackerId);
   const strengthModifier = strengthScore === null ? 0 : strengthScore;
-  const handUse =
-    weapon.handedness === "two_handed"
-      ? "two_handed"
-      : "primary";
+  const handUse = weapon.handedness === "two_handed" ? "two_handed" : "primary";
   const strengthDamage = strengthDamageModifier({
     strengthModifier,
     handUse,
@@ -297,52 +312,57 @@ export async function performAttack(
       reason: "combat.attack",
     },
   ];
+  const event = {
+    id: eventId,
+    campaignId: context.campaignId,
+    sessionId: context.sessionId,
+    eventType: "combat.attack",
+    occurredAt,
+    actorId: input.attackerId,
+    sourceId: weapon.itemId,
+    targetIds: [input.targetId],
+    payload: {
+      kind: input.kind,
+      weaponInventoryId: weapon.inventoryId,
+      damageDice: weapon.damageDice,
+      damageRolls: diceRolls,
+      strengthDamage,
+      attackBonus: resolution.attackBonus,
+      armorClass: resolution.armorClass,
+      naturalRoll: resolution.attackRoll.naturalRoll,
+      total: resolution.attackRoll.total,
+      hit: true,
+      criticalThreat: resolution.critical.threatened,
+      criticalConfirmed: resolution.critical.confirmed,
+      criticalMultiplier: multiplier,
+      damage,
+      absorbedByTemporaryHitPoints: application.absorbedByTemporaryHitPoints,
+      hitPointDamage: application.hitPointDamage,
+      healthState: consciousnessState(application.after),
+    },
+    deltas,
+  };
+  const healthMutation = {
+    characterId: input.targetId,
+    expected: {
+      currentHitPoints: targetHealth.currentHitPoints,
+      temporaryHitPoints: targetHealth.temporaryHitPoints,
+      nonlethalDamage: targetHealth.nonlethalDamage,
+    },
+    next: {
+      currentHitPoints: application.after.currentHitPoints,
+      temporaryHitPoints: application.after.temporaryHitPoints,
+      nonlethalDamage: application.after.nonlethalDamage,
+    },
+  };
 
-  const persisted = await rt.events.applyHealth(
-    {
-      id: eventId,
-      campaignId: context.campaignId,
-      sessionId: context.sessionId,
-      eventType: "combat.attack",
-      occurredAt,
-      actorId: input.attackerId,
-      sourceId: weapon.itemId,
-      targetIds: [input.targetId],
-      payload: {
-        kind: input.kind,
-        weaponInventoryId: weapon.inventoryId,
-        damageDice: weapon.damageDice,
-        damageRolls: diceRolls,
-        strengthDamage,
-        attackBonus: resolution.attackBonus,
-        armorClass: resolution.armorClass,
-        naturalRoll: resolution.attackRoll.naturalRoll,
-        total: resolution.attackRoll.total,
-        hit: true,
-        criticalThreat: resolution.critical.threatened,
-        criticalConfirmed: resolution.critical.confirmed,
-        criticalMultiplier: multiplier,
-        damage,
-        absorbedByTemporaryHitPoints: application.absorbedByTemporaryHitPoints,
-        hitPointDamage: application.hitPointDamage,
-        healthState: consciousnessState(application.after),
-      },
-      deltas,
-    },
-    {
-      characterId: input.targetId,
-      expected: {
-        currentHitPoints: targetHealth.currentHitPoints,
-        temporaryHitPoints: targetHealth.temporaryHitPoints,
-        nonlethalDamage: targetHealth.nonlethalDamage,
-      },
-      next: {
-        currentHitPoints: application.after.currentHitPoints,
-        temporaryHitPoints: application.after.temporaryHitPoints,
-        nonlethalDamage: application.after.nonlethalDamage,
-      },
-    },
-  );
+  const persisted = encounterAction
+    ? await rt.events.commitEncounterAction({
+        event,
+        action: encounterAction,
+        health: healthMutation,
+      })
+    : await rt.events.applyHealth(event, healthMutation);
   if (!persisted) throw new Error("GAME_STATE_CONFLICT");
 
   return {

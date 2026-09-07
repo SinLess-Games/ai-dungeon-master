@@ -1,6 +1,6 @@
 import { engineFailure, engineSuccess, type EngineResult } from "@engine/result";
-import { iterativeBaseAttackBonuses } from "./progression";
 import { resolveAttackRoll, type AttackRollResult } from "./combat";
+import { iterativeBaseAttackBonuses } from "./progression";
 
 export interface ChargeValidation {
   distanceFeet: number;
@@ -10,7 +10,9 @@ export interface ChargeValidation {
 }
 
 function assertNonNegativeFinite(value: number, name: string): void {
-  if (!Number.isFinite(value) || value < 0) throw new RangeError(`${name} must be non-negative and finite.`);
+  if (!Number.isFinite(value) || value < 0) {
+    throw new RangeError(`${name} must be non-negative and finite.`);
+  }
 }
 
 /**
@@ -29,19 +31,34 @@ export function validateCharge(input: {
   const maximumDistanceFeet = input.speedFeet * 2;
 
   if (input.distanceFeet <= 0) {
-    return engineFailure("DND35_CHARGE_NO_MOVEMENT", "A charge must include movement toward the target.");
+    return engineFailure(
+      "DND35_CHARGE_NO_MOVEMENT",
+      "A charge must include movement toward the target.",
+    );
   }
   if (input.distanceFeet > maximumDistanceFeet) {
-    return engineFailure("DND35_CHARGE_TOO_FAR", "The target is beyond twice the charger's speed.");
+    return engineFailure(
+      "DND35_CHARGE_TOO_FAR",
+      "The target is beyond twice the charger's speed.",
+    );
   }
   if (!input.straightLine) {
-    return engineFailure("DND35_CHARGE_NOT_STRAIGHT", "A charge requires a straight path toward the target.");
+    return engineFailure(
+      "DND35_CHARGE_NOT_STRAIGHT",
+      "A charge requires a straight path toward the target.",
+    );
   }
   if (!input.clearPath) {
-    return engineFailure("DND35_CHARGE_PATH_BLOCKED", "A charge cannot pass through blocking terrain or creatures.");
+    return engineFailure(
+      "DND35_CHARGE_PATH_BLOCKED",
+      "A charge cannot pass through blocking terrain or creatures.",
+    );
   }
   if (!input.targetReachable) {
-    return engineFailure("DND35_CHARGE_TARGET_UNREACHABLE", "The charger cannot end in a space from which the target can be attacked.");
+    return engineFailure(
+      "DND35_CHARGE_TARGET_UNREACHABLE",
+      "The charger cannot end in a space from which the target can be attacked.",
+    );
   }
 
   return engineSuccess({
@@ -51,6 +68,9 @@ export function validateCharge(input: {
     armorClassModifier: -2,
   });
 }
+
+/** Semantic alias for callers that think in terms of action resolution. */
+export const resolveCharge = validateCharge;
 
 export interface FullAttackEntry {
   index: number;
@@ -70,12 +90,18 @@ export function resolveFullAttack(input: {
   if (!Number.isSafeInteger(input.baseAttackBonus) || input.baseAttackBonus < 0) {
     throw new RangeError("Full-attack BAB must be a non-negative safe integer.");
   }
-  if (!Number.isFinite(input.fixedAttackModifier)) throw new RangeError("Fixed attack modifier must be finite.");
-  if (!Number.isFinite(input.armorClass)) throw new RangeError("Armor Class must be finite.");
+  if (!Number.isFinite(input.fixedAttackModifier)) {
+    throw new RangeError("Fixed attack modifier must be finite.");
+  }
+  if (!Number.isFinite(input.armorClass)) {
+    throw new RangeError("Armor Class must be finite.");
+  }
 
   const iterative = iterativeBaseAttackBonuses(input.baseAttackBonus);
   if (input.rolls && input.rolls.length !== iterative.length) {
-    throw new RangeError(`Expected ${iterative.length} explicit attack rolls, received ${input.rolls.length}.`);
+    throw new RangeError(
+      `Expected ${iterative.length} explicit attack rolls, received ${input.rolls.length}.`,
+    );
   }
 
   return iterative.map((baseAttackBonus, index) => {
@@ -84,7 +110,9 @@ export function resolveFullAttack(input: {
     const result = resolveAttackRoll({
       attackBonus: totalAttackBonus,
       armorClass: input.armorClass,
-      ...(input.threatMinimum === undefined ? {} : { threatMinimum: input.threatMinimum }),
+      ...(input.threatMinimum === undefined
+        ? {}
+        : { threatMinimum: input.threatMinimum }),
       ...(roll === undefined ? {} : { roll }),
     });
     return { index, baseAttackBonus, totalAttackBonus, result };
@@ -111,7 +139,9 @@ export function resolveCriticalConfirmation(input: {
   const confirmation = resolveAttackRoll({
     attackBonus: input.attackBonus,
     armorClass: input.armorClass,
-    ...(input.confirmationRoll === undefined ? {} : { roll: input.confirmationRoll }),
+    ...(input.confirmationRoll === undefined
+      ? {}
+      : { roll: input.confirmationRoll }),
   });
 
   return {

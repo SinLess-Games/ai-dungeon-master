@@ -53,5 +53,5 @@ export interface WeeklyDevBlogResult {
   postId: string | null;
   slug: string;
   title: string | null;
-  status: "draft" | "published" | null;
+  status: "draft" | "published" | "archived" | null;
 }

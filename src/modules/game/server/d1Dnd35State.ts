@@ -1,0 +1,454 @@
+import { and, desc, eq, inArray } from "drizzle-orm";
+import type { Database } from "@/infrastructure/database/client";
+import {
+  armors,
+  campaigns,
+  characterAbilityIncreases,
+  characterAbilityScores,
+  characterClassLevels,
+  characterInventory,
+  characterSkills,
+  characters,
+  classLevels,
+  dnd35Characters,
+  gameSessions,
+  raceAbilities,
+  races,
+  shields,
+  skills,
+  weaponDamage,
+  weapons,
+} from "@/infrastructure/database/schema";
+import {
+  abilityModifier,
+  aggregateClassProgression,
+  effectiveAbilityScore,
+  hitPointsFromGainedLevels,
+  type Dnd35Size,
+} from "@/rulesets/dnd35";
+import type {
+  Dnd35AttackActionSnapshot,
+  Dnd35AttackKind,
+  Dnd35SaveActionSnapshot,
+  Dnd35SaveKind,
+  Dnd35SkillActionSnapshot,
+} from "../domain/dnd35ActionRuntime";
+
+export type AbilityKey = "str" | "dex" | "con" | "int" | "wis" | "cha";
+
+export interface ActiveGameContext {
+  campaignId: string;
+  worldId: string;
+  sessionId: string;
+  rulesetId: string;
+  rulesetVersion: string;
+}
+
+export interface RuntimeWeaponSnapshot {
+  inventoryId: string | null;
+  itemId: string | null;
+  attackKind: Dnd35AttackKind;
+  threatMinimum: number;
+  criticalMultiplier: number;
+  damageDice: string;
+  handedness: "light" | "one_handed" | "two_handed" | "ranged";
+}
+
+export interface RuntimeHealthSnapshot {
+  characterId: string;
+  maximumHitPoints: number;
+  currentHitPoints: number;
+  temporaryHitPoints: number;
+  nonlethalDamage: number;
+}
+
+function saveAbility(save: Dnd35SaveKind): AbilityKey {
+  if (save === "fort") return "con";
+  if (save === "ref") return "dex";
+  return "wis";
+}
+
+export async function loadActiveGameContext(
+  db: Database,
+  campaignId: string,
+): Promise<ActiveGameContext | null> {
+  const campaign = await db
+    .select({
+      id: campaigns.id,
+      status: campaigns.status,
+      worldId: campaigns.worldId,
+      rulesetId: campaigns.rulesetId,
+      rulesetVersion: campaigns.rulesetVersion,
+    })
+    .from(campaigns)
+    .where(eq(campaigns.id, campaignId))
+    .get();
+  if (!campaign || campaign.status !== "active" || !campaign.worldId) return null;
+
+  const session = await db
+    .select({ id: gameSessions.id, worldId: gameSessions.worldId })
+    .from(gameSessions)
+    .where(and(eq(gameSessions.campaignId, campaignId), eq(gameSessions.status, "active")))
+    .orderBy(desc(gameSessions.ordinal))
+    .limit(1)
+    .get();
+  if (!session || session.worldId !== campaign.worldId) return null;
+
+  return {
+    campaignId: campaign.id,
+    worldId: campaign.worldId,
+    sessionId: session.id,
+    rulesetId: campaign.rulesetId,
+    rulesetVersion: campaign.rulesetVersion,
+  };
+}
+
+async function requireActiveCharacter(db: Database, campaignId: string, characterId: string) {
+  const character = await db
+    .select({
+      id: characters.id,
+      campaignId: characters.campaignId,
+      status: characters.status,
+      rulesetId: characters.rulesetId,
+      rulesetVersion: characters.rulesetVersion,
+    })
+    .from(characters)
+    .where(and(eq(characters.id, characterId), eq(characters.campaignId, campaignId)))
+    .get();
+  if (!character || character.status !== "active") return null;
+  return character;
+}
+
+async function loadDndCharacter(db: Database, characterId: string) {
+  return db
+    .select()
+    .from(dnd35Characters)
+    .where(eq(dnd35Characters.characterId, characterId))
+    .get();
+}
+
+export async function loadEffectiveAbility(
+  db: Database,
+  characterId: string,
+  ability: AbilityKey,
+): Promise<number | null> {
+  const extension = await loadDndCharacter(db, characterId);
+  if (!extension) return null;
+
+  const [score, racial, increases] = await Promise.all([
+    db
+      .select()
+      .from(characterAbilityScores)
+      .where(
+        and(
+          eq(characterAbilityScores.characterId, characterId),
+          eq(characterAbilityScores.ability, ability),
+        ),
+      )
+      .get(),
+    extension.raceId
+      ? db
+          .select({ modifier: raceAbilities.modifier })
+          .from(raceAbilities)
+          .where(and(eq(raceAbilities.raceId, extension.raceId), eq(raceAbilities.ability, ability)))
+          .get()
+      : Promise.resolve(undefined),
+    db
+      .select({ amount: characterAbilityIncreases.amount })
+      .from(characterAbilityIncreases)
+      .where(
+        and(
+          eq(characterAbilityIncreases.characterId, characterId),
+          eq(characterAbilityIncreases.ability, ability),
+        ),
+      )
+      .all(),
+  ]);
+  if (!score) return null;
+
+  return effectiveAbilityScore({
+    baseScore: score.baseScore,
+    inherentBonus: score.inherentBonus,
+    racialAdjustment: racial?.modifier ?? 0,
+    levelAdjustment: increases.reduce((sum, increase) => sum + increase.amount, 0),
+    temporaryAdjustment: score.temporaryAdjustment,
+    abilityDamage: score.abilityDamage,
+    abilityDrain: score.abilityDrain,
+  });
+}
+
+async function loadProgression(db: Database, characterId: string) {
+  const rows = await db
+    .select({
+      classId: classLevels.classId,
+      level: classLevels.level,
+      baseAttackBonus: classLevels.baseAttackBonus,
+      fort: classLevels.fort,
+      ref: classLevels.ref,
+      will: classLevels.will,
+      hitDie: classLevels.hitDie,
+      skillPoints: classLevels.skillPoints,
+      basePowerPoints: classLevels.basePowerPoints,
+      powersKnown: classLevels.powersKnown,
+      maxPowerLevel: classLevels.maxPowerLevel,
+    })
+    .from(characterClassLevels)
+    .innerJoin(classLevels, eq(characterClassLevels.classLevelId, classLevels.id))
+    .where(eq(characterClassLevels.characterId, characterId))
+    .all();
+  return aggregateClassProgression(rows);
+}
+
+async function loadRaceCombatData(db: Database, characterId: string) {
+  const extension = await loadDndCharacter(db, characterId);
+  if (!extension) return null;
+  if (!extension.raceId) {
+    return {
+      size: (extension.sizeOverride ?? "medium") as Dnd35Size,
+      naturalArmor: 0,
+    };
+  }
+  const race = await db
+    .select({ size: races.size, naturalArmor: races.naturalArmor })
+    .from(races)
+    .where(eq(races.id, extension.raceId))
+    .get();
+  if (!race) return null;
+  return {
+    size: (extension.sizeOverride ?? race.size) as Dnd35Size,
+    naturalArmor: race.naturalArmor,
+  };
+}
+
+async function loadDefensiveEquipment(db: Database, characterId: string) {
+  const equipped = await db
+    .select({ itemId: characterInventory.itemId })
+    .from(characterInventory)
+    .where(
+      and(
+        eq(characterInventory.characterId, characterId),
+        eq(characterInventory.equipped, true),
+      ),
+    )
+    .all();
+  const itemIds = equipped.map((entry) => entry.itemId);
+  if (itemIds.length === 0) {
+    return { armorBonus: 0, shieldBonus: 0, maximumDexterityBonus: null as number | null, armorCheckPenalty: 0 };
+  }
+
+  const [armorRows, shieldRows] = await Promise.all([
+    db.select().from(armors).where(inArray(armors.itemId, itemIds)).all(),
+    db.select().from(shields).where(inArray(shields.itemId, itemIds)).all(),
+  ]);
+  const dexCaps = [...armorRows, ...shieldRows]
+    .map((entry) => entry.maxDexBonus)
+    .filter((value): value is number => value !== null);
+
+  return {
+    armorBonus: armorRows.reduce((best, entry) => Math.max(best, entry.acBonus), 0),
+    shieldBonus: shieldRows.reduce((best, entry) => Math.max(best, entry.acBonus), 0),
+    maximumDexterityBonus: dexCaps.length === 0 ? null : Math.min(...dexCaps),
+    armorCheckPenalty:
+      armorRows.reduce((sum, entry) => sum + entry.armorCheckPenalty, 0) +
+      shieldRows.reduce((sum, entry) => sum + entry.armorCheckPenalty, 0),
+  };
+}
+
+export async function loadSkillActionSnapshot(input: {
+  db: Database;
+  campaignId: string;
+  characterId: string;
+  skillId: string;
+  specialization?: string;
+}): Promise<Dnd35SkillActionSnapshot | null> {
+  if (!(await requireActiveCharacter(input.db, input.campaignId, input.characterId))) return null;
+
+  const definition = await input.db
+    .select()
+    .from(skills)
+    .where(eq(skills.id, input.skillId))
+    .get();
+  if (!definition || !definition.ability) return null;
+
+  const specialization = input.specialization ?? "";
+  const [rankRow, abilityScore, defense] = await Promise.all([
+    input.db
+      .select({ ranks: characterSkills.ranks })
+      .from(characterSkills)
+      .where(
+        and(
+          eq(characterSkills.characterId, input.characterId),
+          eq(characterSkills.skillId, input.skillId),
+          eq(characterSkills.specialization, specialization),
+        ),
+      )
+      .get(),
+    loadEffectiveAbility(input.db, input.characterId, definition.ability as AbilityKey),
+    loadDefensiveEquipment(input.db, input.characterId),
+  ]);
+  if (abilityScore === null) return null;
+
+  return {
+    actorId: input.characterId,
+    skillId: input.skillId,
+    ranks: rankRow?.ranks ?? 0,
+    abilityModifier: abilityModifier(abilityScore),
+    armorCheckPenalty: defense.armorCheckPenalty * definition.armorCheckMultiplier,
+    trainedOnly: definition.trainedOnly,
+  };
+}
+
+export async function loadSaveActionSnapshot(input: {
+  db: Database;
+  campaignId: string;
+  characterId: string;
+  save: Dnd35SaveKind;
+}): Promise<Dnd35SaveActionSnapshot | null> {
+  if (!(await requireActiveCharacter(input.db, input.campaignId, input.characterId))) return null;
+  const [progression, score] = await Promise.all([
+    loadProgression(input.db, input.characterId),
+    loadEffectiveAbility(input.db, input.characterId, saveAbility(input.save)),
+  ]);
+  if (score === null) return null;
+  return {
+    actorId: input.characterId,
+    baseSaveBonus: progression[input.save],
+    abilityModifier: abilityModifier(score),
+  };
+}
+
+export async function loadWeaponSnapshot(input: {
+  db: Database;
+  characterId: string;
+  inventoryId?: string;
+  attackerSize: Dnd35Size;
+  kind: Dnd35AttackKind;
+}): Promise<RuntimeWeaponSnapshot | null> {
+  if (!input.inventoryId) {
+    if (input.kind !== "melee") return null;
+    return {
+      inventoryId: null,
+      itemId: null,
+      attackKind: "melee",
+      threatMinimum: 20,
+      criticalMultiplier: 2,
+      damageDice: "1d3",
+      handedness: "one_handed",
+    };
+  }
+
+  const inventory = await input.db
+    .select({ itemId: characterInventory.itemId, location: characterInventory.location })
+    .from(characterInventory)
+    .where(
+      and(
+        eq(characterInventory.id, input.inventoryId),
+        eq(characterInventory.characterId, input.characterId),
+      ),
+    )
+    .get();
+  if (!inventory || inventory.location !== "carried") return null;
+
+  const weapon = await input.db
+    .select()
+    .from(weapons)
+    .where(eq(weapons.itemId, inventory.itemId))
+    .get();
+  if (!weapon) return null;
+  if (weapon.attackKind !== "both" && weapon.attackKind !== input.kind) return null;
+
+  const damage = await input.db
+    .select({ dice: weaponDamage.dice })
+    .from(weaponDamage)
+    .where(
+      and(
+        eq(weaponDamage.weaponId, weapon.itemId),
+        eq(weaponDamage.size, input.attackerSize),
+        eq(weaponDamage.weaponEnd, 1),
+      ),
+    )
+    .get();
+  if (!damage) return null;
+
+  return {
+    inventoryId: input.inventoryId,
+    itemId: weapon.itemId,
+    attackKind: input.kind,
+    threatMinimum: weapon.criticalThreatMinimum,
+    criticalMultiplier: weapon.criticalMultiplier,
+    damageDice: damage.dice,
+    handedness: weapon.handedness,
+  };
+}
+
+export async function loadAttackActionSnapshot(input: {
+  db: Database;
+  campaignId: string;
+  attackerId: string;
+  targetId: string;
+  kind: Dnd35AttackKind;
+}): Promise<Dnd35AttackActionSnapshot | null> {
+  const [attacker, target] = await Promise.all([
+    requireActiveCharacter(input.db, input.campaignId, input.attackerId),
+    requireActiveCharacter(input.db, input.campaignId, input.targetId),
+  ]);
+  if (!attacker || !target) return null;
+
+  const [attackerRace, targetRace, progression, attackAbility, targetDexterity, targetDefense] =
+    await Promise.all([
+      loadRaceCombatData(input.db, input.attackerId),
+      loadRaceCombatData(input.db, input.targetId),
+      loadProgression(input.db, input.attackerId),
+      loadEffectiveAbility(input.db, input.attackerId, input.kind === "melee" ? "str" : "dex"),
+      loadEffectiveAbility(input.db, input.targetId, "dex"),
+      loadDefensiveEquipment(input.db, input.targetId),
+    ]);
+  if (!attackerRace || !targetRace || attackAbility === null || targetDexterity === null) return null;
+
+  return {
+    attackerId: input.attackerId,
+    targetId: input.targetId,
+    baseAttackBonus: progression.baseAttackBonus,
+    attackAbilityModifier: abilityModifier(attackAbility),
+    attackerSize: attackerRace.size,
+    targetDexterityModifier: abilityModifier(targetDexterity),
+    targetSize: targetRace.size,
+    targetNaturalArmor: targetRace.naturalArmor,
+    targetArmorBonus: targetDefense.armorBonus,
+    targetShieldBonus: targetDefense.shieldBonus,
+    targetMaximumDexterityBonus: targetDefense.maximumDexterityBonus,
+  };
+}
+
+export async function loadHealthSnapshot(input: {
+  db: Database;
+  campaignId: string;
+  characterId: string;
+}): Promise<RuntimeHealthSnapshot | null> {
+  if (!(await requireActiveCharacter(input.db, input.campaignId, input.characterId))) return null;
+  const [extension, constitution, hpRows] = await Promise.all([
+    loadDndCharacter(input.db, input.characterId),
+    loadEffectiveAbility(input.db, input.characterId, "con"),
+    input.db
+      .select({ hitPointsGained: characterClassLevels.hitPointsGained, track: characterClassLevels.track })
+      .from(characterClassLevels)
+      .where(eq(characterClassLevels.characterId, input.characterId))
+      .orderBy(characterClassLevels.characterLevel)
+      .all(),
+  ]);
+  if (!extension || constitution === null) return null;
+  const gained = hpRows.filter((row) => row.track === 1).map((row) => row.hitPointsGained);
+  if (gained.length === 0) return null;
+  const maximum = hitPointsFromGainedLevels({
+    gainedHitPoints: gained,
+    constitutionModifier: abilityModifier(constitution),
+  }).maximumHitPoints;
+
+  return {
+    characterId: input.characterId,
+    maximumHitPoints: maximum,
+    currentHitPoints: extension.currentHitPoints,
+    temporaryHitPoints: extension.temporaryHitPoints,
+    nonlethalDamage: extension.nonlethalDamage,
+  };
+}

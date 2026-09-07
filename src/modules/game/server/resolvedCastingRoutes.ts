@@ -64,7 +64,7 @@ const powerSchema = z.object({
     .array(
       z.object({
         index: z.number().int().min(0).max(1000),
-        applications: z.number().int().min(1).max(1000).optional(),
+        applications: z.number().int().min(1).max(1000).default(1),
       }),
     )
     .max(100)

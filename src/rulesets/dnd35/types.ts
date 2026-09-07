@@ -1,15 +1,10 @@
 export const DND35_RULESET_ID = "dnd35" as const;
 export const DND35_RULESET_VERSION = "3.5" as const;
 
-export type Dnd35Ability =
-  | "strength"
-  | "dexterity"
-  | "constitution"
-  | "intelligence"
-  | "wisdom"
-  | "charisma";
-
-export type Dnd35Save = "fortitude" | "reflex" | "will";
+/** Matches the persisted ability keys in dnd35/primitives.ts. */
+export type Dnd35Ability = "str" | "dex" | "con" | "int" | "wis" | "cha";
+/** Matches the persisted save keys in dnd35/primitives.ts. */
+export type Dnd35Save = "fort" | "ref" | "will";
 
 export type Dnd35Size =
   | "fine"

@@ -22,8 +22,9 @@ export interface Dnd35ModifierResolution {
 
 const ALWAYS_STACKING_BONUS_TYPES = new Set(["circumstance", "dodge", "untyped", "unnamed"]);
 
-function normalizeKind(kind: string): string {
-  const normalized = kind.trim().toLowerCase();
+/** Normalize persisted snake_case bonus types and runtime kebab-case aliases. */
+export function normalizeDnd35ModifierKind(kind: string): string {
+  const normalized = kind.trim().toLowerCase().replaceAll("_", "-");
   if (!normalized) throw new RangeError("Modifier kind cannot be empty.");
   return normalized;
 }
@@ -31,7 +32,7 @@ function normalizeKind(kind: string): string {
 function validateModifier(modifier: Dnd35Modifier): void {
   if (!modifier.id.trim()) throw new RangeError("Modifier id cannot be empty.");
   if (!modifier.source.trim()) throw new RangeError("Modifier source cannot be empty.");
-  normalizeKind(modifier.kind);
+  normalizeDnd35ModifierKind(modifier.kind);
   if (!Number.isFinite(modifier.value)) {
     throw new RangeError(`Modifier ${modifier.id} value must be finite.`);
   }
@@ -64,7 +65,7 @@ export function resolveDnd35Modifiers(
   for (const modifier of input) {
     if (modifier.enabled === false) continue;
 
-    const kind = normalizeKind(modifier.kind);
+    const kind = normalizeDnd35ModifierKind(modifier.kind);
     const stacks =
       modifier.stacking === "stack" ||
       (modifier.stacking !== "overlap" && ALWAYS_STACKING_BONUS_TYPES.has(kind));

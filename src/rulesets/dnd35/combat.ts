@@ -1,5 +1,10 @@
 import { resolveCheck, type CheckResult, type RandomSource } from "@/engine";
-import { resolveDnd35Modifiers, type Dnd35Modifier, type Dnd35ModifierResolution } from "./modifiers";
+import {
+  normalizeDnd35ModifierKind,
+  resolveDnd35Modifiers,
+  type Dnd35Modifier,
+  type Dnd35ModifierResolution,
+} from "./modifiers";
 import type { Dnd35Size } from "./types";
 
 const AC_SIZE_MODIFIER: Record<Dnd35Size, number> = {
@@ -42,7 +47,7 @@ export interface ArmorClassResult {
 }
 
 function defaultAcApplicability(kind: string): readonly ("normal" | "touch" | "flat-footed")[] {
-  switch (kind.trim().toLowerCase()) {
+  switch (normalizeDnd35ModifierKind(kind)) {
     case "armor":
     case "shield":
     case "natural-armor":

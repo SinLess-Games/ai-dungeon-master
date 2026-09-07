@@ -6,6 +6,7 @@ import {
   resolveBullRush,
   resolveDnd35Modifiers,
   resolveOpposedSkillCheck,
+  skillPointCostForRanks,
   spendImmediateAction,
   standardConditionModifiers,
   strengthDamageModifier,
@@ -104,6 +105,12 @@ describe("D&D 3.5 SRD regressions", () => {
 
     expect(result.winnerId).toBeNull();
     expect(result.tied).toBe(true);
+  });
+
+  it("purchases class skills in whole ranks and cross-class skills in half ranks", () => {
+    expect(skillPointCostForRanks(2, true)).toBe(2);
+    expect(skillPointCostForRanks(1.5, false)).toBe(3);
+    expect(() => skillPointCostForRanks(1.5, true)).toThrow(/whole numbers/i);
   });
 
   it("blocks immediate actions while flat-footed without creating swift debt", () => {

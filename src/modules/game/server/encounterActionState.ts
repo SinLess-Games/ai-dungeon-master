@@ -47,7 +47,7 @@ export async function prepareEncounterAction(
       encounter.participants.map((participant) => participant.characterId),
     );
     if (input.requiredParticipantIds.some((id) => !participantIds.has(id))) {
-      throw new Error("ENCOUNTER_PARTICIPANT_INVALID");
+      throw new RangeError("All encounter action targets must be active encounter participants.");
     }
   }
 
@@ -59,7 +59,7 @@ export async function prepareEncounterAction(
   const spent = spendCurrentEncounterAction(before, input.actorId, input.kind);
   if (!spent.ok) {
     const error = spent.errors[0];
-    throw new Error(error?.code ?? "ENCOUNTER_ACTION_UNAVAILABLE");
+    throw new RangeError(error?.message ?? "The requested encounter action is unavailable.");
   }
 
   const expectedParticipant = before.participants.find(

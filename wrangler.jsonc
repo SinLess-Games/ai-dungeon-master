@@ -23,7 +23,9 @@
   "vars": {
     "GITHUB_REPOSITORY": "SinLess-Games/ai-dungeon-master",
     "DEVBLOG_AI_ENABLED": "true",
-    "DEVBLOG_AI_AUTO_PUBLISH": "false"
+    "DEVBLOG_AI_AUTO_PUBLISH": "false",
+    "AI_BASE_URL": "https://api.openai.com/v1",
+    "AI_DEVBLOG_MODEL": "gpt-5-mini"
   },
 
   "observability": {

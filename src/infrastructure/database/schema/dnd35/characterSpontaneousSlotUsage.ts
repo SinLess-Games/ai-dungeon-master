@@ -8,7 +8,9 @@ import { nonNegative, timestamps } from "./schemaUtils";
  *
  * Maximum slots remain derived from class progression and casting ability; only
  * the mutable expended count is stored so derived totals cannot drift from the
- * authoritative ruleset data.
+ * authoritative ruleset data. Slot levels are intentionally not capped at 9 so
+ * epic Improved Spell Capacity-style slots can be represented later without a
+ * persistence migration.
  */
 export const characterSpontaneousSlotUsage = sqliteTable(
   "dnd35_character_spontaneous_slot_usage",
@@ -27,10 +29,7 @@ export const characterSpontaneousSlotUsage = sqliteTable(
       "dnd35_character_spontaneous_slot_usage_spell_level_integer",
       sql`typeof(${t.spellLevel}) = 'integer'`,
     ),
-    check(
-      "dnd35_character_spontaneous_slot_usage_spell_level_valid",
-      sql`${t.spellLevel} between 0 and 9`,
-    ),
+    nonNegative("dnd35_character_spontaneous_slot_usage_spell_level_valid", t.spellLevel),
     check(
       "dnd35_character_spontaneous_slot_usage_expended_integer",
       sql`typeof(${t.expendedCount}) = 'integer'`,

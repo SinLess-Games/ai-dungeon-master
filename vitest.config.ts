@@ -1,8 +1,11 @@
 import { fileURLToPath, URL } from "node:url";
 
 import { defineConfig } from "vitest/config";
+import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
+  plugins: [tsconfigPaths()],
+
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
@@ -19,17 +22,9 @@ export default defineConfig({
      */
     environment: "node",
 
-    include: [
-      "tests/unit/**/*.test.ts",
-      "tests/unit/**/*.test.tsx",
-    ],
+    include: ["tests/unit/**/*.test.ts", "tests/unit/**/*.test.tsx"],
 
-    exclude: [
-      "node_modules/**",
-      "dist/**",
-      "old/**",
-      "tests/e2e/**",
-    ],
+    exclude: ["node_modules/**", "dist/**", "old/**", "tests/e2e/**"],
 
     clearMocks: true,
     restoreMocks: true,
@@ -37,12 +32,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
 
-      reporter: [
-        "text",
-        "text-summary",
-        "json-summary",
-        "lcov",
-      ],
+      reporter: ["text", "text-summary", "json-summary", "lcov"],
 
       /**
        * Measure actual application/domain logic.

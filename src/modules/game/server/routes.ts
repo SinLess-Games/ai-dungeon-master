@@ -76,16 +76,32 @@ const conditionSchema = z
   })
   .superRefine((value, ctx) => {
     if (value.durationKind === "rounds" && value.remainingRounds === undefined) {
-      ctx.addIssue({ code: "custom", path: ["remainingRounds"], message: "Round-based conditions require remainingRounds." });
+      ctx.addIssue({
+        code: "custom",
+        path: ["remainingRounds"],
+        message: "Round-based conditions require remainingRounds.",
+      });
     }
     if (value.durationKind !== "rounds" && value.remainingRounds !== undefined) {
-      ctx.addIssue({ code: "custom", path: ["remainingRounds"], message: "remainingRounds is only valid for round-based conditions." });
+      ctx.addIssue({
+        code: "custom",
+        path: ["remainingRounds"],
+        message: "remainingRounds is only valid for round-based conditions.",
+      });
     }
     if (value.durationKind === "until_time" && value.expiresAt === undefined) {
-      ctx.addIssue({ code: "custom", path: ["expiresAt"], message: "until_time conditions require expiresAt." });
+      ctx.addIssue({
+        code: "custom",
+        path: ["expiresAt"],
+        message: "until_time conditions require expiresAt.",
+      });
     }
     if (value.durationKind !== "until_time" && value.expiresAt !== undefined) {
-      ctx.addIssue({ code: "custom", path: ["expiresAt"], message: "expiresAt is only valid for until_time conditions." });
+      ctx.addIssue({
+        code: "custom",
+        path: ["expiresAt"],
+        message: "expiresAt is only valid for until_time conditions.",
+      });
     }
   });
 
@@ -149,7 +165,9 @@ async function requireActorControl(input: {
 
 function requireGameMaster(role: CampaignRole): void {
   if (role !== "owner" && role !== "gm") {
-    throw new ForbiddenError("Only the campaign owner or Game Master can apply direct state changes.");
+    throw new ForbiddenError(
+      "Only the campaign owner or Game Master can apply direct state changes.",
+    );
   }
 }
 
@@ -160,7 +178,9 @@ function translateGameError(error: unknown): never {
     case "CAMPAIGN_GAME_NOT_ACTIVE":
       throw new ConflictError("This campaign does not currently have an active game session.");
     case "CAMPAIGN_RULESET_UNSUPPORTED":
-      throw new ValidationError("The active campaign ruleset is not supported by this game action runtime.");
+      throw new ValidationError(
+        "The active campaign ruleset is not supported by this game action runtime.",
+      );
     case "GAME_ACTOR_OR_SKILL_NOT_FOUND":
       throw new NotFoundError("The actor or requested skill is unavailable in this campaign.");
     case "GAME_ACTOR_NOT_FOUND":
@@ -175,7 +195,9 @@ function translateGameError(error: unknown): never {
     case "GAME_CONDITION_NOT_FOUND":
       throw new NotFoundError("Condition definition not found.");
     case "GAME_STATE_CONFLICT":
-      throw new ConflictError("Game state changed while the action was resolving. Reload and try again.");
+      throw new ConflictError(
+        "Game state changed while the action was resolving. Reload and try again.",
+      );
     default:
       throw error;
   }
@@ -190,9 +212,15 @@ export const gameRoutes = new Hono<GameEnv>()
     const session = await requireUser(createAuth(c.env), c.req.raw.headers);
     const binding = requireDatabase(c.env.DB);
     const db = createDatabase(binding);
-    await campaignRole({ db, campaignId: c.req.param("campaignId"), userId: session.user.id });
+    await campaignRole({
+      db,
+      campaignId: c.req.param("campaignId"),
+      userId: session.user.id,
+    });
     const context = await loadActiveGameContext(db, c.req.param("campaignId"));
-    if (!context) throw new ConflictError("This campaign does not have an active game session.");
+    if (!context) {
+      throw new ConflictError("This campaign does not have an active game session.");
+    }
     return c.json(context);
   })
   .get("/api/campaigns/:campaignId/game/events", async (c) => {
@@ -213,99 +241,214 @@ export const gameRoutes = new Hono<GameEnv>()
       .all();
     return c.json({ items, after, limit });
   })
-  .post("/api/campaigns/:campaignId/game/skill-check", zValidator("json", skillCheckSchema), async (c) => {
-    const session = await requireUser(createAuth(c.env), c.req.raw.headers);
-    const input = c.req.valid("json");
-    const binding = requireDatabase(c.env.DB);
-    const db = createDatabase(binding);
-    const campaignId = c.req.param("campaignId");
-    const role = await campaignRole({ db, campaignId, userId: session.user.id });
-    await requireActorControl({ db, campaignId, userId: session.user.id, role, characterId: input.actorId });
-    try {
-      const result = await performSkillCheck({ db, binding }, { campaignId, ...input });
-      if (!result.allowed) throw new ValidationError(result.message, { code: result.code });
-      return c.json(result);
-    } catch (error) {
-      translateGameError(error);
-    }
-  })
-  .post("/api/campaigns/:campaignId/game/saving-throw", zValidator("json", savingThrowSchema), async (c) => {
-    const session = await requireUser(createAuth(c.env), c.req.raw.headers);
-    const input = c.req.valid("json");
-    const binding = requireDatabase(c.env.DB);
-    const db = createDatabase(binding);
-    const campaignId = c.req.param("campaignId");
-    const role = await campaignRole({ db, campaignId, userId: session.user.id });
-    await requireActorControl({ db, campaignId, userId: session.user.id, role, characterId: input.actorId });
-    try {
-      return c.json(await performSavingThrow({ db, binding }, { campaignId, ...input }));
-    } catch (error) {
-      translateGameError(error);
-    }
-  })
-  .post("/api/campaigns/:campaignId/game/attack", zValidator("json", attackSchema), async (c) => {
-    const session = await requireUser(createAuth(c.env), c.req.raw.headers);
-    const input = c.req.valid("json");
-    const binding = requireDatabase(c.env.DB);
-    const db = createDatabase(binding);
-    const campaignId = c.req.param("campaignId");
-    const role = await campaignRole({ db, campaignId, userId: session.user.id });
-    await requireActorControl({ db, campaignId, userId: session.user.id, role, characterId: input.attackerId });
-    try {
-      return c.json(await performAttack({ db, binding }, { campaignId, ...input }));
-    } catch (error) {
-      translateGameError(error);
-    }
-  })
-  .post("/api/campaigns/:campaignId/game/damage", zValidator("json", healthMutationSchema), async (c) => {
-    const session = await requireUser(createAuth(c.env), c.req.raw.headers);
-    const input = c.req.valid("json");
-    const binding = requireDatabase(c.env.DB);
-    const db = createDatabase(binding);
-    const campaignId = c.req.param("campaignId");
-    const role = await campaignRole({ db, campaignId, userId: session.user.id });
-    requireGameMaster(role);
-    try {
-      return c.json(await applyDirectDamage({ db, binding }, { campaignId, ...input }));
-    } catch (error) {
-      translateGameError(error);
-    }
-  })
-  .post("/api/campaigns/:campaignId/game/healing", zValidator("json", healthMutationSchema), async (c) => {
-    const session = await requireUser(createAuth(c.env), c.req.raw.headers);
-    const input = c.req.valid("json");
-    const binding = requireDatabase(c.env.DB);
-    const db = createDatabase(binding);
-    const campaignId = c.req.param("campaignId");
-    const role = await campaignRole({ db, campaignId, userId: session.user.id });
-    requireGameMaster(role);
-    try {
-      return c.json(await applyDirectHealing({ db, binding }, { campaignId, ...input }));
-    } catch (error) {
-      translateGameError(error);
-    }
-  })
-  .post("/api/campaigns/:campaignId/game/conditions", zValidator("json", conditionSchema), async (c) => {
-    const session = await requireUser(createAuth(c.env), c.req.raw.headers);
-    const input = c.req.valid("json");
-    const binding = requireDatabase(c.env.DB);
-    const db = createDatabase(binding);
-    const campaignId = c.req.param("campaignId");
-    const role = await campaignRole({ db, campaignId, userId: session.user.id });
-    requireGameMaster(role);
-    try {
-      return c.json(
-        await applyPersistentCondition(
+  .post(
+    "/api/campaigns/:campaignId/game/skill-check",
+    zValidator("json", skillCheckSchema),
+    async (c) => {
+      const session = await requireUser(createAuth(c.env), c.req.raw.headers);
+      const input = c.req.valid("json");
+      const binding = requireDatabase(c.env.DB);
+      const db = createDatabase(binding);
+      const campaignId = c.req.param("campaignId");
+      const role = await campaignRole({ db, campaignId, userId: session.user.id });
+      await requireActorControl({
+        db,
+        campaignId,
+        userId: session.user.id,
+        role,
+        characterId: input.actorId,
+      });
+      try {
+        const result = await performSkillCheck(
           { db, binding },
           {
             campaignId,
-            ...input,
-            ...(input.expiresAt === undefined ? {} : { expiresAt: new Date(input.expiresAt) }),
+            actorId: input.actorId,
+            skillId: input.skillId,
+            dc: input.dc,
+            ...(input.specialization === undefined
+              ? {}
+              : { specialization: input.specialization }),
           },
-        ),
-        201,
-      );
-    } catch (error) {
-      translateGameError(error);
-    }
-  });
+        );
+        if (!result.allowed) {
+          throw new ValidationError(result.message, { code: result.code });
+        }
+        return c.json(result);
+      } catch (error) {
+        translateGameError(error);
+      }
+    },
+  )
+  .post(
+    "/api/campaigns/:campaignId/game/saving-throw",
+    zValidator("json", savingThrowSchema),
+    async (c) => {
+      const session = await requireUser(createAuth(c.env), c.req.raw.headers);
+      const input = c.req.valid("json");
+      const binding = requireDatabase(c.env.DB);
+      const db = createDatabase(binding);
+      const campaignId = c.req.param("campaignId");
+      const role = await campaignRole({ db, campaignId, userId: session.user.id });
+      await requireActorControl({
+        db,
+        campaignId,
+        userId: session.user.id,
+        role,
+        characterId: input.actorId,
+      });
+      try {
+        return c.json(
+          await performSavingThrow(
+            { db, binding },
+            {
+              campaignId,
+              actorId: input.actorId,
+              save: input.save,
+              dc: input.dc,
+              ...(input.sourceId === undefined ? {} : { sourceId: input.sourceId }),
+            },
+          ),
+        );
+      } catch (error) {
+        translateGameError(error);
+      }
+    },
+  )
+  .post(
+    "/api/campaigns/:campaignId/game/attack",
+    zValidator("json", attackSchema),
+    async (c) => {
+      const session = await requireUser(createAuth(c.env), c.req.raw.headers);
+      const input = c.req.valid("json");
+      const binding = requireDatabase(c.env.DB);
+      const db = createDatabase(binding);
+      const campaignId = c.req.param("campaignId");
+      const role = await campaignRole({ db, campaignId, userId: session.user.id });
+      await requireActorControl({
+        db,
+        campaignId,
+        userId: session.user.id,
+        role,
+        characterId: input.attackerId,
+      });
+      try {
+        return c.json(
+          await performAttack(
+            { db, binding },
+            {
+              campaignId,
+              attackerId: input.attackerId,
+              targetId: input.targetId,
+              kind: input.kind,
+              ...(input.weaponInventoryId === undefined
+                ? {}
+                : { weaponInventoryId: input.weaponInventoryId }),
+            },
+          ),
+        );
+      } catch (error) {
+        translateGameError(error);
+      }
+    },
+  )
+  .post(
+    "/api/campaigns/:campaignId/game/damage",
+    zValidator("json", healthMutationSchema),
+    async (c) => {
+      const session = await requireUser(createAuth(c.env), c.req.raw.headers);
+      const input = c.req.valid("json");
+      const binding = requireDatabase(c.env.DB);
+      const db = createDatabase(binding);
+      const campaignId = c.req.param("campaignId");
+      const role = await campaignRole({ db, campaignId, userId: session.user.id });
+      requireGameMaster(role);
+      try {
+        return c.json(
+          await applyDirectDamage(
+            { db, binding },
+            {
+              campaignId,
+              targetId: input.targetId,
+              amount: input.amount,
+              ...(input.actorId === undefined ? {} : { actorId: input.actorId }),
+              ...(input.sourceId === undefined ? {} : { sourceId: input.sourceId }),
+              ...(input.reason === undefined ? {} : { reason: input.reason }),
+            },
+          ),
+        );
+      } catch (error) {
+        translateGameError(error);
+      }
+    },
+  )
+  .post(
+    "/api/campaigns/:campaignId/game/healing",
+    zValidator("json", healthMutationSchema),
+    async (c) => {
+      const session = await requireUser(createAuth(c.env), c.req.raw.headers);
+      const input = c.req.valid("json");
+      const binding = requireDatabase(c.env.DB);
+      const db = createDatabase(binding);
+      const campaignId = c.req.param("campaignId");
+      const role = await campaignRole({ db, campaignId, userId: session.user.id });
+      requireGameMaster(role);
+      try {
+        return c.json(
+          await applyDirectHealing(
+            { db, binding },
+            {
+              campaignId,
+              targetId: input.targetId,
+              amount: input.amount,
+              ...(input.actorId === undefined ? {} : { actorId: input.actorId }),
+              ...(input.sourceId === undefined ? {} : { sourceId: input.sourceId }),
+              ...(input.reason === undefined ? {} : { reason: input.reason }),
+            },
+          ),
+        );
+      } catch (error) {
+        translateGameError(error);
+      }
+    },
+  )
+  .post(
+    "/api/campaigns/:campaignId/game/conditions",
+    zValidator("json", conditionSchema),
+    async (c) => {
+      const session = await requireUser(createAuth(c.env), c.req.raw.headers);
+      const input = c.req.valid("json");
+      const binding = requireDatabase(c.env.DB);
+      const db = createDatabase(binding);
+      const campaignId = c.req.param("campaignId");
+      const role = await campaignRole({ db, campaignId, userId: session.user.id });
+      requireGameMaster(role);
+      try {
+        return c.json(
+          await applyPersistentCondition(
+            { db, binding },
+            {
+              campaignId,
+              targetId: input.targetId,
+              conditionId: input.conditionId,
+              durationKind: input.durationKind,
+              ...(input.actorId === undefined ? {} : { actorId: input.actorId }),
+              ...(input.sourceDescription === undefined
+                ? {}
+                : { sourceDescription: input.sourceDescription }),
+              ...(input.remainingRounds === undefined
+                ? {}
+                : { remainingRounds: input.remainingRounds }),
+              ...(input.expiresAt === undefined
+                ? {}
+                : { expiresAt: new Date(input.expiresAt) }),
+              ...(input.state === undefined ? {} : { state: input.state }),
+            },
+          ),
+          201,
+        );
+      } catch (error) {
+        translateGameError(error);
+      }
+    },
+  );

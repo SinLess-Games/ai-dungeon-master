@@ -6,9 +6,10 @@ function assertFinite(value: number, name: string): void {
 }
 
 /**
- * Strength contribution to weapon damage. A negative Strength modifier is not
- * increased by two-handed use; off-hand attacks apply half the modifier with
- * normal mathematical floor behavior for the integer modifier.
+ * Strength contribution to weapon damage. Off-hand use halves only a positive
+ * Strength bonus; a Strength penalty applies in full. Two-handed use multiplies
+ * only a positive bonus by 1.5. Non-composite bows apply Strength penalties but
+ * not positive Strength bonuses.
  */
 export function strengthDamageModifier(input: {
   strengthModifier: number;
@@ -30,7 +31,11 @@ export function strengthDamageModifier(input: {
     return Math.min(input.strengthModifier, rating);
   }
 
-  if (input.handUse === "off_hand") return Math.floor(input.strengthModifier / 2);
+  if (input.handUse === "off_hand") {
+    return input.strengthModifier > 0
+      ? Math.floor(input.strengthModifier / 2)
+      : input.strengthModifier;
+  }
   if (input.handUse === "two_handed" && input.strengthModifier > 0) {
     return Math.floor(input.strengthModifier * 1.5);
   }

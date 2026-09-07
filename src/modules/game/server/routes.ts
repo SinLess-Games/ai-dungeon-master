@@ -116,7 +116,7 @@ function requireDatabase(binding: D1Database | undefined): D1Database {
 }
 
 function scheduleEventPostprocess(
-  c: { env: GameBindings; executionCtx: ExecutionContext },
+  c: { env: GameBindings; executionCtx: { waitUntil(promise: Promise<unknown>): void } },
   input: { campaignId: string; sessionId: string; eventId: string },
 ): void {
   c.executionCtx.waitUntil(

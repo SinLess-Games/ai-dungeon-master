@@ -34,6 +34,8 @@ export const dnd35Characters = sqliteTable(
     currentHitPoints: integer("current_hit_points").notNull().default(0),
     temporaryHitPoints: integer("temporary_hit_points").notNull().default(0),
     nonlethalDamage: integer("nonlethal_damage").notNull().default(0),
+    /** Negative-HP stabilization is mutable state and cannot be re-derived from HP alone. */
+    stable: integer("stable", { mode: "boolean" }).notNull().default(true),
     /** Shared power-point expenditure; maximum is derived from progression and abilities. */
     powerPointsSpent: integer("power_points_spent").notNull().default(0),
     progressionMode: text("progression_mode", { enum: ["standard", "gestalt"] })
@@ -64,6 +66,10 @@ export const dnd35Characters = sqliteTable(
       sql`${t.nonlethalDamage} is null or typeof(${t.nonlethalDamage}) = 'integer'`,
     ),
     check(
+      "dnd35_characters_stable_integer",
+      sql`${t.stable} is null or typeof(${t.stable}) = 'integer'`,
+    ),
+    check(
       "dnd35_characters_power_points_spent_integer",
       sql`${t.powerPointsSpent} is null or typeof(${t.powerPointsSpent}) = 'integer'`,
     ),
@@ -79,6 +85,7 @@ export const dnd35Characters = sqliteTable(
     nonNegative("dnd35_characters_la_valid", t.levelAdjustmentOverride),
     nonNegative("dnd35_characters_temp_hp_valid", t.temporaryHitPoints),
     nonNegative("dnd35_characters_nonlethal_valid", t.nonlethalDamage),
+    booleanCheck("dnd35_characters_stable_bool", t.stable),
     nonNegative("dnd35_characters_pp_valid", t.powerPointsSpent),
     enumCheck("dnd35_characters_progression_valid", t.progressionMode, ["standard", "gestalt"]),
     booleanCheck("dnd35_characters_encumbrance_bool", t.encumbranceEnabled),

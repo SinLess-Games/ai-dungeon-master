@@ -47,7 +47,9 @@ export function consciousnessState(pool: Dnd35HealthPool): Dnd35ConsciousnessSta
   validateHealthPool(pool);
   const hpState: Dnd35HealthState = healthStateForHitPoints(pool.currentHitPoints);
   if (hpState === "dead") return "dead";
-  if (hpState === "dying") return "dying";
+  // A stabilized creature at negative HP is still unconscious, but no longer
+  // actively dying. Persisted `stable` therefore changes the runtime state.
+  if (hpState === "dying") return pool.stable ? "unconscious" : "dying";
   if (hpState === "disabled") return "disabled";
   if (pool.nonlethalDamage > pool.currentHitPoints) return "unconscious";
   if (pool.nonlethalDamage === pool.currentHitPoints && pool.nonlethalDamage > 0) return "staggered";

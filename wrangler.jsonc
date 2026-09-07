@@ -9,6 +9,8 @@
   "workers_dev": true,
   "preview_urls": true,
 
+  "upload_source_maps": true,
+
   "routes": [
     {
       "pattern": "endless-codex.sinlessindustries.com",
@@ -32,7 +34,8 @@
   },
 
   "observability": {
-    "enabled": true
+    "enabled": true,
+    "head_sampling_rate": 0.5
   },
 
   "assets": {

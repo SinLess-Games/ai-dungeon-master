@@ -154,6 +154,20 @@ async function actorRuleEffects(
   if (!actor) return [];
 
   const result: RuleEffect[] = [];
+
+  // Runtime actor conditions are canonical for generated/persisted gameplay
+  // effects and therefore apply to every actor kind, including characters.
+  const runtimeRows = await deps.db
+    .select({ state: runtimeDnd35ActorConditions.state, effects: conditions.effects })
+    .from(runtimeDnd35ActorConditions)
+    .innerJoin(conditions, eq(runtimeDnd35ActorConditions.conditionId, conditions.id))
+    .where(eq(runtimeDnd35ActorConditions.actorId, actorId))
+    .all();
+  for (const row of runtimeRows) {
+    result.push(...parseRuleEffects(row.effects));
+    result.push(...parseRuleEffects(row.state?.effects));
+  }
+
   if (actor.kind === "monster") {
     const definition = await deps.db
       .select({ defenses: monsters.defenses })
@@ -162,18 +176,9 @@ async function actorRuleEffects(
       .where(eq(runtimeDnd35MonsterInstances.actorId, actorId))
       .get();
     result.push(...parseRuleEffects(definition?.defenses));
-
-    const conditionRows = await deps.db
-      .select({ state: runtimeDnd35ActorConditions.state, effects: conditions.effects })
-      .from(runtimeDnd35ActorConditions)
-      .innerJoin(conditions, eq(runtimeDnd35ActorConditions.conditionId, conditions.id))
-      .where(eq(runtimeDnd35ActorConditions.actorId, actorId))
-      .all();
-    for (const row of conditionRows) {
-      result.push(...parseRuleEffects(row.effects));
-      result.push(...parseRuleEffects(row.state?.effects));
-    }
   } else if (actor.kind === "character" && actor.characterId) {
+    // Legacy character conditions remain supported while newer gameplay effects
+    // use the generic runtime actor condition table.
     const rows = await deps.db
       .select({ state: characterConditions.state, effects: conditions.effects })
       .from(characterConditions)

@@ -18,20 +18,9 @@ export interface GameCommandDependencies {
 }
 
 export type GameCommand =
-  | {
-      type: "encounter.start";
-      participantIds: readonly string[];
-    }
-  | {
-      type: "encounter.end_turn";
-      encounterId: string;
-      actorId: string;
-    }
-  | {
-      type: "encounter.finish";
-      encounterId: string;
-      status?: "completed" | "abandoned";
-    }
+  | { type: "encounter.start"; participantIds: readonly string[] }
+  | { type: "encounter.end_turn"; encounterId: string; actorId: string }
+  | { type: "encounter.finish"; encounterId: string; status?: "completed" | "abandoned" }
   | {
       type: "combat.attack";
       attackerId: string;
@@ -79,27 +68,48 @@ export type GameCommand =
       targetIds?: readonly string[];
     };
 
-export type GameCommandResult = {
-  type: GameCommand["type"];
-  value: unknown;
+export type GameCommandResult = { type: GameCommand["type"]; value: unknown };
+
+export interface GameCommandHandlers {
+  startEncounter: typeof startActorEncounter;
+  endTurn: typeof endEncounterTurn;
+  finishEncounter: typeof finishEncounter;
+  attack: typeof performActorAttack;
+  skillCheck: typeof performSkillCheck;
+  savingThrow: typeof performSavingThrow;
+  castPrepared: typeof castPreparedSpellResolved;
+  castSpontaneous: typeof castSpontaneousSpellResolved;
+  manifestPower: typeof manifestPowerResolved;
+}
+
+export const defaultGameCommandHandlers: GameCommandHandlers = {
+  startEncounter: startActorEncounter,
+  endTurn: endEncounterTurn,
+  finishEncounter,
+  attack: performActorAttack,
+  skillCheck: performSkillCheck,
+  savingThrow: performSavingThrow,
+  castPrepared: castPreparedSpellResolved,
+  castSpontaneous: castSpontaneousSpellResolved,
+  manifestPower: manifestPowerResolved,
 };
 
 /**
  * Single authoritative application boundary for commands issued by either the
- * UI or the AI Dungeon Master. The command dispatcher itself owns no rules and
- * no persistent state: it delegates to the existing deterministic services,
- * which validate rules and commit state/events to D1 atomically.
+ * UI or the AI Dungeon Master. The dispatcher owns no rules and no state: all
+ * validation and persistence remain in the deterministic command handlers.
  */
 export async function executeGameCommand(
   deps: GameCommandDependencies,
   campaignId: string,
   command: GameCommand,
+  handlers: GameCommandHandlers = defaultGameCommandHandlers,
 ): Promise<GameCommandResult> {
   switch (command.type) {
     case "encounter.start":
       return {
         type: command.type,
-        value: await startActorEncounter(deps, {
+        value: await handlers.startEncounter(deps, {
           campaignId,
           participantIds: command.participantIds,
         }),
@@ -107,7 +117,7 @@ export async function executeGameCommand(
     case "encounter.end_turn":
       return {
         type: command.type,
-        value: await endEncounterTurn(deps, {
+        value: await handlers.endTurn(deps, {
           campaignId,
           encounterId: command.encounterId,
           actorId: command.actorId,
@@ -116,7 +126,7 @@ export async function executeGameCommand(
     case "encounter.finish":
       return {
         type: command.type,
-        value: await finishEncounter(deps, {
+        value: await handlers.finishEncounter(deps, {
           campaignId,
           encounterId: command.encounterId,
           ...(command.status === undefined ? {} : { status: command.status }),
@@ -125,7 +135,7 @@ export async function executeGameCommand(
     case "combat.attack":
       return {
         type: command.type,
-        value: await performActorAttack(deps, {
+        value: await handlers.attack(deps, {
           campaignId,
           attackerId: command.attackerId,
           targetId: command.targetId,
@@ -141,7 +151,7 @@ export async function executeGameCommand(
     case "check.skill":
       return {
         type: command.type,
-        value: await performSkillCheck(deps, {
+        value: await handlers.skillCheck(deps, {
           campaignId,
           actorId: command.actorId,
           skillId: command.skillId,
@@ -154,7 +164,7 @@ export async function executeGameCommand(
     case "check.save":
       return {
         type: command.type,
-        value: await performSavingThrow(deps, {
+        value: await handlers.savingThrow(deps, {
           campaignId,
           actorId: command.actorId,
           save: command.save,
@@ -165,7 +175,7 @@ export async function executeGameCommand(
     case "spell.cast.prepared":
       return {
         type: command.type,
-        value: await castPreparedSpellResolved(deps, {
+        value: await handlers.castPrepared(deps, {
           campaignId,
           actorId: command.actorId,
           castingTrackId: command.castingTrackId,
@@ -177,7 +187,7 @@ export async function executeGameCommand(
     case "spell.cast.spontaneous":
       return {
         type: command.type,
-        value: await castSpontaneousSpellResolved(deps, {
+        value: await handlers.castSpontaneous(deps, {
           campaignId,
           actorId: command.actorId,
           castingTrackId: command.castingTrackId,
@@ -189,7 +199,7 @@ export async function executeGameCommand(
     case "power.manifest":
       return {
         type: command.type,
-        value: await manifestPowerResolved(deps, {
+        value: await handlers.manifestPower(deps, {
           campaignId,
           actorId: command.actorId,
           castingTrackId: command.castingTrackId,

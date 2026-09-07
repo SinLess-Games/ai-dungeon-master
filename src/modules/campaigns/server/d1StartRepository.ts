@@ -1,22 +1,16 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
-import {
-  engineFailure,
-  engineSuccess,
-  type EngineResult,
-} from "@/engine";
+import { engineFailure, engineSuccess, type EngineResult } from "@/engine";
 import type { Database } from "@/infrastructure/database/client";
 import {
   campaigns,
   characters,
+  gameActors,
   gameEvents,
   gameSessions,
   worlds,
   type WorldSettings,
 } from "@/infrastructure/database/schema";
-import type {
-  CampaignStartAggregate,
-  CampaignStartRepository,
-} from "./startCampaign";
+import type { CampaignStartAggregate, CampaignStartRepository } from "./startCampaign";
 
 function timestamp(value: Date | null): number | null {
   return value ? value.getTime() : null;
@@ -130,6 +124,24 @@ export class D1CampaignStartRepository implements CampaignStartRepository {
     try {
       const settings = (input.generatedWorld.settings ?? {}) as WorldSettings;
       const completedAt = new Date(input.completedAt);
+      const readyCharacters = await this.db
+        .select({ id: characters.id, name: characters.name, ownerUserId: characters.ownerUserId })
+        .from(characters)
+        .where(
+          and(
+            eq(characters.campaignId, input.campaign.id),
+            inArray(characters.id, [...input.readyCharacterIds]),
+            eq(characters.status, "ready"),
+          ),
+        )
+        .all();
+      if (readyCharacters.length !== input.readyCharacterIds.length) {
+        return engineFailure(
+          "CAMPAIGN_CHARACTER_ACTIVATION_CONFLICT",
+          "One or more ready characters changed before campaign activation completed.",
+        );
+      }
+
       const results = await this.db.batch([
         this.db
           .update(worlds)
@@ -137,9 +149,7 @@ export class D1CampaignStartRepository implements CampaignStartRepository {
             status: "ready",
             generatedAt: completedAt,
             settings,
-            ...(input.generatedWorld.name === undefined
-              ? {}
-              : { name: input.generatedWorld.name }),
+            ...(input.generatedWorld.name === undefined ? {} : { name: input.generatedWorld.name }),
             ...(input.generatedWorld.generatorVersion === undefined
               ? {}
               : { generatorVersion: input.generatedWorld.generatorVersion }),
@@ -151,11 +161,7 @@ export class D1CampaignStartRepository implements CampaignStartRepository {
           .returning({ id: worlds.id }),
         this.db
           .update(campaigns)
-          .set({
-            status: "active",
-            startedAt: completedAt,
-            updatedAt: completedAt,
-          })
+          .set({ status: "active", startedAt: completedAt, updatedAt: completedAt })
           .where(
             and(
               eq(campaigns.id, input.campaign.id),
@@ -175,6 +181,26 @@ export class D1CampaignStartRepository implements CampaignStartRepository {
             ),
           )
           .returning({ id: characters.id }),
+        this.db
+          .insert(gameActors)
+          .values(
+            readyCharacters.map((character) => ({
+              // Matching ids keep existing character-targeted events compatible
+              // while actorId becomes the canonical runtime identity.
+              id: character.id,
+              campaignId: input.campaign.id,
+              worldId: input.worldId,
+              kind: "character" as const,
+              characterId: character.id,
+              controllerUserId: character.ownerUserId,
+              name: character.name,
+              status: "active" as const,
+              metadata: {},
+              createdAt: completedAt,
+              updatedAt: completedAt,
+            })),
+          )
+          .returning({ id: gameActors.id }),
         this.db
           .insert(gameSessions)
           .values({
@@ -202,6 +228,7 @@ export class D1CampaignStartRepository implements CampaignStartRepository {
             payload: {
               worldId: input.worldId,
               characterIds: [...input.readyCharacterIds],
+              actorIds: [...input.readyCharacterIds],
               ...(input.generatedWorld.generatorVersion === undefined
                 ? {}
                 : { generatorVersion: input.generatedWorld.generatorVersion }),
@@ -223,7 +250,13 @@ export class D1CampaignStartRepository implements CampaignStartRepository {
           "One or more ready characters changed before campaign activation completed.",
         );
       }
-      if (results[3].length !== 1 || results[4].length !== 1) {
+      if (results[3].length !== input.readyCharacterIds.length) {
+        return engineFailure(
+          "CAMPAIGN_ACTOR_INITIALIZATION_FAILED",
+          "The campaign activated without runtime actors for every ready character.",
+        );
+      }
+      if (results[4].length !== 1 || results[5].length !== 1) {
         return engineFailure(
           "CAMPAIGN_SESSION_INITIALIZATION_FAILED",
           "The campaign activated without a complete initial session history.",

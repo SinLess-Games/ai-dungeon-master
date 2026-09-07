@@ -41,6 +41,7 @@ export interface EncounterActionEconomyState {
 
 export interface EncounterActionMutation {
   encounterId: string;
+  /** Canonical runtime actor id. Character actors intentionally reuse character ids. */
   characterId: string;
   roundNumber: number;
   activeTurnIndex: number;
@@ -130,7 +131,7 @@ function encounterActionGuard(mutation: EncounterActionMutation): {
         AND encounter.status = 'active'
         AND encounter.round_number = ?
         AND encounter.active_turn_index = ?
-        AND participant.character_id = ?
+        AND participant.actor_id = ?
         AND participant.turn_order = ?
         AND participant.turn_order = encounter.active_turn_index
         AND participant.status = 'active'
@@ -193,7 +194,7 @@ function encounterActionUpdate(
        SET standard_available = ?, move_available = ?, swift_available = ?,
            swift_debt_next_turn = ?, attacks_of_opportunity_per_round = ?,
            attacks_of_opportunity_remaining = ?, last_turn_round = ?, updated_at = ?
-       WHERE encounter_id = ? AND character_id = ? AND ${guard.sql}`,
+       WHERE encounter_id = ? AND actor_id = ? AND ${guard.sql}`,
     )
     .bind(
       booleanInt(mutation.next.standardAvailable),
@@ -307,7 +308,9 @@ export class D1GameEventStore {
         const statements: D1PreparedStatement[] = [
           eventStatement(this.binding, input.event, combinedGuard, combinedBindings),
         ];
-        if (input.health !== undefined) statements.push(healthUpdate(this.binding, input.event, input.health));
+        if (input.health !== undefined) {
+          statements.push(healthUpdate(this.binding, input.event, input.health));
+        }
         statements.push(encounterActionUpdate(this.binding, input.event, input.action));
         const results = await this.binding.batch(statements);
         return results.every((result) => changes(result) === 1);
@@ -381,7 +384,9 @@ export class D1GameEventStore {
             input.condition.sourceDescription ?? null,
             input.condition.durationKind,
             input.condition.remainingRounds ?? null,
-            input.condition.expiresAt ? Math.floor(input.condition.expiresAt.getTime() / 1000) : null,
+            input.condition.expiresAt
+              ? Math.floor(input.condition.expiresAt.getTime() / 1000)
+              : null,
             input.condition.state === undefined || input.condition.state === null
               ? null
               : JSON.stringify(input.condition.state),

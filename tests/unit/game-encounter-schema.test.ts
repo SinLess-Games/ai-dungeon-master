@@ -49,6 +49,12 @@ function createActiveGame(database: DatabaseSync): void {
         status, metadata, ready_at
       ) VALUES (?, 'campaign-1', 'user-1', 'dnd35', '3.5', ?, 'active', '{}', 90)`,
     ).run(id, id);
+    database.prepare(
+      `INSERT INTO game_actors (
+        id, campaign_id, world_id, kind, character_id, controller_user_id,
+        name, status, metadata
+      ) VALUES (?, 'campaign-1', 'world-1', 'character', ?, 'user-1', ?, 'active', '{}')`,
+    ).run(id, id, id);
   }
 }
 
@@ -60,36 +66,68 @@ function createEncounter(database: DatabaseSync, id = "encounter-1"): void {
   ).run(id);
 }
 
+function participantIdentity(id: string): string {
+  return id;
+}
+
 describe("game encounter persistence", () => {
-  it("persists ordered initiative and D&D action economy", () => {
+  it("persists ordered initiative and D&D action economy by runtime actor", () => {
     db = migratedDatabase();
     createActiveGame(db);
     createEncounter(db);
 
     db.prepare(
       `INSERT INTO game_encounter_participants (
-        id, encounter_id, character_id, initiative_roll, initiative_modifier,
+        id, encounter_id, actor_id, character_id, initiative_roll, initiative_modifier,
         initiative_total, tie_breaker, turn_order,
         standard_available, move_available, swift_available, swift_debt_next_turn,
         attacks_of_opportunity_per_round, attacks_of_opportunity_remaining, last_turn_round
       ) VALUES (
-        'participant-1', 'encounter-1', 'hero', 17, 3, 20, 3, 0,
+        'participant-1', 'encounter-1', 'hero', 'hero', 17, 3, 20, 3, 0,
         1, 1, 1, 0, 2, 2, 1
       )`,
     ).run();
 
     expect(
       db.prepare(
-        `SELECT initiative_total, turn_order, standard_available,
+        `SELECT actor_id, character_id, initiative_total, turn_order, standard_available,
                 attacks_of_opportunity_remaining
          FROM game_encounter_participants WHERE id = 'participant-1'`,
       ).get(),
     ).toMatchObject({
+      actor_id: "hero",
+      character_id: "hero",
       initiative_total: 20,
       turn_order: 0,
       standard_available: 1,
       attacks_of_opportunity_remaining: 2,
     });
+    expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+  });
+
+  it("allows monster actors without fake character rows", () => {
+    db = migratedDatabase();
+    createActiveGame(db);
+    createEncounter(db);
+
+    db.prepare(
+      `INSERT INTO game_actors (
+        id, campaign_id, world_id, kind, character_id, name, status, metadata
+      ) VALUES ('monster-1', 'campaign-1', 'world-1', 'monster', NULL, 'Monster', 'active', '{}')`,
+    ).run();
+    db.prepare(
+      `INSERT INTO game_encounter_participants (
+        id, encounter_id, actor_id, character_id, initiative_roll, initiative_modifier,
+        initiative_total, tie_breaker, turn_order
+      ) VALUES ('monster-turn', 'encounter-1', 'monster-1', NULL, 12, 1, 13, 1, 0)`,
+    ).run();
+
+    expect(
+      db.prepare(
+        `SELECT actor_id, character_id FROM game_encounter_participants
+         WHERE id = 'monster-turn'`,
+      ).get(),
+    ).toMatchObject({ actor_id: "monster-1", character_id: null });
     expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   });
 
@@ -118,25 +156,25 @@ describe("game encounter persistence", () => {
     expect(() =>
       db?.prepare(
         `INSERT INTO game_encounter_participants (
-          id, encounter_id, character_id, initiative_roll, initiative_modifier,
+          id, encounter_id, actor_id, character_id, initiative_roll, initiative_modifier,
           initiative_total, tie_breaker, turn_order
-        ) VALUES ('bad-total', 'encounter-1', 'hero', 10, 2, 99, 2, 0)`,
+        ) VALUES ('bad-total', 'encounter-1', 'hero', 'hero', 10, 2, 99, 2, 0)`,
       ).run(),
     ).toThrow(/game_encounter_participants_initiative_total_valid|CHECK constraint failed/i);
 
     db.prepare(
       `INSERT INTO game_encounter_participants (
-        id, encounter_id, character_id, initiative_roll, initiative_modifier,
+        id, encounter_id, actor_id, character_id, initiative_roll, initiative_modifier,
         initiative_total, tie_breaker, turn_order
-      ) VALUES ('hero-turn', 'encounter-1', 'hero', 10, 2, 12, 2, 0)`,
+      ) VALUES ('hero-turn', 'encounter-1', 'hero', 'hero', 10, 2, 12, 2, 0)`,
     ).run();
 
     expect(() =>
       db?.prepare(
         `INSERT INTO game_encounter_participants (
-          id, encounter_id, character_id, initiative_roll, initiative_modifier,
+          id, encounter_id, actor_id, character_id, initiative_roll, initiative_modifier,
           initiative_total, tie_breaker, turn_order
-        ) VALUES ('enemy-turn', 'encounter-1', 'enemy', 15, 1, 16, 1, 0)`,
+        ) VALUES ('enemy-turn', 'encounter-1', 'enemy', 'enemy', 15, 1, 16, 1, 0)`,
       ).run(),
     ).toThrow(/game_encounter_participants_turn_order_uidx|UNIQUE constraint failed/i);
   });
@@ -158,12 +196,13 @@ describe("game encounter persistence", () => {
     db = migratedDatabase();
     createActiveGame(db);
     createEncounter(db);
+    const hero = participantIdentity("hero");
     db.prepare(
       `INSERT INTO game_encounter_participants (
-        id, encounter_id, character_id, initiative_roll, initiative_modifier,
+        id, encounter_id, actor_id, character_id, initiative_roll, initiative_modifier,
         initiative_total, tie_breaker, turn_order
-      ) VALUES ('participant-1', 'encounter-1', 'hero', 10, 2, 12, 2, 0)`,
-    ).run();
+      ) VALUES ('participant-1', 'encounter-1', ?, ?, 10, 2, 12, 2, 0)`,
+    ).run(hero, hero);
 
     db.prepare("DELETE FROM game_encounters WHERE id = 'encounter-1'").run();
     expect(

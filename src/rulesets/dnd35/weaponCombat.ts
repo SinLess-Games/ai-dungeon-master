@@ -69,13 +69,16 @@ export function powerAttackExchange(input: {
   if (!Number.isSafeInteger(input.baseAttackBonus) || input.baseAttackBonus < 1) {
     throw new RangeError("Power Attack requires a positive safe-integer base attack bonus.");
   }
-  if (!Number.isSafeInteger(input.penalty) || input.penalty < 0 || input.penalty > input.baseAttackBonus) {
+  if (
+    !Number.isSafeInteger(input.penalty) ||
+    input.penalty < 0 ||
+    input.penalty > input.baseAttackBonus
+  ) {
     throw new RangeError("Power Attack penalty must be between 0 and the base attack bonus.");
   }
-  if (input.lightWeapon) return { attackPenalty: 0, damageBonus: 0 };
   return {
     attackPenalty: -input.penalty,
-    damageBonus: input.penalty * (input.twoHandedWeapon ? 2 : 1),
+    damageBonus: input.lightWeapon ? 0 : input.penalty * (input.twoHandedWeapon ? 2 : 1),
   };
 }
 
@@ -92,7 +95,11 @@ export function canReachMeleeTarget(input: {
     throw new RangeError("Melee reach must be non-negative and finite.");
   }
   const minimumReachFeet = input.minimumReachFeet ?? 0;
-  if (!Number.isFinite(minimumReachFeet) || minimumReachFeet < 0 || minimumReachFeet > input.reachFeet) {
+  if (
+    !Number.isFinite(minimumReachFeet) ||
+    minimumReachFeet < 0 ||
+    minimumReachFeet > input.reachFeet
+  ) {
     throw new RangeError("Minimum reach must be between zero and maximum reach.");
   }
   return input.distanceFeet >= minimumReachFeet && input.distanceFeet <= input.reachFeet;

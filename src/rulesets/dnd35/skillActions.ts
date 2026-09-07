@@ -1,4 +1,4 @@
-import { resolveContest, type CheckResult, type ContestResult } from "@/engine";
+import { resolveContest, type CheckResult, type ContestResult, type ContestTieRule } from "@/engine";
 import { resolveSkillCheck } from "./skills";
 
 export interface TakeCheckResult {
@@ -64,7 +64,17 @@ export function skillSynergyBonus(sourceSkillRanks: number, threshold = 5, bonus
   return sourceSkillRanks >= threshold ? bonus : 0;
 }
 
-/** Opposed skill checks use the generic contest resolver; exact ties remain ties for caller-specific resolution. */
+function opposedSkillTieRule(leftBonus: number, rightBonus: number): ContestTieRule {
+  if (leftBonus > rightBonus) return "left";
+  if (rightBonus > leftBonus) return "right";
+  return "tie";
+}
+
+/**
+ * Resolve an opposed skill check. D&D 3.5 breaks an equal total in favor of the
+ * combatant with the higher skill modifier; if those modifiers also tie the
+ * result remains tied and the caller can reroll both checks.
+ */
 export function resolveOpposedSkillCheck(input: {
   leftId: string;
   leftBonus: number;
@@ -84,5 +94,6 @@ export function resolveOpposedSkillCheck(input: {
       bonus: input.rightBonus,
       ...(input.rightRoll === undefined ? {} : { roll: input.rightRoll }),
     },
+    { tieRule: opposedSkillTieRule(input.leftBonus, input.rightBonus) },
   );
 }

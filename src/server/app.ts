@@ -15,7 +15,9 @@ import { authRoutes, authHandler } from "@/modules/auth/server/routes";
 import type { AuthEnv } from "@/modules/auth/server/auth";
 import { campaignRoutes } from "@/modules/campaigns/server/routes";
 import { characterRoutes } from "@/modules/characters/server/routes";
+import type { CampaignRoom } from "@/modules/game/live/CampaignRoom";
 import { encounterRoutes } from "@/modules/game/server/encounterRoutes";
+import { gameLiveRoutes } from "@/modules/game/server/liveRoutes";
 import { gameRoutes } from "@/modules/game/server/routes";
 
 const isolateStartedAt = Date.now();
@@ -23,6 +25,9 @@ const isolateStartedAt = Date.now();
 interface Bindings extends AuthEnv {
   DB?: D1Database;
   R2_BUCKET?: R2Bucket;
+  CAMPAIGN_ROOM?: DurableObjectNamespace<CampaignRoom>;
+  BACKGROUND_QUEUE?: Queue<unknown>;
+  RUNTIME_CACHE?: KVNamespace;
   AI_API_KEY?: string;
   AI_BASE_URL?: string;
   AI_DEVBLOG_MODEL?: string;
@@ -247,6 +252,7 @@ const routes = app
   .route("/", characterRoutes)
   .route("/", encounterRoutes)
   .route("/", gameRoutes)
+  .route("/", gameLiveRoutes)
   .get("/api", (c) => {
     return c.json({
       name: "The Endless Codex API",
@@ -257,6 +263,7 @@ const routes = app
         live: "/api/health/live",
         campaigns: "/api/campaigns",
         game: "/api/campaigns/:campaignId/game",
+        campaignLive: "/api/campaigns/:campaignId/live",
       },
     });
   })

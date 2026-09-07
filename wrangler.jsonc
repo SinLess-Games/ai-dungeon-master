@@ -1,75 +1,114 @@
 {
-	"$schema": "./node_modules/wrangler/config-schema.json",
-	"name": "the-endless-codex",
-	"main": "./src/server/worker.ts",
-	"compatibility_date": "2026-09-05",
-	"compatibility_flags": [
-		"nodejs_compat"
-	],
-	"workers_dev": true,
-	"preview_urls": true,
-	"upload_source_maps": true,
-	"routes": [
-		{
-			"pattern": "endless-codex.sinlessindustries.com",
-			"custom_domain": true
-		}
-	],
-	"triggers": {
-		"crons": [
-			"0 1 * * MON"
-		]
-	},
-	"vars": {
-		"GITHUB_REPOSITORY": "SinLess-Games/ai-dungeon-master",
-		"DEVBLOG_AI_ENABLED": "true",
-		"DEVBLOG_AI_AUTO_PUBLISH": "false",
-		"AI_DEVBLOG_MODEL": "@cf/google/gemma-4-26b-a4b-it"
-	},
-	"ai": {
-		"binding": "AI"
-	},
-	"observability": {
-		"enabled": true,
-		"head_sampling_rate": 0.5,
-		"logs": {
-			"enabled": true,
-			"head_sampling_rate": 0.5,
-			"invocation_logs": true,
-			"persist": true
-		},
-		"traces": {
-			"enabled": true,
-			"head_sampling_rate": 0.5,
-			"persist": true
-		}
-	},
-	"assets": {
-		"not_found_handling": "single-page-application",
-		"run_worker_first": [
-			"/api",
-			"/api/*"
-		]
-	},
-	"d1_databases": [
-		{
-			"binding": "DB",
-			"database_name": "endless-codex",
-			"database_id": "dc744f5a-7c53-4d37-b695-97b2527ef06a",
-			"migrations_dir": "drizzle",
-			"migrations_pattern": "drizzle/**/*.sql"
-		}
-	],
-	"r2_buckets": [
-		{
-			"binding": "R2_BUCKET",
-			"bucket_name": "endless-codex"
-		}
-	],
-	"kv_namespaces": [
-		{
-			"binding": "RUNTIME_CACHE",
-			"id": "791baf663fe14311ad102402f0b13e88"
-		}
-	]
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "the-endless-codex",
+  "main": "./src/server/worker.ts",
+
+  "compatibility_date": "2026-09-05",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "workers_dev": true,
+  "preview_urls": true,
+
+  "upload_source_maps": true,
+
+  "routes": [
+    {
+      "pattern": "endless-codex.sinlessindustries.com",
+      "custom_domain": true
+    }
+  ],
+
+  "triggers": {
+    "crons": ["0 1 * * MON"]
+  },
+
+  "vars": {
+    "GITHUB_REPOSITORY": "SinLess-Games/ai-dungeon-master",
+    "DEVBLOG_AI_ENABLED": "true",
+    "DEVBLOG_AI_AUTO_PUBLISH": "false",
+    "AI_DEVBLOG_MODEL": "@cf/google/gemma-4-26b-a4b-it"
+  },
+
+  "ai": {
+    "binding": "AI"
+  },
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CAMPAIGN_ROOM",
+        "class_name": "CampaignRoom"
+      }
+    ]
+  },
+
+  "exports": {
+    "CampaignRoom": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  },
+
+  "queues": {
+    "producers": [
+      {
+        "binding": "BACKGROUND_QUEUE",
+        "queue": "endless-codex-background"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "endless-codex-background",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "endless-codex-background-dlq"
+      }
+    ]
+  },
+
+  "kv_namespaces": [
+    {
+      "binding": "RUNTIME_CACHE",
+      "id": "791baf663fe14311ad102402f0b13e88"
+    }
+  ],
+
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.5,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 0.5,
+      "invocation_logs": true,
+      "persist": true
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.5,
+      "persist": true
+    }
+  },
+
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api", "/api/*"]
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "endless-codex",
+      "database_id": "dc744f5a-7c53-4d37-b695-97b2527ef06a",
+      "migrations_dir": "drizzle",
+      "migrations_pattern": "drizzle/**/*.sql"
+    }
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "R2_BUCKET",
+      "bucket_name": "endless-codex"
+    }
+  ]
 }

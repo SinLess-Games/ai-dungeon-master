@@ -1,0 +1,65 @@
+name: Cloudflare Runtime CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/infrastructure/cloudflare/**"
+      - "src/modules/game/live/**"
+      - "src/modules/game/server/liveRoutes.ts"
+      - "src/server/**"
+      - "wrangler.jsonc"
+      - "tests/unit/cloudflare-*.test.ts"
+      - ".github/workflows/cloudflare-runtime-ci.yml"
+      - "package.json"
+      - "package-lock.json"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/infrastructure/cloudflare/**"
+      - "src/modules/game/live/**"
+      - "src/modules/game/server/liveRoutes.ts"
+      - "src/server/**"
+      - "wrangler.jsonc"
+      - "tests/unit/cloudflare-*.test.ts"
+      - ".github/workflows/cloudflare-runtime-ci.yml"
+      - "package.json"
+      - "package-lock.json"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Production build
+        run: npm run build
+
+      - name: Wrangler dry run
+        run: npm run deploy:check

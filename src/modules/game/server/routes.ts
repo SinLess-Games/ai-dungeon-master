@@ -4,6 +4,11 @@ import { zValidator } from "@hono/zod-validator";
 import { and, asc, eq, gt } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
+import {
+  enqueueGameEventPostprocess,
+  publishCommittedGameEvent,
+  type BackgroundJob,
+} from "@/infrastructure/cloudflare/backgroundJobs";
 import { createDatabase } from "@/infrastructure/database/client";
 import {
   campaignMemberships,
@@ -13,6 +18,7 @@ import {
 } from "@/infrastructure/database/schema";
 import { createAuth, type AuthEnv } from "@/modules/auth/server/auth";
 import { requireUser } from "@/modules/auth/server/requireAuth";
+import type { CampaignRoom } from "@/modules/game/live/CampaignRoom";
 import {
   ConflictError,
   ForbiddenError,
@@ -32,6 +38,8 @@ import {
 
 interface GameBindings extends AuthEnv {
   DB?: D1Database;
+  BACKGROUND_QUEUE?: Queue<BackgroundJob>;
+  CAMPAIGN_ROOM?: DurableObjectNamespace<CampaignRoom>;
 }
 
 type GameEnv = { Bindings: GameBindings };
@@ -108,6 +116,37 @@ const conditionSchema = z
 function requireDatabase(binding: D1Database | undefined): D1Database {
   if (!binding) throw new ServiceUnavailableError("Game storage is unavailable.");
   return binding;
+}
+
+function scheduleEventPostprocess(
+  c: { env: GameBindings; executionCtx: { waitUntil(promise: Promise<unknown>): void } },
+  input: { campaignId: string; sessionId: string; eventId: string },
+): void {
+  const publish = publishCommittedGameEvent(c.env, input).catch((error) => {
+    // Live delivery is deliberately best-effort. Clients can recover by
+    // reading the authoritative event stream from D1, and the Queue consumer
+    // will attempt the same broadcast again after delivery.
+    console.error("Unable to publish committed game event", {
+      campaignId: input.campaignId,
+      sessionId: input.sessionId,
+      eventId: input.eventId,
+      error,
+    });
+  });
+
+  const enqueue = enqueueGameEventPostprocess(c.env.BACKGROUND_QUEUE, input).catch((error) => {
+    // The authoritative D1 command already committed. Queue delivery is
+    // deliberately best-effort here so an optional async subsystem cannot
+    // turn a successful game action into a client-visible failure.
+    console.error("Unable to enqueue game-event postprocessing", {
+      campaignId: input.campaignId,
+      sessionId: input.sessionId,
+      eventId: input.eventId,
+      error,
+    });
+  });
+
+  c.executionCtx.waitUntil(Promise.all([publish, enqueue]).then(() => undefined));
 }
 
 async function campaignRole(input: {
@@ -274,6 +313,11 @@ export const gameRoutes = new Hono<GameEnv>()
         if (!result.allowed) {
           throw new ValidationError(result.message, { code: result.code });
         }
+        scheduleEventPostprocess(c, {
+          campaignId,
+          sessionId: result.sessionId,
+          eventId: result.eventId,
+        });
         return c.json(result);
       } catch (error) {
         translateGameError(error);
@@ -298,18 +342,22 @@ export const gameRoutes = new Hono<GameEnv>()
         characterId: input.actorId,
       });
       try {
-        return c.json(
-          await performSavingThrow(
-            { db, binding },
-            {
-              campaignId,
-              actorId: input.actorId,
-              save: input.save,
-              dc: input.dc,
-              ...(input.sourceId === undefined ? {} : { sourceId: input.sourceId }),
-            },
-          ),
+        const result = await performSavingThrow(
+          { db, binding },
+          {
+            campaignId,
+            actorId: input.actorId,
+            save: input.save,
+            dc: input.dc,
+            ...(input.sourceId === undefined ? {} : { sourceId: input.sourceId }),
+          },
         );
+        scheduleEventPostprocess(c, {
+          campaignId,
+          sessionId: result.sessionId,
+          eventId: result.eventId,
+        });
+        return c.json(result);
       } catch (error) {
         translateGameError(error);
       }
@@ -333,20 +381,24 @@ export const gameRoutes = new Hono<GameEnv>()
         characterId: input.attackerId,
       });
       try {
-        return c.json(
-          await performAttack(
-            { db, binding },
-            {
-              campaignId,
-              attackerId: input.attackerId,
-              targetId: input.targetId,
-              kind: input.kind,
-              ...(input.weaponInventoryId === undefined
-                ? {}
-                : { weaponInventoryId: input.weaponInventoryId }),
-            },
-          ),
+        const result = await performAttack(
+          { db, binding },
+          {
+            campaignId,
+            attackerId: input.attackerId,
+            targetId: input.targetId,
+            kind: input.kind,
+            ...(input.weaponInventoryId === undefined
+              ? {}
+              : { weaponInventoryId: input.weaponInventoryId }),
+          },
         );
+        scheduleEventPostprocess(c, {
+          campaignId,
+          sessionId: result.sessionId,
+          eventId: result.eventId,
+        });
+        return c.json(result);
       } catch (error) {
         translateGameError(error);
       }
@@ -364,19 +416,23 @@ export const gameRoutes = new Hono<GameEnv>()
       const role = await campaignRole({ db, campaignId, userId: session.user.id });
       requireGameMaster(role);
       try {
-        return c.json(
-          await applyDirectDamage(
-            { db, binding },
-            {
-              campaignId,
-              targetId: input.targetId,
-              amount: input.amount,
-              ...(input.actorId === undefined ? {} : { actorId: input.actorId }),
-              ...(input.sourceId === undefined ? {} : { sourceId: input.sourceId }),
-              ...(input.reason === undefined ? {} : { reason: input.reason }),
-            },
-          ),
+        const result = await applyDirectDamage(
+          { db, binding },
+          {
+            campaignId,
+            targetId: input.targetId,
+            amount: input.amount,
+            ...(input.actorId === undefined ? {} : { actorId: input.actorId }),
+            ...(input.sourceId === undefined ? {} : { sourceId: input.sourceId }),
+            ...(input.reason === undefined ? {} : { reason: input.reason }),
+          },
         );
+        scheduleEventPostprocess(c, {
+          campaignId,
+          sessionId: result.sessionId,
+          eventId: result.eventId,
+        });
+        return c.json(result);
       } catch (error) {
         translateGameError(error);
       }
@@ -394,19 +450,23 @@ export const gameRoutes = new Hono<GameEnv>()
       const role = await campaignRole({ db, campaignId, userId: session.user.id });
       requireGameMaster(role);
       try {
-        return c.json(
-          await applyDirectHealing(
-            { db, binding },
-            {
-              campaignId,
-              targetId: input.targetId,
-              amount: input.amount,
-              ...(input.actorId === undefined ? {} : { actorId: input.actorId }),
-              ...(input.sourceId === undefined ? {} : { sourceId: input.sourceId }),
-              ...(input.reason === undefined ? {} : { reason: input.reason }),
-            },
-          ),
+        const result = await applyDirectHealing(
+          { db, binding },
+          {
+            campaignId,
+            targetId: input.targetId,
+            amount: input.amount,
+            ...(input.actorId === undefined ? {} : { actorId: input.actorId }),
+            ...(input.sourceId === undefined ? {} : { sourceId: input.sourceId }),
+            ...(input.reason === undefined ? {} : { reason: input.reason }),
+          },
         );
+        scheduleEventPostprocess(c, {
+          campaignId,
+          sessionId: result.sessionId,
+          eventId: result.eventId,
+        });
+        return c.json(result);
       } catch (error) {
         translateGameError(error);
       }
@@ -424,29 +484,32 @@ export const gameRoutes = new Hono<GameEnv>()
       const role = await campaignRole({ db, campaignId, userId: session.user.id });
       requireGameMaster(role);
       try {
-        return c.json(
-          await applyPersistentCondition(
-            { db, binding },
-            {
-              campaignId,
-              targetId: input.targetId,
-              conditionId: input.conditionId,
-              durationKind: input.durationKind,
-              ...(input.actorId === undefined ? {} : { actorId: input.actorId }),
-              ...(input.sourceDescription === undefined
-                ? {}
-                : { sourceDescription: input.sourceDescription }),
-              ...(input.remainingRounds === undefined
-                ? {}
-                : { remainingRounds: input.remainingRounds }),
-              ...(input.expiresAt === undefined
-                ? {}
-                : { expiresAt: new Date(input.expiresAt) }),
-              ...(input.state === undefined ? {} : { state: input.state }),
-            },
-          ),
-          201,
+        const result = await applyPersistentCondition(
+          { db, binding },
+          {
+            campaignId,
+            targetId: input.targetId,
+            conditionId: input.conditionId,
+            durationKind: input.durationKind,
+            ...(input.actorId === undefined ? {} : { actorId: input.actorId }),
+            ...(input.sourceDescription === undefined
+              ? {}
+              : { sourceDescription: input.sourceDescription }),
+            ...(input.remainingRounds === undefined
+              ? {}
+              : { remainingRounds: input.remainingRounds }),
+            ...(input.expiresAt === undefined
+              ? {}
+              : { expiresAt: new Date(input.expiresAt) }),
+            ...(input.state === undefined ? {} : { state: input.state }),
+          },
         );
+        scheduleEventPostprocess(c, {
+          campaignId,
+          sessionId: result.sessionId,
+          eventId: result.eventId,
+        });
+        return c.json(result, 201);
       } catch (error) {
         translateGameError(error);
       }

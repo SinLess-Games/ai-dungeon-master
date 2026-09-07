@@ -35,7 +35,7 @@ function attachment(socket: WebSocket): CampaignSocketAttachment | null {
  * players.
  */
 export class CampaignRoom extends DurableObject<CampaignRoomBindings> {
-  async fetch(request: Request): Promise<Response> {
+  override async fetch(request: Request): Promise<Response> {
     if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
       return new Response("Expected a WebSocket upgrade.", { status: 426 });
     }
@@ -51,6 +51,9 @@ export class CampaignRoom extends DurableObject<CampaignRoomBindings> {
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
+    if (!client || !server) {
+      throw new Error("Cloudflare WebSocketPair did not provide both endpoints.");
+    }
     const connectedAt = Date.now();
 
     this.ctx.acceptWebSocket(server);
@@ -96,7 +99,7 @@ export class CampaignRoom extends DurableObject<CampaignRoomBindings> {
     return { connections: sockets.length, users: users.size };
   }
 
-  async webSocketMessage(socket: WebSocket, message: string | ArrayBuffer): Promise<void> {
+  override async webSocketMessage(socket: WebSocket, message: string | ArrayBuffer): Promise<void> {
     const state = attachment(socket);
     if (!state) {
       socket.close(1008, "Missing connection state");
@@ -137,7 +140,7 @@ export class CampaignRoom extends DurableObject<CampaignRoomBindings> {
     socket.send(JSON.stringify({ type: "error", code: "SOCKET_COMMANDS_READ_ONLY" }));
   }
 
-  async webSocketClose(
+  override async webSocketClose(
     socket: WebSocket,
     code: number,
     reason: string,

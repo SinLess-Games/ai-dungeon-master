@@ -36,10 +36,20 @@ export async function prepareEncounterAction(
     campaignId: string;
     actorId: string;
     kind: Dnd35ActionKind;
+    requiredParticipantIds?: readonly string[];
   },
 ): Promise<EncounterActionMutation | null> {
   const encounter = await getActiveEncounter(deps, input.campaignId);
   if (!encounter) return null;
+
+  if (input.requiredParticipantIds !== undefined) {
+    const participantIds = new Set(
+      encounter.participants.map((participant) => participant.characterId),
+    );
+    if (input.requiredParticipantIds.some((id) => !participantIds.has(id))) {
+      throw new Error("ENCOUNTER_PARTICIPANT_INVALID");
+    }
+  }
 
   const before: EncounterState = {
     roundNumber: encounter.roundNumber,

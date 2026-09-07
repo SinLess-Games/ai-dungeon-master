@@ -130,23 +130,17 @@ function schedulePostprocess(
   c: { env: HealthBindings; executionCtx: { waitUntil(promise: Promise<unknown>): void } },
   input: { campaignId: string; sessionId: string; eventId: string },
 ): void {
-  const work = Promise.all([
-    publishCommittedGameEvent(c.env, input).catch((error) => {
-      console.error("Unable to publish committed health event", { ...input, error });
-    }),
-    enqueueGameEventPostprocess(c.env.BACKGROUND_QUEUE, input).catch((error) => {
-      console.error("Unable to enqueue health-event postprocessing", { ...input, error });
-    }),
-  ]).then(() => undefined);
-  c.executionCtx.waitUntil(work);
+  c.executionCtx.waitUntil(
+    Promise.all([
+      publishCommittedGameEvent(c.env, input).catch((error) => {
+        console.error("Unable to publish committed health event", { ...input, error });
+      }),
+      enqueueGameEventPostprocess(c.env.BACKGROUND_QUEUE, input).catch((error) => {
+        console.error("Unable to enqueue health-event postprocessing", { ...input, error });
+      }),
+    ]).then(() => undefined),
+  );
 }
-
-async function directMutationContext(c: Parameters<Parameters<typeof amountRoute>[0]>[0]) {
-  return c;
-}
-
-// Kept as a named type helper so the route chain remains easy for Hono to infer.
-const amountRoute = [zValidator("json", amountSchema)] as const;
 
 export const healthRoutes = new Hono<HealthEnv>()
   .use("/api/campaigns/:campaignId/game/health/*", async (c, next) => {
@@ -172,9 +166,8 @@ export const healthRoutes = new Hono<HealthEnv>()
   })
   .post(
     "/api/campaigns/:campaignId/game/health/damage",
-    ...amountRoute,
+    zValidator("json", amountSchema),
     async (c) => {
-      void directMutationContext;
       const session = await requireUser(createAuth(c.env), c.req.raw.headers);
       const binding = requireDatabase(c.env.DB);
       const db = createDatabase(binding);
@@ -203,7 +196,7 @@ export const healthRoutes = new Hono<HealthEnv>()
   )
   .post(
     "/api/campaigns/:campaignId/game/health/healing",
-    ...amountRoute,
+    zValidator("json", amountSchema),
     async (c) => {
       const session = await requireUser(createAuth(c.env), c.req.raw.headers);
       const binding = requireDatabase(c.env.DB);
@@ -233,7 +226,7 @@ export const healthRoutes = new Hono<HealthEnv>()
   )
   .post(
     "/api/campaigns/:campaignId/game/health/nonlethal",
-    ...amountRoute,
+    zValidator("json", amountSchema),
     async (c) => {
       const session = await requireUser(createAuth(c.env), c.req.raw.headers);
       const binding = requireDatabase(c.env.DB);
@@ -263,7 +256,7 @@ export const healthRoutes = new Hono<HealthEnv>()
   )
   .post(
     "/api/campaigns/:campaignId/game/health/temporary-hit-points",
-    ...amountRoute,
+    zValidator("json", amountSchema),
     async (c) => {
       const session = await requireUser(createAuth(c.env), c.req.raw.headers);
       const binding = requireDatabase(c.env.DB);

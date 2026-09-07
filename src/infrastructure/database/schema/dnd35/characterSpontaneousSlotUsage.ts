@@ -13,7 +13,7 @@ import { nonNegative, timestamps } from "./schemaUtils";
  * persistence migration.
  */
 export const characterSpontaneousSlotUsage = sqliteTable(
-  "dnd35_character_spontaneous_slot_usage",
+  "runtime_dnd35_character_spontaneous_slot_usage",
   {
     castingTrackId: text("casting_track_id")
       .notNull()
@@ -24,17 +24,17 @@ export const characterSpontaneousSlotUsage = sqliteTable(
   },
   (t) => [
     primaryKey({ columns: [t.castingTrackId, t.spellLevel] }),
-    index("dnd35_character_spontaneous_slot_usage_track_idx").on(t.castingTrackId),
+    index("runtime_dnd35_character_spontaneous_slot_usage_track_idx").on(t.castingTrackId),
     check(
-      "dnd35_character_spontaneous_slot_usage_spell_level_integer",
+      "runtime_dnd35_character_spontaneous_slot_usage_spell_level_integer",
       sql`typeof(${t.spellLevel}) = 'integer'`,
     ),
-    nonNegative("dnd35_character_spontaneous_slot_usage_spell_level_valid", t.spellLevel),
+    nonNegative("runtime_dnd35_character_spontaneous_slot_usage_spell_level_valid", t.spellLevel),
     check(
-      "dnd35_character_spontaneous_slot_usage_expended_integer",
+      "runtime_dnd35_character_spontaneous_slot_usage_expended_integer",
       sql`typeof(${t.expendedCount}) = 'integer'`,
     ),
-    nonNegative("dnd35_character_spontaneous_slot_usage_expended_valid", t.expendedCount),
+    nonNegative("runtime_dnd35_character_spontaneous_slot_usage_expended_valid", t.expendedCount),
   ],
 );
 

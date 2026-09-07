@@ -130,7 +130,7 @@ describe("D1 casting resource transactions", () => {
 
     const batched = db.batch.mock.calls[0]?.[0] as Array<{ sql: string }>;
     expect(batched).toHaveLength(2);
-    expect(batched[1]?.sql).toContain("dnd35_character_spontaneous_slot_usage");
+    expect(batched[1]?.sql).toContain("runtime_dnd35_character_spontaneous_slot_usage");
     expect(batched[1]?.sql).toContain("ON CONFLICT");
   });
 
@@ -153,7 +153,7 @@ describe("D1 casting resource transactions", () => {
     expect(batched).toHaveLength(3);
     expect(batched[0]?.sql).toContain("power_points_spent");
     expect(batched[1]?.sql).toContain("UPDATE dnd35_characters");
-    expect(batched[2]?.sql).toContain("dnd35_character_psionic_states");
+    expect(batched[2]?.sql).toContain("runtime_dnd35_character_psionic_states");
   });
 
   it("restores prepared, spontaneous, and power-point daily resources together", async () => {
@@ -168,7 +168,7 @@ describe("D1 casting resource transactions", () => {
     const batched = db.batch.mock.calls[0]?.[0] as Array<{ sql: string }>;
     expect(batched).toHaveLength(4);
     expect(batched[1]?.sql).toContain("expended_count = 0");
-    expect(batched[2]?.sql).toContain("DELETE FROM dnd35_character_spontaneous_slot_usage");
+    expect(batched[2]?.sql).toContain("DELETE FROM runtime_dnd35_character_spontaneous_slot_usage");
     expect(batched[3]?.sql).toContain("power_points_spent = 0");
   });
 });

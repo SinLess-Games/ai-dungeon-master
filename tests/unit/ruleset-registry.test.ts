@@ -8,16 +8,18 @@ import {
 import {
   DND35_RULESET_ID,
   DND35_RULESET_VERSION,
+  createBuiltInRulesetRegistry,
   dnd35Ruleset,
-} from "@/rulesets/dnd35";
+} from "@/rulesets";
 
 describe("ruleset registry", () => {
   it("registers and resolves the built-in D&D 3.5 adapter", () => {
-    const registry = createRulesetRegistry([dnd35Ruleset]);
+    const registry = createBuiltInRulesetRegistry();
 
     expect(rulesetKey(DND35_RULESET_ID, DND35_RULESET_VERSION)).toBe("dnd35@3.5");
     expect(registry.has("dnd35", "3.5")).toBe(true);
     expect(registry.versions("dnd35")).toEqual(["3.5"]);
+    expect(registry.list().map((entry) => entry.key)).toEqual(["dnd35@3.5"]);
 
     const result = registry.require("dnd35", "3.5");
     expect(result.ok).toBe(true);
@@ -31,7 +33,7 @@ describe("ruleset registry", () => {
   });
 
   it("returns a structured failure when a requested ruleset is unavailable", () => {
-    const registry = createRulesetRegistry([dnd35Ruleset]);
+    const registry = createBuiltInRulesetRegistry();
     const result = registry.require("pathfinder", "1e");
 
     expect(result.ok).toBe(false);

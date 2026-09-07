@@ -120,7 +120,7 @@ const STANDARD_CONDITION_SEMANTICS: Readonly<Record<StandardDnd35Condition, Stan
   },
   invisible: {
     id: "invisible",
-    notes: ["Attackers unable to see the creature normally suffer total concealment; attacks by the invisible creature may deny Dexterity to AC."],
+    notes: ["Attack bonuses, denied Dexterity, and concealment depend on whether the opposing creature can perceive the invisible creature."],
   },
   nauseated: {
     id: "nauseated",
@@ -153,13 +153,16 @@ const STANDARD_CONDITION_SEMANTICS: Readonly<Record<StandardDnd35Condition, Stan
     id: "pinned",
     immobile: true,
     loseDexterityToArmorClass: true,
-    armorClassModifier: -4,
-    notes: ["Pinned actions are further limited by the grapple rules."],
+    notes: [
+      "Pinned actions are further limited by the grapple rules.",
+      "The -4 AC penalty applies against opponents other than the creature doing the pinning and must be resolved contextually.",
+    ],
   },
   prone: {
     id: "prone",
-    attackModifier: -4,
-    notes: ["The -4 attack penalty normally applies to melee attacks; AC is -4 vs melee and +4 vs ranged."],
+    notes: [
+      "Use proneCombatModifiers because the attack and Armor Class adjustments depend on melee-versus-ranged context.",
+    ],
   },
   shaken: {
     id: "shaken",

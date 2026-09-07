@@ -3,14 +3,14 @@ import { dnd35Characters } from "./character";
 import { booleanCheck, timestamps } from "./schemaUtils";
 
 /**
- * Mutable character-level psionic state.
+ * Mutable character-level psionic runtime state.
  *
- * Power-point expenditure remains on dnd35_characters because the pool is
- * shared across manifesting classes. Focus is modeled separately so the
- * character extension does not accumulate unrelated runtime flags.
+ * Runtime resource tables use a separate persistence namespace from the 93
+ * content/character-model D&D tables. Power-point expenditure remains on the
+ * D&D character extension because the pool is shared across manifesting classes.
  */
 export const characterPsionicStates = sqliteTable(
-  "dnd35_character_psionic_states",
+  "runtime_dnd35_character_psionic_states",
   {
     characterId: text("character_id")
       .primaryKey()
@@ -19,7 +19,7 @@ export const characterPsionicStates = sqliteTable(
     focused: integer("focused", { mode: "boolean" }).notNull().default(false),
     ...timestamps(),
   },
-  (t) => [booleanCheck("dnd35_character_psionic_states_focused_bool", t.focused)],
+  (t) => [booleanCheck("runtime_dnd35_character_psionic_states_focused_bool", t.focused)],
 );
 
 export type CharacterPsionicState = typeof characterPsionicStates.$inferSelect;

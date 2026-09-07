@@ -18,6 +18,7 @@ import { characterRoutes } from "@/modules/characters/server/routes";
 import type { CampaignRoom } from "@/modules/game/live/CampaignRoom";
 import { castingRoutes } from "@/modules/game/server/castingRoutes";
 import { encounterRoutes } from "@/modules/game/server/encounterRoutes";
+import { healthRoutes } from "@/modules/game/server/healthRoutes";
 import { gameLiveRoutes } from "@/modules/game/server/liveRoutes";
 import { gameRoutes } from "@/modules/game/server/routes";
 
@@ -194,6 +195,7 @@ const routes = app
   .route("/", encounterRoutes)
   .route("/", gameRoutes)
   .route("/", castingRoutes)
+  .route("/", healthRoutes)
   .route("/", gameLiveRoutes)
   .get("/api", (c) => {
     return c.json({
@@ -206,6 +208,7 @@ const routes = app
         campaigns: "/api/campaigns",
         game: "/api/campaigns/:campaignId/game",
         casting: "/api/campaigns/:campaignId/game/casting/:characterId",
+        characterHealth: "/api/campaigns/:campaignId/game/health/:characterId",
         campaignLive: "/api/campaigns/:campaignId/live",
       },
     });

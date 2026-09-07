@@ -1,4 +1,4 @@
-name: Engine Core CI
+name: Rules Engine CI
 
 on:
   push:
@@ -6,8 +6,11 @@ on:
       - main
     paths:
       - "src/engine/**"
+      - "src/rulesets/**"
       - "tests/unit/engine-*.test.ts"
+      - "tests/unit/dnd35-ruleset*.test.ts"
       - "docs/engine.md"
+      - "docs/dnd35-ruleset.md"
       - ".github/workflows/engine-ci.yml"
       - "package.json"
       - "package-lock.json"
@@ -19,8 +22,11 @@ on:
       - main
     paths:
       - "src/engine/**"
+      - "src/rulesets/**"
       - "tests/unit/engine-*.test.ts"
+      - "tests/unit/dnd35-ruleset*.test.ts"
       - "docs/engine.md"
+      - "docs/dnd35-ruleset.md"
       - ".github/workflows/engine-ci.yml"
       - "package.json"
       - "package-lock.json"

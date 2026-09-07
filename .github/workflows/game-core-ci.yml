@@ -1,0 +1,74 @@
+name: Game Core CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/modules/campaigns/**"
+      - "src/modules/characters/**"
+      - "src/modules/worlds/**"
+      - "src/infrastructure/database/schema/campaign.ts"
+      - "src/infrastructure/database/schema/character.ts"
+      - "src/infrastructure/database/schema/world.ts"
+      - "src/infrastructure/database/schema/campaignMembership.ts"
+      - "src/infrastructure/database/schema/dnd35/character.ts"
+      - "src/infrastructure/database/schema/index.ts"
+      - "drizzle/**"
+      - "tests/unit/campaign-*.test.ts"
+      - "tests/unit/game-core-*.test.ts"
+      - ".github/workflows/game-core-ci.yml"
+      - "package.json"
+      - "package-lock.json"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/modules/campaigns/**"
+      - "src/modules/characters/**"
+      - "src/modules/worlds/**"
+      - "src/infrastructure/database/schema/campaign.ts"
+      - "src/infrastructure/database/schema/character.ts"
+      - "src/infrastructure/database/schema/world.ts"
+      - "src/infrastructure/database/schema/campaignMembership.ts"
+      - "src/infrastructure/database/schema/dnd35/character.ts"
+      - "src/infrastructure/database/schema/index.ts"
+      - "drizzle/**"
+      - "tests/unit/campaign-*.test.ts"
+      - "tests/unit/game-core-*.test.ts"
+      - ".github/workflows/game-core-ci.yml"
+      - "package.json"
+      - "package-lock.json"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Production build
+        run: npm run build

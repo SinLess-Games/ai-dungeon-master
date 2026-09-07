@@ -15,6 +15,7 @@ import { authRoutes, authHandler } from "@/modules/auth/server/routes";
 import type { AuthEnv } from "@/modules/auth/server/auth";
 import { campaignRoutes } from "@/modules/campaigns/server/routes";
 import { characterRoutes } from "@/modules/characters/server/routes";
+import { encounterRoutes } from "@/modules/game/server/encounterRoutes";
 import { gameRoutes } from "@/modules/game/server/routes";
 
 const isolateStartedAt = Date.now();
@@ -244,6 +245,7 @@ const routes = app
   .route("/", devblogAIRoutes)
   .route("/", campaignRoutes)
   .route("/", characterRoutes)
+  .route("/", encounterRoutes)
   .route("/", gameRoutes)
   .get("/api", (c) => {
     return c.json({

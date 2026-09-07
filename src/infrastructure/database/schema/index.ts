@@ -5,6 +5,8 @@ export * from "./campaignMembership";
 export * from "./character";
 export * from "./gameSession";
 export * from "./gameEvent";
+export * from "./gameEncounter";
+export * from "./gameEncounterParticipant";
 export * from "./dnd35";
 export * from "./auth";
 export * from "./devblog";

@@ -70,13 +70,21 @@ function damageReductionApplies(
 
 /**
  * Resolve common resistance/immunity/DR layers. Damage reduction is applied to
- * the physical damage packet once, not once per physical damage type.
+ * the physical packet once. Each energy resistance pool is likewise consumed
+ * once across components of the same damage type in this attack/effect packet.
  */
 export function mitigateDamage(input: DamageMitigationInput): EngineResult<DamageMitigationResult> {
   const immunities = new Set(input.immunities ?? []);
   const attackQualities = input.attackQualities ?? [];
   const dr = input.damageReduction;
   if (dr) assertNonNegativeInteger(dr.amount, "Damage reduction");
+
+  const remainingResistance = new Map<Dnd35DamageType, number>();
+  for (const [type, amount] of Object.entries(input.energyResistances ?? {})) {
+    if (amount === undefined) continue;
+    assertNonNegativeInteger(amount, `${type} resistance`);
+    remainingResistance.set(type as Dnd35DamageType, amount);
+  }
 
   let remainingDr = dr?.amount ?? 0;
   const components: MitigatedDamageComponent[] = [];
@@ -89,9 +97,9 @@ export function mitigateDamage(input: DamageMitigationInput): EngineResult<Damag
     if (immunities.has(component.type)) {
       resisted = component.amount;
     } else {
-      const resistance = input.energyResistances?.[component.type] ?? 0;
-      assertNonNegativeInteger(resistance, `${component.type} resistance`);
+      const resistance = remainingResistance.get(component.type) ?? 0;
       resisted = Math.min(component.amount, resistance);
+      remainingResistance.set(component.type, Math.max(0, resistance - resisted));
     }
 
     const afterResistance = component.amount - resisted;

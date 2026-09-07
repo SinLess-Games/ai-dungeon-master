@@ -161,7 +161,7 @@ function spontaneousGuard(input: {
   return {
     sql: `COALESCE((
       SELECT expended_count
-      FROM dnd35_character_spontaneous_slot_usage
+      FROM runtime_dnd35_character_spontaneous_slot_usage
       WHERE casting_track_id = ? AND spell_level = ?
     ), 0) = ?`,
     bindings: [input.castingTrackId, input.spellLevel, input.expectedExpendedCount],
@@ -187,7 +187,7 @@ function focusGuard(input: {
 }): { sql: string; bindings: readonly unknown[] } {
   return {
     sql: `COALESCE((
-      SELECT focused FROM dnd35_character_psionic_states WHERE character_id = ?
+      SELECT focused FROM runtime_dnd35_character_psionic_states WHERE character_id = ?
     ), 0) = ?`,
     bindings: [input.characterId, booleanInt(input.expectedFocused)],
   };
@@ -270,13 +270,13 @@ export class D1CastingStore {
           eventStatement(this.binding, input.event, combined.sql, combined.bindings),
           this.binding
             .prepare(
-              `INSERT INTO dnd35_character_spontaneous_slot_usage (
+              `INSERT INTO runtime_dnd35_character_spontaneous_slot_usage (
                  casting_track_id, spell_level, expended_count, created_at, updated_at
                ) VALUES (?, ?, ?, ?, ?)
                ON CONFLICT(casting_track_id, spell_level) DO UPDATE SET
                  expended_count = excluded.expended_count,
                  updated_at = excluded.updated_at
-               WHERE dnd35_character_spontaneous_slot_usage.expended_count = ?`,
+               WHERE runtime_dnd35_character_spontaneous_slot_usage.expended_count = ?`,
             )
             .bind(
               input.castingTrackId,
@@ -343,13 +343,13 @@ export class D1CastingStore {
           statements.push(
             this.binding
               .prepare(
-                `INSERT INTO dnd35_character_psionic_states (
+                `INSERT INTO runtime_dnd35_character_psionic_states (
                    character_id, focused, created_at, updated_at
                  ) VALUES (?, ?, ?, ?)
                  ON CONFLICT(character_id) DO UPDATE SET
                    focused = excluded.focused,
                    updated_at = excluded.updated_at
-                 WHERE dnd35_character_psionic_states.focused = ?`,
+                 WHERE runtime_dnd35_character_psionic_states.focused = ?`,
               )
               .bind(
                 input.characterId,
@@ -391,11 +391,11 @@ export class D1CastingStore {
           eventStatement(this.binding, input.event, combined.sql, combined.bindings),
           this.binding
             .prepare(
-              `INSERT INTO dnd35_character_psionic_states (
+              `INSERT INTO runtime_dnd35_character_psionic_states (
                  character_id, focused, created_at, updated_at
                ) VALUES (?, 1, ?, ?)
                ON CONFLICT(character_id) DO UPDATE SET focused = 1, updated_at = excluded.updated_at
-               WHERE dnd35_character_psionic_states.focused = 0`,
+               WHERE runtime_dnd35_character_psionic_states.focused = 0`,
             )
             .bind(input.characterId, timestamp, timestamp),
         ];
@@ -432,7 +432,7 @@ export class D1CastingStore {
             .bind(timestamp, input.characterId),
           this.binding
             .prepare(
-              `DELETE FROM dnd35_character_spontaneous_slot_usage
+              `DELETE FROM runtime_dnd35_character_spontaneous_slot_usage
                WHERE casting_track_id IN (
                  SELECT id FROM dnd35_character_casting_tracks WHERE character_id = ?
                )`,

@@ -70,10 +70,70 @@ export type GameCommand =
 
 export type GameCommandResult = { type: GameCommand["type"]; value: unknown };
 
+async function encounterEvent(
+  deps: GameCommandDependencies,
+  input: {
+    campaignId: string;
+    encounterId: string;
+    eventTypes: readonly string[];
+    actorId?: string;
+  },
+): Promise<{ id: string; session_id: string }> {
+  const placeholders = input.eventTypes.map(() => "?").join(", ");
+  const actorClause = input.actorId === undefined ? "" : " AND actor_id = ?";
+  const bindings: unknown[] = [
+    input.campaignId,
+    ...input.eventTypes,
+    input.encounterId,
+    ...(input.actorId === undefined ? [] : [input.actorId]),
+  ];
+  const row = await deps.binding
+    .prepare(
+      `SELECT id, session_id
+       FROM game_events
+       WHERE campaign_id = ?
+         AND event_type IN (${placeholders})
+         AND json_extract(payload, '$.encounterId') = ?${actorClause}
+       ORDER BY sequence DESC
+       LIMIT 1`,
+    )
+    .bind(...bindings)
+    .first<{ id: string; session_id: string }>();
+  if (!row) throw new Error("GAME_EVENT_NOT_FOUND");
+  return row;
+}
+
+async function endTurnCommand(
+  deps: GameCommandDependencies,
+  input: { campaignId: string; encounterId: string; actorId: string },
+) {
+  const value = await endEncounterTurn(deps, input);
+  const event = await encounterEvent(deps, {
+    campaignId: input.campaignId,
+    encounterId: input.encounterId,
+    actorId: input.actorId,
+    eventTypes: ["encounter.turn_advanced", "encounter.round_advanced"],
+  });
+  return { ...value, eventId: event.id, sessionId: event.session_id };
+}
+
+async function finishEncounterCommand(
+  deps: GameCommandDependencies,
+  input: { campaignId: string; encounterId: string; status?: "completed" | "abandoned" },
+) {
+  const value = await finishEncounter(deps, input);
+  const event = await encounterEvent(deps, {
+    campaignId: input.campaignId,
+    encounterId: input.encounterId,
+    eventTypes: [value.status === "completed" ? "encounter.completed" : "encounter.abandoned"],
+  });
+  return { ...value, eventId: event.id, sessionId: event.session_id };
+}
+
 export interface GameCommandHandlers {
   startEncounter: typeof startActorEncounter;
-  endTurn: typeof endEncounterTurn;
-  finishEncounter: typeof finishEncounter;
+  endTurn: typeof endTurnCommand;
+  finishEncounter: typeof finishEncounterCommand;
   attack: typeof performActorAttack;
   skillCheck: typeof performSkillCheck;
   savingThrow: typeof performSavingThrow;
@@ -84,8 +144,8 @@ export interface GameCommandHandlers {
 
 export const defaultGameCommandHandlers: GameCommandHandlers = {
   startEncounter: startActorEncounter,
-  endTurn: endEncounterTurn,
-  finishEncounter,
+  endTurn: endTurnCommand,
+  finishEncounter: finishEncounterCommand,
   attack: performActorAttack,
   skillCheck: performSkillCheck,
   savingThrow: performSavingThrow,

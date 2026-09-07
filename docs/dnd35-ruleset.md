@@ -21,7 +21,7 @@ id:      dnd35
 version: 3.5
 ```
 
-`src/rulesets/dnd35/ruleset.ts` exposes `dnd35Ruleset`, which can be registered through the generic `RulesetRegistry` in `src/engine/rulesets.ts`.
+`src/rulesets/dnd35/ruleset.ts` exposes `dnd35Ruleset`, which can be registered through the generic `RulesetRegistry` in `src/engine/rulesets.ts`. `src/rulesets/index.ts` is the application-facing composition root for the built-in rulesets shipped by The Endless Codex.
 
 The descriptor advertises these runtime capabilities:
 
@@ -80,11 +80,13 @@ The D&D adapter implements typed bonus/penalty resolution while preserving full 
 By default:
 
 - positive bonuses of the same type overlap and only the highest applies,
-- dodge bonuses stack,
-- circumstance bonuses stack,
-- untyped/unnamed bonuses stack,
-- penalties stack,
+- same-type penalties that do not stack overlap and only the worst penalty applies,
+- dodge modifiers stack,
+- circumstance modifiers stack unless the originating rule says otherwise,
+- untyped/unnamed modifiers stack unless they duplicate the same underlying source,
 - exceptional rules text may explicitly force stacking or overlap behavior.
+
+Same-source deduplication belongs to the content/effect layer because human-readable source labels are not stable source identities.
 
 Persisted/common rule effects can be adapted into runtime modifiers, grants, resistances, and immunities without teaching the generic engine about D&D-specific vocabulary.
 
@@ -128,7 +130,7 @@ Skill support includes:
 - Aid Another,
 - synergy bonuses.
 
-Skill checks do **not** treat natural 1 or natural 20 as automatic failure/success.
+Skill checks do **not** treat natural 1 or natural 20 as automatic failure/success. Opposed checks break equal totals in favor of the higher skill modifier; if the totals and modifiers both tie, the runtime leaves the contest tied so the caller can reroll both checks.
 
 ### Combat
 
@@ -142,20 +144,21 @@ Combat primitives include:
 - critical multipliers,
 - critical-aware damage components,
 - full attacks and normal iterative attacks,
-- charge validation and modifiers,
+- charge validation and modifiers, including the 10-foot minimum and restricted standard-action charge distance,
 - attacks of opportunity and provocation metadata,
 - action economy for standard, move, full-round, swift, immediate, free, and AoO actions,
 - immediate-action debt against the next swift action,
+- the flat-footed restriction on immediate actions,
 - concealment and miss chance,
 - cover and situational combat modifiers,
 - flanking helpers,
 - melee reach checks,
-- Strength-to-damage handling,
+- Strength-to-damage handling, including full negative Strength penalties for off-hand attacks,
 - two-weapon fighting penalties,
 - Power Attack exchange,
 - grapple contests,
 - trip,
-- bull rush,
+- bull rush, including additional distance for each full 5 points of opposed-check margin,
 - disarm.
 
 Map geometry/pathfinding remains outside the ruleset. The map layer supplies facts such as distance, reachability, clear paths, adjacency, cover, and flanking geometry; the ruleset resolves the D&D consequences.
@@ -175,7 +178,7 @@ The runtime includes:
 - immunity,
 - physical damage reduction and bypass qualities.
 
-Damage resolution remains explicit about packets/components so callers can preserve enough information for resistance, DR, critical, sneak-attack, and effect-specific behavior.
+Damage resolution remains explicit about packets/components so callers can preserve enough information for resistance, DR, critical, sneak-attack, and effect-specific behavior. Resistance and damage-reduction pools are consumed once across the relevant components of one attack/effect packet rather than being reapplied independently to every component.
 
 ### Conditions
 
@@ -190,7 +193,7 @@ Persisted conditions can be adapted to the generic condition engine for:
 
 The ruleset also contains standard D&D condition semantics for common conditions such as blinded, dazed, deafened, entangled, exhausted, fatigued, flat-footed, frightened, helpless, invisible, nauseated, panicked, paralyzed, pinned, prone, shaken, sickened, staggered, stunned, and unconscious.
 
-Condition helpers expose action restrictions and common modifiers. Highly contextual prose rules remain explicit notes or rule effects instead of being silently approximated.
+Condition helpers expose action restrictions and common unconditional modifiers. Context-sensitive effects are deliberately kept out of global condition totals—for example prone attack/AC modifiers depend on melee-versus-ranged context, and the pinned AC penalty depends on which opponent is attacking. Those cases use dedicated contextual helpers or explicit rule evaluation.
 
 ### Spellcasting
 
@@ -208,6 +211,7 @@ Spellcasting support includes:
 - arcane spell failure,
 - spell resistance checks,
 - atomic action + prepared/spontaneous resource consumption,
+- immediate-spell action validation before resource expenditure,
 - metamagic slot-level validation,
 - dispel checks,
 - same-spell counterspell access,

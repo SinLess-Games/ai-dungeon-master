@@ -19,6 +19,11 @@ export interface Dnd35ActionEconomy {
   attacksOfOpportunityRemaining: number;
 }
 
+export interface ImmediateActionOptions {
+  /** D&D 3.5 does not permit immediate actions while flat-footed. */
+  flatFooted?: boolean;
+}
+
 function assertAttacksOfOpportunity(value: number): void {
   if (!Number.isSafeInteger(value) || value < 0) {
     throw new RangeError("Attacks of opportunity must be a non-negative safe integer.");
@@ -62,12 +67,20 @@ export function beginDnd35Round(state: Dnd35ActionEconomy): Dnd35ActionEconomy {
 /**
  * Spend an immediate action. During the actor's own turn it consumes the same
  * swift-action allowance; outside the turn it creates a swift-action debt for
- * the actor's next turn.
+ * the actor's next turn. Immediate actions are unavailable while flat-footed.
  */
 export function spendImmediateAction(
   state: Dnd35ActionEconomy,
   duringOwnTurn: boolean,
+  options: ImmediateActionOptions = {},
 ): EngineResult<Dnd35ActionEconomy> {
+  if (options.flatFooted) {
+    return engineFailure(
+      "DND35_IMMEDIATE_FLAT_FOOTED",
+      "Immediate actions cannot be taken while flat-footed.",
+    );
+  }
+
   if (duringOwnTurn) {
     if (!state.swiftAvailable) {
       return engineFailure(

@@ -97,6 +97,5 @@ export const aiWriterStatusQuery = (userId: string) =>
     meta: { requiresAuth: true },
     gcTime: 0,
     retry: false,
-    queryFn: async ({ signal }) =>
-      checked(await api.api.admin.devblog.ai.status.$get({}, { init: { signal } })),
+    queryFn: async () => checked(await api.api.admin.devblog.ai.status.$get()),
   });

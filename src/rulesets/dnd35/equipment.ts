@@ -95,13 +95,16 @@ export function weaponRangePenalty(input: {
 
   const increments = Math.max(1, Math.ceil(input.distanceFeet / input.rangeIncrementFeet));
   const inRange = increments <= maximumIncrements;
+  const penaltySteps = inRange ? increments - 1 : maximumIncrements - 1;
+  const penalty = penaltySteps === 0 ? 0 : -2 * penaltySteps;
+
   return {
     distanceFeet: input.distanceFeet,
     rangeIncrementFeet: input.rangeIncrementFeet,
     increments,
     maximumIncrements,
     inRange,
-    penalty: inRange ? -2 * (increments - 1) : -2 * (maximumIncrements - 1),
+    penalty,
   };
 }
 

@@ -6,6 +6,7 @@ export * from "./character";
 export * from "./gameActor";
 export * from "./runtimeDnd35MonsterInstance";
 export * from "./runtimeDnd35ActorCondition";
+export * from "./runtimeDnd35EffectProfile";
 export * from "./gameSession";
 export * from "./gameEvent";
 export * from "./gameEncounter";

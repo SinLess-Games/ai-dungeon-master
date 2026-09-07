@@ -16,6 +16,16 @@
     }
   ],
 
+  "triggers": {
+    "crons": ["0 1 * * MON"]
+  },
+
+  "vars": {
+    "GITHUB_REPOSITORY": "SinLess-Games/ai-dungeon-master",
+    "DEVBLOG_AI_ENABLED": "true",
+    "DEVBLOG_AI_AUTO_PUBLISH": "false"
+  },
+
   "observability": {
     "enabled": true
   },

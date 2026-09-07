@@ -27,7 +27,12 @@ export interface HealthMutation {
   };
 }
 
-function eventStatement(db: D1Database, event: GameEventWrite, guardSql = "1 = 1") {
+function eventStatement(
+  db: D1Database,
+  event: GameEventWrite,
+  guardSql = "1 = 1",
+  guardBindings: readonly unknown[] = [],
+) {
   const sql = `
     INSERT INTO game_events (
       id, campaign_id, session_id, sequence, event_type, occurred_at,
@@ -52,6 +57,7 @@ function eventStatement(db: D1Database, event: GameEventWrite, guardSql = "1 = 1
     JSON.stringify(event.payload ?? {}),
     JSON.stringify(event.deltas ?? []),
     unixSeconds,
+    ...guardBindings,
   );
 }
 
@@ -98,28 +104,16 @@ export class D1GameEventStore {
         AND temporary_hit_points = ?
         AND nonlethal_damage = ?
     )`;
+    const guardBindings = [
+      mutation.characterId,
+      mutation.expected.currentHitPoints,
+      mutation.expected.temporaryHitPoints,
+      mutation.expected.nonlethalDamage,
+    ] as const;
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        const guardedEvent = eventStatement(this.binding, event, guard).bind(
-          event.id,
-          event.campaignId,
-          event.sessionId,
-          event.campaignId,
-          event.eventType,
-          Math.floor(event.occurredAt.getTime() / 1000),
-          event.actorId ?? null,
-          event.sourceId ?? null,
-          JSON.stringify(event.targetIds ?? []),
-          JSON.stringify(event.payload ?? {}),
-          JSON.stringify(event.deltas ?? []),
-          Math.floor(event.occurredAt.getTime() / 1000),
-          mutation.characterId,
-          mutation.expected.currentHitPoints,
-          mutation.expected.temporaryHitPoints,
-          mutation.expected.nonlethalDamage,
-        );
-
+        const guardedEvent = eventStatement(this.binding, event, guard, guardBindings);
         const update = this.binding
           .prepare(
             `UPDATE dnd35_characters
@@ -166,31 +160,31 @@ export class D1GameEventStore {
     };
   }): Promise<void> {
     const timestamp = Math.floor(input.event.occurredAt.getTime() / 1000);
-    const conditionInsert = this.binding
-      .prepare(
-        `INSERT INTO dnd35_character_conditions (
-          id, character_id, condition_id, source_character_id, source_description,
-          duration_kind, remaining_rounds, expires_at, state, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        input.condition.id,
-        input.condition.characterId,
-        input.condition.conditionId,
-        input.condition.sourceCharacterId ?? null,
-        input.condition.sourceDescription ?? null,
-        input.condition.durationKind,
-        input.condition.remainingRounds ?? null,
-        input.condition.expiresAt ? Math.floor(input.condition.expiresAt.getTime() / 1000) : null,
-        input.condition.state === undefined || input.condition.state === null
-          ? null
-          : JSON.stringify(input.condition.state),
-        timestamp,
-        timestamp,
-      );
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
+        const conditionInsert = this.binding
+          .prepare(
+            `INSERT INTO dnd35_character_conditions (
+              id, character_id, condition_id, source_character_id, source_description,
+              duration_kind, remaining_rounds, expires_at, state, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          )
+          .bind(
+            input.condition.id,
+            input.condition.characterId,
+            input.condition.conditionId,
+            input.condition.sourceCharacterId ?? null,
+            input.condition.sourceDescription ?? null,
+            input.condition.durationKind,
+            input.condition.remainingRounds ?? null,
+            input.condition.expiresAt ? Math.floor(input.condition.expiresAt.getTime() / 1000) : null,
+            input.condition.state === undefined || input.condition.state === null
+              ? null
+              : JSON.stringify(input.condition.state),
+            timestamp,
+            timestamp,
+          );
         await this.binding.batch([conditionInsert, eventStatement(this.binding, input.event)]);
         return;
       } catch (error) {

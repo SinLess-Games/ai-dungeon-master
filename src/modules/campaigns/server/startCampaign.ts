@@ -40,8 +40,9 @@ export interface WorldGenerator {
  *
  * `begin` must atomically create the generating world and move the campaign to
  * `starting`. `complete` must atomically mark the world ready, activate the
- * campaign, and activate the participating characters. `recover` must detach
- * and remove/archive the failed world while returning the campaign to ready.
+ * campaign, activate the participating characters, create the first game
+ * session, and append the first campaign event. `recover` must detach and
+ * preserve/archive the failed world while returning the campaign to ready.
  */
 export interface CampaignStartRepository {
   load(campaignId: string): Promise<CampaignStartAggregate | null>;
@@ -53,6 +54,7 @@ export interface CampaignStartRepository {
   complete(input: {
     campaign: CampaignLifecycleSnapshot;
     worldId: string;
+    sessionId: string;
     generatedWorld: GeneratedWorldPayload;
     readyCharacterIds: readonly string[];
     completedAt: number;
@@ -67,6 +69,7 @@ export interface CampaignStartRepository {
 export interface StartCampaignResult {
   campaignId: string;
   worldId: string;
+  sessionId: string;
   status: "active";
   characterIds: readonly string[];
 }
@@ -91,6 +94,7 @@ export async function startCampaign(input: {
   repository: CampaignStartRepository;
   worldGenerator: WorldGenerator;
   createWorldId?: () => string;
+  createSessionId?: () => string;
   now?: () => number;
 }): Promise<EngineResult<StartCampaignResult>> {
   if (!input.campaignId.trim()) throw new RangeError("Campaign id cannot be empty.");
@@ -115,6 +119,7 @@ export async function startCampaign(input: {
 
   const now = input.now ?? Date.now;
   const createWorldId = input.createWorldId ?? (() => crypto.randomUUID());
+  const createSessionId = input.createSessionId ?? (() => crypto.randomUUID());
   const requestedAt = now();
   const worldId = createWorldId();
 
@@ -173,9 +178,11 @@ export async function startCampaign(input: {
   });
   if (!active.ok) return active;
 
+  const sessionId = createSessionId();
   const completed = await input.repository.complete({
     campaign: active.value,
     worldId,
+    sessionId,
     generatedWorld,
     readyCharacterIds,
     completedAt,
@@ -185,6 +192,7 @@ export async function startCampaign(input: {
   return engineSuccess({
     campaignId: aggregate.campaign.id,
     worldId,
+    sessionId,
     status: "active",
     characterIds: readyCharacterIds,
   });

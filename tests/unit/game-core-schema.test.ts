@@ -33,6 +33,22 @@ function openMigratedDatabase(): DatabaseSync {
   return database;
 }
 
+function createStartedCampaign(database: DatabaseSync) {
+  database.prepare(
+    `INSERT INTO worlds (id, status, generation_seed, settings, generated_at)
+     VALUES ('world-1', 'ready', 'seed-1', '{}', 200)`,
+  ).run();
+  database.prepare(
+    `INSERT INTO campaigns (
+      id, owner_user_id, world_id, ruleset_id, ruleset_version, name, slug,
+      status, settings, started_at
+    ) VALUES (
+      'campaign-1', 'user-1', 'world-1', 'dnd35', '3.5', 'Campaign', 'campaign',
+      'active', '{}', 200
+    )`,
+  ).run();
+}
+
 describe("campaign-first game persistence", () => {
   it("enforces world creation only after campaign start begins", () => {
     db = openMigratedDatabase();
@@ -121,6 +137,98 @@ describe("campaign-first game persistence", () => {
       db.prepare("SELECT campaign_id, owner_user_id, status FROM characters WHERE id = 'ready-character'").get(),
     ).toMatchObject({ campaign_id: "campaign-1", owner_user_id: "user-1", status: "ready" });
     expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+  });
+
+  it("persists the first session and ordered campaign event history", () => {
+    db = openMigratedDatabase();
+    createStartedCampaign(db);
+
+    db.prepare(
+      `INSERT INTO game_sessions (
+        id, campaign_id, world_id, ordinal, status, started_at
+      ) VALUES ('session-1', 'campaign-1', 'world-1', 1, 'active', 200)`,
+    ).run();
+    db.prepare(
+      `INSERT INTO game_events (
+        id, campaign_id, session_id, sequence, event_type, occurred_at,
+        target_ids, payload, deltas
+      ) VALUES (
+        'event-1', 'campaign-1', 'session-1', 1, 'campaign.started', 200,
+        '["hero-1"]', '{"worldId":"world-1"}', '[]'
+      )`,
+    ).run();
+
+    expect(
+      db.prepare("SELECT ordinal, status FROM game_sessions WHERE id = 'session-1'").get(),
+    ).toMatchObject({ ordinal: 1, status: "active" });
+    expect(
+      db.prepare("SELECT sequence, event_type FROM game_events WHERE id = 'event-1'").get(),
+    ).toMatchObject({ sequence: 1, event_type: "campaign.started" });
+    expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+  });
+
+  it("enforces session ordinal and campaign event sequence uniqueness", () => {
+    db = openMigratedDatabase();
+    createStartedCampaign(db);
+    db.prepare(
+      `INSERT INTO game_sessions (
+        id, campaign_id, world_id, ordinal, status, started_at
+      ) VALUES ('session-1', 'campaign-1', 'world-1', 1, 'active', 200)`,
+    ).run();
+
+    expect(() =>
+      db
+        ?.prepare(
+          `INSERT INTO game_sessions (
+            id, campaign_id, world_id, ordinal, status, started_at
+          ) VALUES ('session-duplicate', 'campaign-1', 'world-1', 1, 'active', 300)`,
+        )
+        .run(),
+    ).toThrow(/UNIQUE constraint failed/i);
+
+    db.prepare(
+      `INSERT INTO game_events (
+        id, campaign_id, session_id, sequence, event_type, occurred_at,
+        target_ids, payload, deltas
+      ) VALUES ('event-1', 'campaign-1', 'session-1', 1, 'campaign.started', 200, '[]', '{}', '[]')`,
+    ).run();
+
+    expect(() =>
+      db
+        ?.prepare(
+          `INSERT INTO game_events (
+            id, campaign_id, session_id, sequence, event_type, occurred_at,
+            target_ids, payload, deltas
+          ) VALUES ('event-2', 'campaign-1', 'session-1', 1, 'duplicate', 201, '[]', '{}', '[]')`,
+        )
+        .run(),
+    ).toThrow(/UNIQUE constraint failed/i);
+  });
+
+  it("rejects invalid ended sessions and orphan game events", () => {
+    db = openMigratedDatabase();
+    createStartedCampaign(db);
+
+    expect(() =>
+      db
+        ?.prepare(
+          `INSERT INTO game_sessions (
+            id, campaign_id, world_id, ordinal, status, started_at
+          ) VALUES ('bad-ended', 'campaign-1', 'world-1', 1, 'ended', 200)`,
+        )
+        .run(),
+    ).toThrow(/game_sessions_end_timestamp_valid|CHECK constraint failed/i);
+
+    expect(() =>
+      db
+        ?.prepare(
+          `INSERT INTO game_events (
+            id, campaign_id, session_id, sequence, event_type, occurred_at,
+            target_ids, payload, deltas
+          ) VALUES ('orphan', 'campaign-1', 'missing-session', 1, 'test', 200, '[]', '{}', '[]')`,
+        )
+        .run(),
+    ).toThrow(/FOREIGN KEY constraint failed/i);
   });
 
   it("converts legacy started campaigns into one generated world and owner membership", () => {

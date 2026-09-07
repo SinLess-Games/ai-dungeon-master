@@ -8,6 +8,8 @@ import type { Database } from "@/infrastructure/database/client";
 import {
   campaigns,
   characters,
+  gameEvents,
+  gameSessions,
   worlds,
   type WorldSettings,
 } from "@/infrastructure/database/schema";
@@ -127,12 +129,13 @@ export class D1CampaignStartRepository implements CampaignStartRepository {
   ): Promise<EngineResult<void>> {
     try {
       const settings = (input.generatedWorld.settings ?? {}) as WorldSettings;
+      const completedAt = new Date(input.completedAt);
       const results = await this.db.batch([
         this.db
           .update(worlds)
           .set({
             status: "ready",
-            generatedAt: new Date(input.completedAt),
+            generatedAt: completedAt,
             settings,
             ...(input.generatedWorld.name === undefined
               ? {}
@@ -142,7 +145,7 @@ export class D1CampaignStartRepository implements CampaignStartRepository {
               : { generatorVersion: input.generatedWorld.generatorVersion }),
             failedAt: null,
             failureReason: null,
-            updatedAt: new Date(input.completedAt),
+            updatedAt: completedAt,
           })
           .where(and(eq(worlds.id, input.worldId), eq(worlds.status, "generating")))
           .returning({ id: worlds.id }),
@@ -150,8 +153,8 @@ export class D1CampaignStartRepository implements CampaignStartRepository {
           .update(campaigns)
           .set({
             status: "active",
-            startedAt: new Date(input.completedAt),
-            updatedAt: new Date(input.completedAt),
+            startedAt: completedAt,
+            updatedAt: completedAt,
           })
           .where(
             and(
@@ -163,7 +166,7 @@ export class D1CampaignStartRepository implements CampaignStartRepository {
           .returning({ id: campaigns.id }),
         this.db
           .update(characters)
-          .set({ status: "active", updatedAt: new Date(input.completedAt) })
+          .set({ status: "active", updatedAt: completedAt })
           .where(
             and(
               eq(characters.campaignId, input.campaign.id),
@@ -172,6 +175,40 @@ export class D1CampaignStartRepository implements CampaignStartRepository {
             ),
           )
           .returning({ id: characters.id }),
+        this.db
+          .insert(gameSessions)
+          .values({
+            id: input.sessionId,
+            campaignId: input.campaign.id,
+            worldId: input.worldId,
+            ordinal: 1,
+            status: "active",
+            startedAt: completedAt,
+            updatedAt: completedAt,
+          })
+          .returning({ id: gameSessions.id }),
+        this.db
+          .insert(gameEvents)
+          .values({
+            id: crypto.randomUUID(),
+            campaignId: input.campaign.id,
+            sessionId: input.sessionId,
+            sequence: 1,
+            eventType: "campaign.started",
+            occurredAt: completedAt,
+            actorId: null,
+            sourceId: null,
+            targetIds: [...input.readyCharacterIds],
+            payload: {
+              worldId: input.worldId,
+              characterIds: [...input.readyCharacterIds],
+              ...(input.generatedWorld.generatorVersion === undefined
+                ? {}
+                : { generatorVersion: input.generatedWorld.generatorVersion }),
+            },
+            deltas: [],
+          })
+          .returning({ id: gameEvents.id }),
       ]);
 
       if (results[0].length === 0 || results[1].length === 0) {
@@ -184,6 +221,12 @@ export class D1CampaignStartRepository implements CampaignStartRepository {
         return engineFailure(
           "CAMPAIGN_CHARACTER_ACTIVATION_CONFLICT",
           "One or more ready characters changed before campaign activation completed.",
+        );
+      }
+      if (results[3].length !== 1 || results[4].length !== 1) {
+        return engineFailure(
+          "CAMPAIGN_SESSION_INITIALIZATION_FAILED",
+          "The campaign activated without a complete initial session history.",
         );
       }
       return engineSuccess(undefined);

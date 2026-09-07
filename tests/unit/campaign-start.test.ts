@@ -7,7 +7,6 @@ import {
   type GeneratedWorldPayload,
   type WorldGenerator,
 } from "@/modules/campaigns/server/startCampaign";
-import type { CampaignLifecycleSnapshot } from "@/modules/campaigns/domain/lifecycle";
 
 function aggregate(withReadyCharacter = true): CampaignStartAggregate {
   return {
@@ -47,7 +46,7 @@ function repository(
       return engineSuccess(undefined);
     },
     async complete(input) {
-      calls.push(`complete:${input.campaign.status}:${input.worldId}`);
+      calls.push(`complete:${input.campaign.status}:${input.worldId}:${input.sessionId}`);
       return engineSuccess(undefined);
     },
     async recover(input) {
@@ -82,6 +81,7 @@ describe("campaign start orchestration", () => {
       repository: repo,
       worldGenerator,
       createWorldId: () => "world-1",
+      createSessionId: () => "session-1",
       now: () => 100,
     });
 
@@ -93,7 +93,7 @@ describe("campaign start orchestration", () => {
     expect(calls).toEqual(["load"]);
   });
 
-  it("creates the world only after validation, then activates the campaign", async () => {
+  it("creates the world and first session only after validation, then activates the campaign", async () => {
     const calls: string[] = [];
     let time = 100;
 
@@ -106,6 +106,7 @@ describe("campaign start orchestration", () => {
         generatorVersion: "worldgen-v1",
       }),
       createWorldId: () => "world-1",
+      createSessionId: () => "session-1",
       now: () => {
         const current = time;
         time += 100;
@@ -118,6 +119,7 @@ describe("campaign start orchestration", () => {
       value: {
         campaignId: "campaign-1",
         worldId: "world-1",
+        sessionId: "session-1",
         status: "active",
         characterIds: ["hero-1"],
       },
@@ -126,11 +128,11 @@ describe("campaign start orchestration", () => {
       "load",
       "begin:starting:world-1",
       "generate:world-1:hero-1",
-      "complete:active:world-1",
+      "complete:active:world-1:session-1",
     ]);
   });
 
-  it("recovers to ready and detaches the failed world when generation throws", async () => {
+  it("recovers to ready and never creates a session when generation throws", async () => {
     const calls: string[] = [];
     const result = await startCampaign({
       campaignId: "campaign-1",
@@ -138,6 +140,7 @@ describe("campaign start orchestration", () => {
       repository: repository(aggregate(), calls),
       worldGenerator: generator(calls, new Error("Generator unavailable")),
       createWorldId: () => "world-failed",
+      createSessionId: () => "session-should-not-exist",
       now: () => 100,
     });
 
@@ -161,6 +164,7 @@ describe("campaign start orchestration", () => {
       repository: repository(aggregate(), calls),
       worldGenerator,
       createWorldId: () => "world-1",
+      createSessionId: () => "session-1",
       now: () => 100,
     });
 
@@ -189,6 +193,7 @@ describe("campaign start orchestration", () => {
       repository: repo,
       worldGenerator,
       createWorldId: () => "world-1",
+      createSessionId: () => "session-1",
       now: () => 100,
     });
 

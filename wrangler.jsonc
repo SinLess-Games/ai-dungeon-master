@@ -49,6 +49,31 @@
     }
   },
 
+  "queues": {
+    "producers": [
+      {
+        "binding": "BACKGROUND_QUEUE",
+        "queue": "endless-codex-background"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "endless-codex-background",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "endless-codex-background-dlq"
+      }
+    ]
+  },
+
+  "kv_namespaces": [
+    {
+      "binding": "RUNTIME_CACHE",
+      "id": "791baf663fe14311ad102402f0b13e88"
+    }
+  ],
+
   "observability": {
     "enabled": true,
     "head_sampling_rate": 0.5,

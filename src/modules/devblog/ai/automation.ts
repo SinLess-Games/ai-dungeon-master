@@ -1,7 +1,10 @@
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { createDatabase } from "@/infrastructure/database/client";
-import { generateOpenAICompatibleText } from "@/infrastructure/ai/openaiCompatible";
+import {
+  DEFAULT_WORKERS_AI_DEVBLOG_MODEL,
+  generateOpenAICompatibleText,
+} from "@/infrastructure/ai/openaiCompatible";
 import { users } from "@/infrastructure/database/schema/auth";
 import { blogPosts as posts } from "@/infrastructure/database/schema/devblog";
 import { collectWeeklyGitHubActivity } from "./github";
@@ -217,11 +220,26 @@ export async function getWeeklyDevBlogStatus(env: DevBlogAIEnv, now = new Date()
     .where(eq(posts.slug, slug))
     .get();
 
+  const workersAIConfigured = Boolean(env.AI);
+  const fallbackAIConfigured = Boolean(env.AI_API_KEY);
+  const githubConfigured = Boolean(env.GITHUB_TOKEN);
+  const aiConfigured = workersAIConfigured || fallbackAIConfigured;
+
   return {
     enabled: isWeeklyDevBlogEnabled(env),
     autoPublish: shouldAutoPublishWeeklyDevBlog(env),
-    configured: Boolean(env.AI_API_KEY && env.GITHUB_TOKEN),
-    model: env.AI_DEVBLOG_MODEL?.trim() || "gpt-5-mini",
+    configured: aiConfigured && githubConfigured,
+    aiConfigured,
+    githubConfigured,
+    freeWorkersAI: workersAIConfigured,
+    provider: workersAIConfigured
+      ? "Cloudflare Workers AI"
+      : fallbackAIConfigured
+        ? "OpenAI-compatible API"
+        : "Not configured",
+    model:
+      env.AI_DEVBLOG_MODEL?.trim() ||
+      (workersAIConfigured ? DEFAULT_WORKERS_AI_DEVBLOG_MODEL : "gpt-5-mini"),
     repository: env.GITHUB_REPOSITORY?.trim() || "SinLess-Games/ai-dungeon-master",
     schedule: "Every Sunday evening (01:00 UTC Monday)",
     weekKey,

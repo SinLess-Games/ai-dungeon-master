@@ -7,7 +7,7 @@ CREATE TABLE `dnd35_character_spontaneous_slot_usage` (
 	PRIMARY KEY(`casting_track_id`, `spell_level`),
 	FOREIGN KEY (`casting_track_id`) REFERENCES `dnd35_character_casting_tracks`(`id`) ON UPDATE no action ON DELETE cascade,
 	CONSTRAINT `dnd35_character_spontaneous_slot_usage_spell_level_integer` CHECK(typeof(`spell_level`) = 'integer'),
-	CONSTRAINT `dnd35_character_spontaneous_slot_usage_spell_level_valid` CHECK(`spell_level` between 0 and 9),
+	CONSTRAINT `dnd35_character_spontaneous_slot_usage_spell_level_valid` CHECK(`spell_level` >= 0),
 	CONSTRAINT `dnd35_character_spontaneous_slot_usage_expended_integer` CHECK(typeof(`expended_count`) = 'integer'),
 	CONSTRAINT `dnd35_character_spontaneous_slot_usage_expended_valid` CHECK(`expended_count` >= 0)
 );

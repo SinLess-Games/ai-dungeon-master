@@ -108,7 +108,8 @@ function healthUpdate(
          AND current_hit_points = ?
          AND temporary_hit_points = ?
          AND nonlethal_damage = ?
-         AND stable = ?`,
+         AND stable = ?
+         AND EXISTS (SELECT 1 FROM game_events WHERE id = ?)` ,
     )
     .bind(
       mutation.next.currentHitPoints,
@@ -121,6 +122,7 @@ function healthUpdate(
       mutation.expected.temporaryHitPoints,
       mutation.expected.nonlethalDamage,
       bool(mutation.expected.stable),
+      event.id,
     );
 }
 
@@ -179,7 +181,8 @@ function actionUpdate(
        SET standard_available = ?, move_available = ?, swift_available = ?,
            swift_debt_next_turn = ?, attacks_of_opportunity_per_round = ?,
            attacks_of_opportunity_remaining = ?, last_turn_round = ?, updated_at = ?
-       WHERE encounter_id = ? AND actor_id = ? AND ${guard.sql}`,
+       WHERE encounter_id = ? AND actor_id = ? AND ${guard.sql}
+         AND EXISTS (SELECT 1 FROM game_events WHERE id = ?)` ,
     )
     .bind(
       bool(action.next.standardAvailable),
@@ -193,13 +196,15 @@ function actionUpdate(
       action.encounterId,
       action.characterId,
       ...guard.bindings,
+      event.id,
     );
 }
 
 /**
  * Atomically appends an event, mutates any runtime actor's D&D health, and
- * optionally spends encounter action economy. D1 is the authoritative commit
- * boundary; Durable Objects only broadcast the committed event afterwards.
+ * optionally spends encounter action economy. Every mutation is gated on the
+ * event row inserted by the combined optimistic guard. If any expected state
+ * is stale, the event is not inserted and every following mutation is a no-op.
  */
 export class D1ActorHealthStore {
   constructor(private readonly binding: D1Database) {}

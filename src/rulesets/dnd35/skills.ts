@@ -18,8 +18,16 @@ export function maximumSkillRanks(characterLevel: number, classSkill: boolean): 
   return classSkill ? characterLevel + 3 : (characterLevel + 3) / 2;
 }
 
+/**
+ * Convert purchased ranks into spent skill points. Class skills are purchased
+ * one full rank per point; cross-class skills are purchased one-half rank per
+ * point, so only cross-class ranks may use half-rank increments when spending.
+ */
 export function skillPointCostForRanks(ranks: number, classSkill: boolean): number {
   assertRanks(ranks);
+  if (classSkill && !Number.isSafeInteger(ranks)) {
+    throw new RangeError("Purchased class-skill ranks must be whole numbers.");
+  }
   return ranks * (classSkill ? 1 : 2);
 }
 

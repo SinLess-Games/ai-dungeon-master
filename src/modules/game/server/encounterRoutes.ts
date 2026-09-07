@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { createDatabase } from "@/infrastructure/database/client";
-import { campaignMemberships, campaigns, characters } from "@/infrastructure/database/schema";
+import { campaignMemberships, campaigns, gameActors } from "@/infrastructure/database/schema";
 import { createAuth, type AuthEnv } from "@/modules/auth/server/auth";
 import { requireUser } from "@/modules/auth/server/requireAuth";
 import {
@@ -15,12 +15,8 @@ import {
   ServiceUnavailableError,
   ValidationError,
 } from "@/server/middleware/errors";
-import {
-  endEncounterTurn,
-  finishEncounter,
-  getActiveEncounter,
-  startEncounter,
-} from "./encounterService";
+import { startActorEncounter } from "./actorEncounterService";
+import { endEncounterTurn, finishEncounter, getActiveEncounter } from "./encounterService";
 
 interface EncounterBindings extends AuthEnv {
   DB?: D1Database;
@@ -32,11 +28,7 @@ type CampaignRole = "owner" | "gm" | "player" | "observer";
 const startEncounterSchema = z.object({
   participantIds: z.array(z.string().trim().min(1)).min(1).max(100),
 });
-
-const endTurnSchema = z.object({
-  actorId: z.string().trim().min(1),
-});
-
+const endTurnSchema = z.object({ actorId: z.string().trim().min(1) });
 const finishEncounterSchema = z.object({
   status: z.enum(["completed", "abandoned"]).optional(),
 });
@@ -86,24 +78,19 @@ async function requireActorControl(input: {
   campaignId: string;
   userId: string;
   role: CampaignRole;
-  characterId: string;
+  actorId: string;
 }): Promise<void> {
   if (input.role === "owner" || input.role === "gm") return;
   if (input.role === "observer") {
     throw new ForbiddenError("Observers cannot perform encounter actions.");
   }
-  const character = await input.db
-    .select({ ownerUserId: characters.ownerUserId })
-    .from(characters)
-    .where(
-      and(
-        eq(characters.id, input.characterId),
-        eq(characters.campaignId, input.campaignId),
-      ),
-    )
+  const actor = await input.db
+    .select({ controllerUserId: gameActors.controllerUserId, kind: gameActors.kind })
+    .from(gameActors)
+    .where(and(eq(gameActors.id, input.actorId), eq(gameActors.campaignId, input.campaignId)))
     .get();
-  if (!character || character.ownerUserId !== input.userId) {
-    throw new ForbiddenError("You can only end the turn of your own character.");
+  if (!actor || actor.kind !== "character" || actor.controllerUserId !== input.userId) {
+    throw new ForbiddenError("You can only end the turn of a character you control.");
   }
 }
 
@@ -120,9 +107,9 @@ function translateEncounterError(error: unknown): never {
     case "ENCOUNTER_NOT_ACTIVE":
       throw new NotFoundError("Active encounter not found.");
     case "ENCOUNTER_PARTICIPANT_INVALID":
-      throw new ValidationError("Every encounter participant must be an active character in this campaign.");
+      throw new ValidationError("Every encounter participant must be an active runtime actor in this campaign.");
     case "ENCOUNTER_NOT_ACTORS_TURN":
-      throw new ConflictError("That character does not currently have the turn.");
+      throw new ConflictError("That actor does not currently have the turn.");
     case "ENCOUNTER_STATE_INVALID":
     case "GAME_STATE_CONFLICT":
       throw new ConflictError("Encounter state changed while the command was resolving. Reload and try again.");
@@ -143,7 +130,12 @@ export const encounterRoutes = new Hono<EncounterEnv>()
     const campaignId = c.req.param("campaignId");
     await campaignRole({ db, campaignId, userId: session.user.id });
     try {
-      return c.json({ encounter: await getActiveEncounter({ db, binding }, campaignId) });
+      const encounter = await getActiveEncounter({ db, binding }, campaignId);
+      return c.json({
+        encounter: encounter
+          ? { ...encounter, currentActorId: encounter.currentCharacterId }
+          : null,
+      });
     } catch (error) {
       translateEncounterError(error);
     }
@@ -160,13 +152,11 @@ export const encounterRoutes = new Hono<EncounterEnv>()
       requireGameMaster(role);
       const input = c.req.valid("json");
       try {
-        return c.json(
-          await startEncounter(
-            { db, binding },
-            { campaignId, participantIds: input.participantIds },
-          ),
-          201,
+        const encounter = await startActorEncounter(
+          { db, binding },
+          { campaignId, participantIds: input.participantIds },
         );
+        return c.json({ ...encounter, currentActorId: encounter.currentCharacterId }, 201);
       } catch (error) {
         translateEncounterError(error);
       }
@@ -187,19 +177,18 @@ export const encounterRoutes = new Hono<EncounterEnv>()
         campaignId,
         userId: session.user.id,
         role,
-        characterId: input.actorId,
+        actorId: input.actorId,
       });
       try {
-        return c.json(
-          await endEncounterTurn(
-            { db, binding },
-            {
-              campaignId,
-              encounterId: c.req.param("encounterId"),
-              actorId: input.actorId,
-            },
-          ),
+        const encounter = await endEncounterTurn(
+          { db, binding },
+          {
+            campaignId,
+            encounterId: c.req.param("encounterId"),
+            actorId: input.actorId,
+          },
         );
+        return c.json({ ...encounter, currentActorId: encounter.currentCharacterId });
       } catch (error) {
         translateEncounterError(error);
       }

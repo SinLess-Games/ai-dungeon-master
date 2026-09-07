@@ -7,6 +7,7 @@ export interface ChargeValidation {
   maximumDistanceFeet: number;
   attackModifier: number;
   armorClassModifier: number;
+  restrictedToStandardAction: boolean;
 }
 
 function assertNonNegativeFinite(value: number, name: string): void {
@@ -16,8 +17,11 @@ function assertNonNegativeFinite(value: number, name: string): void {
 }
 
 /**
- * Validate the core geometry/action constraints of a charge. Terrain/pathfinding
- * stays outside the ruleset; the caller reports whether a straight clear path exists.
+ * Validate the core movement constraints of a D&D 3.5 charge. Terrain and exact
+ * path geometry stay outside the ruleset; callers report the authoritative map
+ * facts. A normal charge is a full-round action and may move up to double speed.
+ * When a creature is restricted to one standard/move action, the special
+ * standard-action charge is limited to its speed.
  */
 export function validateCharge(input: {
   speedFeet: number;
@@ -25,21 +29,25 @@ export function validateCharge(input: {
   straightLine: boolean;
   clearPath: boolean;
   targetReachable: boolean;
+  restrictedToStandardAction?: boolean;
 }): EngineResult<ChargeValidation> {
   assertNonNegativeFinite(input.speedFeet, "Speed");
   assertNonNegativeFinite(input.distanceFeet, "Charge distance");
-  const maximumDistanceFeet = input.speedFeet * 2;
+  const restrictedToStandardAction = input.restrictedToStandardAction ?? false;
+  const maximumDistanceFeet = input.speedFeet * (restrictedToStandardAction ? 1 : 2);
 
-  if (input.distanceFeet <= 0) {
+  if (input.distanceFeet < 10) {
     return engineFailure(
-      "DND35_CHARGE_NO_MOVEMENT",
-      "A charge must include movement toward the target.",
+      "DND35_CHARGE_TOO_SHORT",
+      "A charge must move at least 10 feet toward the target.",
     );
   }
   if (input.distanceFeet > maximumDistanceFeet) {
     return engineFailure(
       "DND35_CHARGE_TOO_FAR",
-      "The target is beyond twice the charger's speed.",
+      restrictedToStandardAction
+        ? "A standard-action charge cannot move farther than the charger's speed."
+        : "The target is beyond twice the charger's speed.",
     );
   }
   if (!input.straightLine) {
@@ -51,13 +59,13 @@ export function validateCharge(input: {
   if (!input.clearPath) {
     return engineFailure(
       "DND35_CHARGE_PATH_BLOCKED",
-      "A charge cannot pass through blocking terrain or creatures.",
+      "A charge cannot pass through blocking, slowing, or occupied terrain.",
     );
   }
   if (!input.targetReachable) {
     return engineFailure(
       "DND35_CHARGE_TARGET_UNREACHABLE",
-      "The charger cannot end in a space from which the target can be attacked.",
+      "The charger cannot end in the closest legal space from which the target can be attacked.",
     );
   }
 
@@ -66,6 +74,7 @@ export function validateCharge(input: {
     maximumDistanceFeet,
     attackModifier: 2,
     armorClassModifier: -2,
+    restrictedToStandardAction,
   });
 }
 

@@ -3,6 +3,8 @@ export * from "./world";
 export * from "./campaign";
 export * from "./campaignMembership";
 export * from "./character";
+export * from "./gameSession";
+export * from "./gameEvent";
 export * from "./dnd35";
 export * from "./auth";
 export * from "./devblog";

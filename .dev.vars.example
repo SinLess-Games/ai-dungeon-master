@@ -140,18 +140,25 @@ DISCORD_CLIENT_SECRET=
 # Weekly AI devblog writer - server-only
 # -----------------------------------------------------------------------------
 #
-# The production Worker runs the writer weekly from its Cloudflare Cron Trigger.
+# Production uses the Cloudflare Workers AI binding configured in wrangler.jsonc.
+# That is the default/free setup and requires NO AI_API_KEY.
+#
 # The Devblog Studio also exposes an admin-only "Generate now" action.
 #
-# AI_API_KEY and GITHUB_TOKEN are secrets. Never prefix them with VITE_.
+# GITHUB_TOKEN is still required because the source repository is private.
+# Use a fine-grained, read-only token scoped only to this repository.
+# Never prefix it with VITE_.
 #
 
-# OpenAI-compatible provider. AI_BASE_URL defaults to https://api.openai.com/v1.
+# The production default is configured in wrangler.jsonc:
+#   @cf/google/gemma-4-26b-a4b-it
+# Override only if you intentionally want another Workers AI model.
+AI_DEVBLOG_MODEL=
+
+# Optional fallback for development or a non-Cloudflare deployment.
+# Leave blank when using the Workers AI binding.
 AI_API_KEY=
 AI_BASE_URL=
-
-# Defaults to gpt-5-mini when blank. Set this when using a different provider/model.
-AI_DEVBLOG_MODEL=
 
 # Private repository source material. In production wrangler.jsonc already supplies
 # the repository name, but it can be overridden per environment.

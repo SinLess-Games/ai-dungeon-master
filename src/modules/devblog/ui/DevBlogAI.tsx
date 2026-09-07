@@ -53,19 +53,34 @@ export function DevBlogAI({
               {data.enabled ? "Enabled" : "Disabled"} · {data.schedule}
             </p>
             <p>
-              Result: <strong>{data.autoPublish ? "Published automatically" : "Draft for review"}</strong>
+              Result:{" "}
+              <strong>{data.autoPublish ? "Published automatically" : "Draft for review"}</strong>
             </p>
           </div>
         </article>
 
         <article>
           <div>
-            <h3>Sources and model</h3>
-            <p className="blog-meta">{data.repository}</p>
+            <h3>AI provider</h3>
+            <p className="blog-meta">{data.provider}</p>
             <p>
-              Model: <strong>{data.model}</strong> · Credentials:{" "}
-              <strong>{data.configured ? "configured" : "missing"}</strong>
+              Model: <strong>{data.model}</strong>
             </p>
+            <p>
+              AI: <strong>{data.aiConfigured ? "ready" : "missing"}</strong> · GitHub:{" "}
+              <strong>{data.githubConfigured ? "ready" : "missing"}</strong>
+            </p>
+            {data.freeWorkersAI && (
+              <p className="blog-success">Using the Cloudflare Workers AI free allocation.</p>
+            )}
+          </div>
+        </article>
+
+        <article>
+          <div>
+            <h3>Sources</h3>
+            <p className="blog-meta">{data.repository}</p>
+            <p>Commits, pull requests, issues, the roadmap, and recent published posts.</p>
           </div>
         </article>
 
@@ -108,9 +123,16 @@ export function DevBlogAI({
         </button>
       </div>
 
-      {!data.configured && (
+      {!data.aiConfigured && (
         <p role="status">
-          Configure AI_API_KEY and GITHUB_TOKEN on the Worker before generation can run.
+          The Workers AI binding is missing. Deploy the current Wrangler configuration to enable
+          free AI generation.
+        </p>
+      )}
+      {!data.githubConfigured && (
+        <p role="status">
+          Configure GITHUB_TOKEN on the Worker with read-only access to the private repository.
+          GitHub does not charge for this token.
         </p>
       )}
       {generate.isError && <BlogError error={generate.error} retry={() => generate.mutate()} />}

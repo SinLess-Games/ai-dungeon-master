@@ -303,6 +303,9 @@ export class D1GameEventStore {
       characterId: string;
       conditionId: string;
       sourceCharacterId?: string | null;
+      encounterId?: string | null;
+      expiresEncounterRound?: number | null;
+      expiresTurnOrder?: number | null;
       sourceDescription?: string | null;
       durationKind: "rounds" | "until_time" | "permanent" | "concentration" | "special";
       remainingRounds?: number | null;
@@ -317,15 +320,20 @@ export class D1GameEventStore {
         const conditionInsert = this.binding
           .prepare(
             `INSERT INTO dnd35_character_conditions (
-              id, character_id, condition_id, source_character_id, source_description,
-              duration_kind, remaining_rounds, expires_at, state, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              id, character_id, condition_id, source_character_id,
+              encounter_id, expires_encounter_round, expires_turn_order,
+              source_description, duration_kind, remaining_rounds, expires_at,
+              state, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
           .bind(
             input.condition.id,
             input.condition.characterId,
             input.condition.conditionId,
             input.condition.sourceCharacterId ?? null,
+            input.condition.encounterId ?? null,
+            input.condition.expiresEncounterRound ?? null,
+            input.condition.expiresTurnOrder ?? null,
             input.condition.sourceDescription ?? null,
             input.condition.durationKind,
             input.condition.remainingRounds ?? null,

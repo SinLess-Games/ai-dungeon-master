@@ -424,26 +424,49 @@ export async function endEncounterTurn(
       ),
   );
 
-  const conditionStatements: D1PreparedStatement[] = [];
-  if (advanced.value.roundAdvanced) {
-    conditionStatements.push(
-      deps.binding
-        .prepare(
-          `DELETE FROM dnd35_character_conditions
-           WHERE encounter_id = ? AND duration_kind = 'rounds' AND remaining_rounds <= 1
-             AND ${guardSql}`,
-        )
-        .bind(loaded.encounter.id, ...guardBindings),
-      deps.binding
-        .prepare(
-          `UPDATE dnd35_character_conditions
-           SET remaining_rounds = remaining_rounds - 1, updated_at = ?
-           WHERE encounter_id = ? AND duration_kind = 'rounds' AND remaining_rounds > 1
-             AND ${guardSql}`,
-        )
-        .bind(timestamp, loaded.encounter.id, ...guardBindings),
-    );
-  }
+  const destinationRound = advanced.value.state.roundNumber;
+  const destinationTurnOrder = advanced.value.state.activeTurnIndex;
+  const conditionStatements: D1PreparedStatement[] = [
+    deps.binding
+      .prepare(
+        `DELETE FROM dnd35_character_conditions
+         WHERE encounter_id = ?
+           AND duration_kind = 'rounds'
+           AND expires_encounter_round IS NOT NULL
+           AND expires_turn_order IS NOT NULL
+           AND (
+             expires_encounter_round < ? OR
+             (expires_encounter_round = ? AND expires_turn_order <= ?)
+           )
+           AND ${guardSql}`,
+      )
+      .bind(
+        loaded.encounter.id,
+        destinationRound,
+        destinationRound,
+        destinationTurnOrder,
+        ...guardBindings,
+      ),
+    deps.binding
+      .prepare(
+        `UPDATE dnd35_character_conditions
+         SET remaining_rounds = remaining_rounds - 1, updated_at = ?
+         WHERE encounter_id = ?
+           AND duration_kind = 'rounds'
+           AND expires_encounter_round IS NOT NULL
+           AND expires_turn_order = ?
+           AND expires_encounter_round > ?
+           AND remaining_rounds > 1
+           AND ${guardSql}`,
+      )
+      .bind(
+        timestamp,
+        loaded.encounter.id,
+        destinationTurnOrder,
+        destinationRound,
+        ...guardBindings,
+      ),
+  ];
 
   const encounterUpdate = deps.binding
     .prepare(

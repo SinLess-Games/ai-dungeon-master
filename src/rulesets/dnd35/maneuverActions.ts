@@ -93,7 +93,7 @@ export function resolveBullRush(input: {
   }
 
   const minimumPushFeet = 5;
-  const additionalPushFeet = Math.floor(Math.max(0, opposedCheck.margin - 1) / 5) * 5;
+  const additionalPushFeet = Math.floor(opposedCheck.margin / 5) * 5;
   return {
     opposedCheck,
     succeeded: true,

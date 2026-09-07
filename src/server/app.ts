@@ -16,6 +16,7 @@ import type { AuthEnv } from "@/modules/auth/server/auth";
 import { campaignRoutes } from "@/modules/campaigns/server/routes";
 import { characterRoutes } from "@/modules/characters/server/routes";
 import type { CampaignRoom } from "@/modules/game/live/CampaignRoom";
+import { castingRoutes } from "@/modules/game/server/castingRoutes";
 import { encounterRoutes } from "@/modules/game/server/encounterRoutes";
 import { gameLiveRoutes } from "@/modules/game/server/liveRoutes";
 import { gameRoutes } from "@/modules/game/server/routes";
@@ -37,11 +38,7 @@ interface Bindings extends AuthEnv {
   DEVBLOG_AI_AUTO_PUBLISH?: string;
   DEVBLOG_AI_AUTHOR_EMAIL?: string;
 
-  /**
-   * Optional deployment metadata.
-   *
-   * These can later be supplied through Wrangler/CI.
-   */
+  /** Optional deployment metadata supplied through Wrangler/CI. */
   APP_VERSION?: string;
   BUILD_ID?: string;
   ENVIRONMENT?: string;
@@ -53,7 +50,6 @@ type AppEnv = {
 };
 
 type HealthStatus = "healthy" | "degraded" | "unhealthy";
-
 type DependencyHealthStatus = "healthy" | "unhealthy" | "unavailable";
 
 interface DependencyHealth {
@@ -65,7 +61,6 @@ interface DependencyHealth {
 
 interface HealthResponse {
   status: HealthStatus;
-
   service: {
     name: string;
     version: string;
@@ -73,39 +68,27 @@ interface HealthResponse {
     buildId: string;
     commit: string;
   };
-
   runtime: {
     platform: "cloudflare-workers";
     isolateUptimeMs: number;
     isolateStartedAt: string;
   };
-
   checks: {
     database: DependencyHealth;
     objectStorage: DependencyHealth;
   };
-
   timing: {
     totalMs: number;
   };
-
   timestamp: string;
 }
 
-/**
- * Convert a high-resolution timer measurement to a compact millisecond value.
- */
 function elapsedMilliseconds(start: number): number {
   return Number((performance.now() - start).toFixed(2));
 }
 
-/**
- * Verify that the D1 binding exists and that the database can successfully
- * execute a minimal query.
- */
 async function checkDatabase(database: D1Database | undefined): Promise<DependencyHealth> {
   const startedAt = performance.now();
-
   if (!database) {
     return {
       status: "unavailable",
@@ -117,7 +100,6 @@ async function checkDatabase(database: D1Database | undefined): Promise<Dependen
 
   try {
     const result = await database.prepare("SELECT 1 AS healthy").first<{ healthy: number }>();
-
     if (result?.healthy !== 1) {
       return {
         status: "unhealthy",
@@ -126,7 +108,6 @@ async function checkDatabase(database: D1Database | undefined): Promise<Dependen
         message: "D1 database returned an unexpected health-check result.",
       };
     }
-
     return {
       status: "healthy",
       required: true,
@@ -134,10 +115,7 @@ async function checkDatabase(database: D1Database | undefined): Promise<Dependen
       message: "D1 database is reachable.",
     };
   } catch (error) {
-    console.error("Database health check failed", {
-      error,
-    });
-
+    console.error("Database health check failed", { error });
     return {
       status: "unhealthy",
       required: true,
@@ -147,15 +125,8 @@ async function checkDatabase(database: D1Database | undefined): Promise<Dependen
   }
 }
 
-/**
- * Verify that the R2 binding exists and that the bucket can be queried.
- *
- * The list operation is intentionally limited to one object. No object
- * names or bucket contents are returned through the health endpoint.
- */
 async function checkObjectStorage(bucket: R2Bucket | undefined): Promise<DependencyHealth> {
   const startedAt = performance.now();
-
   if (!bucket) {
     return {
       status: "unavailable",
@@ -166,10 +137,7 @@ async function checkObjectStorage(bucket: R2Bucket | undefined): Promise<Depende
   }
 
   try {
-    await bucket.list({
-      limit: 1,
-    });
-
+    await bucket.list({ limit: 1 });
     return {
       status: "healthy",
       required: false,
@@ -177,10 +145,7 @@ async function checkObjectStorage(bucket: R2Bucket | undefined): Promise<Depende
       message: "R2 object storage is reachable.",
     };
   } catch (error) {
-    console.error("Object storage health check failed", {
-      error,
-    });
-
+    console.error("Object storage health check failed", { error });
     return {
       status: "unhealthy",
       required: false,
@@ -190,32 +155,11 @@ async function checkObjectStorage(bucket: R2Bucket | undefined): Promise<Depende
   }
 }
 
-/**
- * Determine the application's overall health from its dependency checks.
- *
- * Required dependency failure:
- *   unhealthy
- *
- * Optional dependency failure:
- *   degraded
- *
- * Everything operational:
- *   healthy
- */
 function determineHealthStatus(checks: DependencyHealth[]): HealthStatus {
   const requiredFailure = checks.some((check) => check.required && check.status !== "healthy");
-
-  if (requiredFailure) {
-    return "unhealthy";
-  }
-
+  if (requiredFailure) return "unhealthy";
   const optionalFailure = checks.some((check) => !check.required && check.status !== "healthy");
-
-  if (optionalFailure) {
-    return "degraded";
-  }
-
-  return "healthy";
+  return optionalFailure ? "degraded" : "healthy";
 }
 
 const app = new Hono<AppEnv>();
@@ -236,9 +180,6 @@ app.use(
   }),
 );
 
-/**
- * API discovery/root endpoint.
- */
 app.route("/", authRoutes);
 app.route("/", authHandler);
 
@@ -252,6 +193,7 @@ const routes = app
   .route("/", characterRoutes)
   .route("/", encounterRoutes)
   .route("/", gameRoutes)
+  .route("/", castingRoutes)
   .route("/", gameLiveRoutes)
   .get("/api", (c) => {
     return c.json({
@@ -263,23 +205,13 @@ const routes = app
         live: "/api/health/live",
         campaigns: "/api/campaigns",
         game: "/api/campaigns/:campaignId/game",
+        casting: "/api/campaigns/:campaignId/game/casting/:characterId",
         campaignLive: "/api/campaigns/:campaignId/live",
       },
     });
   })
-
-  /**
-   * Lightweight liveness endpoint.
-   *
-   * This intentionally does not contact external dependencies.
-   *
-   * Use this when the question is simply:
-   *
-   * "Is the Worker alive and capable of handling requests?"
-   */
   .get("/api/health/live", (c) => {
     c.header("Cache-Control", "no-store");
-
     return c.json({
       status: "healthy",
       service: "the-endless-codex",
@@ -288,43 +220,18 @@ const routes = app
       timestamp: new Date().toISOString(),
     });
   })
-
-  /**
-   * Detailed readiness/health endpoint.
-   *
-   * This performs real dependency checks against infrastructure required by
-   * Endless Codex.
-   *
-   * It intentionally does NOT expose:
-   *
-   * - database IDs
-   * - database names
-   * - bucket names
-   * - account IDs
-   * - environment secrets
-   * - object names
-   * - connection credentials
-   */
   .get("/api/health", async (c) => {
     const startedAt = performance.now();
-
     c.header("Cache-Control", "no-store");
 
     const [database, objectStorage] = await Promise.all([
       checkDatabase(c.env.DB),
       checkObjectStorage(c.env.R2_BUCKET),
     ]);
-
-    const checks = {
-      database,
-      objectStorage,
-    };
-
+    const checks = { database, objectStorage };
     const status = determineHealthStatus([checks.database, checks.objectStorage]);
-
     const response: HealthResponse = {
       status,
-
       service: {
         name: "the-endless-codex",
         version: c.env.APP_VERSION ?? "development",
@@ -332,40 +239,24 @@ const routes = app
         buildId: c.env.BUILD_ID ?? "unknown",
         commit: c.env.GIT_COMMIT_SHA ?? "unknown",
       },
-
       runtime: {
         platform: "cloudflare-workers",
         isolateUptimeMs: Date.now() - isolateStartedAt,
         isolateStartedAt: new Date(isolateStartedAt).toISOString(),
       },
-
       checks,
-
       timing: {
         totalMs: elapsedMilliseconds(startedAt),
       },
-
       timestamp: new Date().toISOString(),
     };
 
-    /**
-     * A failed required dependency means the application is not ready to
-     * reliably serve game requests.
-     *
-     * Degraded health remains HTTP 200 because only an optional subsystem
-     * has failed.
-     */
-    if (status === "unhealthy") {
-      return c.json(response, 503);
-    }
-
+    if (status === "unhealthy") return c.json(response, 503);
     return c.json(response, 200);
   });
 
 app.notFound(notFoundHandler);
-
 app.onError(errorHandler);
 
 export { routes as app };
-
 export type AppType = typeof routes;

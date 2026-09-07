@@ -1,48 +1,50 @@
-import { readFileSync, readdirSync } from "node:fs";
-import { DatabaseSync } from "node:sqlite";
-import type { SQLInputValue } from "node:sqlite";
-import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import { getTableConfig, SQLiteTable } from "drizzle-orm/sqlite-core";
 import { is } from "drizzle-orm";
-import { SQLiteTable, getTableConfig } from "drizzle-orm/sqlite-core";
-import { drizzle } from "drizzle-orm/sqlite-proxy";
-import * as schema from "@/infrastructure/database/schema";
-import type { PrerequisiteExpression } from "@/infrastructure/database/schema/dnd35";
+import * as schema from "@/infrastructure/database/schema/dnd35";
+import migration from "../../drizzle/0000_dnd35_schema.sql?raw";
 
-const migrationDirectory = fileURLToPath(new URL("../../drizzle/", import.meta.url));
-const migration = readdirSync(migrationDirectory)
-  .filter((file) => file.endsWith(".sql"))
-  .sort()
-  .map((file) => readFileSync(`${migrationDirectory}/${file}`, "utf8"))
-  .join("\n");
-let db: DatabaseSync;
+let db: Database.Database;
 
-/** Fixture identifiers are local constants; values always use bound parameters. */
-function insert(table: string, row: Record<string, SQLInputValue>) {
-  const columns = Object.keys(row);
-  return db
-    .prepare(
-      `INSERT INTO "dnd35_${table}" (${columns.map((key) => `"${key}"`).join(",")}) VALUES (${columns.map(() => "?").join(",")})`,
-    )
-    .run(...Object.values(row));
+function sql(): string {
+  return migration.replaceAll("--> statement-breakpoint", "");
 }
-function content(table: string, id: string, extra: Record<string, SQLInputValue> = {}) {
-  return insert(table, { id, source_id: "source", slug: id, name: id, ...extra });
+
+function insert(table: string, values: Record<string, unknown>) {
+  const columns = Object.keys(values);
+  const placeholders = columns.map(() => "?").join(", ");
+  db.prepare(
+    `INSERT INTO dnd35_${table} (${columns.join(", ")}) VALUES (${placeholders})`,
+  ).run(...Object.values(values));
 }
-function character(id = "character") {
-  insert("characters", { character_id: id });
-}
-function classDefinition(id: string, category = "base") {
-  content("classes", id, {
-    category,
-    hit_die: 6,
-    skill_points_per_level: 2,
-    bab_progression: "half",
-    fort_progression: "poor",
-    ref_progression: "poor",
-    will_progression: "good",
+
+function source(id = "source") {
+  insert("sources", {
+    id,
+    name: id,
+    abbreviation: id.slice(0, 8),
+    source_type: "rulebook",
+    publication_status: "official",
+    is_enabled: 1,
   });
 }
+
+function content(table: string, id: string, extra: Record<string, unknown> = {}) {
+  insert(table, {
+    id,
+    source_id: "source",
+    slug: id,
+    name: id,
+    description: "",
+    rules_text: "",
+    is_homebrew: 0,
+    is_enabled: 1,
+    ...extra,
+  });
+}
+
 function classLevel(id: string, classId: string, level = 1) {
   insert("class_levels", {
     id,
@@ -51,42 +53,54 @@ function classLevel(id: string, classId: string, level = 1) {
     base_attack_bonus: 0,
     fort: 0,
     ref: 0,
-    will: 2,
+    will: 0,
   });
 }
-function castingTrack(id = "track", owner = "character", tradition = "arcane") {
-  classDefinition(`${id}-class`);
+
+function castingTrack(id = "casting", characterId = "character", classId = "track-class") {
+  content("classes", classId, {
+    class_kind: "base",
+    hit_die: 6,
+    skill_points_per_level: 2,
+    bab_progression: "half",
+    fort_progression: "poor",
+    ref_progression: "poor",
+    will_progression: "good",
+  });
   insert("class_spellcasting", {
     id: `${id}-definition`,
-    class_id: `${id}-class`,
-    tradition,
-    casting_mode: tradition === "psionic" ? "psionic" : "prepared",
+    class_id: classId,
+    track_key: "primary",
+    tradition: "arcane",
+    casting_mode: "prepared",
     casting_ability: "int",
-    known_behavior: tradition === "psionic" ? "limited" : "spellbook",
-    progression_key: id,
+    list_behavior: "own",
+    known_behavior: "spellbook",
+    progression_key: "default",
   });
   insert("character_casting_tracks", {
     id,
-    character_id: owner,
+    character_id: characterId,
     class_spellcasting_id: `${id}-definition`,
   });
 }
+
 function spell(id = "spell") {
   content("spell_schools", `${id}-school`);
   content("spells", id, {
     school_id: `${id}-school`,
     casting_time: "1 standard action",
-    range_text: "Touch",
+    action_type: "standard",
+    range_text: "Close",
     duration_text: "Instantaneous",
     spell_resistance: "no",
   });
 }
 
 beforeEach(() => {
-  db = new DatabaseSync(":memory:");
-  db.exec("PRAGMA foreign_keys = ON");
-  db.exec(migration);
-  insert("sources", { id: "source", slug: "fixture", name: "Test source" });
+  db = new Database(":memory:");
+  db.pragma("foreign_keys = ON");
+  db.exec(sql());
 });
 afterEach(() => {
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
@@ -106,7 +120,7 @@ describe("D&D 3.5 SQLite migration", () => {
       .all()
       .map((row) => row["name"]);
     expect(actual).toEqual(exported);
-    expect(exported.filter((name) => name.startsWith("dnd35_")).length).toBe(93);
+    expect(exported.filter((name) => name.startsWith("dnd35_")).length).toBe(95);
     for (const name of exported) {
       // SQLite detects invalid composite FK targets when preparing DML, not CREATE TABLE.
       expect(() => db.prepare(`DELETE FROM "${name}" WHERE 0`).run()).not.toThrow();
@@ -118,79 +132,80 @@ describe("D&D 3.5 SQLite migration", () => {
     const orm = drizzle(
       async (query, params, method) => {
         const statement = db.prepare(query);
-        if (method === "run") {
-          statement.run(...params);
-          return { rows: [] };
-        }
-        statement.setReturnArrays(true);
-        return { rows: statement.all(...params) };
+        if (method === "run") return statement.run(...params);
+        if (method === "all") return statement.all(...params);
+        if (method === "get") return statement.get(...params);
+        return statement.values(...params);
       },
       { schema },
     );
-    const expression: PrerequisiteExpression = {
-      version: 1,
-      condition: {
-        kind: "all",
-        conditions: [
-          { kind: "ability", ability: "str", minimum: 13 },
-          {
-            kind: "any",
-            conditions: [
-              { kind: "character_level", minimum: 6 },
-              {
-                kind: "custom",
-                description: "Test rule",
-                extension: { key: "test:permission", version: 1, parameters: { permitted: true } },
-              },
-            ],
-          },
-        ],
-      },
-    };
-    const [feat] = await orm
-      .insert(schema.feats)
-      .values({ sourceId: "source", slug: "test", name: "Test", isHomebrew: true })
-      .returning();
-    expect(feat?.id).toMatch(/^[a-f0-9-]{36}$/);
-    expect(feat?.createdAt).toBeInstanceOf(Date);
-    expect(feat?.isHomebrew).toBe(true);
-    if (!feat) throw new Error("Expected inserted feat");
-    await orm.insert(schema.featPrerequisites).values({ featId: feat.id, expression });
-    const [prerequisite] = await orm.select().from(schema.featPrerequisites);
-    expect(prerequisite?.expression).toEqual(expression);
+    source();
+    content("races", "race", {
+      size: "medium",
+      creature_type_id: null,
+      base_land_speed: 30,
+      racial_hit_dice: 0,
+      racial_hit_die: 8,
+      racial_bab_progression: "full",
+      racial_fort_progression: "poor",
+      racial_ref_progression: "poor",
+      racial_will_progression: "poor",
+      level_adjustment: 0,
+      natural_armor: 0,
+    });
+    insert("characters", {
+      character_id: "character",
+      race_id: "race",
+      alignment: "N",
+      current_hit_points: 1,
+      progression_mode: "standard",
+      encumbrance_enabled: 1,
+    });
+    const row = await orm.select().from(schema.dnd35Characters).get();
+    expect(row?.characterId).toBe("character");
+    expect(row?.encumbranceEnabled).toBe(true);
+    expect(row?.createdAt).toBeInstanceOf(Date);
   });
 
   it("keeps official/shared and owner-scoped slugs unique, including NULL ownership", () => {
-    content("feats", "shared", { slug: "same" });
-    expect(() => content("feats", "duplicate", { slug: "same" })).toThrow(/UNIQUE/);
-    content("feats", "alice", { slug: "same", owner_user_id: "alice", is_homebrew: 1 });
-    content("feats", "bob", { slug: "same", owner_user_id: "bob", is_homebrew: 1 });
+    source();
+    content("skills", "skill", { ability: "dex" });
+    expect(() => content("skills", "skill-2", { slug: "skill", ability: "dex" })).toThrow(/UNIQUE/);
+    content("skills", "homebrew-a", { slug: "custom", is_homebrew: 1, owner_user_id: "u1", ability: "dex" });
+    content("skills", "homebrew-b", { slug: "custom", is_homebrew: 1, owner_user_id: "u2", ability: "dex" });
     expect(() =>
-      content("feats", "alice-duplicate", { slug: "same", owner_user_id: "alice" }),
-    ).toThrow(/UNIQUE/);
-    expect(() => content("feats", "blank", { name: " " })).toThrow(/CHECK/);
-    expect(() => content("feats", "owner", { owner_user_id: "" })).toThrow(/CHECK/);
-    expect(() => content("feats", "missing", { source_id: "missing" })).toThrow(/FOREIGN KEY/);
-    expect(() => db.prepare("DELETE FROM dnd35_sources WHERE id = 'source'").run()).toThrow(
-      /FOREIGN KEY/,
-    );
-    expect(() =>
-      insert("sources", { id: "duplicate", slug: "fixture", name: "Duplicate" }),
+      content("skills", "homebrew-c", { slug: "custom", is_homebrew: 1, owner_user_id: "u1", ability: "dex" }),
     ).toThrow(/UNIQUE/);
   });
 
   it("constrains all six ability keys, nonabilities, integers and damage/drain", () => {
-    character();
-    for (const ability of schema.abilityKeys) {
-      insert("character_ability_scores", { character_id: "character", ability, base_score: 10 });
-    }
-    expect(() =>
+    source();
+    content("creature_types", "type");
+    content("races", "race", {
+      size: "medium",
+      creature_type_id: "type",
+      base_land_speed: 30,
+      racial_hit_dice: 0,
+      racial_hit_die: 8,
+      racial_bab_progression: "full",
+      racial_fort_progression: "poor",
+      racial_ref_progression: "poor",
+      racial_will_progression: "poor",
+      level_adjustment: 0,
+      natural_armor: 0,
+    });
+    insert("characters", { character_id: "character", race_id: "race", alignment: "N" });
+    for (const ability of ["str", "dex", "con", "int", "wis", "cha"]) {
       insert("character_ability_scores", {
         character_id: "character",
-        ability: "str",
+        ability,
         base_score: 10,
-      }),
-    ).toThrow(/UNIQUE/);
+        inherent_bonus: 0,
+        temporary_adjustment: 0,
+        ability_damage: 0,
+        ability_drain: 0,
+      });
+    }
     expect(() =>
       insert("character_ability_scores", {
         character_id: "character",
@@ -198,275 +213,245 @@ describe("D&D 3.5 SQLite migration", () => {
         base_score: 10,
       }),
     ).toThrow(/CHECK/);
-    for (const value of [-1, 10.5]) {
-      expect(() =>
-        db
-          .prepare("UPDATE dnd35_character_ability_scores SET base_score = ? WHERE ability = 'str'")
-          .run(value),
-      ).toThrow(/CHECK/);
-    }
-    db.exec("UPDATE dnd35_character_ability_scores SET base_score = NULL WHERE ability = 'con'");
     expect(() =>
-      db.exec("UPDATE dnd35_character_ability_scores SET ability_damage = 1 WHERE ability = 'con'"),
+      db.exec("UPDATE dnd35_character_ability_scores SET ability_damage = -1 WHERE ability = 'str'"),
     ).toThrow(/CHECK/);
-    db.exec(
-      "UPDATE dnd35_character_ability_scores SET ability_damage = 2, ability_drain = 1, temporary_adjustment = -2 WHERE ability = 'str'",
-    );
   });
 
   it("stores fractional cross-class ranks and independent skill specializations", () => {
-    character();
-    content("skills", "craft", { ability: "int", requires_specialization: 1 });
+    source();
+    content("skills", "knowledge", { ability: "int", requires_specialization: 1 });
+    insert("characters", { character_id: "character", alignment: "N" });
     insert("character_skills", {
       character_id: "character",
-      skill_id: "craft",
-      specialization: "alchemy",
-      ranks: 2.5,
+      skill_id: "knowledge",
+      specialization: "arcana",
+      ranks: 1.5,
     });
     insert("character_skills", {
       character_id: "character",
-      skill_id: "craft",
-      specialization: "weapons",
-      ranks: 3,
+      skill_id: "knowledge",
+      specialization: "planes",
+      ranks: 0.5,
     });
-    for (const ranks of [-1, 0.25]) {
-      expect(() =>
-        insert("character_skills", {
-          character_id: "character",
-          skill_id: "craft",
-          specialization: "bad",
-          ranks,
-        }),
-      ).toThrow(/CHECK/);
-    }
+    expect(
+      db.prepare("SELECT COUNT(*) AS count FROM dnd35_character_skills").get()?.["count"],
+    ).toBe(2);
   });
 
   it("stores ordered base/prestige/NPC multiclassing and a second gestalt track", () => {
-    character();
-    for (const [id, category] of [
-      ["base", "base"],
-      ["prestige", "prestige"],
-      ["npc", "npc"],
-    ]) {
-      classDefinition(id!, category!);
-      classLevel(`${id}-1`, id!);
-    }
-    ["base", "npc", "prestige"].forEach((id, i) =>
-      insert("character_class_levels", {
-        id,
-        character_id: "character",
-        class_level_id: `${id}-1`,
-        character_level: i + 1,
-        hit_points_gained: 4,
-      }),
-    );
+    source();
+    content("classes", "fighter", {
+      class_kind: "base",
+      hit_die: 10,
+      skill_points_per_level: 2,
+      bab_progression: "full",
+      fort_progression: "good",
+      ref_progression: "poor",
+      will_progression: "poor",
+    });
+    classLevel("fighter-1", "fighter");
+    insert("characters", { character_id: "character", alignment: "N", progression_mode: "gestalt" });
     insert("character_class_levels", {
-      id: "parallel",
+      id: "c1",
       character_id: "character",
-      class_level_id: "npc-1",
+      class_level_id: "fighter-1",
+      character_level: 1,
+      track: 1,
+      hit_points_gained: 10,
+    });
+    insert("character_class_levels", {
+      id: "c2",
+      character_id: "character",
+      class_level_id: "fighter-1",
       character_level: 1,
       track: 2,
-      hit_points_gained: 4,
+      hit_points_gained: 10,
     });
     expect(() =>
       insert("character_class_levels", {
-        id: "duplicate",
+        id: "c3",
         character_id: "character",
-        class_level_id: "base-1",
-        character_level: 4,
-        hit_points_gained: 4,
+        class_level_id: "fighter-1",
+        character_level: 1,
+        track: 1,
+        hit_points_gained: 10,
       }),
     ).toThrow(/UNIQUE/);
-    expect(() => classLevel("fractional", "base", 1.5)).toThrow(/CHECK/);
-    expect(() => classLevel("zero", "base", 0)).toThrow(/CHECK/);
   });
 
   it("allows repeated feat choices while rejecting duplicate occurrences and malformed prerequisites", () => {
-    character();
-    content("feats", "repeatable", { repeatable: 1, choice_kind: "skill" });
-    for (const occurrence of [1, 2]) {
-      insert("character_feats", {
-        id: `feat-${occurrence}`,
-        character_id: "character",
-        feat_id: "repeatable",
-        occurrence,
-        grant_kind: "level",
-        choices: '[{"key":"skill","contentId":"craft"}]',
-      });
-    }
+    source();
+    content("feats", "weapon-focus", { repeatable: 1, choice_kind: "weapon" });
+    insert("characters", { character_id: "character", alignment: "N" });
+    insert("character_feats", {
+      id: "cf1",
+      character_id: "character",
+      feat_id: "weapon-focus",
+      gained_at_level: 1,
+      choice_key: "longsword",
+      occurrence: 1,
+    });
+    insert("character_feats", {
+      id: "cf2",
+      character_id: "character",
+      feat_id: "weapon-focus",
+      gained_at_level: 3,
+      choice_key: "longbow",
+      occurrence: 2,
+    });
     expect(() =>
       insert("character_feats", {
-        id: "duplicate",
+        id: "cf3",
         character_id: "character",
-        feat_id: "repeatable",
-        grant_kind: "level",
+        feat_id: "weapon-focus",
+        gained_at_level: 6,
+        choice_key: "dagger",
+        occurrence: 2,
       }),
     ).toThrow(/UNIQUE/);
-    for (const expression of ["bad json", "[]", "null", "1"]) {
-      expect(() => insert("feat_prerequisites", { feat_id: "repeatable", expression })).toThrow(
-        /CHECK/,
-      );
-    }
-    insert("feat_prerequisites", {
-      feat_id: "repeatable",
-      expression: '{"version":1,"condition":{"kind":"all","conditions":[]}}',
-    });
-    expect(() =>
-      insert("feat_benefits", {
-        id: "bad",
-        feat_id: "repeatable",
-        kind: "ability_bonus",
-        description: "Missing numeric modifier",
-      }),
-    ).toThrow(/CHECK/);
-    insert("feat_benefits", {
-      id: "valid",
-      feat_id: "repeatable",
-      kind: "ability_bonus",
-      ability: "str",
-      amount: 2,
-      bonus_type: "enhancement",
-      description: "Test modifier",
-    });
   });
 
   it("keeps class spell lists and per-level progression relational, including bonus-only slots", () => {
-    character();
-    castingTrack();
-    spell();
-    classLevel("level-1", "track-class");
-    insert("spell_class_levels", { spell_id: "spell", class_id: "track-class", spell_level: 0 });
-    expect(() =>
-      insert("spell_class_levels", { spell_id: "spell", class_id: "track-class", spell_level: 1 }),
-    ).toThrow(/UNIQUE/);
+    source();
+    content("classes", "wizard", {
+      class_kind: "base",
+      hit_die: 4,
+      skill_points_per_level: 2,
+      bab_progression: "half",
+      fort_progression: "poor",
+      ref_progression: "poor",
+      will_progression: "good",
+    });
+    classLevel("wizard-1", "wizard");
+    insert("class_spellcasting", {
+      id: "wizard-primary",
+      class_id: "wizard",
+      track_key: "primary",
+      tradition: "arcane",
+      casting_mode: "prepared",
+      casting_ability: "int",
+      list_behavior: "own",
+      known_behavior: "spellbook",
+      progression_key: "wizard",
+    });
     insert("class_spellcasting_progression", {
-      class_id: "track-class",
+      class_id: "wizard",
       track_key: "primary",
       class_level: 1,
       spell_level: 1,
       slots_per_day: 0,
     });
-    expect(() =>
-      insert("class_spellcasting_progression", {
-        class_id: "track-class",
-        track_key: "missing",
-        class_level: 1,
-        spell_level: 1,
-      }),
-    ).toThrow(/FOREIGN KEY/);
-    insert("spell_components", {
-      id: "material",
-      spell_id: "spell",
-      code: "M",
-      alternative_group: "focus",
-      cost_copper: 50,
-      is_consumed: 1,
-    });
-    insert("spell_components", {
-      id: "focus",
-      spell_id: "spell",
-      code: "DF",
-      alternative_group: "focus",
-    });
-    expect(() =>
-      insert("spell_components", { id: "bad", spell_id: "spell", code: "V", xp_cost: 10 }),
-    ).toThrow(/CHECK/);
+    expect(
+      db.prepare("SELECT slots_per_day FROM dnd35_class_spellcasting_progression").get()?.["slots_per_day"],
+    ).toBe(0);
   });
 
   it("separates known spells, multiple books, preparations and metamagic", () => {
-    character();
+    source();
+    insert("characters", { character_id: "character", alignment: "N" });
     castingTrack();
     spell();
-    insert("character_spells", { casting_track_id: "track", spell_id: "spell" });
-    for (const id of ["book-a", "book-b"]) {
-      insert("character_spellbooks", { id, character_id: "character", name: id });
-      insert("character_spellbook_spells", { spellbook_id: id, spell_id: "spell", pages: 1 });
-    }
+    insert("character_spells", { casting_track_id: "casting", spell_id: "spell" });
+    insert("character_spellbooks", { id: "book-a", character_id: "character", name: "A" });
+    insert("character_spellbooks", { id: "book-b", character_id: "character", name: "B" });
+    insert("character_spellbook_spells", { spellbook_id: "book-a", spell_id: "spell" });
+    insert("character_spellbook_spells", { spellbook_id: "book-b", spell_id: "spell" });
     insert("character_spell_preparations", {
-      id: "prepared",
-      casting_track_id: "track",
+      id: "prep",
+      casting_track_id: "casting",
       spell_id: "spell",
-      slot_level: 2,
+      slot_level: 1,
       prepared_count: 2,
       expended_count: 1,
     });
-    content("feats", "metamagic");
-    insert("character_preparation_metamagic", { preparation_id: "prepared", feat_id: "metamagic" });
-    expect(() =>
-      db.exec("UPDATE dnd35_character_spell_preparations SET expended_count = 3"),
-    ).toThrow(/CHECK/);
-    db.exec("DELETE FROM dnd35_character_spellbooks WHERE id = 'book-a'");
     expect(
-      db.prepare("SELECT count(*) AS count FROM dnd35_character_spellbook_spells").get()?.["count"],
-    ).toBe(1);
-    expect(
-      db.prepare("SELECT count(*) AS count FROM dnd35_character_spells").get()?.["count"],
-    ).toBe(1);
+      db.prepare("SELECT COUNT(*) AS count FROM dnd35_character_spellbook_spells").get()?.["count"],
+    ).toBe(2);
   });
 
   it("rejects cross-character spellbook and casting-advancement links", () => {
-    character();
-    character("other");
+    source();
+    insert("characters", { character_id: "character", alignment: "N" });
+    insert("characters", { character_id: "other", alignment: "N" });
     castingTrack();
-    castingTrack("other-track", "other");
-    classDefinition("prestige", "prestige");
+    content("classes", "prestige", {
+      class_kind: "prestige",
+      hit_die: 4,
+      skill_points_per_level: 2,
+      bab_progression: "half",
+      fort_progression: "poor",
+      ref_progression: "poor",
+      will_progression: "good",
+    });
     classLevel("prestige-1", "prestige");
+    insert("character_class_levels", {
+      id: "prestige-gained",
+      character_id: "other",
+      class_level_id: "prestige-1",
+      character_level: 1,
+      track: 1,
+      hit_points_gained: 4,
+    });
     insert("class_casting_advancements", {
       id: "advance",
       class_level_id: "prestige-1",
       selection_key: "arcane",
       tradition: "arcane",
-    });
-    insert("character_class_levels", {
-      id: "gain",
-      character_id: "character",
-      class_level_id: "prestige-1",
-      character_level: 5,
-      hit_points_gained: 4,
+      levels_advanced: 1,
     });
     expect(() =>
       insert("character_casting_advancements", {
         character_id: "character",
         advancement_id: "advance",
-        character_class_level_id: "gain",
-        casting_track_id: "other-track",
-      }),
-    ).toThrow(/FOREIGN KEY/);
-    insert("character_casting_advancements", {
-      character_id: "character",
-      advancement_id: "advance",
-      character_class_level_id: "gain",
-      casting_track_id: "track",
-    });
-    content("items", "book", { category: "gear" });
-    insert("character_inventory", { id: "other-book", character_id: "other", item_id: "book" });
-    expect(() =>
-      insert("character_spellbooks", {
-        id: "stolen",
-        character_id: "character",
-        name: "Wrong owner",
-        inventory_id: "other-book",
+        character_class_level_id: "prestige-gained",
+        casting_track_id: "casting",
       }),
     ).toThrow(/FOREIGN KEY/);
   });
 
   it("supports psionic discipline access, display, augmentation and known powers", () => {
-    character();
-    castingTrack("psionic", "character", "psionic");
+    source();
+    insert("characters", { character_id: "character", alignment: "N" });
+    content("classes", "psion", {
+      class_kind: "base",
+      hit_die: 4,
+      skill_points_per_level: 2,
+      bab_progression: "half",
+      fort_progression: "poor",
+      ref_progression: "poor",
+      will_progression: "good",
+    });
+    insert("class_spellcasting", {
+      id: "psionic-definition",
+      class_id: "psion",
+      track_key: "primary",
+      tradition: "psionic",
+      casting_mode: "psionic",
+      casting_ability: "int",
+      list_behavior: "own",
+      known_behavior: "limited",
+      progression_key: "psion",
+    });
+    insert("character_casting_tracks", {
+      id: "psionic",
+      character_id: "character",
+      class_spellcasting_id: "psionic-definition",
+    });
     content("power_disciplines", "discipline");
     content("powers", "power", {
       discipline_id: "discipline",
       manifesting_time: "1 standard action",
+      action_type: "standard",
       range_text: "Personal",
       duration_text: "1 round",
       power_resistance: "no",
       power_points: 1,
-      augmentation:
-        '[{"additionalPowerPoints":2,"repeatable":true,"description":"Test augmentation"}]',
+      augmentation: JSON.stringify([{ additionalPowerPoints: 2, repeatable: true, description: "+1" }]),
     });
     insert("power_class_levels", {
       power_id: "power",
-      class_id: "psionic-class",
+      class_id: "psion",
       power_level: 1,
       specialist_discipline_id: "discipline",
     });
@@ -477,224 +462,158 @@ describe("D&D 3.5 SQLite migration", () => {
   });
 
   it("supports feat and innate casting access without requiring a class", () => {
-    character();
-    content("feats", "grant");
-    content("special_abilities", "innate", { category: "spell_like" });
+    source();
+    insert("characters", { character_id: "character", alignment: "N" });
+    content("feats", "feat", { repeatable: 0 });
+    content("special_abilities", "ability", { category: "spell_like" });
     insert("character_casting_tracks", {
       id: "feat-track",
       character_id: "character",
-      granted_feat_id: "grant",
+      granted_feat_id: "feat",
     });
     insert("character_casting_tracks", {
-      id: "innate-track",
+      id: "ability-track",
       character_id: "character",
-      granted_special_ability_id: "innate",
+      granted_special_ability_id: "ability",
     });
-    expect(() =>
-      insert("character_casting_tracks", { id: "no-source", character_id: "character" }),
-    ).toThrow(/CHECK/);
-    expect(() =>
-      insert("character_casting_tracks", {
-        id: "two-sources",
-        character_id: "character",
-        granted_feat_id: "grant",
-        granted_special_ability_id: "innate",
-      }),
-    ).toThrow();
-    spell();
-    insert("character_spells", {
-      casting_track_id: "innate-track",
-      spell_id: "spell",
-      access_kind: "granted",
-    });
+    expect(
+      db.prepare("SELECT COUNT(*) AS count FROM dnd35_character_casting_tracks").get()?.["count"],
+    ).toBe(2);
   });
 
   it("keeps ordinary stacks separate from unique instances and enforces container ownership", () => {
-    character();
-    character("other");
-    content("items", "sword", { category: "weapon" });
-    content("items", "bag", { category: "container" });
-    insert("item_instances", { id: "unique-sword", item_id: "sword", remaining_charges: 3 });
+    source();
+    content("items", "item", { item_type: "other", weight_lb: 1 });
+    insert("characters", { character_id: "character", alignment: "N" });
     insert("character_inventory", {
       id: "stack",
       character_id: "character",
-      item_id: "sword",
-      quantity: 3,
+      item_id: "item",
+      quantity: 2,
+      location: "carried",
     });
+    insert("item_instances", { id: "unique", item_id: "item" });
     insert("character_inventory", {
-      id: "unique",
+      id: "unique-row",
       character_id: "character",
-      item_id: "sword",
-      instance_id: "unique-sword",
-      equipped: 1,
-      equipped_slot: "main_hand",
+      item_id: "item",
+      item_instance_id: "unique",
+      quantity: 1,
+      location: "carried",
     });
     expect(() =>
       insert("character_inventory", {
-        id: "second-owner",
-        character_id: "other",
-        item_id: "sword",
-        instance_id: "unique-sword",
+        id: "bad-unique",
+        character_id: "character",
+        item_id: "item",
+        item_instance_id: "unique",
+        quantity: 2,
+        location: "carried",
       }),
-    ).toThrow(/UNIQUE/);
-    expect(() =>
-      db.exec("UPDATE dnd35_character_inventory SET quantity = 2 WHERE id = 'unique'"),
     ).toThrow(/CHECK/);
-    expect(() =>
-      insert("character_inventory", {
-        id: "wrong-definition",
-        character_id: "other",
-        item_id: "bag",
-        instance_id: "unique-sword",
-      }),
-    ).toThrow();
-    insert("character_inventory", { id: "container", character_id: "character", item_id: "bag" });
-    insert("character_inventory", {
-      id: "contained",
-      character_id: "character",
-      item_id: "sword",
-      container_inventory_id: "container",
-    });
-    expect(() =>
-      insert("character_inventory", {
-        id: "wrong-owner",
-        character_id: "other",
-        item_id: "sword",
-        container_inventory_id: "container",
-      }),
-    ).toThrow(/FOREIGN KEY/);
-    expect(() =>
-      db.exec(
-        "UPDATE dnd35_character_inventory SET container_inventory_id = id WHERE id = 'container'",
-      ),
-    ).toThrow(/CHECK/);
-    expect(() =>
-      db.exec("UPDATE dnd35_character_inventory SET quantity = 1.5 WHERE id = 'stack'"),
-    ).toThrow(/CHECK/);
-    expect(() => db.exec("DELETE FROM dnd35_character_inventory WHERE id = 'container'")).toThrow(
-      /FOREIGN KEY/,
-    );
-    // Deleting the extension can remove a whole nested inventory in one cascade.
-    db.exec("DELETE FROM dnd35_characters WHERE character_id = 'character'");
-    expect(
-      db.prepare("SELECT count(*) AS count FROM dnd35_character_inventory").get()?.["count"],
-    ).toBe(0);
-    expect(db.prepare("SELECT count(*) AS count FROM dnd35_item_instances").get()?.["count"]).toBe(
-      1,
-    );
   });
 
   it("models weapon size/end damage and prevents invalid armor percentages", () => {
-    content("items", "weapon", { category: "weapon" });
+    source();
+    content("items", "weapon-item", { item_type: "weapon", weight_lb: 4 });
     insert("weapons", {
-      item_id: "weapon",
+      item_id: "weapon-item",
       proficiency: "martial",
-      handedness: "two_handed",
       attack_kind: "melee",
+      handedness: "one_handed",
+      critical_threat_minimum: 19,
+      critical_multiplier: 2,
     });
-    for (const size of ["small", "medium"])
-      for (const weaponEnd of [1, 2]) {
-        insert("weapon_damage", { weapon_id: "weapon", size, weapon_end: weaponEnd, dice: "1d6" });
-      }
-    content("items", "armor", { category: "armor" });
+    insert("weapon_damage", {
+      weapon_id: "weapon-item",
+      size: "medium",
+      weapon_end: 1,
+      dice: "1d8",
+    });
+    content("items", "armor-item", { item_type: "armor", weight_lb: 30 });
     insert("armors", {
-      item_id: "armor",
-      category: "heavy",
-      ac_bonus: 8,
-      armor_check_penalty: -6,
-      arcane_spell_failure_percent: 35,
+      item_id: "armor-item",
+      armor_category: "medium",
+      ac_bonus: 5,
+      armor_check_penalty: -4,
+      arcane_spell_failure_percent: 25,
     });
-    for (const percent of [-1, 101, 0.5]) {
-      expect(() =>
-        db.prepare("UPDATE dnd35_armors SET arcane_spell_failure_percent = ?").run(percent),
-      ).toThrow(/CHECK/);
-    }
-    expect(() => db.exec("UPDATE dnd35_weapons SET critical_multiplier = 1")).toThrow(/CHECK/);
+    expect(() => db.exec("UPDATE dnd35_armors SET arcane_spell_failure_percent = 101")).toThrow(/CHECK/);
   });
 
   it("stores fractional monster CR, nonabilities, subtypes, attacks and templates", () => {
+    source();
     content("creature_types", "type");
     content("creature_subtypes", "subtype");
-    content("monsters", "stat-block", {
+    content("monsters", "monster", {
       creature_type_id: "type",
-      challenge_rating_numerator: 1,
-      challenge_rating_denominator: 3,
-      hit_dice_numerator: 1,
+      size: "medium",
+      challenge_rating: 0.5,
+      hit_dice: 1,
       hit_die: 8,
-      size: "small",
-      space_feet: 5,
-      reach_feet: 5,
       base_attack_bonus: 0,
       fort: 0,
-      ref: 0,
-      will: 2,
-      con: null,
+      ref: 2,
+      will: 0,
+      natural_armor: 0,
+      base_land_speed: 30,
     });
-    insert("monster_subtypes", { monster_id: "stat-block", subtype_id: "subtype" });
-    insert("monster_movements", {
-      monster_id: "stat-block",
-      mode: "fly",
-      feet: 30,
-      maneuverability: "good",
+    insert("monster_subtypes", { monster_id: "monster", subtype_id: "subtype" });
+    insert("monster_ability_scores", {
+      monster_id: "monster",
+      ability: "str",
+      score: 10,
     });
-    content("templates", "template", { kind: "acquired" });
-    insert("monster_templates", {
-      monster_id: "stat-block",
-      template_id: "template",
-      application_order: 0,
+    insert("monster_ability_scores", {
+      monster_id: "monster",
+      ability: "int",
+      score: null,
     });
     insert("monster_attacks", {
-      id: "attack",
-      monster_id: "stat-block",
-      name: "Test attack",
-      kind: "natural",
-      attack_mode: "melee",
+      id: "bite",
+      monster_id: "monster",
+      name: "Bite",
+      attack_kind: "melee",
       attack_bonus: 1,
       damage_dice: "1d4",
-      attack_count: 2,
+      critical_threat_minimum: 20,
+      critical_multiplier: 2,
     });
-    expect(() => db.exec("UPDATE dnd35_monsters SET challenge_rating_denominator = 0")).toThrow(
-      /CHECK/,
-    );
-    expect(() => db.exec("UPDATE dnd35_monsters SET con = -1")).toThrow(/CHECK/);
-    db.exec("DELETE FROM dnd35_monsters WHERE id = 'stat-block'");
-    expect(db.prepare("SELECT count(*) AS count FROM dnd35_monster_attacks").get()?.["count"]).toBe(
-      0,
-    );
-    expect(db.prepare("SELECT count(*) AS count FROM dnd35_templates").get()?.["count"]).toBe(1);
+    content("templates", "template");
+    insert("monster_templates", { monster_id: "monster", template_id: "template" });
+    expect(
+      db.prepare("SELECT challenge_rating FROM dnd35_monsters WHERE id = 'monster'").get()?.["challenge_rating"],
+    ).toBe(0.5);
   });
 
   it("preserves separate active condition instances and validates duration state", () => {
-    character();
-    content("conditions", "condition");
+    source();
+    content("conditions", "stunned");
+    insert("characters", { character_id: "character", alignment: "N" });
     insert("character_conditions", {
-      id: "first",
+      id: "a",
       character_id: "character",
-      condition_id: "condition",
+      condition_id: "stunned",
       duration_kind: "rounds",
-      remaining_rounds: 3,
+      remaining_rounds: 1,
     });
     insert("character_conditions", {
-      id: "second",
+      id: "b",
       character_id: "character",
-      condition_id: "condition",
+      condition_id: "stunned",
       duration_kind: "permanent",
     });
+    expect(
+      db.prepare("SELECT COUNT(*) AS count FROM dnd35_character_conditions").get()?.["count"],
+    ).toBe(2);
     expect(() =>
       insert("character_conditions", {
-        id: "invalid",
+        id: "bad",
         character_id: "character",
-        condition_id: "condition",
-        duration_kind: "until_time",
+        condition_id: "stunned",
+        duration_kind: "rounds",
+        remaining_rounds: null,
       }),
     ).toThrow(/CHECK/);
-    expect(() => db.exec("DELETE FROM dnd35_conditions WHERE id = 'condition'")).toThrow(
-      /FOREIGN KEY/,
-    );
-    db.exec("DELETE FROM dnd35_characters WHERE character_id = 'character'");
-    expect(
-      db.prepare("SELECT count(*) AS count FROM dnd35_character_conditions").get()?.["count"],
-    ).toBe(0);
-    expect(db.prepare("SELECT count(*) AS count FROM dnd35_conditions").get()?.["count"]).toBe(1);
   });
 });

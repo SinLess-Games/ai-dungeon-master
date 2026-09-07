@@ -26,6 +26,13 @@ function unix(date: Date): number {
   return Math.floor(date.getTime() / 1000);
 }
 
+function shouldRetrySequence(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /game_events_campaign_sequence_uidx|UNIQUE constraint failed: game_events\.campaign_id, game_events\.sequence/i.test(
+    message,
+  );
+}
+
 async function initiativeModifierForActor(
   db: Database,
   actor: typeof gameActors.$inferSelect,
@@ -36,6 +43,7 @@ async function initiativeModifierForActor(
     if (dexterity === null) throw new Error("ENCOUNTER_PARTICIPANT_INVALID");
     return abilityModifier(dexterity);
   }
+
   if (actor.kind === "monster") {
     const row = await db
       .select({ dexterity: monsters.dex })
@@ -46,6 +54,10 @@ async function initiativeModifierForActor(
     if (!row) throw new Error("ENCOUNTER_PARTICIPANT_INVALID");
     return row.dexterity === null ? 0 : abilityModifier(row.dexterity);
   }
+
+  // Generic NPC actors do not yet have a ruleset-specific combat snapshot.
+  // Reject them instead of inventing ability scores; a later NPC runtime can
+  // opt them into combat by providing the same authoritative adapter.
   throw new Error("ENCOUNTER_PARTICIPANT_INVALID");
 }
 
@@ -53,9 +65,15 @@ export async function startActorEncounter(
   deps: EncounterServiceDependencies,
   input: { campaignId: string; participantIds: readonly string[] },
 ): Promise<ActiveEncounterView> {
-  if (input.participantIds.length === 0) throw new RangeError("An encounter requires participants.");
+  if (input.participantIds.length === 0) {
+    throw new RangeError("An encounter requires participants.");
+  }
+
   const participantIds = [...new Set(input.participantIds.map((id) => id.trim()))];
-  if (participantIds.some((id) => id.length === 0) || participantIds.length !== input.participantIds.length) {
+  if (
+    participantIds.some((id) => id.length === 0) ||
+    participantIds.length !== input.participantIds.length
+  ) {
     throw new RangeError("Encounter participants must be unique, non-empty actor ids.");
   }
 
@@ -63,7 +81,12 @@ export async function startActorEncounter(
   const existing = await deps.db
     .select({ id: gameEncounters.id })
     .from(gameEncounters)
-    .where(and(eq(gameEncounters.sessionId, context.sessionId), eq(gameEncounters.status, "active")))
+    .where(
+      and(
+        eq(gameEncounters.sessionId, context.sessionId),
+        eq(gameEncounters.status, "active"),
+      ),
+    )
     .get();
   if (existing) throw new Error("ENCOUNTER_ALREADY_ACTIVE");
 
@@ -79,7 +102,9 @@ export async function startActorEncounter(
       ),
     )
     .all();
-  if (actors.length !== participantIds.length) throw new Error("ENCOUNTER_PARTICIPANT_INVALID");
+  if (actors.length !== participantIds.length) {
+    throw new Error("ENCOUNTER_PARTICIPANT_INVALID");
+  }
   const byId = new Map(actors.map((actor) => [actor.id, actor]));
 
   const initiativeRoller = deps.rollInitiative ?? (() => Math.floor(Math.random() * 20) + 1);
@@ -92,9 +117,17 @@ export async function startActorEncounter(
         throw new RangeError("Initiative roller must return an integer from 1 through 20.");
       }
       const initiativeModifier = await initiativeModifierForActor(deps.db, actor);
-      return { characterId: actorId, initiativeRoll, initiativeModifier, tieBreaker: initiativeModifier };
+      // Encounter runtime predates GameActor and calls the identity characterId.
+      // At this boundary the value is intentionally the canonical actor id.
+      return {
+        characterId: actorId,
+        initiativeRoll,
+        initiativeModifier,
+        tieBreaker: initiativeModifier,
+      };
     }),
   );
+
   const state = createEncounterState(seeds);
   const createId = deps.createId ?? (() => crypto.randomUUID());
   const now = deps.now ?? (() => new Date());
@@ -103,98 +136,108 @@ export async function startActorEncounter(
   const occurredAt = now();
   const timestamp = unix(occurredAt);
 
-  const statements: D1PreparedStatement[] = [
-    deps.binding
-      .prepare(
-        `INSERT INTO game_encounters (
-          id, campaign_id, session_id, status, round_number, active_turn_index,
-          started_at, created_at, updated_at
-        ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        encounterId,
-        context.campaignId,
-        context.sessionId,
-        state.roundNumber,
-        state.activeTurnIndex,
-        timestamp,
-        timestamp,
-        timestamp,
-      ),
-    ...state.participants.map((participant) =>
-      deps.binding
-        .prepare(
-          `INSERT INTO game_encounter_participants (
-            id, encounter_id, actor_id, character_id, status,
-            initiative_roll, initiative_modifier, initiative_total, tie_breaker, turn_order,
-            standard_available, move_available, swift_available, swift_debt_next_turn,
-            attacks_of_opportunity_per_round, attacks_of_opportunity_remaining,
-            last_turn_round, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .bind(
-          createId(),
-          encounterId,
-          participant.characterId,
-          participant.characterId,
-          participant.initiativeRoll,
-          participant.initiativeModifier,
-          participant.initiativeTotal,
-          participant.tieBreaker,
-          participant.turnOrder,
-          participant.standardAvailable ? 1 : 0,
-          participant.moveAvailable ? 1 : 0,
-          participant.swiftAvailable ? 1 : 0,
-          participant.swiftDebtNextTurn ? 1 : 0,
-          participant.attacksOfOpportunityPerRound,
-          participant.attacksOfOpportunityRemaining,
-          participant.lastTurnRound,
-          timestamp,
-          timestamp,
-        ),
-    ),
-    deps.binding
-      .prepare(
-        `INSERT INTO game_events (
-          id, campaign_id, session_id, sequence, event_type, occurred_at,
-          actor_id, source_id, target_ids, payload, deltas, created_at
-        ) VALUES (
-          ?, ?, ?,
-          (SELECT COALESCE(MAX(sequence), 0) + 1 FROM game_events WHERE campaign_id = ?),
-          'encounter.started', ?, NULL, NULL, ?, ?, '[]', ?
-        )`,
-      )
-      .bind(
-        eventId,
-        context.campaignId,
-        context.sessionId,
-        context.campaignId,
-        timestamp,
-        JSON.stringify(state.participants.map((p) => p.characterId)),
-        JSON.stringify({
-          encounterId,
-          roundNumber: state.roundNumber,
-          currentActorId: state.participants[state.activeTurnIndex]?.characterId ?? null,
-          initiative: state.participants.map((participant) => ({
-            actorId: participant.characterId,
-            roll: participant.initiativeRoll,
-            modifier: participant.initiativeModifier,
-            total: participant.initiativeTotal,
-            turnOrder: participant.turnOrder,
-          })),
-        }),
-        timestamp,
-      ),
-  ];
+  const encounterInsert = deps.binding
+    .prepare(
+      `INSERT INTO game_encounters (
+        id, campaign_id, session_id, status, round_number, active_turn_index,
+        started_at, created_at, updated_at
+      ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      encounterId,
+      context.campaignId,
+      context.sessionId,
+      state.roundNumber,
+      state.activeTurnIndex,
+      timestamp,
+      timestamp,
+      timestamp,
+    );
 
-  try {
-    await deps.binding.batch(statements);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (/game_encounters_one_active_per_session_uidx|UNIQUE constraint failed: game_encounters\.session_id/i.test(message)) {
-      throw new Error("ENCOUNTER_ALREADY_ACTIVE");
+  const participantInserts = state.participants.map((participant) => {
+    const actor = byId.get(participant.characterId);
+    if (!actor) throw new Error("ENCOUNTER_PARTICIPANT_INVALID");
+    return deps.binding
+      .prepare(
+        `INSERT INTO game_encounter_participants (
+          id, encounter_id, actor_id, character_id, status,
+          initiative_roll, initiative_modifier, initiative_total, tie_breaker, turn_order,
+          standard_available, move_available, swift_available, swift_debt_next_turn,
+          attacks_of_opportunity_per_round, attacks_of_opportunity_remaining,
+          last_turn_round, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        createId(),
+        encounterId,
+        actor.id,
+        actor.characterId,
+        participant.initiativeRoll,
+        participant.initiativeModifier,
+        participant.initiativeTotal,
+        participant.tieBreaker,
+        participant.turnOrder,
+        participant.standardAvailable ? 1 : 0,
+        participant.moveAvailable ? 1 : 0,
+        participant.swiftAvailable ? 1 : 0,
+        participant.swiftDebtNextTurn ? 1 : 0,
+        participant.attacksOfOpportunityPerRound,
+        participant.attacksOfOpportunityRemaining,
+        participant.lastTurnRound,
+        timestamp,
+        timestamp,
+      );
+  });
+
+  const event = deps.binding
+    .prepare(
+      `INSERT INTO game_events (
+        id, campaign_id, session_id, sequence, event_type, occurred_at,
+        actor_id, source_id, target_ids, payload, deltas, created_at
+      ) VALUES (
+        ?, ?, ?,
+        (SELECT COALESCE(MAX(sequence), 0) + 1 FROM game_events WHERE campaign_id = ?),
+        'encounter.started', ?, NULL, NULL, ?, ?, '[]', ?
+      )`,
+    )
+    .bind(
+      eventId,
+      context.campaignId,
+      context.sessionId,
+      context.campaignId,
+      timestamp,
+      JSON.stringify(state.participants.map((participant) => participant.characterId)),
+      JSON.stringify({
+        encounterId,
+        roundNumber: state.roundNumber,
+        currentActorId: state.participants[state.activeTurnIndex]?.characterId ?? null,
+        initiative: state.participants.map((participant) => ({
+          actorId: participant.characterId,
+          roll: participant.initiativeRoll,
+          modifier: participant.initiativeModifier,
+          total: participant.initiativeTotal,
+          turnOrder: participant.turnOrder,
+        })),
+      }),
+      timestamp,
+    );
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await deps.binding.batch([encounterInsert, ...participantInserts, event]);
+      break;
+    } catch (error) {
+      if (attempt === 0 && shouldRetrySequence(error)) continue;
+      const message = error instanceof Error ? error.message : String(error);
+      if (
+        /game_encounters_one_active_per_session_uidx|UNIQUE constraint failed: game_encounters\.session_id/i.test(
+          message,
+        )
+      ) {
+        throw new Error("ENCOUNTER_ALREADY_ACTIVE");
+      }
+      throw error;
     }
-    throw error;
   }
 
   const current = currentEncounterParticipant(state);

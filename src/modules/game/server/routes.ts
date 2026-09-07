@@ -6,6 +6,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import {
   enqueueGameEventPostprocess,
+  publishCommittedGameEvent,
   type BackgroundJob,
 } from "@/infrastructure/cloudflare/backgroundJobs";
 import { createDatabase } from "@/infrastructure/database/client";
@@ -17,6 +18,7 @@ import {
 } from "@/infrastructure/database/schema";
 import { createAuth, type AuthEnv } from "@/modules/auth/server/auth";
 import { requireUser } from "@/modules/auth/server/requireAuth";
+import type { CampaignRoom } from "@/modules/game/live/CampaignRoom";
 import {
   ConflictError,
   ForbiddenError,
@@ -37,6 +39,7 @@ import {
 interface GameBindings extends AuthEnv {
   DB?: D1Database;
   BACKGROUND_QUEUE?: Queue<BackgroundJob>;
+  CAMPAIGN_ROOM?: DurableObjectNamespace<CampaignRoom>;
 }
 
 type GameEnv = { Bindings: GameBindings };
@@ -119,19 +122,31 @@ function scheduleEventPostprocess(
   c: { env: GameBindings; executionCtx: { waitUntil(promise: Promise<unknown>): void } },
   input: { campaignId: string; sessionId: string; eventId: string },
 ): void {
-  c.executionCtx.waitUntil(
-    enqueueGameEventPostprocess(c.env.BACKGROUND_QUEUE, input).catch((error) => {
-      // The authoritative D1 command already committed. Queue delivery is
-      // deliberately best-effort here so an optional async subsystem cannot
-      // turn a successful game action into a client-visible failure.
-      console.error("Unable to enqueue game-event postprocessing", {
-        campaignId: input.campaignId,
-        sessionId: input.sessionId,
-        eventId: input.eventId,
-        error,
-      });
-    }),
-  );
+  const publish = publishCommittedGameEvent(c.env, input).catch((error) => {
+    // Live delivery is deliberately best-effort. Clients can recover by
+    // reading the authoritative event stream from D1, and the Queue consumer
+    // will attempt the same broadcast again after delivery.
+    console.error("Unable to publish committed game event", {
+      campaignId: input.campaignId,
+      sessionId: input.sessionId,
+      eventId: input.eventId,
+      error,
+    });
+  });
+
+  const enqueue = enqueueGameEventPostprocess(c.env.BACKGROUND_QUEUE, input).catch((error) => {
+    // The authoritative D1 command already committed. Queue delivery is
+    // deliberately best-effort here so an optional async subsystem cannot
+    // turn a successful game action into a client-visible failure.
+    console.error("Unable to enqueue game-event postprocessing", {
+      campaignId: input.campaignId,
+      sessionId: input.sessionId,
+      eventId: input.eventId,
+      error,
+    });
+  });
+
+  c.executionCtx.waitUntil(Promise.all([publish, enqueue]).then(() => undefined));
 }
 
 async function campaignRole(input: {

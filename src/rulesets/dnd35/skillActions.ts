@@ -1,5 +1,5 @@
-import { resolveContest, type ContestResult } from "@/engine";
-import { resolveSkillCheck, type CheckResult } from "./skills";
+import { resolveContest, type CheckResult, type ContestResult } from "@/engine";
+import { resolveSkillCheck } from "./skills";
 
 export interface TakeCheckResult {
   naturalRoll: number;

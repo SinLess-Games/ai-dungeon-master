@@ -10,7 +10,7 @@ import {
   type BackgroundJob,
 } from "@/infrastructure/cloudflare/backgroundJobs";
 import { createDatabase } from "@/infrastructure/database/client";
-import { campaignMemberships, campaigns } from "@/infrastructure/database/schema";
+import { campaignMemberships, campaigns, gameActors } from "@/infrastructure/database/schema";
 import { createAuth, type AuthEnv } from "@/modules/auth/server/auth";
 import { requireUser } from "@/modules/auth/server/requireAuth";
 import type { CampaignRoom } from "@/modules/game/live/CampaignRoom";
@@ -21,6 +21,7 @@ import {
   ServiceUnavailableError,
   ValidationError,
 } from "@/server/middleware/errors";
+import { performActorAttack } from "./actorCombatService";
 import { createMonsterActor, getGameActor, listGameActors } from "./actorService";
 
 interface ActorBindings extends AuthEnv {
@@ -36,6 +37,14 @@ const createMonsterSchema = z.object({
   monsterId: z.string().trim().min(1),
   name: z.string().trim().min(1).max(120).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+const actorAttackSchema = z.object({
+  attackerId: z.string().trim().min(1),
+  targetId: z.string().trim().min(1),
+  kind: z.enum(["melee", "ranged"]),
+  weaponInventoryId: z.string().trim().min(1).optional(),
+  monsterAttackId: z.string().trim().min(1).optional(),
 });
 
 function requireDatabase(binding: D1Database | undefined): D1Database {
@@ -77,6 +86,25 @@ function requireGameMaster(role: CampaignRole) {
   }
 }
 
+async function requireActorControl(input: {
+  db: ReturnType<typeof createDatabase>;
+  campaignId: string;
+  actorId: string;
+  userId: string;
+  role: CampaignRole;
+}) {
+  if (input.role === "owner" || input.role === "gm") return;
+  if (input.role === "observer") throw new ForbiddenError("Observers cannot perform game actions.");
+  const actor = await input.db
+    .select({ kind: gameActors.kind, controllerUserId: gameActors.controllerUserId })
+    .from(gameActors)
+    .where(and(eq(gameActors.id, input.actorId), eq(gameActors.campaignId, input.campaignId)))
+    .get();
+  if (!actor || actor.kind !== "character" || actor.controllerUserId !== input.userId) {
+    throw new ForbiddenError("You can only act as a character assigned to you.");
+  }
+}
+
 function translate(error: unknown): never {
   if (error instanceof RangeError) throw new ValidationError(error.message);
   if (!(error instanceof Error)) throw error;
@@ -84,11 +112,17 @@ function translate(error: unknown): never {
     case "CAMPAIGN_GAME_NOT_ACTIVE":
       throw new ConflictError("This campaign does not currently have an active game session.");
     case "CAMPAIGN_RULESET_UNSUPPORTED":
-      throw new ValidationError("The active campaign ruleset does not support runtime monster actors.");
+      throw new ValidationError("The active campaign ruleset does not support runtime actors.");
     case "MONSTER_DEFINITION_NOT_FOUND":
       throw new NotFoundError("Monster definition not found.");
     case "MONSTER_RUNTIME_STATE_MISSING":
       throw new ConflictError("The monster actor is missing its authoritative runtime state.");
+    case "GAME_ATTACK_PARTICIPANT_NOT_FOUND":
+      throw new NotFoundError("The attacker or target does not have authoritative combat state.");
+    case "GAME_WEAPON_INVALID":
+      throw new ValidationError("The selected attack cannot be used for this action.");
+    case "GAME_STATE_CONFLICT":
+      throw new ConflictError("Game state changed while the action was resolving. Reload and try again.");
     default:
       throw error;
   }
@@ -166,6 +200,46 @@ export const actorRoutes = new Hono<ActorEnv>()
         );
         schedule(c, { campaignId, sessionId: result.sessionId, eventId: result.eventId });
         return c.json(result, 201);
+      } catch (error) {
+        translate(error);
+      }
+    },
+  )
+  .post(
+    "/api/campaigns/:campaignId/game/actors/attack",
+    zValidator("json", actorAttackSchema),
+    async (c) => {
+      const session = await requireUser(createAuth(c.env), c.req.raw.headers);
+      const binding = requireDatabase(c.env.DB);
+      const db = createDatabase(binding);
+      const campaignId = c.req.param("campaignId");
+      const input = c.req.valid("json");
+      const role = await campaignRole({ db, campaignId, userId: session.user.id });
+      await requireActorControl({
+        db,
+        campaignId,
+        actorId: input.attackerId,
+        userId: session.user.id,
+        role,
+      });
+      try {
+        const result = await performActorAttack(
+          { db, binding },
+          {
+            campaignId,
+            attackerId: input.attackerId,
+            targetId: input.targetId,
+            kind: input.kind,
+            ...(input.weaponInventoryId === undefined
+              ? {}
+              : { weaponInventoryId: input.weaponInventoryId }),
+            ...(input.monsterAttackId === undefined
+              ? {}
+              : { monsterAttackId: input.monsterAttackId }),
+          },
+        );
+        schedule(c, { campaignId, sessionId: result.sessionId, eventId: result.eventId });
+        return c.json(result);
       } catch (error) {
         translate(error);
       }

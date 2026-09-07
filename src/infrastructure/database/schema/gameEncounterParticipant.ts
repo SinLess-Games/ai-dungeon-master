@@ -1,6 +1,5 @@
 import { sql } from "drizzle-orm";
 import { check, index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
-import { characters } from "./character";
 import { gameActors } from "./gameActor";
 import { gameEncounters } from "./gameEncounter";
 
@@ -9,8 +8,12 @@ export type GameEncounterParticipantStatus = (typeof gameEncounterParticipantSta
 
 /**
  * Initiative order plus persistent per-turn action economy for any runtime actor.
- * `characterId` is retained as an optional compatibility/read convenience for
- * actors backed by a pre-world character; actorId is the canonical runtime id.
+ *
+ * `actorId` is canonical for actor-aware runtime commands. `characterId` is a
+ * required legacy identity key retained so the existing generic turn state and
+ * older character-only callers can continue using a non-null identifier during
+ * the migration. For new runtime actors it is set to the actor id; it is no
+ * longer a foreign key to `characters`.
  */
 export const gameEncounterParticipants = sqliteTable(
   "game_encounter_participants",
@@ -21,10 +24,8 @@ export const gameEncounterParticipants = sqliteTable(
     encounterId: text("encounter_id")
       .notNull()
       .references(() => gameEncounters.id, { onDelete: "cascade" }),
-    actorId: text("actor_id")
-      .notNull()
-      .references(() => gameActors.id, { onDelete: "restrict" }),
-    characterId: text("character_id").references(() => characters.id, { onDelete: "restrict" }),
+    actorId: text("actor_id").references(() => gameActors.id, { onDelete: "restrict" }),
+    characterId: text("character_id").notNull(),
     status: text("status").$type<GameEncounterParticipantStatus>().notNull().default("active"),
     initiativeRoll: integer("initiative_roll").notNull(),
     initiativeModifier: integer("initiative_modifier").notNull(),
@@ -47,12 +48,15 @@ export const gameEncounterParticipants = sqliteTable(
   },
   (table) => [
     uniqueIndex("game_encounter_participants_actor_uidx").on(table.encounterId, table.actorId),
+    uniqueIndex("game_encounter_participants_identity_uidx").on(
+      table.encounterId,
+      table.characterId,
+    ),
     uniqueIndex("game_encounter_participants_turn_order_uidx").on(
       table.encounterId,
       table.turnOrder,
     ),
     index("game_encounter_participants_encounter_status_idx").on(table.encounterId, table.status),
-    index("game_encounter_participants_character_idx").on(table.characterId),
     check(
       "game_encounter_participants_status_valid",
       sql`${table.status} IN ('active', 'defeated', 'removed')`,

@@ -137,6 +137,38 @@ DISCORD_CLIENT_SECRET=
 
 
 # -----------------------------------------------------------------------------
+# Weekly AI devblog writer - server-only
+# -----------------------------------------------------------------------------
+#
+# The production Worker runs the writer weekly from its Cloudflare Cron Trigger.
+# The Devblog Studio also exposes an admin-only "Generate now" action.
+#
+# AI_API_KEY and GITHUB_TOKEN are secrets. Never prefix them with VITE_.
+#
+
+# OpenAI-compatible provider. AI_BASE_URL defaults to https://api.openai.com/v1.
+AI_API_KEY=
+AI_BASE_URL=
+
+# Defaults to gpt-5-mini when blank. Set this when using a different provider/model.
+AI_DEVBLOG_MODEL=
+
+# Private repository source material. In production wrangler.jsonc already supplies
+# the repository name, but it can be overridden per environment.
+GITHUB_REPOSITORY=SinLess-Games/ai-dungeon-master
+GITHUB_TOKEN=
+
+# Generation defaults to enabled and draft-only. Set auto publish to true only
+# after you trust the generated articles enough to publish without review.
+DEVBLOG_AI_ENABLED=true
+DEVBLOG_AI_AUTO_PUBLISH=false
+
+# Optional. If blank, scheduled generation uses the oldest administrator account.
+# If set, it must match an existing administrator email.
+DEVBLOG_AI_AUTHOR_EMAIL=
+
+
+# -----------------------------------------------------------------------------
 # Seed administrator - server/tooling only
 # -----------------------------------------------------------------------------
 #

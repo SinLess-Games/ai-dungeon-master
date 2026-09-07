@@ -26,9 +26,13 @@ function spendCastingAction(
   state: Dnd35ActionEconomy,
   actionKind: Dnd35ActionKind,
   immediateOutsideOwnTurn: boolean,
+  actorFlatFooted: boolean,
 ): EngineResult<Dnd35ActionEconomy> {
   if (actionKind === "immediate" && immediateOutsideOwnTurn) {
-    return spendImmediateAction(state, false);
+    return spendImmediateAction(state, false, { flatFooted: actorFlatFooted });
+  }
+  if (actionKind === "immediate" && actorFlatFooted) {
+    return spendImmediateAction(state, true, { flatFooted: true });
   }
   return spendDnd35Action(state, actionKind);
 }
@@ -42,11 +46,13 @@ export function commitSpellCast(input: {
   actionKind: Dnd35ActionKind;
   resource: SpellCastingResource;
   immediateOutsideOwnTurn?: boolean;
+  actorFlatFooted?: boolean;
 }): EngineResult<SpellCastCommit> {
   const action = spendCastingAction(
     input.actionEconomy,
     input.actionKind,
     input.immediateOutsideOwnTurn ?? false,
+    input.actorFlatFooted ?? false,
   );
   if (!action.ok) return action;
 

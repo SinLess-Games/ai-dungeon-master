@@ -341,7 +341,9 @@ export class D1GameEventStore {
       event: input.event,
       characterId: input.condition.characterId,
       durationKind: input.condition.durationKind,
-      remainingRounds: input.condition.remainingRounds,
+      ...(input.condition.remainingRounds === undefined
+        ? {}
+        : { remainingRounds: input.condition.remainingRounds }),
     });
     const encounterId = input.condition.encounterId ?? inferred?.encounterId ?? null;
     const expiresEncounterRound =

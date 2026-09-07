@@ -13,6 +13,8 @@ import { feedbackRoutes } from "@/modules/feedback/server/routes";
 import { adminRoutes } from "@/modules/admin/server/routes";
 import { authRoutes, authHandler } from "@/modules/auth/server/routes";
 import type { AuthEnv } from "@/modules/auth/server/auth";
+import { campaignRoutes } from "@/modules/campaigns/server/routes";
+import { characterRoutes } from "@/modules/characters/server/routes";
 
 const isolateStartedAt = Date.now();
 
@@ -239,6 +241,8 @@ const routes = app
   .route("/", devblogRoutes)
   .route("/", devblogAdminRoutes)
   .route("/", devblogAIRoutes)
+  .route("/", campaignRoutes)
+  .route("/", characterRoutes)
   .get("/api", (c) => {
     return c.json({
       name: "The Endless Codex API",
@@ -247,6 +251,7 @@ const routes = app
       endpoints: {
         health: "/api/health",
         live: "/api/health/live",
+        campaigns: "/api/campaigns",
       },
     });
   })

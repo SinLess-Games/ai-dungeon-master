@@ -51,10 +51,30 @@ export function monsterArmorClass(input: {
     dexterityModifier: monsterInitiativeModifier(input.dexterity),
     size: input.size,
     modifiers: [
-      { id: "monster:natural", kind: "natural-armor", value: input.naturalArmor },
-      { id: "monster:armor", kind: "armor", value: input.armorBonus },
-      { id: "monster:shield", kind: "shield", value: input.shieldBonus },
-      { id: "monster:deflection", kind: "deflection", value: input.deflectionBonus },
+      {
+        id: "monster:natural",
+        source: "monster natural armor",
+        kind: "natural-armor",
+        value: input.naturalArmor,
+      },
+      {
+        id: "monster:armor",
+        source: "monster armor",
+        kind: "armor",
+        value: input.armorBonus,
+      },
+      {
+        id: "monster:shield",
+        source: "monster shield",
+        kind: "shield",
+        value: input.shieldBonus,
+      },
+      {
+        id: "monster:deflection",
+        source: "monster deflection",
+        kind: "deflection",
+        value: input.deflectionBonus,
+      },
     ],
   });
 }

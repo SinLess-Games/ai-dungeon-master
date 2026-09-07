@@ -128,7 +128,7 @@ describe("D&D 3.5 progression", () => {
 });
 
 describe("D&D 3.5 modifier stacking", () => {
-  it("overlaps same-type bonuses while stacking dodge, circumstance, untyped, and penalties", () => {
+  it("overlaps same-type bonuses and penalties while stacking dodge and untyped modifiers", () => {
     const result = resolveDnd35Modifiers(
       [
         { id: "armor-1", source: "chain", kind: "armor", value: 4 },
@@ -144,10 +144,12 @@ describe("D&D 3.5 modifier stacking", () => {
       10,
     );
 
-    expect(result.modifierTotal).toBe(10);
-    expect(result.total).toBe(20);
+    expect(result.modifierTotal).toBe(11);
+    expect(result.total).toBe(21);
     expect(result.modifiers.find((entry) => entry.id === "armor-1")?.selected).toBe(false);
     expect(result.modifiers.find((entry) => entry.id === "armor-2")?.selected).toBe(true);
+    expect(result.modifiers.find((entry) => entry.id === "penalty-a")?.selected).toBe(false);
+    expect(result.modifiers.find((entry) => entry.id === "penalty-b")?.selected).toBe(true);
   });
 
   it("allows rules text to override stacking behavior", () => {

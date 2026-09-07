@@ -27,6 +27,31 @@ export interface HealthMutation {
   };
 }
 
+export interface EncounterActionEconomyState {
+  standardAvailable: boolean;
+  moveAvailable: boolean;
+  swiftAvailable: boolean;
+  swiftDebtNextTurn: boolean;
+  attacksOfOpportunityPerRound: number;
+  attacksOfOpportunityRemaining: number;
+  lastTurnRound: number;
+}
+
+/**
+ * Optimistic mutation for one combatant's persistent action economy.
+ * The encounter round/index are included so stale commands cannot spend an
+ * action after the turn has already advanced.
+ */
+export interface EncounterActionMutation {
+  encounterId: string;
+  characterId: string;
+  roundNumber: number;
+  activeTurnIndex: number;
+  turnOrder: number;
+  expected: EncounterActionEconomyState;
+  next: EncounterActionEconomyState;
+}
+
 function eventStatement(
   db: D1Database,
   event: GameEventWrite,
@@ -72,6 +97,122 @@ function shouldRetry(error: unknown): boolean {
   );
 }
 
+function booleanInt(value: boolean): number {
+  return value ? 1 : 0;
+}
+
+function healthGuard(mutation: HealthMutation): { sql: string; bindings: readonly unknown[] } {
+  return {
+    sql: `EXISTS (
+      SELECT 1 FROM dnd35_characters
+      WHERE character_id = ?
+        AND current_hit_points = ?
+        AND temporary_hit_points = ?
+        AND nonlethal_damage = ?
+    )`,
+    bindings: [
+      mutation.characterId,
+      mutation.expected.currentHitPoints,
+      mutation.expected.temporaryHitPoints,
+      mutation.expected.nonlethalDamage,
+    ],
+  };
+}
+
+function encounterActionGuard(mutation: EncounterActionMutation): {
+  sql: string;
+  bindings: readonly unknown[];
+} {
+  return {
+    sql: `EXISTS (
+      SELECT 1
+      FROM game_encounters encounter
+      JOIN game_encounter_participants participant
+        ON participant.encounter_id = encounter.id
+      WHERE encounter.id = ?
+        AND encounter.status = 'active'
+        AND encounter.round_number = ?
+        AND encounter.active_turn_index = ?
+        AND participant.character_id = ?
+        AND participant.turn_order = ?
+        AND participant.turn_order = encounter.active_turn_index
+        AND participant.status = 'active'
+        AND participant.standard_available = ?
+        AND participant.move_available = ?
+        AND participant.swift_available = ?
+        AND participant.swift_debt_next_turn = ?
+        AND participant.attacks_of_opportunity_per_round = ?
+        AND participant.attacks_of_opportunity_remaining = ?
+        AND participant.last_turn_round = ?
+    )`,
+    bindings: [
+      mutation.encounterId,
+      mutation.roundNumber,
+      mutation.activeTurnIndex,
+      mutation.characterId,
+      mutation.turnOrder,
+      booleanInt(mutation.expected.standardAvailable),
+      booleanInt(mutation.expected.moveAvailable),
+      booleanInt(mutation.expected.swiftAvailable),
+      booleanInt(mutation.expected.swiftDebtNextTurn),
+      mutation.expected.attacksOfOpportunityPerRound,
+      mutation.expected.attacksOfOpportunityRemaining,
+      mutation.expected.lastTurnRound,
+    ],
+  };
+}
+
+function healthUpdate(db: D1Database, event: GameEventWrite, mutation: HealthMutation) {
+  return db
+    .prepare(
+      `UPDATE dnd35_characters
+       SET current_hit_points = ?, temporary_hit_points = ?, nonlethal_damage = ?, updated_at = ?
+       WHERE character_id = ?
+         AND current_hit_points = ?
+         AND temporary_hit_points = ?
+         AND nonlethal_damage = ?`,
+    )
+    .bind(
+      mutation.next.currentHitPoints,
+      mutation.next.temporaryHitPoints,
+      mutation.next.nonlethalDamage,
+      Math.floor(event.occurredAt.getTime() / 1000),
+      mutation.characterId,
+      mutation.expected.currentHitPoints,
+      mutation.expected.temporaryHitPoints,
+      mutation.expected.nonlethalDamage,
+    );
+}
+
+function encounterActionUpdate(
+  db: D1Database,
+  event: GameEventWrite,
+  mutation: EncounterActionMutation,
+) {
+  const guard = encounterActionGuard(mutation);
+  return db
+    .prepare(
+      `UPDATE game_encounter_participants
+       SET standard_available = ?, move_available = ?, swift_available = ?,
+           swift_debt_next_turn = ?, attacks_of_opportunity_per_round = ?,
+           attacks_of_opportunity_remaining = ?, last_turn_round = ?, updated_at = ?
+       WHERE encounter_id = ? AND character_id = ? AND ${guard.sql}`,
+    )
+    .bind(
+      booleanInt(mutation.next.standardAvailable),
+      booleanInt(mutation.next.moveAvailable),
+      booleanInt(mutation.next.swiftAvailable),
+      booleanInt(mutation.next.swiftDebtNextTurn),
+      mutation.next.attacksOfOpportunityPerRound,
+      mutation.next.attacksOfOpportunityRemaining,
+      mutation.next.lastTurnRound,
+      Math.floor(event.occurredAt.getTime() / 1000),
+      mutation.encounterId,
+      mutation.characterId,
+      ...guard.bindings,
+    );
+}
+
 export class D1GameEventStore {
   constructor(private readonly binding: D1Database) {}
 
@@ -97,45 +238,55 @@ export class D1GameEventStore {
    * state nor history.
    */
   async applyHealth(event: GameEventWrite, mutation: HealthMutation): Promise<boolean> {
-    const guard = `EXISTS (
-      SELECT 1 FROM dnd35_characters
-      WHERE character_id = ?
-        AND current_hit_points = ?
-        AND temporary_hit_points = ?
-        AND nonlethal_damage = ?
-    )`;
-    const guardBindings = [
-      mutation.characterId,
-      mutation.expected.currentHitPoints,
-      mutation.expected.temporaryHitPoints,
-      mutation.expected.nonlethalDamage,
-    ] as const;
+    const guard = healthGuard(mutation);
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        const guardedEvent = eventStatement(this.binding, event, guard, guardBindings);
-        const update = this.binding
-          .prepare(
-            `UPDATE dnd35_characters
-             SET current_hit_points = ?, temporary_hit_points = ?, nonlethal_damage = ?, updated_at = ?
-             WHERE character_id = ?
-               AND current_hit_points = ?
-               AND temporary_hit_points = ?
-               AND nonlethal_damage = ?`,
-          )
-          .bind(
-            mutation.next.currentHitPoints,
-            mutation.next.temporaryHitPoints,
-            mutation.next.nonlethalDamage,
-            Math.floor(event.occurredAt.getTime() / 1000),
-            mutation.characterId,
-            mutation.expected.currentHitPoints,
-            mutation.expected.temporaryHitPoints,
-            mutation.expected.nonlethalDamage,
-          );
-
+        const guardedEvent = eventStatement(this.binding, event, guard.sql, guard.bindings);
+        const update = healthUpdate(this.binding, event, mutation);
         const results = await this.binding.batch([guardedEvent, update]);
         return changes(results[0]) === 1 && changes(results[1]) === 1;
+      } catch (error) {
+        if (attempt === 0 && shouldRetry(error)) continue;
+        throw error;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Commit a turn-aware command as one D1 transaction.
+   *
+   * The immutable event, optional health mutation, and action-economy spend are
+   * all guarded by the exact encounter/turn snapshot used by the rules engine.
+   * A race with another action or turn advancement therefore commits nothing.
+   */
+  async commitEncounterAction(input: {
+    event: GameEventWrite;
+    action: EncounterActionMutation;
+    health?: HealthMutation;
+  }): Promise<boolean> {
+    const actionGuard = encounterActionGuard(input.action);
+    const health = input.health === undefined ? null : healthGuard(input.health);
+    const combinedGuard = health === null
+      ? actionGuard.sql
+      : `(${actionGuard.sql}) AND (${health.sql})`;
+    const combinedBindings = health === null
+      ? actionGuard.bindings
+      : [...actionGuard.bindings, ...health.bindings];
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const statements: D1PreparedStatement[] = [
+          eventStatement(this.binding, input.event, combinedGuard, combinedBindings),
+        ];
+        if (input.health !== undefined) {
+          statements.push(healthUpdate(this.binding, input.event, input.health));
+        }
+        statements.push(encounterActionUpdate(this.binding, input.event, input.action));
+
+        const results = await this.binding.batch(statements);
+        return results.every((result) => changes(result) === 1);
       } catch (error) {
         if (attempt === 0 && shouldRetry(error)) continue;
         throw error;

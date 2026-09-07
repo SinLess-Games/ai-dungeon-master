@@ -91,3 +91,12 @@ export const moderationQuery = (
         ),
       ),
   });
+export const aiWriterStatusQuery = (userId: string) =>
+  queryOptions({
+    queryKey: ["admin", userId, "devblog", "ai-writer"],
+    meta: { requiresAuth: true },
+    gcTime: 0,
+    retry: false,
+    queryFn: async ({ signal }) =>
+      checked(await api.api.admin.devblog.ai.status.$get({}, { init: { signal } })),
+  });

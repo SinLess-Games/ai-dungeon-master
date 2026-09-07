@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { createRoundConditionAnchor } from "../domain/conditionTiming";
+
 export interface GameEventWrite {
   id: string;
   campaignId: string;
@@ -37,11 +39,6 @@ export interface EncounterActionEconomyState {
   lastTurnRound: number;
 }
 
-/**
- * Optimistic mutation for one combatant's persistent action economy.
- * The encounter round/index are included so stale commands cannot spend an
- * action after the turn has already advanced.
- */
 export interface EncounterActionMutation {
   encounterId: string;
   characterId: string;
@@ -213,10 +210,58 @@ function encounterActionUpdate(
     );
 }
 
+async function inferConditionAnchor(
+  db: D1Database,
+  input: {
+    event: GameEventWrite;
+    characterId: string;
+    durationKind: "rounds" | "until_time" | "permanent" | "concentration" | "special";
+    remainingRounds?: number | null;
+  },
+): Promise<{
+  encounterId: string;
+  expiresEncounterRound: number;
+  expiresTurnOrder: number;
+} | null> {
+  if (input.durationKind !== "rounds") return null;
+  const durationRounds = input.remainingRounds;
+  if (!Number.isSafeInteger(durationRounds) || (durationRounds ?? 0) < 1) {
+    throw new RangeError("Round duration requires a positive integer remainingRounds value.");
+  }
+
+  const row = await db
+    .prepare(
+      `SELECT encounter.id AS encounter_id,
+              encounter.round_number AS round_number,
+              encounter.active_turn_index AS active_turn_index
+       FROM game_encounters encounter
+       JOIN game_encounter_participants participant
+         ON participant.encounter_id = encounter.id
+       WHERE encounter.campaign_id = ?
+         AND encounter.session_id = ?
+         AND encounter.status = 'active'
+         AND participant.character_id = ?
+         AND participant.status = 'active'
+       LIMIT 1`,
+    )
+    .bind(input.event.campaignId, input.event.sessionId, input.characterId)
+    .first<{ encounter_id: string; round_number: number; active_turn_index: number }>();
+  if (!row) return null;
+
+  const anchor = createRoundConditionAnchor({
+    currentRound: row.round_number,
+    currentTurnOrder: row.active_turn_index,
+    durationRounds: durationRounds as number,
+  });
+  return {
+    encounterId: row.encounter_id,
+    ...anchor,
+  };
+}
+
 export class D1GameEventStore {
   constructor(private readonly binding: D1Database) {}
 
-  /** Append an immutable event, retrying once if two requests race for the same sequence. */
   async append(event: GameEventWrite): Promise<void> {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
@@ -229,17 +274,8 @@ export class D1GameEventStore {
     }
   }
 
-  /**
-   * Atomically write a health event and its HP mutation.
-   *
-   * The event INSERT is guarded by the exact state used to resolve the action.
-   * D1 batch execution is transactional, so the guard and update cannot be
-   * interleaved by another action. A stale command therefore writes neither
-   * state nor history.
-   */
   async applyHealth(event: GameEventWrite, mutation: HealthMutation): Promise<boolean> {
     const guard = healthGuard(mutation);
-
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         const guardedEvent = eventStatement(this.binding, event, guard.sql, guard.bindings);
@@ -254,13 +290,6 @@ export class D1GameEventStore {
     return false;
   }
 
-  /**
-   * Commit a turn-aware command as one D1 transaction.
-   *
-   * The immutable event, optional health mutation, and action-economy spend are
-   * all guarded by the exact encounter/turn snapshot used by the rules engine.
-   * A race with another action or turn advancement therefore commits nothing.
-   */
   async commitEncounterAction(input: {
     event: GameEventWrite;
     action: EncounterActionMutation;
@@ -268,23 +297,18 @@ export class D1GameEventStore {
   }): Promise<boolean> {
     const actionGuard = encounterActionGuard(input.action);
     const health = input.health === undefined ? null : healthGuard(input.health);
-    const combinedGuard = health === null
-      ? actionGuard.sql
-      : `(${actionGuard.sql}) AND (${health.sql})`;
-    const combinedBindings = health === null
-      ? actionGuard.bindings
-      : [...actionGuard.bindings, ...health.bindings];
+    const combinedGuard =
+      health === null ? actionGuard.sql : `(${actionGuard.sql}) AND (${health.sql})`;
+    const combinedBindings =
+      health === null ? actionGuard.bindings : [...actionGuard.bindings, ...health.bindings];
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         const statements: D1PreparedStatement[] = [
           eventStatement(this.binding, input.event, combinedGuard, combinedBindings),
         ];
-        if (input.health !== undefined) {
-          statements.push(healthUpdate(this.binding, input.event, input.health));
-        }
+        if (input.health !== undefined) statements.push(healthUpdate(this.binding, input.event, input.health));
         statements.push(encounterActionUpdate(this.binding, input.event, input.action));
-
         const results = await this.binding.batch(statements);
         return results.every((result) => changes(result) === 1);
       } catch (error) {
@@ -295,7 +319,6 @@ export class D1GameEventStore {
     return false;
   }
 
-  /** Atomically append an event and apply a persistent condition instance. */
   async applyCondition(input: {
     event: GameEventWrite;
     condition: {
@@ -303,6 +326,9 @@ export class D1GameEventStore {
       characterId: string;
       conditionId: string;
       sourceCharacterId?: string | null;
+      encounterId?: string | null;
+      expiresEncounterRound?: number | null;
+      expiresTurnOrder?: number | null;
       sourceDescription?: string | null;
       durationKind: "rounds" | "until_time" | "permanent" | "concentration" | "special";
       remainingRounds?: number | null;
@@ -311,21 +337,47 @@ export class D1GameEventStore {
     };
   }): Promise<void> {
     const timestamp = Math.floor(input.event.occurredAt.getTime() / 1000);
+    const inferred = await inferConditionAnchor(this.binding, {
+      event: input.event,
+      characterId: input.condition.characterId,
+      durationKind: input.condition.durationKind,
+      ...(input.condition.remainingRounds === undefined
+        ? {}
+        : { remainingRounds: input.condition.remainingRounds }),
+    });
+    const encounterId = input.condition.encounterId ?? inferred?.encounterId ?? null;
+    const expiresEncounterRound =
+      input.condition.expiresEncounterRound ?? inferred?.expiresEncounterRound ?? null;
+    const expiresTurnOrder = input.condition.expiresTurnOrder ?? inferred?.expiresTurnOrder ?? null;
+    const event: GameEventWrite = {
+      ...input.event,
+      payload: {
+        ...(input.event.payload ?? {}),
+        encounterId,
+        expiresEncounterRound,
+        expiresTurnOrder,
+      },
+    };
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
         const conditionInsert = this.binding
           .prepare(
             `INSERT INTO dnd35_character_conditions (
-              id, character_id, condition_id, source_character_id, source_description,
-              duration_kind, remaining_rounds, expires_at, state, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              id, character_id, condition_id, source_character_id,
+              encounter_id, expires_encounter_round, expires_turn_order,
+              source_description, duration_kind, remaining_rounds, expires_at,
+              state, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
           .bind(
             input.condition.id,
             input.condition.characterId,
             input.condition.conditionId,
             input.condition.sourceCharacterId ?? null,
+            encounterId,
+            expiresEncounterRound,
+            expiresTurnOrder,
             input.condition.sourceDescription ?? null,
             input.condition.durationKind,
             input.condition.remainingRounds ?? null,
@@ -336,7 +388,7 @@ export class D1GameEventStore {
             timestamp,
             timestamp,
           );
-        await this.binding.batch([conditionInsert, eventStatement(this.binding, input.event)]);
+        await this.binding.batch([conditionInsert, eventStatement(this.binding, event)]);
         return;
       } catch (error) {
         if (attempt === 0 && shouldRetry(error)) continue;

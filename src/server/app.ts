@@ -8,6 +8,7 @@ import { errorHandler, notFoundHandler } from "@/server/middleware/errors";
 
 import { devblogRoutes } from "@/modules/devblog/server/routes";
 import { devblogAdminRoutes } from "@/modules/devblog/server/adminRoutes";
+import { devblogAIRoutes } from "@/modules/devblog/server/aiRoutes";
 import { feedbackRoutes } from "@/modules/feedback/server/routes";
 import { adminRoutes } from "@/modules/admin/server/routes";
 import { authRoutes, authHandler } from "@/modules/auth/server/routes";
@@ -18,6 +19,14 @@ const isolateStartedAt = Date.now();
 interface Bindings extends AuthEnv {
   DB?: D1Database;
   R2_BUCKET?: R2Bucket;
+  AI_API_KEY?: string;
+  AI_BASE_URL?: string;
+  AI_DEVBLOG_MODEL?: string;
+  GITHUB_TOKEN?: string;
+  GITHUB_REPOSITORY?: string;
+  DEVBLOG_AI_ENABLED?: string;
+  DEVBLOG_AI_AUTO_PUBLISH?: string;
+  DEVBLOG_AI_AUTHOR_EMAIL?: string;
 
   /**
    * Optional deployment metadata.
@@ -229,6 +238,7 @@ const routes = app
   .route("/", feedbackRoutes)
   .route("/", devblogRoutes)
   .route("/", devblogAdminRoutes)
+  .route("/", devblogAIRoutes)
   .get("/api", (c) => {
     return c.json({
       name: "The Endless Codex API",

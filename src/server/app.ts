@@ -19,8 +19,11 @@ import type { CampaignRoom } from "@/modules/game/live/CampaignRoom";
 import { actorRoutes } from "@/modules/game/server/actorRoutes";
 import { castingRoutes } from "@/modules/game/server/castingRoutes";
 import { encounterRoutes } from "@/modules/game/server/encounterRoutes";
+import { gameCommandRoutes } from "@/modules/game/server/gameCommandRoutes";
+import { gameReadModelRoutes } from "@/modules/game/server/gameReadModelRoutes";
 import { healthRoutes } from "@/modules/game/server/healthRoutes";
 import { gameLiveRoutes } from "@/modules/game/server/liveRoutes";
+import { resolvedCastingRoutes } from "@/modules/game/server/resolvedCastingRoutes";
 import { gameRoutes } from "@/modules/game/server/routes";
 
 const isolateStartedAt = Date.now();
@@ -196,7 +199,10 @@ const routes = app
   .route("/", actorRoutes)
   .route("/", encounterRoutes)
   .route("/", gameRoutes)
+  .route("/", gameCommandRoutes)
+  .route("/", gameReadModelRoutes)
   .route("/", castingRoutes)
+  .route("/", resolvedCastingRoutes)
   .route("/", healthRoutes)
   .route("/", gameLiveRoutes)
   .get("/api", (c) => {
@@ -209,8 +215,11 @@ const routes = app
         live: "/api/health/live",
         campaigns: "/api/campaigns",
         game: "/api/campaigns/:campaignId/game",
+        gameState: "/api/campaigns/:campaignId/game/state",
+        gameCommands: "/api/campaigns/:campaignId/game/commands",
         actors: "/api/campaigns/:campaignId/game/actors",
         casting: "/api/campaigns/:campaignId/game/casting/:characterId",
+        resolvedCasting: "/api/campaigns/:campaignId/game/resolved-casting",
         characterHealth: "/api/campaigns/:campaignId/game/health/:characterId",
         campaignLive: "/api/campaigns/:campaignId/live",
       },

@@ -7,7 +7,6 @@ export interface ChargeValidation {
   maximumDistanceFeet: number;
   attackModifier: number;
   armorClassModifier: number;
-  restrictedToStandardAction: boolean;
 }
 
 function assertNonNegativeFinite(value: number, name: string): void {
@@ -74,7 +73,6 @@ export function validateCharge(input: {
     maximumDistanceFeet,
     attackModifier: 2,
     armorClassModifier: -2,
-    restrictedToStandardAction,
   });
 }
 

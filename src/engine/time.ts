@@ -17,7 +17,9 @@ export interface DurationAdvance {
 }
 
 function assertNonNegativeInteger(value: number, name: string): void {
-  if (!Number.isSafeInteger(value) || value < 0) throw new RangeError(`${name} must be a non-negative safe integer.`);
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new RangeError(`${name} must be a non-negative safe integer.`);
+  }
 }
 
 export function validateDuration(duration: Duration): Duration {
@@ -37,16 +39,33 @@ export function advanceDuration(duration: Duration, step: TimeStep): DurationAdv
   }
 
   if (duration.kind === "elapsed") {
-    if (step.kind !== "elapsed") return { before: duration, after: duration, expired: false, changed: false };
+    if (step.kind !== "elapsed") {
+      return { before: duration, after: duration, expired: false, changed: false };
+    }
     assertNonNegativeInteger(step.milliseconds, "Elapsed milliseconds");
-    const after: Duration = { kind: "elapsed", remainingMs: Math.max(0, duration.remainingMs - step.milliseconds) };
-    return { before: duration, after, expired: after.remainingMs === 0, changed: after.remainingMs !== duration.remainingMs };
+    const remainingMs = Math.max(0, duration.remainingMs - step.milliseconds);
+    const after: Duration = { kind: "elapsed", remainingMs };
+    return {
+      before: duration,
+      after,
+      expired: remainingMs === 0,
+      changed: remainingMs !== duration.remainingMs,
+    };
   }
 
   const expectedStep = duration.kind === "turns" ? "turn" : "round";
-  if (step.kind !== expectedStep) return { before: duration, after: duration, expired: false, changed: false };
+  if (step.kind !== expectedStep) {
+    return { before: duration, after: duration, expired: false, changed: false };
+  }
+
   const amount = step.amount ?? 1;
   assertNonNegativeInteger(amount, "Time step amount");
-  const after: Duration = { kind: duration.kind, remaining: Math.max(0, duration.remaining - amount) };
-  return { before: duration, after, expired: after.remaining === 0, changed: after.remaining !== duration.remaining };
+  const remaining = Math.max(0, duration.remaining - amount);
+  const after: Duration = { kind: duration.kind, remaining };
+  return {
+    before: duration,
+    after,
+    expired: remaining === 0,
+    changed: remaining !== duration.remaining,
+  };
 }

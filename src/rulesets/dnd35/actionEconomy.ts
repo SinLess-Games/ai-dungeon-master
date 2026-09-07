@@ -5,6 +5,7 @@ export type Dnd35ActionKind =
   | "move"
   | "full_round"
   | "swift"
+  | "immediate"
   | "free"
   | "attack_of_opportunity";
 
@@ -12,6 +13,8 @@ export interface Dnd35ActionEconomy {
   standardAvailable: boolean;
   moveAvailable: boolean;
   swiftAvailable: boolean;
+  /** An off-turn immediate action consumes the swift action on the next turn. */
+  swiftDebtNextTurn: boolean;
   attacksOfOpportunityPerRound: number;
   attacksOfOpportunityRemaining: number;
 }
@@ -30,6 +33,7 @@ export function createDnd35ActionEconomy(
     standardAvailable: true,
     moveAvailable: true,
     swiftAvailable: true,
+    swiftDebtNextTurn: false,
     attacksOfOpportunityPerRound,
     attacksOfOpportunityRemaining: attacksOfOpportunityPerRound,
   };
@@ -37,11 +41,13 @@ export function createDnd35ActionEconomy(
 
 /** Reset per-turn actions while preserving the current round's AoO usage. */
 export function beginDnd35Turn(state: Dnd35ActionEconomy): Dnd35ActionEconomy {
+  const swiftAvailable = !state.swiftDebtNextTurn;
   return {
     ...state,
     standardAvailable: true,
     moveAvailable: true,
-    swiftAvailable: true,
+    swiftAvailable,
+    swiftDebtNextTurn: false,
   };
 }
 
@@ -51,6 +57,34 @@ export function beginDnd35Round(state: Dnd35ActionEconomy): Dnd35ActionEconomy {
     ...state,
     attacksOfOpportunityRemaining: state.attacksOfOpportunityPerRound,
   };
+}
+
+/**
+ * Spend an immediate action. During the actor's own turn it consumes the same
+ * swift-action allowance; outside the turn it creates a swift-action debt for
+ * the actor's next turn.
+ */
+export function spendImmediateAction(
+  state: Dnd35ActionEconomy,
+  duringOwnTurn: boolean,
+): EngineResult<Dnd35ActionEconomy> {
+  if (duringOwnTurn) {
+    if (!state.swiftAvailable) {
+      return engineFailure(
+        "DND35_IMMEDIATE_ACTION_SPENT",
+        "No swift/immediate action remains this turn.",
+      );
+    }
+    return engineSuccess({ ...state, swiftAvailable: false });
+  }
+
+  if (state.swiftDebtNextTurn) {
+    return engineFailure(
+      "DND35_IMMEDIATE_ACTION_DEBT",
+      "The next turn's swift action is already committed to an immediate action.",
+    );
+  }
+  return engineSuccess({ ...state, swiftDebtNextTurn: true });
 }
 
 export function spendDnd35Action(
@@ -75,7 +109,10 @@ export function spendDnd35Action(
       if (state.standardAvailable) {
         return engineSuccess({ ...state, standardAvailable: false });
       }
-      return engineFailure("DND35_MOVE_ACTION_SPENT", "No move or convertible standard action remains this turn.");
+      return engineFailure(
+        "DND35_MOVE_ACTION_SPENT",
+        "No move or convertible standard action remains this turn.",
+      );
 
     case "full_round":
       if (!state.standardAvailable || !state.moveAvailable) {
@@ -91,6 +128,9 @@ export function spendDnd35Action(
         return engineFailure("DND35_SWIFT_ACTION_SPENT", "No swift action remains this turn.");
       }
       return engineSuccess({ ...state, swiftAvailable: false });
+
+    case "immediate":
+      return spendImmediateAction(state, true);
 
     case "attack_of_opportunity":
       if (state.attacksOfOpportunityRemaining < 1) {

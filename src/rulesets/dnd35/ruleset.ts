@@ -1,7 +1,5 @@
 import type { RulesetAdapter } from "@/engine";
-
-export const DND35_RULESET_ID = "dnd35";
-export const DND35_RULESET_VERSION = "3.5";
+import { DND35_RULESET_ID, DND35_RULESET_VERSION } from "./types";
 
 export const dnd35Ruleset: RulesetAdapter = {
   descriptor: {

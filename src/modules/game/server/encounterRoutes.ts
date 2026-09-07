@@ -28,7 +28,11 @@ type CampaignRole = "owner" | "gm" | "player" | "observer";
 const startEncounterSchema = z.object({
   participantIds: z.array(z.string().trim().min(1)).min(1).max(100),
 });
-const endTurnSchema = z.object({ actorId: z.string().trim().min(1) });
+
+const endTurnSchema = z.object({
+  actorId: z.string().trim().min(1),
+});
+
 const finishEncounterSchema = z.object({
   status: z.enum(["completed", "abandoned"]).optional(),
 });
@@ -84,13 +88,19 @@ async function requireActorControl(input: {
   if (input.role === "observer") {
     throw new ForbiddenError("Observers cannot perform encounter actions.");
   }
+
   const actor = await input.db
-    .select({ controllerUserId: gameActors.controllerUserId, kind: gameActors.kind })
+    .select({ kind: gameActors.kind, controllerUserId: gameActors.controllerUserId })
     .from(gameActors)
-    .where(and(eq(gameActors.id, input.actorId), eq(gameActors.campaignId, input.campaignId)))
+    .where(
+      and(
+        eq(gameActors.id, input.actorId),
+        eq(gameActors.campaignId, input.campaignId),
+      ),
+    )
     .get();
   if (!actor || actor.kind !== "character" || actor.controllerUserId !== input.userId) {
-    throw new ForbiddenError("You can only end the turn of a character you control.");
+    throw new ForbiddenError("You can only act as a character assigned to you.");
   }
 }
 
@@ -107,7 +117,9 @@ function translateEncounterError(error: unknown): never {
     case "ENCOUNTER_NOT_ACTIVE":
       throw new NotFoundError("Active encounter not found.");
     case "ENCOUNTER_PARTICIPANT_INVALID":
-      throw new ValidationError("Every encounter participant must be an active runtime actor in this campaign.");
+      throw new ValidationError(
+        "Every encounter participant must be an active runtime actor with authoritative D&D 3.5 combat state.",
+      );
     case "ENCOUNTER_NOT_ACTORS_TURN":
       throw new ConflictError("That actor does not currently have the turn.");
     case "ENCOUNTER_STATE_INVALID":
@@ -130,12 +142,7 @@ export const encounterRoutes = new Hono<EncounterEnv>()
     const campaignId = c.req.param("campaignId");
     await campaignRole({ db, campaignId, userId: session.user.id });
     try {
-      const encounter = await getActiveEncounter({ db, binding }, campaignId);
-      return c.json({
-        encounter: encounter
-          ? { ...encounter, currentActorId: encounter.currentCharacterId }
-          : null,
-      });
+      return c.json({ encounter: await getActiveEncounter({ db, binding }, campaignId) });
     } catch (error) {
       translateEncounterError(error);
     }
@@ -152,11 +159,13 @@ export const encounterRoutes = new Hono<EncounterEnv>()
       requireGameMaster(role);
       const input = c.req.valid("json");
       try {
-        const encounter = await startActorEncounter(
-          { db, binding },
-          { campaignId, participantIds: input.participantIds },
+        return c.json(
+          await startActorEncounter(
+            { db, binding },
+            { campaignId, participantIds: input.participantIds },
+          ),
+          201,
         );
-        return c.json({ ...encounter, currentActorId: encounter.currentCharacterId }, 201);
       } catch (error) {
         translateEncounterError(error);
       }
@@ -180,15 +189,16 @@ export const encounterRoutes = new Hono<EncounterEnv>()
         actorId: input.actorId,
       });
       try {
-        const encounter = await endEncounterTurn(
-          { db, binding },
-          {
-            campaignId,
-            encounterId: c.req.param("encounterId"),
-            actorId: input.actorId,
-          },
+        return c.json(
+          await endEncounterTurn(
+            { db, binding },
+            {
+              campaignId,
+              encounterId: c.req.param("encounterId"),
+              actorId: input.actorId,
+            },
+          ),
         );
-        return c.json({ ...encounter, currentActorId: encounter.currentCharacterId });
       } catch (error) {
         translateEncounterError(error);
       }

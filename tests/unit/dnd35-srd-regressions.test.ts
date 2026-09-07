@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  commitSpellCast,
+  createDnd35ActionEconomy,
+  proneCombatModifiers,
   resolveBullRush,
   resolveDnd35Modifiers,
   resolveOpposedSkillCheck,
+  spendImmediateAction,
+  standardConditionModifiers,
   strengthDamageModifier,
   validateCharge,
 } from "@/rulesets/dnd35";
@@ -99,5 +104,49 @@ describe("D&D 3.5 SRD regressions", () => {
 
     expect(result.winnerId).toBeNull();
     expect(result.tied).toBe(true);
+  });
+
+  it("blocks immediate actions while flat-footed without creating swift debt", () => {
+    const start = createDnd35ActionEconomy();
+    const result = spendImmediateAction(start, false, { flatFooted: true });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors[0]?.code).toBe("DND35_IMMEDIATE_FLAT_FOOTED");
+    expect(start.swiftDebtNextTurn).toBe(false);
+  });
+
+  it("blocks a flat-footed immediate spell before spending its prepared resource", () => {
+    const result = commitSpellCast({
+      actionEconomy: createDnd35ActionEconomy(),
+      actionKind: "immediate",
+      immediateOutsideOwnTurn: true,
+      actorFlatFooted: true,
+      resource: {
+        kind: "prepared",
+        state: {
+          id: "prep-feather-fall",
+          spellId: "feather-fall",
+          slotLevel: 1,
+          preparedCount: 1,
+          expendedCount: 0,
+        },
+      },
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors[0]?.code).toBe("DND35_IMMEDIATE_FLAT_FOOTED");
+  });
+
+  it("keeps prone and pinned context-dependent modifiers out of global condition totals", () => {
+    expect(standardConditionModifiers("prone")).toEqual([]);
+    expect(standardConditionModifiers("pinned").some((modifier) => modifier.id.includes("armor-class"))).toBe(false);
+
+    expect(proneCombatModifiers({ attackingWithRangedWeapon: false })).toEqual({
+      attackModifier: -4,
+      armorClassVsMelee: -4,
+      armorClassVsRanged: 4,
+    });
   });
 });

@@ -3,6 +3,8 @@ import { rollDice } from "@/engine";
 import type { Database } from "@/infrastructure/database/client";
 import { dnd35Characters } from "@/infrastructure/database/schema";
 import {
+  applyHealing,
+  applyLethalDamage,
   applyNonlethalDamage,
   consciousnessState,
   grantTemporaryHitPoints,
@@ -60,7 +62,7 @@ function persistent(pool: Dnd35HealthPool): PersistentHealthState {
   };
 }
 
-function describe(pool: Dnd35HealthPool) {
+export function describeHealth(pool: Dnd35HealthPool) {
   return {
     maximumHitPoints: pool.maximumHitPoints,
     currentHitPoints: pool.currentHitPoints,
@@ -90,44 +92,52 @@ async function commitHealthTransition(
   const deltas = [
     ...(input.before.currentHitPoints === input.after.currentHitPoints
       ? []
-      : [{
-          id: `${eventId}:hp`,
-          entityId: input.targetId,
-          path: ["dnd35", "currentHitPoints"],
-          before: input.before.currentHitPoints,
-          after: input.after.currentHitPoints,
-          reason: input.eventType,
-        }]),
+      : [
+          {
+            id: `${eventId}:hp`,
+            entityId: input.targetId,
+            path: ["dnd35", "currentHitPoints"],
+            before: input.before.currentHitPoints,
+            after: input.after.currentHitPoints,
+            reason: input.eventType,
+          },
+        ]),
     ...(input.before.temporaryHitPoints === input.after.temporaryHitPoints
       ? []
-      : [{
-          id: `${eventId}:temp-hp`,
-          entityId: input.targetId,
-          path: ["dnd35", "temporaryHitPoints"],
-          before: input.before.temporaryHitPoints,
-          after: input.after.temporaryHitPoints,
-          reason: input.eventType,
-        }]),
+      : [
+          {
+            id: `${eventId}:temp-hp`,
+            entityId: input.targetId,
+            path: ["dnd35", "temporaryHitPoints"],
+            before: input.before.temporaryHitPoints,
+            after: input.after.temporaryHitPoints,
+            reason: input.eventType,
+          },
+        ]),
     ...(input.before.nonlethalDamage === input.after.nonlethalDamage
       ? []
-      : [{
-          id: `${eventId}:nonlethal`,
-          entityId: input.targetId,
-          path: ["dnd35", "nonlethalDamage"],
-          before: input.before.nonlethalDamage,
-          after: input.after.nonlethalDamage,
-          reason: input.eventType,
-        }]),
+      : [
+          {
+            id: `${eventId}:nonlethal`,
+            entityId: input.targetId,
+            path: ["dnd35", "nonlethalDamage"],
+            before: input.before.nonlethalDamage,
+            after: input.after.nonlethalDamage,
+            reason: input.eventType,
+          },
+        ]),
     ...(input.before.stable === input.after.stable
       ? []
-      : [{
-          id: `${eventId}:stable`,
-          entityId: input.targetId,
-          path: ["dnd35", "stable"],
-          before: input.before.stable,
-          after: input.after.stable,
-          reason: input.eventType,
-        }]),
+      : [
+          {
+            id: `${eventId}:stable`,
+            entityId: input.targetId,
+            path: ["dnd35", "stable"],
+            before: input.before.stable,
+            after: input.after.stable,
+            reason: input.eventType,
+          },
+        ]),
   ];
 
   const persisted = await new D1HealthLifecycleStore(deps.binding).commit(
@@ -142,8 +152,8 @@ async function commitHealthTransition(
       targetIds: [input.targetId],
       payload: {
         ...input.payload,
-        before: describe(input.before),
-        after: describe(input.after),
+        before: describeHealth(input.before),
+        after: describeHealth(input.after),
       },
       deltas,
     },
@@ -154,7 +164,12 @@ async function commitHealthTransition(
     },
   );
   if (!persisted) throw new Error("GAME_STATE_CONFLICT");
-  return { eventId, sessionId: context.sessionId, before: describe(input.before), after: describe(input.after) };
+  return {
+    eventId,
+    sessionId: context.sessionId,
+    before: describeHealth(input.before),
+    after: describeHealth(input.after),
+  };
 }
 
 export async function getAuthoritativeHealthState(
@@ -168,7 +183,81 @@ export async function getAuthoritativeHealthState(
     characterId: input.characterId,
   });
   if (!pool) throw new Error("GAME_TARGET_HEALTH_UNAVAILABLE");
-  return describe(pool);
+  return describeHealth(pool);
+}
+
+export async function applyPersistentLethalDamage(
+  deps: HealthLifecycleDependencies,
+  input: {
+    campaignId: string;
+    actorId?: string;
+    targetId: string;
+    amount: number;
+    sourceId?: string;
+    reason?: string;
+  },
+) {
+  if (!Number.isSafeInteger(input.amount) || input.amount < 0) {
+    throw new RangeError("Damage must be a non-negative safe integer.");
+  }
+  const before = await loadPersistentHealthPool({
+    db: deps.db,
+    campaignId: input.campaignId,
+    characterId: input.targetId,
+  });
+  if (!before) throw new Error("GAME_TARGET_HEALTH_UNAVAILABLE");
+  const application = applyLethalDamage(before, input.amount);
+  return {
+    ...(await commitHealthTransition(deps, {
+      campaignId: input.campaignId,
+      ...(input.actorId === undefined ? {} : { actorId: input.actorId }),
+      targetId: input.targetId,
+      eventType: "health.damage",
+      ...(input.sourceId === undefined ? {} : { sourceId: input.sourceId }),
+      before,
+      after: application.after,
+      payload: {
+        amount: input.amount,
+        reason: input.reason ?? "direct",
+        absorbedByTemporaryHitPoints: application.absorbedByTemporaryHitPoints,
+        hitPointDamage: application.hitPointDamage,
+      },
+    })),
+    application,
+  };
+}
+
+export async function applyPersistentHealing(
+  deps: HealthLifecycleDependencies,
+  input: {
+    campaignId: string;
+    actorId?: string;
+    targetId: string;
+    amount: number;
+    sourceId?: string;
+    reason?: string;
+  },
+) {
+  if (!Number.isSafeInteger(input.amount) || input.amount < 0) {
+    throw new RangeError("Healing must be a non-negative safe integer.");
+  }
+  const before = await loadPersistentHealthPool({
+    db: deps.db,
+    campaignId: input.campaignId,
+    characterId: input.targetId,
+  });
+  if (!before) throw new Error("GAME_TARGET_HEALTH_UNAVAILABLE");
+  const after = applyHealing(before, input.amount);
+  return commitHealthTransition(deps, {
+    campaignId: input.campaignId,
+    ...(input.actorId === undefined ? {} : { actorId: input.actorId }),
+    targetId: input.targetId,
+    eventType: "health.healing",
+    ...(input.sourceId === undefined ? {} : { sourceId: input.sourceId }),
+    before,
+    after,
+    payload: { amount: input.amount, reason: input.reason ?? "direct" },
+  });
 }
 
 export async function applyPersistentNonlethalDamage(
@@ -254,12 +343,13 @@ export async function attemptPersistentStabilization(
     throw new RangeError(first?.message ?? "Stabilization check is not available.");
   }
   const after = resolved.value;
+  const stabilizedThisCheck = !before.stable && after.stable;
   return {
     ...(await commitHealthTransition(deps, {
       campaignId: input.campaignId,
       actorId: input.characterId,
       targetId: input.characterId,
-      eventType: after.stable ? "health.stabilized" : "health.stabilization_failed",
+      eventType: stabilizedThisCheck ? "health.stabilized" : "health.stabilization_failed",
       before,
       after,
       payload: { percentileRoll: roll, stabilized: after.stable },

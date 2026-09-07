@@ -22,3 +22,11 @@ CREATE TABLE `runtime_dnd35_character_psionic_states` (
 	FOREIGN KEY (`character_id`) REFERENCES `dnd35_characters`(`character_id`) ON UPDATE no action ON DELETE cascade,
 	CONSTRAINT `runtime_dnd35_character_psionic_states_focused_bool` CHECK(`focused` in (0, 1))
 );
+--> statement-breakpoint
+-- Read aliases keep the service SQL stable while runtime-mutating tables remain
+-- outside the canonical dnd35_* content/model namespace.
+CREATE VIEW `dnd35_character_spontaneous_slot_usage` AS
+SELECT * FROM `runtime_dnd35_character_spontaneous_slot_usage`;
+--> statement-breakpoint
+CREATE VIEW `dnd35_character_psionic_states` AS
+SELECT * FROM `runtime_dnd35_character_psionic_states`;

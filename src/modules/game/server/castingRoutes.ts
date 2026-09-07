@@ -24,11 +24,11 @@ import {
 import {
   castPreparedSpell,
   castSpontaneousSpell,
-  gainPersistentPsionicFocus,
   getCharacterCastingState,
   manifestPower,
   restorePersistentCastingResources,
 } from "./castingService";
+import { gainPersistentPsionicFocus } from "./psionicFocusAttemptService";
 
 interface CastingBindings extends AuthEnv {
   DB?: D1Database;
@@ -296,6 +296,11 @@ export const castingRoutes = new Hono<CastingEnv>()
         characterId: input.actorId,
       });
       try {
+        const augmentations = input.augmentations?.map((selection) =>
+          selection.applications === undefined
+            ? { index: selection.index }
+            : { index: selection.index, applications: selection.applications },
+        );
         const result = await manifestPower(
           { db, binding },
           {
@@ -303,7 +308,7 @@ export const castingRoutes = new Hono<CastingEnv>()
             actorId: input.actorId,
             castingTrackId: input.castingTrackId,
             powerId: input.powerId,
-            ...(input.augmentations === undefined ? {} : { augmentations: input.augmentations }),
+            ...(augmentations === undefined ? {} : { augmentations }),
             ...(input.targetIds === undefined ? {} : { targetIds: input.targetIds }),
           },
         );
@@ -340,13 +345,11 @@ export const castingRoutes = new Hono<CastingEnv>()
           { db, binding },
           { campaignId, actorId: input.actorId },
         );
-        if ("eventId" in result) {
-          scheduleEventPostprocess(c, {
-            campaignId,
-            sessionId: result.sessionId,
-            eventId: result.eventId,
-          });
-        }
+        scheduleEventPostprocess(c, {
+          campaignId,
+          sessionId: result.sessionId,
+          eventId: result.eventId,
+        });
         return c.json(result);
       } catch (error) {
         translateCastingError(error);

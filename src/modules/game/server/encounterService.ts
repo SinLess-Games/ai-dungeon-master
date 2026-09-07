@@ -114,8 +114,6 @@ async function requireDnd35Context(deps: EncounterServiceDependencies, campaignI
 
 function rowToParticipant(row: typeof gameEncounterParticipants.$inferSelect): EncounterParticipantState {
   return {
-    // EncounterParticipantState predates GameActor. Keep its field name while
-    // feeding it the canonical runtime identity.
     characterId: row.actorId,
     initiativeRoll: row.initiativeRoll,
     initiativeModifier: row.initiativeModifier,
@@ -193,23 +191,13 @@ export async function getActiveEncounter(
   };
 }
 
-/**
- * Character-only compatibility starter used by existing tests/callers.
- * Character runtime actor ids intentionally equal character ids, so the
- * resulting encounter uses the same canonical actor identity as mixed combat.
- */
 export async function startEncounter(
   deps: EncounterServiceDependencies,
   input: { campaignId: string; participantIds: readonly string[] },
 ): Promise<ActiveEncounterView> {
-  if (input.participantIds.length === 0) {
-    throw new RangeError("An encounter requires participants.");
-  }
+  if (input.participantIds.length === 0) throw new RangeError("An encounter requires participants.");
   const participantIds = [...new Set(input.participantIds.map((id) => id.trim()))];
-  if (
-    participantIds.some((id) => id.length === 0) ||
-    participantIds.length !== input.participantIds.length
-  ) {
+  if (participantIds.some((id) => id.length === 0) || participantIds.length !== input.participantIds.length) {
     throw new RangeError("Encounter participants must be unique, non-empty character ids.");
   }
 
@@ -217,12 +205,7 @@ export async function startEncounter(
   const existing = await deps.db
     .select({ id: gameEncounters.id })
     .from(gameEncounters)
-    .where(
-      and(
-        eq(gameEncounters.sessionId, context.sessionId),
-        eq(gameEncounters.status, "active"),
-      ),
-    )
+    .where(and(eq(gameEncounters.sessionId, context.sessionId), eq(gameEncounters.status, "active")))
     .get();
   if (existing) throw new Error("ENCOUNTER_ALREADY_ACTIVE");
 
@@ -237,9 +220,7 @@ export async function startEncounter(
       ),
     )
     .all();
-  if (characterRows.length !== participantIds.length) {
-    throw new Error("ENCOUNTER_PARTICIPANT_INVALID");
-  }
+  if (characterRows.length !== participantIds.length) throw new Error("ENCOUNTER_PARTICIPANT_INVALID");
 
   const rt = runtime(deps);
   const seeds = await Promise.all(
@@ -251,12 +232,7 @@ export async function startEncounter(
         throw new RangeError("Initiative roller must return an integer from 1 through 20.");
       }
       const initiativeModifier = abilityModifier(dexterity);
-      return {
-        characterId,
-        initiativeRoll,
-        initiativeModifier,
-        tieBreaker: initiativeModifier,
-      };
+      return { characterId, initiativeRoll, initiativeModifier, tieBreaker: initiativeModifier };
     }),
   );
   const state = createEncounterState(seeds);
@@ -272,16 +248,7 @@ export async function startEncounter(
         started_at, created_at, updated_at
       ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?)`,
     )
-    .bind(
-      encounterId,
-      context.campaignId,
-      context.sessionId,
-      state.roundNumber,
-      state.activeTurnIndex,
-      timestamp,
-      timestamp,
-      timestamp,
-    );
+    .bind(encounterId, context.campaignId, context.sessionId, state.roundNumber, state.activeTurnIndex, timestamp, timestamp, timestamp);
 
   const participantInserts = state.participants.map((participant) =>
     deps.binding
@@ -295,24 +262,13 @@ export async function startEncounter(
         ) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
-        rt.id(),
-        encounterId,
-        participant.characterId,
-        participant.characterId,
-        participant.initiativeRoll,
-        participant.initiativeModifier,
-        participant.initiativeTotal,
-        participant.tieBreaker,
-        participant.turnOrder,
-        participant.standardAvailable ? 1 : 0,
-        participant.moveAvailable ? 1 : 0,
-        participant.swiftAvailable ? 1 : 0,
-        participant.swiftDebtNextTurn ? 1 : 0,
-        participant.attacksOfOpportunityPerRound,
-        participant.attacksOfOpportunityRemaining,
-        participant.lastTurnRound,
-        timestamp,
-        timestamp,
+        rt.id(), encounterId, participant.characterId, participant.characterId,
+        participant.initiativeRoll, participant.initiativeModifier, participant.initiativeTotal,
+        participant.tieBreaker, participant.turnOrder,
+        participant.standardAvailable ? 1 : 0, participant.moveAvailable ? 1 : 0,
+        participant.swiftAvailable ? 1 : 0, participant.swiftDebtNextTurn ? 1 : 0,
+        participant.attacksOfOpportunityPerRound, participant.attacksOfOpportunityRemaining,
+        participant.lastTurnRound, timestamp, timestamp,
       ),
   );
 
@@ -344,11 +300,7 @@ export async function startEncounter(
     } catch (error) {
       if (attempt === 0 && shouldRetrySequence(error)) continue;
       const message = error instanceof Error ? error.message : String(error);
-      if (
-        /game_encounters_one_active_per_session_uidx|UNIQUE constraint failed: game_encounters\.session_id/i.test(
-          message,
-        )
-      ) {
+      if (/game_encounters_one_active_per_session_uidx|UNIQUE constraint failed: game_encounters\.session_id/i.test(message)) {
         throw new Error("ENCOUNTER_ALREADY_ACTIVE");
       }
       throw error;
@@ -381,32 +333,26 @@ export async function endEncounterTurn(
   if (current.characterId !== input.actorId) throw new Error("ENCOUNTER_NOT_ACTORS_TURN");
 
   const advanced = advanceEncounterTurn(before);
-  if (!advanced.ok) {
-    throw new Error(advanced.errors[0]?.message ?? "Unable to advance encounter turn.");
-  }
+  if (!advanced.ok) throw new Error(advanced.errors[0]?.message ?? "Unable to advance encounter turn.");
   const rt = runtime(deps);
   const occurredAt = rt.now();
   const timestamp = unix(occurredAt);
+  const conditionEncounterId = loaded.encounter.id;
   const guardSql = `EXISTS (
     SELECT 1 FROM game_encounters
     WHERE id = ? AND campaign_id = ? AND session_id = ? AND status = 'active'
       AND round_number = ? AND active_turn_index = ?
   )`;
   const guardBindings = [
-    loaded.encounter.id,
-    loaded.encounter.campaignId,
-    loaded.encounter.sessionId,
-    loaded.encounter.roundNumber,
-    loaded.encounter.activeTurnIndex,
+    loaded.encounter.id, loaded.encounter.campaignId, loaded.encounter.sessionId,
+    loaded.encounter.roundNumber, loaded.encounter.activeTurnIndex,
   ] as const;
 
   const turnEvent = eventInsert(deps.binding, {
     id: rt.id(),
     campaignId: loaded.encounter.campaignId,
     sessionId: loaded.encounter.sessionId,
-    eventType: advanced.value.roundAdvanced
-      ? "encounter.round_advanced"
-      : "encounter.turn_advanced",
+    eventType: advanced.value.roundAdvanced ? "encounter.round_advanced" : "encounter.turn_advanced",
     occurredAt,
     actorId: input.actorId,
     targetIds: [advanced.value.currentCharacterId],
@@ -431,16 +377,10 @@ export async function endEncounterTurn(
          WHERE encounter_id = ? AND actor_id = ? AND ${guardSql}`,
       )
       .bind(
-        participant.standardAvailable ? 1 : 0,
-        participant.moveAvailable ? 1 : 0,
-        participant.swiftAvailable ? 1 : 0,
-        participant.swiftDebtNextTurn ? 1 : 0,
-        participant.attacksOfOpportunityPerRound,
-        participant.attacksOfOpportunityRemaining,
-        participant.lastTurnRound,
-        timestamp,
-        loaded.encounter.id,
-        participant.characterId,
+        participant.standardAvailable ? 1 : 0, participant.moveAvailable ? 1 : 0,
+        participant.swiftAvailable ? 1 : 0, participant.swiftDebtNextTurn ? 1 : 0,
+        participant.attacksOfOpportunityPerRound, participant.attacksOfOpportunityRemaining,
+        participant.lastTurnRound, timestamp, conditionEncounterId, participant.characterId,
         ...guardBindings,
       ),
   );
@@ -453,42 +393,22 @@ export async function endEncounterTurn(
       deps.binding
         .prepare(
           `DELETE FROM ${tableName}
-           WHERE encounter_id = ?
-             AND duration_kind = 'rounds'
-             AND expires_encounter_round IS NOT NULL
-             AND expires_turn_order IS NOT NULL
-             AND (
-               expires_encounter_round < ? OR
-               (expires_encounter_round = ? AND expires_turn_order <= ?)
-             )
+           WHERE encounter_id = ? AND duration_kind = 'rounds'
+             AND expires_encounter_round IS NOT NULL AND expires_turn_order IS NOT NULL
+             AND (expires_encounter_round < ? OR (expires_encounter_round = ? AND expires_turn_order <= ?))
              AND ${guardSql}`,
         )
-        .bind(
-          loaded.encounter.id,
-          destinationRound,
-          destinationRound,
-          destinationTurnOrder,
-          ...guardBindings,
-        ),
+        .bind(conditionEncounterId, destinationRound, destinationRound, destinationTurnOrder, ...guardBindings),
       deps.binding
         .prepare(
           `UPDATE ${tableName}
            SET remaining_rounds = remaining_rounds - 1, updated_at = ?
-           WHERE encounter_id = ?
-             AND duration_kind = 'rounds'
-             AND expires_encounter_round IS NOT NULL
-             AND expires_turn_order = ?
-             AND expires_encounter_round > ?
-             AND remaining_rounds > 1
+           WHERE encounter_id = ? AND duration_kind = 'rounds'
+             AND expires_encounter_round IS NOT NULL AND expires_turn_order = ?
+             AND expires_encounter_round > ? AND remaining_rounds > 1
              AND ${guardSql}`,
         )
-        .bind(
-          timestamp,
-          loaded.encounter.id,
-          destinationTurnOrder,
-          destinationRound,
-          ...guardBindings,
-        ),
+        .bind(timestamp, conditionEncounterId, destinationTurnOrder, destinationRound, ...guardBindings),
     ];
   }
 
@@ -505,27 +425,15 @@ export async function endEncounterTurn(
          AND round_number = ? AND active_turn_index = ?`,
     )
     .bind(
-      advanced.value.state.roundNumber,
-      advanced.value.state.activeTurnIndex,
-      timestamp,
-      loaded.encounter.id,
-      loaded.encounter.campaignId,
-      loaded.encounter.sessionId,
-      loaded.encounter.roundNumber,
-      loaded.encounter.activeTurnIndex,
+      advanced.value.state.roundNumber, advanced.value.state.activeTurnIndex, timestamp,
+      loaded.encounter.id, loaded.encounter.campaignId, loaded.encounter.sessionId,
+      loaded.encounter.roundNumber, loaded.encounter.activeTurnIndex,
     );
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const results = await deps.binding.batch([
-        turnEvent,
-        ...participantUpdates,
-        ...conditionStatements,
-        encounterUpdate,
-      ]);
-      if (changes(results[0]) !== 1 || changes(results.at(-1)) !== 1) {
-        throw new Error("GAME_STATE_CONFLICT");
-      }
+      const results = await deps.binding.batch([turnEvent, ...participantUpdates, ...conditionStatements, encounterUpdate]);
+      if (changes(results[0]) !== 1 || changes(results.at(-1)) !== 1) throw new Error("GAME_STATE_CONFLICT");
       break;
     } catch (error) {
       if (attempt === 0 && shouldRetrySequence(error)) continue;
@@ -560,14 +468,9 @@ export async function finishEncounter(
   const occurredAt = rt.now();
   const timestamp = unix(occurredAt);
   const guardSql = `EXISTS (
-    SELECT 1 FROM game_encounters
-    WHERE id = ? AND campaign_id = ? AND session_id = ? AND status = 'active'
+    SELECT 1 FROM game_encounters WHERE id = ? AND campaign_id = ? AND session_id = ? AND status = 'active'
   )`;
-  const guardBindings = [
-    loaded.encounter.id,
-    loaded.encounter.campaignId,
-    loaded.encounter.sessionId,
-  ] as const;
+  const guardBindings = [loaded.encounter.id, loaded.encounter.campaignId, loaded.encounter.sessionId] as const;
   const event = eventInsert(deps.binding, {
     id: rt.id(),
     campaignId: loaded.encounter.campaignId,
@@ -585,21 +488,12 @@ export async function finishEncounter(
        SET status = ?, ended_at = ?, updated_at = ?
        WHERE id = ? AND campaign_id = ? AND session_id = ? AND status = 'active'`,
     )
-    .bind(
-      status,
-      timestamp,
-      timestamp,
-      loaded.encounter.id,
-      loaded.encounter.campaignId,
-      loaded.encounter.sessionId,
-    );
+    .bind(status, timestamp, timestamp, loaded.encounter.id, loaded.encounter.campaignId, loaded.encounter.sessionId);
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const results = await deps.binding.batch([event, update]);
-      if (changes(results[0]) !== 1 || changes(results[1]) !== 1) {
-        throw new Error("GAME_STATE_CONFLICT");
-      }
+      if (changes(results[0]) !== 1 || changes(results[1]) !== 1) throw new Error("GAME_STATE_CONFLICT");
       return { encounterId: loaded.encounter.id, status };
     } catch (error) {
       if (attempt === 0 && shouldRetrySequence(error)) continue;
@@ -609,15 +503,11 @@ export async function finishEncounter(
   throw new Error("GAME_STATE_CONFLICT");
 }
 
-/** Exposed for turn-aware game commands that need the persistent action economy. */
 export async function loadEncounterStateForAction(
   deps: EncounterServiceDependencies,
   campaignId: string,
 ): Promise<{ encounterId: string; state: EncounterState } | null> {
   const loaded = await loadEncounterRows(deps, campaignId);
   if (!loaded.encounter) return null;
-  return {
-    encounterId: loaded.encounter.id,
-    state: encounterState(loaded.encounter, loaded.participants),
-  };
+  return { encounterId: loaded.encounter.id, state: encounterState(loaded.encounter, loaded.participants) };
 }

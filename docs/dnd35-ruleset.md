@@ -2,7 +2,7 @@
 
 The D&D 3.5 adapter lives under `src/rulesets/dnd35/` and depends on the reusable primitives in `src/engine/`.
 
-The boundary is deliberate:
+The dependency boundary is deliberate:
 
 ```text
 application / AI DM / API
@@ -10,28 +10,249 @@ application / AI DM / API
              -> reusable engine
 ```
 
-`src/engine/` must never import this ruleset.
+`src/engine/` must never import this ruleset. React, Hono, Cloudflare, Drizzle, D1, R2, AI providers, and persistence repositories also stay outside the ruleset runtime.
 
-## Implemented foundation
+## Ruleset identity
 
-The first runtime layer now covers:
+The adapter is registered as:
 
-- ability modifiers and effective ability scores,
-- full / three-quarter / half / custom BAB progressions,
-- good / poor / custom save progressions,
+```text
+id:      dnd35
+version: 3.5
+```
+
+`src/rulesets/dnd35/ruleset.ts` exposes `dnd35Ruleset`, which can be registered through the generic `RulesetRegistry` in `src/engine/rulesets.ts`.
+
+The descriptor advertises these runtime capabilities:
+
+- abilities,
+- classes,
+- races,
+- feats,
+- skills,
+- combat,
+- conditions,
+- equipment,
+- spellcasting,
+- psionics,
+- advancement,
+- character creation.
+
+## Implemented deterministic runtime
+
+### Character math
+
+The runtime includes:
+
+- ability modifiers,
+- effective ability-score assembly,
+- ability damage and drain inputs,
+- full / three-quarter / half / custom BAB progression,
+- good / poor / custom save progression,
 - multiclass BAB and save aggregation,
 - iterative attacks,
-- XP thresholds, general feat slots, and ability-score increases,
-- D&D 3.5 typed-bonus stacking,
+- class-level derived-stat assembly from persisted cumulative rows,
 - Armor Class, touch AC, and flat-footed AC,
-- attack bonuses, attack rolls, threat ranges, initiative, and grapple modifiers,
-- saving throw bonuses and natural-1/natural-20 resolution,
+- initiative,
+- grapple modifiers,
+- hit-point totals,
+- carrying capacity and encumbrance,
+- effective character level from class levels, racial Hit Dice, and level adjustment.
+
+### Race and movement
+
+Race adapters cover:
+
+- size,
+- land speed,
+- additional movement modes,
+- movement multipliers,
+- natural armor,
+- racial Hit Dice,
+- level adjustment,
+- first-level feat bonuses,
+- per-level skill-point bonuses.
+
+### Modifiers and effects
+
+The D&D adapter implements typed bonus/penalty resolution while preserving full source attribution.
+
+By default:
+
+- positive bonuses of the same type overlap and only the highest applies,
+- dodge bonuses stack,
+- circumstance bonuses stack,
+- untyped/unnamed bonuses stack,
+- penalties stack,
+- exceptional rules text may explicitly force stacking or overlap behavior.
+
+Persisted/common rule effects can be adapted into runtime modifiers, grants, resistances, and immunities without teaching the generic engine about D&D-specific vocabulary.
+
+### Prerequisites and feats
+
+The runtime supports the versioned prerequisite expression model already used by the D&D schema, including:
+
+- nested all / any / not expressions,
+- ability minimums,
+- character level,
+- BAB,
+- class level,
+- saving throws,
+- feats and feat choices,
+- skill ranks,
+- caster level,
+- manifester level,
+- spell-level access,
+- race,
+- creature type,
+- alignment,
+- class features,
+- special abilities,
+- explicit custom predicates/extensions.
+
+Feat runtime support includes repeatability, required choices, existing-choice collision checks, prerequisite validation, and conversion of relational feat benefits into common runtime effects.
+
+### Skills
+
+Skill support includes:
+
+- class and cross-class rank caps,
+- half-rank validation,
+- skill-point costs,
+- armor-check penalties,
+- typed modifiers,
+- ordinary skill checks,
+- opposed skill checks,
+- Take 10,
+- Take 20,
+- Aid Another,
+- synergy bonuses.
+
+Skill checks do **not** treat natural 1 or natural 20 as automatic failure/success.
+
+### Combat
+
+Combat primitives include:
+
+- melee/ranged attack bonus calculation,
+- natural-1 automatic misses,
+- natural-20 automatic hits,
+- critical threat ranges,
+- critical confirmation,
+- critical multipliers,
 - critical-aware damage components,
-- class/cross-class skill rank caps and skill checks,
-- carrying capacity and load categories,
-- hit-point totals and core HP states,
-- spell ability requirements, bonus spells, and spell save DCs,
-- psionic ability requirements, bonus power points, and power save DCs.
+- full attacks and normal iterative attacks,
+- charge validation and modifiers,
+- attacks of opportunity and provocation metadata,
+- action economy for standard, move, full-round, swift, immediate, free, and AoO actions,
+- immediate-action debt against the next swift action,
+- concealment and miss chance,
+- cover and situational combat modifiers,
+- flanking helpers,
+- melee reach checks,
+- Strength-to-damage handling,
+- two-weapon fighting penalties,
+- Power Attack exchange,
+- grapple contests,
+- trip,
+- bull rush,
+- disarm.
+
+Map geometry/pathfinding remains outside the ruleset. The map layer supplies facts such as distance, reachability, clear paths, adjacency, cover, and flanking geometry; the ruleset resolves the D&D consequences.
+
+### Damage and health
+
+The runtime includes:
+
+- lethal damage,
+- nonlethal damage,
+- temporary hit points,
+- healing,
+- disabled/dying/dead thresholds,
+- staggered/unconscious nonlethal thresholds,
+- dying stabilization,
+- energy resistance,
+- immunity,
+- physical damage reduction and bypass qualities.
+
+Damage resolution remains explicit about packets/components so callers can preserve enough information for resistance, DR, critical, sneak-attack, and effect-specific behavior.
+
+### Conditions
+
+Persisted conditions can be adapted to the generic condition engine for:
+
+- round durations,
+- absolute expiration times,
+- permanent duration,
+- concentration duration,
+- special duration,
+- independent/replacement/cumulative/special stacking.
+
+The ruleset also contains standard D&D condition semantics for common conditions such as blinded, dazed, deafened, entangled, exhausted, fatigued, flat-footed, frightened, helpless, invisible, nauseated, panicked, paralyzed, pinned, prone, shaken, sickened, staggered, stunned, and unconscious.
+
+Condition helpers expose action restrictions and common modifiers. Highly contextual prose rules remain explicit notes or rule effects instead of being silently approximated.
+
+### Spellcasting
+
+Spellcasting support includes:
+
+- casting-ability requirements,
+- bonus spells per day,
+- spell save DCs,
+- spell progression at an effective class level,
+- bonus-only slot access,
+- prepared spell counts and expenditure,
+- spontaneous slot expenditure and restoration,
+- caster-level calculation,
+- concentration DCs/checks,
+- arcane spell failure,
+- spell resistance checks,
+- atomic action + prepared/spontaneous resource consumption,
+- metamagic slot-level validation,
+- dispel checks,
+- same-spell counterspell access,
+- target saving-throw and spell-resistance resolution.
+
+Individual spell text remains content. Special spell behavior is implemented through rule effects or explicit ruleset extensions rather than hard-coding every spell into the core runtime.
+
+### Psionics
+
+Psionic support includes:
+
+- manifesting-ability requirements,
+- power save DCs,
+- bonus power points,
+- augmentation planning,
+- manifester-level spending limits,
+- power-point expenditure,
+- psionic focus gain/use,
+- atomic manifestation resource handling,
+- power-resistance checks.
+
+Individual power text and unusual augmentation clauses remain content-driven extensions.
+
+### Advancement and character creation
+
+Advancement support includes:
+
+- standard XP thresholds,
+- level-from-XP resolution,
+- XP awards spanning multiple levels,
+- feat-slot milestones,
+- ability-score increase milestones,
+- level-up summary data.
+
+Character-creation validation includes:
+
+- required race/class selection,
+- ability-score validation,
+- skill-rank caps,
+- skill-point budgets,
+- feat-choice counts,
+- feat prerequisites,
+- duplicate/nonrepeatable feat handling.
+
+The runtime validates rules. Persistence remains responsible for committing the validated character or level-up transaction.
 
 ## Persistence alignment
 
@@ -42,49 +263,57 @@ BAB:  full | three_quarters | half | custom
 Save: good | poor | custom
 ```
 
-Custom rows must supply their resolved base bonus to the runtime. That keeps unusual prestige classes/homebrew representable without hard-coding their tables into the generic engine.
+Character class history stores cumulative class-level values. Runtime aggregation therefore selects the highest attained row per class before adding multiclass totals; it does not sum every historical level row.
 
-Ability resolution also mirrors the character ability-score schema: base score, inherent bonus, damage, drain, and temporary adjustment are explicit inputs. Race, level, and sourced-effect adjustments remain caller inputs so runtime code stays independent of D1/Drizzle.
+Spell progression preserves the schema distinction between:
 
-## Modifier policy
+- `slotsPerDay = null`: this spell level is not available,
+- `slotsPerDay = 0`: the class has bonus-slots-only access at that level.
 
-By default the adapter implements the core D&D 3.5 overlap rule:
+Ability resolution mirrors the character ability-score schema: base score, inherent bonus, damage, drain, and temporary adjustment are explicit inputs. Race, level, and sourced-effect adjustments remain caller inputs so runtime code stays independent of D1/Drizzle.
 
-- positive bonuses of the same type overlap; the highest applies,
-- dodge bonuses stack,
-- circumstance bonuses stack,
-- untyped/unnamed bonuses stack,
-- penalties stack,
-- exceptional rules text can explicitly force a modifier to stack or overlap.
+## Determinism and authority
 
-The resolver preserves every supplied modifier and marks whether it was selected, so character sheets and AI tool errors can explain where a total came from.
+Random behavior accepts explicit rolls or injected random sources where appropriate. This makes unit tests, recorded rolls, replay, multiplayer authority, and AI tool calls reproducible.
 
-## Combat policy
+The intended authority chain is:
 
-The reusable check engine only knows `roll + bonus vs target`. The D&D adapter adds system rules on top:
+```text
+AI / UI proposes an action
+        ↓
+ruleset validates D&D-specific legality
+        ↓
+generic engine resolves checks/effects/transactions/events
+        ↓
+application persists the authoritative result
+```
 
-- natural 1 automatically misses an attack,
-- natural 20 automatically hits an attack,
-- a critical threat is only produced by a successful attack within the weapon's threat range,
-- natural 1 automatically fails a saving throw,
-- natural 20 automatically succeeds a saving throw,
-- skill checks do **not** gain automatic success/failure from natural 1/20.
+The AI never becomes the rules authority.
 
-Critical damage uses repeated rolls for critical-eligible components rather than multiplying one sampled roll. Extra dice such as sneak attack can be represented as a separate component with `criticalEligible: false`.
+## What is intentionally outside this runtime
 
-## Still ruleset work, not generic-engine work
+A "complete runtime" does **not** mean every published D&D 3.5 sentence is hard-coded. The following remain data or explicit extensions:
 
-The next D&D-specific layers should build on this foundation rather than extend `src/engine/`:
+- individual feat prose and exceptional feat rules,
+- individual spell/power effects,
+- monster-specific abilities,
+- prestige-class/homebrew exceptions,
+- individual magic-item behavior,
+- terrain and map geometry,
+- campaign house rules,
+- optional/variant rules not selected by campaign configuration.
 
-1. class-level derived-stat assembly from content rows,
-2. race/size/speed application,
-3. feat prerequisite fact adapters and feat effects,
-4. equipment/weapon/armor runtime adapters,
-5. combat actions (full attack, charge, AoO, grapple, trip, bull rush),
-6. conditions with actual 3.5 semantics,
-7. spell slots, preparation, casting, SR, dispel and concentration,
-8. psionic powers, augmentation, focus and power-point spending,
-9. XP awards and level-up transactions,
-10. character-creation validation.
+Those behaviors should enter through schema-backed rule effects, prerequisite trees, content metadata, or named custom extensions. This keeps the runtime reusable, testable, and compatible with homebrew without turning `src/engine/` into a D&D-specific monolith.
 
-All of those should produce structured engine results/events so persistence, multiplayer, and the AI DM consume the same authoritative outcomes.
+## Validation gate
+
+Changes under `src/engine/**` or `src/rulesets/**` are covered by the Rules Engine CI workflow. Before merge, the branch must pass:
+
+```bash
+npm run typecheck
+npm run lint
+npm run test:unit
+npm run build
+```
+
+Do not merge engine/ruleset work while any of those checks are failing.

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   enqueueGameEventPostprocess,
   processBackgroundJobBatch,
+  publishCommittedGameEvent,
   type BackgroundJob,
 } from "@/infrastructure/cloudflare/backgroundJobs";
 
@@ -14,6 +15,23 @@ function message(body: BackgroundJob) {
     ack: vi.fn(),
     retry: vi.fn(),
   };
+}
+
+function committedEventDatabase() {
+  const first = vi.fn().mockResolvedValue({
+    id: "event-1",
+    campaign_id: "campaign-1",
+    session_id: "session-1",
+    sequence: 42,
+    event_type: "combat.attack",
+    occurred_at: 1_788_806_400,
+    actor_id: "hero-1",
+    source_id: "sword-1",
+    target_ids: JSON.stringify(["goblin-1"]),
+  });
+  const bind = vi.fn(() => ({ first }));
+  const prepare = vi.fn(() => ({ bind }));
+  return { first, bind, prepare, database: { prepare } as unknown as D1Database };
 }
 
 describe("Cloudflare background jobs", () => {
@@ -49,20 +67,42 @@ describe("Cloudflare background jobs", () => {
     );
   });
 
+  it("publishes a committed event directly to the campaign Durable Object", async () => {
+    const { prepare, database } = committedEventDatabase();
+    const publish = vi.fn().mockResolvedValue(2);
+    const getByName = vi.fn(() => ({ publish }));
+
+    await publishCommittedGameEvent(
+      {
+        DB: database,
+        CAMPAIGN_ROOM: { getByName } as unknown as DurableObjectNamespace,
+      },
+      {
+        campaignId: "campaign-1",
+        sessionId: "session-1",
+        eventId: "event-1",
+      },
+    );
+
+    expect(prepare).toHaveBeenCalledOnce();
+    expect(getByName).toHaveBeenCalledWith("campaign-1");
+    expect(publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "game.event",
+        campaignId: "campaign-1",
+        payload: expect.objectContaining({
+          eventId: "event-1",
+          sessionId: "session-1",
+          sequence: 42,
+          eventType: "combat.attack",
+          targetIds: ["goblin-1"],
+        }),
+      }),
+    );
+  });
+
   it("caches the event cursor, broadcasts it, and acknowledges the message", async () => {
-    const first = vi.fn().mockResolvedValue({
-      id: "event-1",
-      campaign_id: "campaign-1",
-      session_id: "session-1",
-      sequence: 42,
-      event_type: "combat.attack",
-      occurred_at: 1_788_806_400,
-      actor_id: "hero-1",
-      source_id: "sword-1",
-      target_ids: JSON.stringify(["goblin-1"]),
-    });
-    const bind = vi.fn(() => ({ first }));
-    const prepare = vi.fn(() => ({ bind }));
+    const { bind, prepare, database } = committedEventDatabase();
     const put = vi.fn().mockResolvedValue(undefined);
     const publish = vi.fn().mockResolvedValue(2);
     const getByName = vi.fn(() => ({ publish }));
@@ -82,7 +122,7 @@ describe("Cloudflare background jobs", () => {
         messages: [queued],
       } as unknown as MessageBatch<BackgroundJob>,
       {
-        DB: { prepare } as unknown as D1Database,
+        DB: database,
         RUNTIME_CACHE: { put } as unknown as KVNamespace,
         CAMPAIGN_ROOM: { getByName } as unknown as DurableObjectNamespace,
       },

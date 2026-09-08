@@ -15,6 +15,7 @@ import { authRoutes, authHandler } from "@/modules/auth/server/routes";
 import type { AuthEnv } from "@/modules/auth/server/auth";
 import { campaignRoutes } from "@/modules/campaigns/server/routes";
 import { characterRoutes } from "@/modules/characters/server/routes";
+import { characterOptionRoutes } from "@/modules/characters/server/optionsRoutes";
 import type { CampaignRoom } from "@/modules/game/live/CampaignRoom";
 import { actorRoutes } from "@/modules/game/server/actorRoutes";
 import { castingRoutes } from "@/modules/game/server/castingRoutes";
@@ -196,6 +197,7 @@ const routes = app
   .route("/", devblogAIRoutes)
   .route("/", campaignRoutes)
   .route("/", characterRoutes)
+  .route("/", characterOptionRoutes)
   .route("/", actorRoutes)
   .route("/", encounterRoutes)
   .route("/", gameRoutes)

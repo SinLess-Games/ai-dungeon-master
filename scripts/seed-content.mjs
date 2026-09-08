@@ -15,18 +15,22 @@ const preferredSeedOrder = [
   "phb-classes",
   "phb-feats",
   "phb-spells",
+  "phb-rules",
   "dmg-rules",
   "phb2-classes",
   "phb2-feats",
   "phb2-spells",
+  "phb2-rules",
   "dmg2-rules",
   "spell-compendium-spells",
   "expanded-psionics-handbook-classes",
   "expanded-psionics-handbook-feats",
   "expanded-psionics-handbook-powers",
+  "expanded-psionics-handbook-rules",
   "psionics-handbook-classes",
   "psionics-handbook-feats",
   "psionics-handbook-powers",
+  "psionics-handbook-rules",
 ];
 
 function parseArgs(argv) {

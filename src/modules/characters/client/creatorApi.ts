@@ -25,6 +25,7 @@ export interface RaceOption {
 
 export interface ClassOption {
   id: string;
+  slug: string;
   name: string;
   description: string;
   rulesText: string;
@@ -39,6 +40,8 @@ export interface ClassOption {
   classLevelId: string;
   firstLevelHitPoints: number;
   firstLevelSkillPoints: number;
+  allowedAlignments: Alignment[];
+  prerequisiteExplanation: string | null;
 }
 
 export interface CharacterCreationOptions {

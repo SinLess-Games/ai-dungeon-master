@@ -80,6 +80,20 @@ export async function listDraftCampaigns(): Promise<CampaignSummary[]> {
   );
 }
 
+export async function createSoloCampaign(name: string): Promise<CampaignSummary> {
+  return requestJson<CampaignSummary>("/api/campaigns", {
+    method: "POST",
+    body: JSON.stringify({
+      name,
+      description: "Created from the D&D 3.5 character creator.",
+      playMode: "solo",
+      gameMasterMode: "ai",
+      timeMode: "paused",
+      visibility: "private",
+    }),
+  });
+}
+
 export function getCharacterCreationOptions(): Promise<CharacterCreationOptions> {
   return requestJson<CharacterCreationOptions>("/api/dnd35/character-creation-options");
 }

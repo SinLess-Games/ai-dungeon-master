@@ -122,6 +122,13 @@ export interface CharacterReadyResult {
 export async function createLevelOneCharacter(
   input: CreateLevelOneCharacterInput,
 ): Promise<CharacterReadyResult> {
+  if (!input.characterClass.allowedAlignments.includes(input.alignment)) {
+    throw new Error(
+      input.characterClass.prerequisiteExplanation ??
+        `${input.characterClass.name} does not allow the selected alignment.`,
+    );
+  }
+
   const character = await requestJson<{ id: string }>(
     `/api/campaigns/${encodeURIComponent(input.campaignId)}/characters`,
     {

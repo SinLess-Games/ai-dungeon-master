@@ -24,7 +24,7 @@ export const powerClassLevels = sqliteTable(
       sql`${t.powerLevel} is null or typeof(${t.powerLevel}) = 'integer'`,
     ),
     primaryKey({ columns: [t.powerId, t.classId] }),
-    check("dnd35_power_class_levels_level_valid", sql`${t.powerLevel} between 1 and 9`),
+    check("dnd35_power_class_levels_level_valid", sql`${t.powerLevel} between 0 and 9`),
     index("dnd35_power_class_levels_list_idx").on(t.classId, t.powerLevel),
   ],
 );

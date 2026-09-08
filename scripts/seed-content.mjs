@@ -9,6 +9,8 @@ const DATABASE_BINDING = "DB";
 const SEEDS_ROOT = resolve(process.cwd(), "seeds");
 
 // Keep dependencies deterministic. Entries that do not exist yet are simply skipped.
+// Revised 3.5 sources intentionally run before older-edition sources where shared slugs
+// should resolve to the revised canonical row instead of creating duplicates.
 const preferredSeedOrder = [
   "phb-classes",
   "phb-feats",
@@ -17,6 +19,12 @@ const preferredSeedOrder = [
   "phb2-feats",
   "phb2-spells",
   "spell-compendium-spells",
+  "expanded-psionics-handbook-classes",
+  "expanded-psionics-handbook-feats",
+  "expanded-psionics-handbook-powers",
+  "psionics-handbook-classes",
+  "psionics-handbook-feats",
+  "psionics-handbook-powers",
 ];
 
 function parseArgs(argv) {

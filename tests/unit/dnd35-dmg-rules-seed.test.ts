@@ -49,7 +49,7 @@ it("seeds DMG and DMG II rules idempotently without duplicate canonical slugs", 
     expect({
       dmg: scalar(db, "SELECT count(*) AS n FROM dnd35_rules WHERE source_id='dmg-3.5'"),
       dmg2: scalar(db, "SELECT count(*) AS n FROM dnd35_rules WHERE source_id='dmg2-3.5'"),
-    }).toEqual({ dmg: 167, dmg2: 123 });
+    }).toEqual({ dmg: 195, dmg2: 146 });
 
     const firstCount = scalar(db, "SELECT count(*) AS n FROM dnd35_rules");
     seedRules(db);
@@ -93,6 +93,25 @@ it("seeds DMG and DMG II rules idempotently without duplicate canonical slugs", 
       initial_check_dc: 10,
       dc_increase_per_round: 1,
     });
+    expect(mechanics(db, "dmg-defense-roll-variant")).toMatchObject({
+      defense_roll: "1d20 + (AC - 10)",
+      round_reuse_option: true,
+    });
+    expect(mechanics(db, "dmg-save-dc-formulas")).toMatchObject({
+      misc_dc_min: 10,
+      misc_dc_max: 20,
+      misc_default_dc: 15,
+    });
+    expect(mechanics(db, "dmg-encounter-difficulty-mix")).toMatchObject({
+      recommended_percent: {
+        easy: 10,
+        easy_if_handled_properly: 20,
+        challenging: 50,
+        very_difficult: 15,
+        overpowering: 5,
+      },
+    });
+
     expect(mechanics(db, "dmg2-mob-trample")).toMatchObject({
       damage: "2d6 + 1.5 * Strength modifier",
       reflex_dc: "25 + Strength modifier",
@@ -110,6 +129,19 @@ it("seeds DMG and DMG II rules idempotently without duplicate canonical slugs", 
       reagent_gp_per_member: 300,
       xp_per_member: 300,
       take_10: true,
+    });
+    expect(mechanics(db, "dmg2-business-profit-check")).toMatchObject({
+      term: "month",
+      take_10_min_primary_skill_ranks: 1,
+      take_20: false,
+      profit_rating: "profit check result - 25",
+    });
+    expect(mechanics(db, "dmg2-mentor-favor-check")).toMatchObject({
+      dc: { small: 15, large: 25, huge: 40 },
+      mentor_score_change_per_request: -1,
+    });
+    expect(mechanics(db, "dmg2-pitspawned-template")).toMatchObject({
+      weapon: { added_cost_gp: 1000, critical_confirmation_bonus: 2 },
     });
 
     expect(

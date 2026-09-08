@@ -41,6 +41,7 @@ export const featCategories = [
   "general",
   "fighter",
   "metamagic",
+  "metapsionic",
   "item_creation",
   "psionic",
   "epic",

@@ -48,6 +48,8 @@ export const featCategories = [
   "divine",
   "wild",
   "heritage",
+  "ceremony",
+  "combat_form",
   "tactical",
   "reserve",
   "incarnum",

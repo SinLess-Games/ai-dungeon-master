@@ -39,6 +39,7 @@ export * from "./monsterSkill";
 export * from "./power";
 export * from "./powerClassLevel";
 export * from "./powerDiscipline";
+export * from "./powerDisciplineAssignment";
 export * from "./prerequisite";
 export * from "./primitives";
 export * from "./race";

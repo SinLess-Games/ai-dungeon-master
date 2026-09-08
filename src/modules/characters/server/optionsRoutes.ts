@@ -3,7 +3,13 @@
 import { and, asc, eq, isNull, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDatabase } from "@/infrastructure/database/client";
-import { classLevels, classes, raceAbilities, races } from "@/infrastructure/database/schema";
+import {
+  classLevels,
+  classPrerequisites,
+  classes,
+  raceAbilities,
+  races,
+} from "@/infrastructure/database/schema";
 import { createAuth, type AuthEnv } from "@/modules/auth/server/auth";
 import { requireUser } from "@/modules/auth/server/requireAuth";
 import { ServiceUnavailableError } from "@/server/middleware/errors";
@@ -13,6 +19,8 @@ interface CharacterOptionBindings extends AuthEnv {
 }
 
 type CharacterOptionEnv = { Bindings: CharacterOptionBindings };
+
+const alignments = ["LG", "NG", "CG", "LN", "N", "CN", "LE", "NE", "CE"] as const;
 
 function requireDatabase(binding: D1Database | undefined): D1Database {
   if (!binding) throw new ServiceUnavailableError("Character rules data is unavailable.");
@@ -26,7 +34,7 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>().get(
     const session = await requireUser(createAuth(c.env), c.req.raw.headers);
     const db = createDatabase(requireDatabase(c.env.DB));
 
-    const [raceRows, racialAbilityRows, classRows] = await Promise.all([
+    const [raceRows, racialAbilityRows, classRows, prerequisiteRows] = await Promise.all([
       db
         .select({
           id: races.id,
@@ -67,6 +75,7 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>().get(
       db
         .select({
           id: classes.id,
+          slug: classes.slug,
           name: classes.name,
           description: classes.description,
           rulesText: classes.rulesText,
@@ -93,6 +102,14 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>().get(
         )
         .orderBy(asc(classes.name))
         .all(),
+      db
+        .select({
+          classId: classPrerequisites.classId,
+          expression: classPrerequisites.expression,
+          explanation: classPrerequisites.explanation,
+        })
+        .from(classPrerequisites)
+        .all(),
     ]);
 
     const modifiersByRace = new Map<string, Record<string, number>>();
@@ -102,18 +119,27 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>().get(
       modifiersByRace.set(row.raceId, modifiers);
     }
 
+    const prerequisitesByClass = new Map(prerequisiteRows.map((row) => [row.classId, row]));
+
     return c.json({
       races: raceRows.map((race) => ({
         ...race,
         abilityModifiers: modifiersByRace.get(race.id) ?? {},
       })),
-      classes: classRows.map((characterClass) => ({
-        ...characterClass,
-        firstLevelHitPoints: characterClass.levelOneHitDie ?? characterClass.hitDie,
-        firstLevelSkillPoints:
-          characterClass.levelOneSkillPoints ?? characterClass.skillPointsPerLevel,
-      })),
-      alignments: ["LG", "NG", "CG", "LN", "N", "CN", "LE", "NE", "CE"] as const,
+      classes: classRows.map((characterClass) => {
+        const prerequisite = prerequisitesByClass.get(characterClass.id);
+        const condition = prerequisite?.expression.condition;
+        const allowedAlignments = condition?.kind === "alignment" ? condition.allowed : alignments;
+        return {
+          ...characterClass,
+          firstLevelHitPoints: characterClass.levelOneHitDie ?? characterClass.hitDie,
+          firstLevelSkillPoints:
+            characterClass.levelOneSkillPoints ?? characterClass.skillPointsPerLevel,
+          allowedAlignments,
+          prerequisiteExplanation: prerequisite?.explanation ?? null,
+        };
+      }),
+      alignments,
     });
   },
 );

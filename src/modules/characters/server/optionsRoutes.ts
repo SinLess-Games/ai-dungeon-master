@@ -25,8 +25,6 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>().get(
     c.header("Cache-Control", "private, max-age=300");
     const session = await requireUser(createAuth(c.env), c.req.raw.headers);
     const db = createDatabase(requireDatabase(c.env.DB));
-    const canSeeOwnedContent = (ownerColumn: typeof races.ownerUserId) =>
-      or(isNull(ownerColumn), eq(ownerColumn, session.user.id));
 
     const [raceRows, racialAbilityRows, classRows] = await Promise.all([
       db
@@ -43,14 +41,28 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>().get(
           isHomebrew: races.isHomebrew,
         })
         .from(races)
-        .where(and(eq(races.isEnabled, true), canSeeOwnedContent(races.ownerUserId)))
+        .where(
+          and(
+            eq(races.isEnabled, true),
+            or(isNull(races.ownerUserId), eq(races.ownerUserId, session.user.id)),
+          ),
+        )
         .orderBy(asc(races.name))
         .all(),
       db
-        .select({ raceId: raceAbilities.raceId, ability: raceAbilities.ability, modifier: raceAbilities.modifier })
+        .select({
+          raceId: raceAbilities.raceId,
+          ability: raceAbilities.ability,
+          modifier: raceAbilities.modifier,
+        })
         .from(raceAbilities)
         .innerJoin(races, eq(raceAbilities.raceId, races.id))
-        .where(and(eq(races.isEnabled, true), canSeeOwnedContent(races.ownerUserId)))
+        .where(
+          and(
+            eq(races.isEnabled, true),
+            or(isNull(races.ownerUserId), eq(races.ownerUserId, session.user.id)),
+          ),
+        )
         .all(),
       db
         .select({
@@ -76,7 +88,7 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>().get(
           and(
             eq(classes.isEnabled, true),
             eq(classes.category, "base"),
-            canSeeOwnedContent(classes.ownerUserId),
+            or(isNull(classes.ownerUserId), eq(classes.ownerUserId, session.user.id)),
           ),
         )
         .orderBy(asc(classes.name))
@@ -91,11 +103,15 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>().get(
     }
 
     return c.json({
-      races: raceRows.map((race) => ({ ...race, abilityModifiers: modifiersByRace.get(race.id) ?? {} })),
+      races: raceRows.map((race) => ({
+        ...race,
+        abilityModifiers: modifiersByRace.get(race.id) ?? {},
+      })),
       classes: classRows.map((characterClass) => ({
         ...characterClass,
         firstLevelHitPoints: characterClass.levelOneHitDie ?? characterClass.hitDie,
-        firstLevelSkillPoints: characterClass.levelOneSkillPoints ?? characterClass.skillPointsPerLevel,
+        firstLevelSkillPoints:
+          characterClass.levelOneSkillPoints ?? characterClass.skillPointsPerLevel,
       })),
       alignments: ["LG", "NG", "CG", "LN", "N", "CN", "LE", "NE", "CE"] as const,
     });

@@ -56,5 +56,6 @@ export * from "./spellComponent";
 export * from "./spellDescriptor";
 export * from "./spellDomainLevel";
 export * from "./spellSchool";
+export * from "./spellSchoolAssignment";
 export * from "./template";
 export * from "./weapon";

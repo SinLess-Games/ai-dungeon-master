@@ -1,0 +1,76 @@
+-- PHB feat prerequisites.
+-- Structured expressions are used where the current rules schema can model the prerequisite directly.
+-- Proficiency, skill-rank, selected-school/weapon, and turn/rebuke requirements use namespaced custom extensions.
+
+WITH desired(slug,expression,explanation) AS (VALUES
+  ('armor-proficiency-medium', '{"version":1,"condition":{"kind":"feat","featId":"phb-feat-armor-proficiency-light"}}', 'Armor Proficiency (light).'),
+  ('armor-proficiency-heavy', '{"version":1,"condition":{"kind":"feat","featId":"phb-feat-armor-proficiency-medium"}}', 'Armor Proficiency (medium).'),
+  ('augment-summoning', '{"version":1,"condition":{"kind":"custom","description":"Spell Focus (conjuration).","extension":{"key":"dnd35.prerequisite.selected-feat","version":1,"parameters":{"featId":"phb-feat-spell-focus","choice":"conjuration"}}}}', 'Spell Focus (conjuration).'),
+  ('combat-expertise', '{"version":1,"condition":{"kind":"ability","ability":"int","minimum":13}}', 'Intelligence 13.'),
+  ('improved-disarm', '{"version":1,"condition":{"kind":"feat","featId":"phb-feat-combat-expertise"}}', 'Combat Expertise.'),
+  ('improved-feint', '{"version":1,"condition":{"kind":"feat","featId":"phb-feat-combat-expertise"}}', 'Combat Expertise.'),
+  ('improved-trip', '{"version":1,"condition":{"kind":"feat","featId":"phb-feat-combat-expertise"}}', 'Combat Expertise.'),
+  ('whirlwind-attack', '{"version":1,"condition":{"kind":"all","conditions":[{"kind":"ability","ability":"dex","minimum":13},{"kind":"feat","featId":"phb-feat-combat-expertise"},{"kind":"feat","featId":"phb-feat-dodge"},{"kind":"feat","featId":"phb-feat-mobility"},{"kind":"feat","featId":"phb-feat-spring-attack"},{"kind":"base_attack_bonus","minimum":4}]}}', 'Dexterity 13, Combat Expertise, Dodge, Mobility, Spring Attack, base attack bonus +4.'),
+  ('dodge', '{"version":1,"condition":{"kind":"ability","ability":"dex","minimum":13}}', 'Dexterity 13.'),
+  ('mobility', '{"version":1,"condition":{"kind":"feat","featId":"phb-feat-dodge"}}', 'Dodge.'),
+  ('spring-attack', '{"version":1,"condition":{"kind":"all","conditions":[{"kind":"feat","featId":"phb-feat-mobility"},{"kind":"base_attack_bonus","minimum":4}]}}', 'Mobility, base attack bonus +4.'),
+  ('diehard', '{"version":1,"condition":{"kind":"feat","featId":"phb-feat-endurance"}}', 'Endurance.'),
+  ('exotic-weapon-proficiency', '{"version":1,"condition":{"kind":"base_attack_bonus","minimum":1}}', 'Base attack bonus +1.'),
+  ('extra-turning', '{"version":1,"condition":{"kind":"custom","description":"Ability to turn or rebuke creatures.","extension":{"key":"dnd35.prerequisite.turn-or-rebuke","version":1,"parameters":{"text":"Ability to turn or rebuke creatures."}}}}', 'Ability to turn or rebuke creatures.'),
+  ('improved-critical', '{"version":1,"condition":{"kind":"all","conditions":[{"kind":"custom","description":"Proficiency with the selected weapon.","extension":{"key":"dnd35.prerequisite.weapon-proficiency","version":1,"parameters":{"text":"Proficiency with the selected weapon."}}},{"kind":"base_attack_bonus","minimum":8}]}}', 'Proficiency with selected weapon, base attack bonus +8.'),
+  ('improved-turning', '{"version":1,"condition":{"kind":"custom","description":"Ability to turn or rebuke creatures.","extension":{"key":"dnd35.prerequisite.turn-or-rebuke","version":1,"parameters":{"text":"Ability to turn or rebuke creatures."}}}}', 'Ability to turn or rebuke creatures.'),
+  ('improved-grapple', '{"version":1,"condition":{"kind":"all","conditions":[{"kind":"ability","ability":"dex","minimum":13},{"kind":"feat","featId":"phb-feat-improved-unarmed-strike"}]}}', 'Dexterity 13, Improved Unarmed Strike.'),
+  ('deflect-arrows', '{"version":1,"condition":{"kind":"all","conditions":[{"kind":"ability","ability":"dex","minimum":13},{"kind":"feat","featId":"phb-feat-improved-unarmed-strike"}]}}', 'Dexterity 13, Improved Unarmed Strike.'),
+  ('snatch-arrows', '{"version":1,"condition":{"kind":"all","conditions":[{"kind":"ability","ability":"dex","minimum":15},{"kind":"feat","featId":"phb-feat-deflect-arrows"},{"kind":"feat","featId":"phb-feat-improved-unarmed-strike"}]}}', 'Dexterity 15, Deflect Arrows, Improved Unarmed Strike.'),
+  ('stunning-fist', '{"version":1,"condition":{"kind":"all","conditions":[{"kind":"ability","ability":"dex","minimum":13},{"kind":"ability","ability":"wis","minimum":13},{"kind":"feat","featId":"phb-feat-improved-unarmed-strike"},{"kind":"base_attack_bonus","minimum":8}]}}', 'Dexterity 13, Wisdom 13, Improved Unarmed Strike, base attack bonus +8.'),
+  ('leadership', '{"version":1,"condition":{"kind":"character_level","minimum":6}}', 'Character level 6th.'),
+  ('mounted-combat', '{"version":1,"condition":{"kind":"custom","description":"Ride 1 rank.","extension":{"key":"dnd35.prerequisite.skill-ranks","version":1,"parameters":{"skill":"Ride","minimum":1}}}}', 'Ride 1 rank.'),
+  ('mounted-archery', '{"version":1,"condition":{"kind":"feat","featId":"phb-feat-mounted-combat"}}', 'Mounted Combat.'),
+  ('ride-by-attack', '{"version":1,"condition":{"kind":"feat","featId":"phb-feat-mounted-combat"}}', 'Mounted Combat.'),
+  ('spirited-charge', '{"version":1,"condition":{"kind":"all","conditions":[{"kind":"feat","featId":"phb-feat-mounted-combat"},{"kind":"feat","featId":"phb-feat-ride-by-attack"}]}}', 'Mounted Combat, Ride-By Attack.'),
+  ('trample', '{"version":1,"condition":{"kind":"feat","featId":"phb-feat-mounted-combat"}}', 'Mounted Combat.'),
+  ('natural-spell', '{"version":1,"condition":{"kind":"all","conditions":[{"kind":"ability","ability":"wis","minimum":13},{"kind":"class_feature","classFeatureId":"phb-class-feature-druid-wild-shape"}]}}', 'Wisdom 13, ability to use wild shape.'),
+  ('far-shot', '{"version":1,"condition":{"kind":"feat","featId":"phb-feat-point-blank-shot"}}', 'Point Blank Shot.'),
+  ('precise-shot', '{"version":1,"condition":{"kind":"feat","featId":"phb-feat-point-blank-shot"}}', 'Point Blank Shot.'),
+  ('rapid-shot', '{"version":1,"condition":{"kind":"all","conditions":[{"kind":"ability","ability":"dex","minimum":13},{"kind":"feat","featId":"phb-feat-point-blank-shot"}]}}', 'Dexterity 13, Point Blank Shot.'),
+  ('manyshot', '{"version":1,"condition":{"kind":"all","conditions":[{"kind":"ability","ability":"dex","minimum":17},{"kind":"feat","featId":"phb-feat-point-blank-shot"},{"kind":"feat","featId":"phb-feat-rapid-shot"},{"kind":"base_attack_bonus","minimum":6}]}}', 'Dexterity 17, Point Blank Shot, Rapid Shot, base attack bonus +6.'),
+  ('shot-on-the-run', '{"version":1,"condition":{"kind":"all","conditions":[{"kind":"ability","ability":"dex","minimum":13},{"kind":"feat","featId":"phb-feat-dodge"},{"kind":"feat","featId":"phb-feat-mobility"},{"kind":"feat","featId":"phb-feat-point-blank-shot"},{"kind":"base_attack_bonus","minimum":4}]}}', 'Dexterity 13, Dodge, Mobility, Point Blank Shot, base attack bonus +4.'),
+  ('improved-precise-shot', '{"version":1,"condition":{"kind":"all","conditions":[{"kind":"ability","ability":"dex","minimum":19},{"kind":"feat","featId":"phb-feat-point-blank-shot"},{"kind":"feat","featId":"phb-feat-precise-shot"},{"kind":"base_attack_bonus","minimum":11}]}}', 'Dexterity 19, Point Blank Shot, Precise Shot, base attack bonus +11.'),
+  ('power-attack', '{"version":1,"condition":{"kind":"ability","ability":"str","minimum":13}}', 'Strength 13.'),
+  ('cleave', '{"version":1,"condition":{"kind":"feat","featId":"phb-feat-power-attack"}}', 'Power Attack.'),
+  ('great-cleave', '{"version":1,"condition":{"kind":"all","conditions":[{"kind":"feat","featId":"phb-feat-cleave"},{"kind":"feat","featId":"phb-feat-power-attack"},{"kind":"base_attack_bonus","minimum":4}]}}', 'Cleave, Power Attack, base attack bonus +4.'),
+  ('improved-bull-rush', '{"version":1,"condition":{"kind":"feat","featId":"phb-feat-power-attack"}}', 'Power Attack.'),
+  ('improved-overrun', '{"version":1,"condition":{"kind":"feat","featId":"phb-feat-power-attack"}}', 'Power Attack.'),
+  ('improved-sunder', '{"version":1,"condition":{"kind":"feat","featId":"phb-feat-power-attack"}}', 'Power Attack.'),
+  ('quick-draw', '{"version":1,"condition":{"kind":"base_attack_bonus","minimum":1}}', 'Base attack bonus +1.'),
+  ('rapid-reload', '{"version":1,"condition":{"kind":"custom","description":"Weapon proficiency with the selected crossbow.","extension":{"key":"dnd35.prerequisite.weapon-proficiency","version":1,"parameters":{"text":"Weapon proficiency with the selected crossbow."}}}}', 'Weapon proficiency with the selected crossbow.'),
+  ('improved-shield-bash', '{"version":1,"condition":{"kind":"feat","featId":"phb-feat-shield-proficiency"}}', 'Shield Proficiency.'),
+  ('tower-shield-proficiency', '{"version":1,"condition":{"kind":"feat","featId":"phb-feat-shield-proficiency"}}', 'Shield Proficiency.'),
+  ('greater-spell-focus', '{"version":1,"condition":{"kind":"custom","description":"Spell Focus in the same selected school.","extension":{"key":"dnd35.prerequisite.selected-feat","version":1,"parameters":{"featId":"phb-feat-spell-focus","choiceRelation":"same"}}}}', 'Spell Focus in the selected school.'),
+  ('spell-mastery', '{"version":1,"condition":{"kind":"class_level","classId":"phb-class-wizard","minimum":1}}', 'Wizard level 1st.'),
+  ('greater-spell-penetration', '{"version":1,"condition":{"kind":"feat","featId":"phb-feat-spell-penetration"}}', 'Spell Penetration.'),
+  ('two-weapon-fighting', '{"version":1,"condition":{"kind":"ability","ability":"dex","minimum":15}}', 'Dexterity 15.'),
+  ('two-weapon-defense', '{"version":1,"condition":{"kind":"feat","featId":"phb-feat-two-weapon-fighting"}}', 'Two-Weapon Fighting.'),
+  ('improved-two-weapon-fighting', '{"version":1,"condition":{"kind":"all","conditions":[{"kind":"ability","ability":"dex","minimum":17},{"kind":"feat","featId":"phb-feat-two-weapon-fighting"},{"kind":"base_attack_bonus","minimum":6}]}}', 'Dexterity 17, Two-Weapon Fighting, base attack bonus +6.'),
+  ('greater-two-weapon-fighting', '{"version":1,"condition":{"kind":"all","conditions":[{"kind":"ability","ability":"dex","minimum":19},{"kind":"feat","featId":"phb-feat-improved-two-weapon-fighting"},{"kind":"feat","featId":"phb-feat-two-weapon-fighting"},{"kind":"base_attack_bonus","minimum":11}]}}', 'Dexterity 19, Improved Two-Weapon Fighting, Two-Weapon Fighting, base attack bonus +11.'),
+  ('weapon-finesse', '{"version":1,"condition":{"kind":"all","conditions":[{"kind":"custom","description":"Proficiency with the selected qualifying weapon.","extension":{"key":"dnd35.prerequisite.weapon-proficiency","version":1,"parameters":{"text":"Proficiency with the selected qualifying weapon."}}},{"kind":"base_attack_bonus","minimum":1}]}}', 'Proficiency with selected weapon, base attack bonus +1.'),
+  ('weapon-focus', '{"version":1,"condition":{"kind":"all","conditions":[{"kind":"custom","description":"Proficiency with the selected weapon.","extension":{"key":"dnd35.prerequisite.weapon-proficiency","version":1,"parameters":{"text":"Proficiency with the selected weapon."}}},{"kind":"base_attack_bonus","minimum":1}]}}', 'Proficiency with selected weapon, base attack bonus +1.'),
+  ('weapon-specialization', '{"version":1,"condition":{"kind":"all","conditions":[{"kind":"custom","description":"Proficiency with the selected weapon and Weapon Focus with that same weapon.","extension":{"key":"dnd35.prerequisite.selected-weapon-feat","version":1,"parameters":{"featId":"phb-feat-weapon-focus"}}},{"kind":"class_level","classId":"phb-class-fighter","minimum":4}]}}', 'Proficiency with selected weapon, Weapon Focus with selected weapon, fighter level 4th.'),
+  ('greater-weapon-focus', '{"version":1,"condition":{"kind":"all","conditions":[{"kind":"custom","description":"Proficiency with the selected weapon and Weapon Focus with that same weapon.","extension":{"key":"dnd35.prerequisite.selected-weapon-feat","version":1,"parameters":{"featId":"phb-feat-weapon-focus"}}},{"kind":"class_level","classId":"phb-class-fighter","minimum":8}]}}', 'Proficiency with selected weapon, Weapon Focus with selected weapon, fighter level 8th.'),
+  ('greater-weapon-specialization', '{"version":1,"condition":{"kind":"all","conditions":[{"kind":"custom","description":"Proficiency with the selected weapon; Greater Weapon Focus, Weapon Focus, and Weapon Specialization with that same weapon.","extension":{"key":"dnd35.prerequisite.selected-weapon-feat","version":1,"parameters":{"featIds":["phb-feat-greater-weapon-focus","phb-feat-weapon-focus","phb-feat-weapon-specialization"]}}},{"kind":"class_level","classId":"phb-class-fighter","minimum":12}]}}', 'Proficiency with selected weapon, Greater Weapon Focus, Weapon Focus, Weapon Specialization with selected weapon, fighter level 12th.'),
+  ('brew-potion', '{"version":1,"condition":{"kind":"caster_level","minimum":3}}', 'Caster level 3rd.'),
+  ('craft-magic-arms-and-armor', '{"version":1,"condition":{"kind":"caster_level","minimum":5}}', 'Caster level 5th.'),
+  ('craft-rod', '{"version":1,"condition":{"kind":"caster_level","minimum":9}}', 'Caster level 9th.'),
+  ('craft-staff', '{"version":1,"condition":{"kind":"caster_level","minimum":12}}', 'Caster level 12th.'),
+  ('craft-wand', '{"version":1,"condition":{"kind":"caster_level","minimum":5}}', 'Caster level 5th.'),
+  ('craft-wondrous-item', '{"version":1,"condition":{"kind":"caster_level","minimum":3}}', 'Caster level 3rd.'),
+  ('forge-ring', '{"version":1,"condition":{"kind":"caster_level","minimum":12}}', 'Caster level 12th.'),
+  ('scribe-scroll', '{"version":1,"condition":{"kind":"caster_level","minimum":1}}', 'Caster level 1st.')
+)
+INSERT INTO dnd35_feat_prerequisites (feat_id,expression,explanation)
+SELECT f.id,d.expression,d.explanation
+FROM desired d
+JOIN dnd35_feats f ON f.slug=d.slug
+JOIN dnd35_sources s ON s.id=f.source_id
+WHERE s.slug='players-handbook-3-5' AND f.owner_user_id IS NULL
+ON CONFLICT(feat_id) DO UPDATE SET expression=excluded.expression, explanation=excluded.explanation;

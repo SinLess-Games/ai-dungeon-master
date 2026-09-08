@@ -46,6 +46,7 @@ export * from "./race";
 export * from "./raceAbility";
 export * from "./raceLanguage";
 export * from "./raceTrait";
+export * from "./rule";
 export * from "./shield";
 export * from "./skill";
 export * from "./skillSynergy";

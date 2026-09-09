@@ -1,8 +1,5 @@
 /* global console, URL */
-/**
- * Real isolated D&D 3.5 character-creator end-to-end + smoke verification.
- * Boots the Cloudflare/Vite monolith against disposable local D1 state.
- */
+/** Real isolated D&D 3.5 character-creator end-to-end + smoke verification. */
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -33,7 +30,6 @@ const seedDirectories = [
   "expanded-psionics-handbook-feats",
   "expanded-psionics-handbook-powers",
 ];
-
 let proxy;
 let server;
 let browser;
@@ -48,12 +44,47 @@ async function sqlFiles(path) {
   return files;
 }
 
-function executableSeedSql(sql) {
+function stripLineComments(sql) {
   return sql
     .split("\n")
     .filter((line) => !line.trimStart().startsWith("--"))
-    .join("\n")
-    .trim();
+    .join("\n");
+}
+
+function splitSqlStatements(sql) {
+  const statements = [];
+  let current = "";
+  let single = false;
+  let double = false;
+  for (let index = 0; index < sql.length; index += 1) {
+    const character = sql[index];
+    const next = sql[index + 1];
+    if (character === "'" && !double) {
+      current += character;
+      if (single && next === "'") {
+        current += next;
+        index += 1;
+      } else {
+        single = !single;
+      }
+      continue;
+    }
+    if (character === '"' && !single) {
+      double = !double;
+      current += character;
+      continue;
+    }
+    if (character === ";" && !single && !double) {
+      if (current.trim()) statements.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += character;
+  }
+  if (current.trim()) statements.push(current.trim());
+  assert.equal(single, false, "Seed SQL contains an unterminated single-quoted string.");
+  assert.equal(double, false, "Seed SQL contains an unterminated double-quoted identifier.");
+  return statements;
 }
 
 async function applyMigrations(db) {
@@ -72,8 +103,8 @@ async function applyMigrations(db) {
 async function applySeeds(db) {
   for (const seedDirectory of seedDirectories) {
     for (const file of await sqlFiles(join("seeds", seedDirectory))) {
-      const sql = executableSeedSql(await readFile(file, "utf8"));
-      if (sql) await db.exec(sql);
+      const sql = stripLineComments(await readFile(file, "utf8"));
+      for (const statement of splitSqlStatements(sql)) await db.prepare(statement).run();
     }
   }
 }
@@ -89,11 +120,7 @@ async function api(page, method, path, data, status = 200) {
     ...(data === undefined ? {} : { data }),
   });
   const text = await response.text();
-  assert.equal(
-    response.status(),
-    status,
-    `${method} ${path} returned ${response.status()} instead of ${status}: ${text}`,
-  );
+  assert.equal(response.status(), status, `${method} ${path}: ${response.status()} ${text}`);
   return text ? JSON.parse(text) : null;
 }
 
@@ -164,12 +191,10 @@ function exactSkills(page) {
 function simpleFeat(page, preferredSlug, used) {
   const feat =
     page.options.find(
-      (option) =>
-        option.slug === preferredSlug && option.choiceKind === "none" && !used.has(option.id),
+      (option) => option.slug === preferredSlug && option.choiceKind === "none" && !used.has(option.id),
     ) ??
     page.options.find(
-      (option) =>
-        option.choiceKind === "none" && !option.explanation && !used.has(option.id),
+      (option) => option.choiceKind === "none" && !option.explanation && !used.has(option.id),
     );
   assert.ok(feat, "Expected a selectable no-choice feat.");
   used.add(feat.id);
@@ -183,7 +208,6 @@ async function wizardEndToEnd(page) {
     hitPointsGained: 4,
   });
   const id = character.id;
-
   const early = await page.request.post(`${origin}/api/characters/${id}/ready`, {
     headers: { Origin: origin },
   });
@@ -212,21 +236,12 @@ async function wizardEndToEnd(page) {
     classBonusFeats: [],
   });
 
-  const wealth = await api(
-    page,
-    "POST",
-    `/api/characters/${id}/starting-wealth/roll`,
-    undefined,
-    201,
-  );
+  const wealth = await api(page, "POST", `/api/characters/${id}/starting-wealth/roll`, undefined, 201);
   assert.ok(wealth.startingWealthCopper > 0);
-  const reroll = await api(page, "POST", `/api/characters/${id}/starting-wealth/roll`);
-  assert.equal(reroll.alreadyRolled, true);
+  assert.equal((await api(page, "POST", `/api/characters/${id}/starting-wealth/roll`)).alreadyRolled, true);
   await api(page, "PUT", `/api/characters/${id}/equipment`, { selections: [] });
 
-  await api(page, "PUT", `/api/characters/${id}/class-choices`, {
-    wizardSpecialization: null,
-  });
+  await api(page, "PUT", `/api/characters/${id}/class-choices`, { wizardSpecialization: null });
   const spells = await api(page, "GET", `/api/characters/${id}/creation/spells`);
   assert.equal(spells.mode, "spellbook");
   assert.ok(spells.automaticSpellIds.length > 0);
@@ -247,13 +262,11 @@ async function wizardEndToEnd(page) {
   const readiness = await api(page, "GET", `/api/characters/${id}/creation/readiness`);
   assert.equal(readiness.complete, true);
   assert.deepEqual(readiness.missing, []);
-
   const ready = await api(page, "POST", `/api/characters/${id}/ready`);
   assert.equal(ready.status, "ready");
   assert.equal(ready.creationComplete, true);
   assert.equal(ready.campaignStatus, "ready");
   assert.ok(ready.maximumHitPoints > 0);
-
   const persisted = await api(page, "GET", `/api/campaigns/${campaign.id}`);
   assert.equal(persisted.campaign.status, "ready");
   assert.equal(persisted.characters.find((entry) => entry.id === id)?.status, "ready");
@@ -279,10 +292,8 @@ async function wizardSpecializationSmoke(page) {
     },
   });
   const spells = await api(page, "GET", `/api/characters/${id}/creation/spells`);
-  assert.ok(
-    spells.options.every((spell) => ![enchantment.id, necromancy.id].includes(spell.schoolId)),
-  );
-  console.log("✓ smoke: Wizard specialist spell list excludes prohibited schools");
+  assert.ok(spells.options.every((spell) => ![enchantment.id, necromancy.id].includes(spell.schoolId)));
+  console.log("✓ smoke: Wizard specialist excludes prohibited schools");
 }
 
 async function clericDomainSmoke(page) {
@@ -294,14 +305,14 @@ async function clericDomainSmoke(page) {
   const id = character.id;
   const divine = await api(page, "GET", `/api/characters/${id}/creation/divine`);
   assert.equal(divine.required, true);
-  assert.ok(divine.domainOptions.length >= 2);
   const domainIds = divine.domainOptions.slice(0, 2).map((domain) => domain.id);
+  assert.equal(domainIds.length, 2);
   const selected = await api(page, "PUT", `/api/characters/${id}/divine`, {
     deityId: null,
     domainIds,
   });
   assert.deepEqual(new Set(selected.domainIds), new Set(domainIds));
-  console.log("✓ smoke: Cleric domain selection validates and persists");
+  console.log("✓ smoke: Cleric domains validate and persist");
 }
 
 async function druidCompanionSmoke(page) {
@@ -330,19 +341,17 @@ async function rangerFavoredEnemySmoke(page) {
   const humanoid = choices.options.find((option) => option.slug === "humanoid");
   const human = choices.subtypeOptions.humanoid.find((option) => option.slug === "human");
   assert.ok(humanoid && human);
-
   const missingSubtype = await page.request.put(`${origin}/api/characters/${id}/class-choices`, {
     headers: { Origin: origin },
     data: { favoredEnemyTypeId: humanoid.id },
   });
   assert.equal(missingSubtype.status(), 400);
-
   const selected = await api(page, "PUT", `/api/characters/${id}/class-choices`, {
     favoredEnemyTypeId: humanoid.id,
     favoredEnemySubtypeId: human.id,
   });
   assert.equal(selected.choices[0].parameters.subtypeSlug, "human");
-  console.log("✓ smoke: Ranger Humanoid favored enemy requires and stores a subtype");
+  console.log("✓ smoke: Ranger favored enemy subtype is enforced and persisted");
 }
 
 async function psionPowerSmoke(page) {
@@ -356,9 +365,7 @@ async function psionPowerSmoke(page) {
   assert.equal(choices.choice, "psionic-discipline");
   assert.ok(choices.options.length >= 6);
   const discipline = choices.options[0];
-  await api(page, "PUT", `/api/characters/${id}/class-choices`, {
-    psionDisciplineId: discipline.id,
-  });
+  await api(page, "PUT", `/api/characters/${id}/class-choices`, { psionDisciplineId: discipline.id });
   const powers = await api(page, "GET", `/api/characters/${id}/creation/powers`);
   assert.equal(powers.required, true);
   assert.equal(powers.disciplineId, discipline.id);
@@ -389,7 +396,6 @@ try {
       },
     }),
   );
-
   proxy = await getPlatformProxy({
     configPath,
     persist: { path: join(directory, "v3") },
@@ -397,7 +403,6 @@ try {
   });
   await applyMigrations(proxy.env.DB);
   await applySeeds(proxy.env.DB);
-
   assert.ok((await scalar(proxy.env.DB, "SELECT count(*) AS n FROM dnd35_classes")) >= 15);
   assert.ok((await scalar(proxy.env.DB, "SELECT count(*) AS n FROM dnd35_skills")) >= 40);
   assert.ok((await scalar(proxy.env.DB, "SELECT count(*) AS n FROM dnd35_feats")) >= 100);
@@ -405,8 +410,7 @@ try {
   assert.ok((await scalar(proxy.env.DB, "SELECT count(*) AS n FROM dnd35_powers")) >= 250);
   assert.ok((await scalar(proxy.env.DB, "SELECT count(*) AS n FROM dnd35_domains")) >= 20);
   assert.ok((await scalar(proxy.env.DB, "SELECT count(*) AS n FROM dnd35_creature_types")) >= 15);
-  console.log("✓ smoke: disposable D1 migrations and creator content seeds load correctly");
-
+  console.log("✓ smoke: disposable D1 migrations and creator seeds load correctly");
   await proxy.dispose();
   proxy = undefined;
 
@@ -432,7 +436,6 @@ try {
     server: { host: "localhost", port: 5187, strictPort: true },
   });
   await server.listen();
-
   browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   page.setDefaultTimeout(15_000);
@@ -443,7 +446,7 @@ try {
   assert.equal((await page.request.get(`${origin}/api/health/live`)).status(), 200);
   assert.equal((await page.request.get(`${origin}/api/health`)).status(), 200);
   assert.equal((await page.request.get(`${origin}/api/campaigns`)).status(), 401);
-  console.log("✓ smoke: health endpoints and unauthenticated creator boundary respond correctly");
+  console.log("✓ smoke: health and auth boundaries respond correctly");
 
   await page.getByRole("button", { name: "Create Account", exact: true }).click();
   await page.getByLabel("Username", { exact: true }).fill("CreatorE2E");
@@ -452,9 +455,12 @@ try {
   await page.getByLabel("Confirm password", { exact: true }).fill(password);
   await page.locator("form").getByRole("button", { name: "Create Account", exact: true }).click();
   await page.locator(".auth-user-menu summary").waitFor();
-  const cookies = await page.context().cookies();
-  assert.ok(cookies.some((cookie) => cookie.httpOnly && cookie.name.includes("session_token")));
-  console.log("✓ smoke: real browser signup creates an authenticated session");
+  assert.ok(
+    (await page.context().cookies()).some(
+      (cookie) => cookie.httpOnly && cookie.name.includes("session_token"),
+    ),
+  );
+  console.log("✓ smoke: browser signup creates an authenticated creator session");
 
   await wizardEndToEnd(page);
   await wizardSpecializationSmoke(page);
@@ -462,7 +468,6 @@ try {
   await druidCompanionSmoke(page);
   await rangerFavoredEnemySmoke(page);
   await psionPowerSmoke(page);
-
   assert.deepEqual(pageErrors, []);
   console.log("\n✓ Character creator end-to-end and smoke verification passed.");
 } finally {

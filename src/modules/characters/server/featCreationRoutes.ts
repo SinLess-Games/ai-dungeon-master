@@ -212,7 +212,7 @@ export const characterFeatCreationRoutes = new Hono<CharacterCreationEnv>()
     const featureFacts = Object.fromEntries(featureRows.map(({ id }) => [id, 1]));
     const hasTurning = featureRows.some(({ slug }) => slug.includes("turn-rebuke"));
 
-    const spellAccess: Array<{ level: number; tradition: string; classId: string }> = [];
+    const spellAccess: Array<{ level: number; tradition: "arcane" | "divine" | "psionic" | "other"; classId: string }> = [];
     const classCasterLevels: Record<string, number> = {};
     for (const casting of spellcastingRows) {
       if (casting.castingMode === "psionic") continue;

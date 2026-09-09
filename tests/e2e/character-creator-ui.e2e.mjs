@@ -26,6 +26,7 @@ const seedDirectories = [
   "phb-feats",
   "phb-divine",
   "phb-creatures",
+  "srd-monster-races",
   "phb-spells",
   "expanded-psionics-handbook-classes",
   "expanded-psionics-handbook-feats",
@@ -201,9 +202,16 @@ async function runUiFlow(page) {
   assert.match(completeText, /Level 1 Dwarf Barbarian/);
   assert.match(completeText, /Standard/);
   assert.ok(completeText.includes(campaignName));
-  await page.getByRole("link", { name: "View my characters" }).waitFor();
 
-  console.log("✓ UI E2E: Play → Characters opens the library, then the full creator completes a Dwarf Barbarian");
+  const libraryLink = page.getByRole("link", { name: "View my characters" });
+  await libraryLink.click();
+  await page.waitForURL(`${origin}/characters`);
+  const savedCard = page.locator(".character-library-card").filter({ hasText: characterName });
+  await savedCard.waitFor();
+  assert.match((await savedCard.textContent()) ?? "", /Dwarf\s*·\s*Barbarian/);
+  assert.match((await savedCard.textContent()) ?? "", /Ready/i);
+
+  console.log("✓ UI E2E: Play → Characters opens the library, the full creator completes a Dwarf Barbarian, and the saved character appears in the library");
 }
 
 try {

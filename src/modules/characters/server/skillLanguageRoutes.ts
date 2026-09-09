@@ -77,7 +77,7 @@ async function requireRaceAndIntelligence(
       )
       .get(),
   ]);
-  if (!extension?.raceId || intelligenceRow?.baseScore === undefined) {
+  if (!extension?.raceId || intelligenceRow?.baseScore == null) {
     throw new ValidationError("Choose race and ability scores before completing this step.");
   }
 

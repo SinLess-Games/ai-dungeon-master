@@ -222,7 +222,7 @@ export const characterClassChoiceCreationRoutes = new Hono<CharacterCreationEnv>
       if (new Set(trackChoices.map(({ track }) => track)).size !== trackChoices.length) {
         throw new ValidationError("Each gestalt class track can submit class choices only once.");
       }
-      const inputByTrack = new Map(trackChoices.map((choice) => [choice.track, choice]));
+      const inputByTrack = new Map<number, TrackChoice>(trackChoices.map((choice) => [choice.track, choice]));
 
       await db
         .delete(characterCreationChoices)

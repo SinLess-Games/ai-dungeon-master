@@ -7,8 +7,17 @@ import {
   classLevels,
   classPrerequisites,
   classes,
+  deities,
+  deityDomains,
+  domains,
+  items,
+  languages,
   raceAbilities,
   races,
+  skills,
+  spellSchools,
+  spells,
+  weapons,
 } from "@/infrastructure/database/schema";
 import { createAuth, type AuthEnv } from "@/modules/auth/server/auth";
 import { requireUser } from "@/modules/auth/server/requireAuth";
@@ -27,9 +36,12 @@ function requireDatabase(binding: D1Database | undefined): D1Database {
   return binding;
 }
 
-export const characterOptionRoutes = new Hono<CharacterOptionEnv>().get(
-  "/api/dnd35/character-creation-options",
-  async (c) => {
+function visibleToUser(ownerUserId: typeof races.ownerUserId, userId: string) {
+  return or(isNull(ownerUserId), eq(ownerUserId, userId));
+}
+
+export const characterOptionRoutes = new Hono<CharacterOptionEnv>()
+  .get("/api/dnd35/character-creation-options", async (c) => {
     c.header("Cache-Control", "private, max-age=300");
     const session = await requireUser(createAuth(c.env), c.req.raw.headers);
     const db = createDatabase(requireDatabase(c.env.DB));
@@ -49,12 +61,7 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>().get(
           isHomebrew: races.isHomebrew,
         })
         .from(races)
-        .where(
-          and(
-            eq(races.isEnabled, true),
-            or(isNull(races.ownerUserId), eq(races.ownerUserId, session.user.id)),
-          ),
-        )
+        .where(and(eq(races.isEnabled, true), visibleToUser(races.ownerUserId, session.user.id)))
         .orderBy(asc(races.name))
         .all(),
       db
@@ -65,12 +72,7 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>().get(
         })
         .from(raceAbilities)
         .innerJoin(races, eq(raceAbilities.raceId, races.id))
-        .where(
-          and(
-            eq(races.isEnabled, true),
-            or(isNull(races.ownerUserId), eq(races.ownerUserId, session.user.id)),
-          ),
-        )
+        .where(and(eq(races.isEnabled, true), visibleToUser(races.ownerUserId, session.user.id)))
         .all(),
       db
         .select({
@@ -97,7 +99,7 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>().get(
           and(
             eq(classes.isEnabled, true),
             eq(classes.category, "base"),
-            or(isNull(classes.ownerUserId), eq(classes.ownerUserId, session.user.id)),
+            visibleToUser(classes.ownerUserId, session.user.id),
           ),
         )
         .orderBy(asc(classes.name))
@@ -133,13 +135,92 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>().get(
         return {
           ...characterClass,
           firstLevelHitPoints: characterClass.levelOneHitDie ?? characterClass.hitDie,
-          firstLevelSkillPoints:
-            characterClass.levelOneSkillPoints ?? characterClass.skillPointsPerLevel,
+          firstLevelSkillPoints: characterClass.levelOneSkillPoints ?? characterClass.skillPointsPerLevel,
           allowedAlignments,
           prerequisiteExplanation: prerequisite?.explanation ?? null,
         };
       }),
       alignments,
     });
-  },
-);
+  })
+  .get("/api/dnd35/character-creation-reference-options", async (c) => {
+    c.header("Cache-Control", "private, max-age=300");
+    const session = await requireUser(createAuth(c.env), c.req.raw.headers);
+    const db = createDatabase(requireDatabase(c.env.DB));
+
+    const [languageRows, skillRows, weaponRows, schoolRows, spellRows, deityDomainRows] =
+      await Promise.all([
+        db
+          .select({ id: languages.id, slug: languages.slug, name: languages.name })
+          .from(languages)
+          .where(
+            and(
+              eq(languages.isEnabled, true),
+              eq(languages.isSecret, false),
+              visibleToUser(languages.ownerUserId, session.user.id),
+            ),
+          )
+          .orderBy(asc(languages.name))
+          .all(),
+        db
+          .select({ id: skills.id, slug: skills.slug, name: skills.name })
+          .from(skills)
+          .where(and(eq(skills.isEnabled, true), visibleToUser(skills.ownerUserId, session.user.id)))
+          .orderBy(asc(skills.name))
+          .all(),
+        db
+          .select({ id: items.id, slug: items.slug, name: items.name })
+          .from(weapons)
+          .innerJoin(items, eq(weapons.itemId, items.id))
+          .where(and(eq(items.isEnabled, true), visibleToUser(items.ownerUserId, session.user.id)))
+          .orderBy(asc(items.name))
+          .all(),
+        db
+          .select({ id: spellSchools.id, slug: spellSchools.slug, name: spellSchools.name })
+          .from(spellSchools)
+          .where(
+            and(
+              eq(spellSchools.isEnabled, true),
+              visibleToUser(spellSchools.ownerUserId, session.user.id),
+            ),
+          )
+          .orderBy(asc(spellSchools.name))
+          .all(),
+        db
+          .select({ id: spells.id, slug: spells.slug, name: spells.name })
+          .from(spells)
+          .where(and(eq(spells.isEnabled, true), visibleToUser(spells.ownerUserId, session.user.id)))
+          .orderBy(asc(spells.name))
+          .all(),
+        db
+          .select({ deityId: deityDomains.deityId, domainId: deityDomains.domainId })
+          .from(deityDomains)
+          .innerJoin(deities, eq(deityDomains.deityId, deities.id))
+          .innerJoin(domains, eq(deityDomains.domainId, domains.id))
+          .where(
+            and(
+              eq(deities.isEnabled, true),
+              eq(domains.isEnabled, true),
+              visibleToUser(deities.ownerUserId, session.user.id),
+              visibleToUser(domains.ownerUserId, session.user.id),
+            ),
+          )
+          .all(),
+      ]);
+
+    const deityDomainIds: Record<string, string[]> = {};
+    for (const row of deityDomainRows) {
+      (deityDomainIds[row.deityId] ??= []).push(row.domainId);
+    }
+
+    return c.json({
+      languages: languageRows,
+      featChoiceOptions: {
+        skill: skillRows,
+        weapon: weaponRows,
+        school: schoolRows,
+        spell: spellRows,
+      },
+      deityDomainIds,
+    });
+  });

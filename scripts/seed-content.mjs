@@ -16,6 +16,7 @@ const preferredSeedOrder = [
   "phb-races",
   "phb-skills",
   "phb-feats",
+  "phb-divine",
   "phb-spells",
   "phb-rules",
   "dmg-rules",

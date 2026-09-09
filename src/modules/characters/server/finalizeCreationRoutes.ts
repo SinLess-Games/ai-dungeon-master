@@ -11,12 +11,17 @@ import {
   characters,
   dnd35Characters,
   raceAbilities,
+  races,
 } from "@/infrastructure/database/schema";
 import { createAuth, type AuthEnv } from "@/modules/auth/server/auth";
 import { requireUser } from "@/modules/auth/server/requireAuth";
 import { reconcileCampaignReadiness } from "@/modules/campaigns/domain/lifecycle";
 import { abilityModifier } from "@/rulesets/dnd35";
 import { ValidationError } from "@/server/middleware/errors";
+import {
+  monsterEffectiveCharacterLevel,
+  racialHitPoints,
+} from "../domain/monsterRaceCreation";
 import { validateDnd35CharacterReadiness } from "../domain/readiness";
 import { requireCharacterCreatorEditor, requireCharacterDatabase } from "./creationAccess";
 
@@ -72,6 +77,10 @@ export function maximumHitPointsFromClassTracks(
   );
 }
 
+function classLevelCount(classRows: Array<{ characterLevel: number }>): number {
+  return new Set(classRows.map(({ characterLevel }) => characterLevel)).size;
+}
+
 export const characterFinalizeCreationRoutes = new Hono<CharacterCreationEnv>()
   .use("/api/characters/*", async (c, next) => {
     c.header("Cache-Control", "no-store");
@@ -83,7 +92,7 @@ export const characterFinalizeCreationRoutes = new Hono<CharacterCreationEnv>()
     const row = await requireCharacterCreatorEditor({ db, characterId: c.req.param("characterId"), userId: session.user.id });
     const [progress, extension, classRows] = await Promise.all([
       db.select().from(characterCreationProgress).where(eq(characterCreationProgress.characterId, row.character.id)).get(),
-      db.select({ progressionMode: dnd35Characters.progressionMode }).from(dnd35Characters).where(eq(dnd35Characters.characterId, row.character.id)).get(),
+      db.select({ progressionMode: dnd35Characters.progressionMode, raceId: dnd35Characters.raceId }).from(dnd35Characters).where(eq(dnd35Characters.characterId, row.character.id)).get(),
       db.select({ track: characterClassLevels.track, characterLevel: characterClassLevels.characterLevel }).from(characterClassLevels).where(eq(characterClassLevels.characterId, row.character.id)).all(),
     ]);
     const missing = missingCreationSteps(progress ?? undefined);
@@ -91,7 +100,26 @@ export const characterFinalizeCreationRoutes = new Hono<CharacterCreationEnv>()
       const firstLevelTracks = new Set(classRows.filter(({ characterLevel }) => characterLevel === 1).map(({ track }) => track));
       if (!firstLevelTracks.has(1) || !firstLevelTracks.has(2)) missing.unshift("both gestalt classes");
     }
-    return c.json({ characterId: row.character.id, complete: missing.length === 0, missing, progress: progress ?? null });
+    const selectedRace = extension?.raceId
+      ? await db
+          .select({ racialHitDice: races.racialHitDice, levelAdjustment: races.levelAdjustment })
+          .from(races)
+          .where(eq(races.id, extension.raceId))
+          .get()
+      : undefined;
+    const retainedRacialHitDice = selectedRace?.racialHitDice ?? 0;
+    const actualClassLevels = classLevelCount(classRows);
+    const levelAdjustment = selectedRace?.levelAdjustment ?? 0;
+    return c.json({
+      characterId: row.character.id,
+      complete: missing.length === 0,
+      missing,
+      progress: progress ?? null,
+      racialHitDice: retainedRacialHitDice,
+      totalHitDice: retainedRacialHitDice + actualClassLevels,
+      levelAdjustment,
+      effectiveCharacterLevel: monsterEffectiveCharacterLevel(retainedRacialHitDice, actualClassLevels, levelAdjustment),
+    });
   })
   .post("/api/characters/:characterId/ready", async (c) => {
     const session = await requireUser(createAuth(c.env), c.req.raw.headers);
@@ -137,16 +165,42 @@ export const characterFinalizeCreationRoutes = new Hono<CharacterCreationEnv>()
 
     const conScore = abilityScores.con;
     if (conScore == null) throw new ValidationError("A Constitution score is required for a playable character.");
-    const racialConstitution = extension?.raceId
-      ? await db
-          .select({ modifier: raceAbilities.modifier })
-          .from(raceAbilities)
-          .where(and(eq(raceAbilities.raceId, extension.raceId), eq(raceAbilities.ability, "con")))
-          .get()
-      : undefined;
+    const [racialConstitution, selectedRace] = extension?.raceId
+      ? await Promise.all([
+          db
+            .select({ modifier: raceAbilities.modifier })
+            .from(raceAbilities)
+            .where(and(eq(raceAbilities.raceId, extension.raceId), eq(raceAbilities.ability, "con")))
+            .get(),
+          db
+            .select({
+              racialHitDice: races.racialHitDice,
+              racialHitDie: races.racialHitDie,
+              levelAdjustment: races.levelAdjustment,
+            })
+            .from(races)
+            .where(eq(races.id, extension.raceId))
+            .get(),
+        ])
+      : [undefined, undefined] as const;
     const effectiveConstitution = conScore + (racialConstitution?.modifier ?? 0);
     const conModifier = abilityModifier(effectiveConstitution);
-    const maximumHitPoints = maximumHitPointsFromClassTracks(classRows, conModifier);
+    const retainedRacialHitDice = selectedRace?.racialHitDice ?? 0;
+    const racialMaximumHitPoints = racialHitPoints(
+      retainedRacialHitDice,
+      selectedRace?.racialHitDie ?? null,
+      conModifier,
+    );
+    const classMaximumHitPoints = maximumHitPointsFromClassTracks(classRows, conModifier);
+    const maximumHitPoints = racialMaximumHitPoints + classMaximumHitPoints;
+    const actualClassLevels = classLevelCount(classRows);
+    const levelAdjustment = selectedRace?.levelAdjustment ?? 0;
+    const totalHitDice = retainedRacialHitDice + actualClassLevels;
+    const effectiveCharacterLevel = monsterEffectiveCharacterLevel(
+      retainedRacialHitDice,
+      actualClassLevels,
+      levelAdjustment,
+    );
     const now = new Date();
 
     await db.batch([
@@ -183,6 +237,12 @@ export const characterFinalizeCreationRoutes = new Hono<CharacterCreationEnv>()
       characterId: row.character.id,
       status: "ready",
       maximumHitPoints,
+      racialHitPoints: racialMaximumHitPoints,
+      classHitPoints: classMaximumHitPoints,
+      racialHitDice: retainedRacialHitDice,
+      totalHitDice,
+      levelAdjustment,
+      effectiveCharacterLevel,
       campaignStatus: reconciled.status,
       creationComplete: true,
     });

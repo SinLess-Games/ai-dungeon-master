@@ -111,6 +111,11 @@ function signed(value: number) {
   return value >= 0 ? `+${value}` : String(value);
 }
 
+function hasStandardArray(abilities: Record<AbilityKey, number>) {
+  const assigned = abilityKeys.map((key) => abilities[key]).sort((a, b) => b - a);
+  return assigned.every((score, index) => score === standardArray[index]);
+}
+
 function formatCopper(copper: number) {
   const gp = Math.floor(copper / 100);
   const sp = Math.floor((copper % 100) / 10);
@@ -186,6 +191,7 @@ export function CharacterCreator() {
     mutationFn: async () => {
       if (!selectedClass) throw new Error("Choose a class first.");
       if (!selectedRace) throw new Error("Choose a race first.");
+      if (!hasStandardArray(abilities)) throw new Error("Assign every standard-array score exactly once.");
       return createCharacterFoundation({
         campaignId,
         name: name.trim(),
@@ -275,7 +281,7 @@ export function CharacterCreator() {
   const canBaseContinue =
     (step === 0 && Boolean(campaignId && name.trim())) ||
     (step === 1 && Boolean(raceId)) ||
-    step === 2 ||
+    (step === 2 && hasStandardArray(abilities)) ||
     (step === 3 && Boolean(selectedClass?.allowedAlignments.includes(alignment)));
 
   return (
@@ -555,9 +561,19 @@ function AbilitiesStep({ abilities, setAbilities, selectedRace }: {
   setAbilities: (value: Record<AbilityKey, number>) => void;
   selectedRace: RaceOption | undefined;
 }) {
+  const swapScore = (ability: AbilityKey, nextScore: number) => {
+    const currentScore = abilities[ability];
+    const otherAbility = abilityKeys.find(
+      (candidate) => candidate !== ability && abilities[candidate] === nextScore,
+    );
+    const next = { ...abilities, [ability]: nextScore };
+    if (otherAbility) next[otherAbility] = currentScore;
+    setAbilities(next);
+  };
+
   return (
     <div className="creator-step-content">
-      <StepHeading icon={<Dices />} eyebrow="Ability scores" title="Assign the standard array" body="Use each value once. Racial adjustments are shown in the final score." />
+      <StepHeading icon={<Dices />} eyebrow="Ability scores" title="Assign the standard array" body="Choose any score for any ability. Selecting a used score automatically swaps the two values." />
       <div className="creator-abilities-grid">
         {abilityKeys.map((ability) => {
           const racial = selectedRace?.abilityModifiers[ability] ?? 0;
@@ -565,11 +581,8 @@ function AbilitiesStep({ abilities, setAbilities, selectedRace }: {
           return (
             <div className="creator-ability-card" key={ability}>
               <span>{ability.toUpperCase()}</span><h3>{abilityNames[ability]}</h3>
-              <select value={abilities[ability]} onChange={(event) => setAbilities({ ...abilities, [ability]: Number(event.target.value) })}>
-                {standardArray.map((score) => {
-                  const usedBy = abilityKeys.find((key) => key !== ability && abilities[key] === score);
-                  return <option key={score} value={score} disabled={Boolean(usedBy)}>{score}{usedBy ? ` — ${usedBy.toUpperCase()}` : ""}</option>;
-                })}
+              <select value={abilities[ability]} onChange={(event) => swapScore(ability, Number(event.target.value))}>
+                {standardArray.map((score) => <option key={score} value={score}>{score}</option>)}
               </select>
               <div className="creator-score-math"><span>Base {abilities[ability]}</span><span>Race {signed(racial)}</span><strong>{total}</strong></div>
               <p>Modifier <b>{signed(abilityModifier(total))}</b></p>

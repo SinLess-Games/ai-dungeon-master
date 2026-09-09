@@ -9,6 +9,7 @@ import {
   characterCreationChoices,
   classFeatureGrants,
   classFeatures,
+  creatureSubtypes,
   creatureTypes,
   powerDisciplines,
   spellSchools,
@@ -35,9 +36,41 @@ const wizardSpecializationSchema = z.object({
 
 const classChoiceSchema = z.object({
   favoredEnemyTypeId: z.string().trim().min(1).nullable().optional(),
+  favoredEnemySubtypeId: z.string().trim().min(1).nullable().optional(),
   wizardSpecialization: wizardSpecializationSchema.nullable().optional(),
   psionDisciplineId: z.string().trim().min(1).nullable().optional(),
 });
+
+const HUMANOID_FAVORED_ENEMY_SUBTYPES = new Set([
+  "aquatic",
+  "dwarf",
+  "elf",
+  "goblinoid",
+  "gnoll",
+  "gnome",
+  "halfling",
+  "human",
+  "orc",
+  "reptilian",
+]);
+
+const OUTSIDER_FAVORED_ENEMY_SUBTYPES = new Set([
+  "air",
+  "chaotic",
+  "earth",
+  "evil",
+  "fire",
+  "good",
+  "lawful",
+  "native",
+  "water",
+]);
+
+function favoredEnemySubtypeSet(typeSlug: string): ReadonlySet<string> | null {
+  if (typeSlug === "humanoid") return HUMANOID_FAVORED_ENEMY_SUBTYPES;
+  if (typeSlug === "outsider") return OUTSIDER_FAVORED_ENEMY_SUBTYPES;
+  return null;
+}
 
 async function firstLevelFeatureMap(
   db: ReturnType<typeof createDatabase>,
@@ -74,18 +107,31 @@ export const characterClassChoiceCreationRoutes = new Hono<CharacterCreationEnv>
       .all();
 
     if (firstClass.classSlug === "ranger") {
-      const options = await db
-        .select({ id: creatureTypes.id, slug: creatureTypes.slug, name: creatureTypes.name })
-        .from(creatureTypes)
-        .where(eq(creatureTypes.isEnabled, true))
-        .orderBy(asc(creatureTypes.name))
-        .all();
+      const [options, subtypes] = await Promise.all([
+        db
+          .select({ id: creatureTypes.id, slug: creatureTypes.slug, name: creatureTypes.name })
+          .from(creatureTypes)
+          .where(eq(creatureTypes.isEnabled, true))
+          .orderBy(asc(creatureTypes.name))
+          .all(),
+        db
+          .select({ id: creatureSubtypes.id, slug: creatureSubtypes.slug, name: creatureSubtypes.name })
+          .from(creatureSubtypes)
+          .where(eq(creatureSubtypes.isEnabled, true))
+          .orderBy(asc(creatureSubtypes.name))
+          .all(),
+      ]);
       return c.json({
         classId: firstClass.classId,
         className: firstClass.className,
         choice: "favored-enemy",
         required: true,
         options,
+        subtypeRequiredFor: ["humanoid", "outsider"],
+        subtypeOptions: {
+          humanoid: subtypes.filter(({ slug }) => HUMANOID_FAVORED_ENEMY_SUBTYPES.has(slug)),
+          outsider: subtypes.filter(({ slug }) => OUTSIDER_FAVORED_ENEMY_SUBTYPES.has(slug)),
+        },
         selected,
       });
     }
@@ -171,11 +217,35 @@ export const characterClassChoiceCreationRoutes = new Hono<CharacterCreationEnv>
           throw new ValidationError("A 1st-level ranger must choose a favored enemy creature type.");
         }
         const type = await db
-          .select({ id: creatureTypes.id, name: creatureTypes.name })
+          .select({ id: creatureTypes.id, slug: creatureTypes.slug, name: creatureTypes.name })
           .from(creatureTypes)
           .where(and(eq(creatureTypes.id, input.favoredEnemyTypeId), eq(creatureTypes.isEnabled, true)))
           .get();
         if (!type) throw new ValidationError("Selected favored-enemy creature type is unavailable.");
+
+        const allowedSubtypes = favoredEnemySubtypeSet(type.slug);
+        let subtype: { id: string; slug: string; name: string } | undefined;
+        if (allowedSubtypes) {
+          if (!input.favoredEnemySubtypeId) {
+            throw new ValidationError(`${type.name} favored enemies require a subtype.`);
+          }
+          subtype = await db
+            .select({ id: creatureSubtypes.id, slug: creatureSubtypes.slug, name: creatureSubtypes.name })
+            .from(creatureSubtypes)
+            .where(
+              and(
+                eq(creatureSubtypes.id, input.favoredEnemySubtypeId),
+                eq(creatureSubtypes.isEnabled, true),
+              ),
+            )
+            .get();
+          if (!subtype || !allowedSubtypes.has(subtype.slug)) {
+            throw new ValidationError(`Selected subtype is not a legal ${type.name} favored-enemy subtype.`);
+          }
+        } else if (input.favoredEnemySubtypeId) {
+          throw new ValidationError(`${type.name} favored enemies do not take a subtype choice.`);
+        }
+
         const feature = features.get("ranger-favored-enemy");
         if (!feature) throw new ValidationError("Ranger favored enemy feature is missing from the rules catalog.");
         values.push({
@@ -186,7 +256,11 @@ export const characterClassChoiceCreationRoutes = new Hono<CharacterCreationEnv>
           choiceKey: "ranger-favored-enemy-1",
           kind: "creature_type",
           contentId: type.id,
-          parameters: { rank: 1, bonus: 2 },
+          parameters: {
+            rank: 1,
+            bonus: 2,
+            ...(subtype ? { subtypeId: subtype.id, subtypeSlug: subtype.slug } : {}),
+          },
         });
       } else if (firstClass.classSlug === "wizard") {
         const specialization = input.wizardSpecialization ?? null;
@@ -269,7 +343,12 @@ export const characterClassChoiceCreationRoutes = new Hono<CharacterCreationEnv>
           parameters: { system: "psionics", discipline: true },
         });
       } else {
-        if (input.favoredEnemyTypeId || input.wizardSpecialization || input.psionDisciplineId) {
+        if (
+          input.favoredEnemyTypeId ||
+          input.favoredEnemySubtypeId ||
+          input.wizardSpecialization ||
+          input.psionDisciplineId
+        ) {
           throw new ValidationError(`${firstClass.className} has no supported 1st-level class choice in this creator step.`);
         }
       }

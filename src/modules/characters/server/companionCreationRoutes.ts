@@ -85,6 +85,7 @@ export const characterCompanionCreationRoutes = new Hono<CharacterCreationEnv>()
     const row = await requireCharacterCreatorEditor({ db, characterId: c.req.param("characterId"), userId: session.user.id });
     const firstClasses = await requireFirstCharacterClasses(db, row.character.id);
     const relevant = firstClasses.filter(({ classSlug }) => companionDefinition(classSlug) !== null);
+    const legacyRequest = input.selections === undefined;
     const selections = input.selections ?? [{ track: relevant[0]?.track ?? 1, creatureName: input.creatureName ?? null, name: input.name }];
     if (new Set(selections.map(({ track }) => track)).size !== selections.length) throw new ValidationError("Each gestalt companion track can be selected only once.");
     const selectionByTrack = new Map(selections.map((selection) => [selection.track, selection]));
@@ -107,5 +108,10 @@ export const characterCompanionCreationRoutes = new Hono<CharacterCreationEnv>()
     }
     if (values.length > 0) await db.insert(characterCompanions).values(values).run();
     await markCreationStep(db, row.character.id, "companionsFinalized");
-    return c.json({ characterId: row.character.id, selected: values, required: relevant.length > 0 });
+    return c.json({
+      characterId: row.character.id,
+      selected: legacyRequest ? (values[0] ?? null) : values,
+      selections: values,
+      required: relevant.length > 0,
+    });
   });

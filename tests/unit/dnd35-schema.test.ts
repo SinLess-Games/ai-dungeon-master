@@ -106,7 +106,7 @@ describe("D&D 3.5 SQLite migration", () => {
       .all()
       .map((row) => row["name"]);
     expect(actual).toEqual(exported);
-    expect(exported.filter((name) => name.startsWith("dnd35_")).length).toBe(93);
+    expect(exported.filter((name) => name.startsWith("dnd35_")).length).toBe(96);
     for (const name of exported) {
       // SQLite detects invalid composite FK targets when preparing DML, not CREATE TABLE.
       expect(() => db.prepare(`DELETE FROM "${name}" WHERE 0`).run()).not.toThrow();
@@ -472,7 +472,7 @@ describe("D&D 3.5 SQLite migration", () => {
     });
     insert("power_display_assignments", { power_id: "power", display: "mental" });
     insert("character_powers", { casting_track_id: "psionic", power_id: "power" });
-    expect(() => db.exec("UPDATE dnd35_power_class_levels SET power_level = 0")).toThrow(/CHECK/);
+    expect(() => db.exec("UPDATE dnd35_power_class_levels SET power_level = -1")).toThrow(/CHECK/);
     expect(() => db.exec("UPDATE dnd35_powers SET power_points = -1")).toThrow(/CHECK/);
   });
 

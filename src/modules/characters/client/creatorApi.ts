@@ -54,7 +54,7 @@ export interface SkillOption {
   id: string;
   slug: string;
   name: string;
-  ability: AbilityKey;
+  ability: AbilityKey | "—";
   trainedOnly: boolean;
   armorCheckMultiplier: number;
   requiresSpecialization: boolean;
@@ -366,6 +366,7 @@ export async function getSkills(id: string): Promise<SkillPage> {
   ]);
   return {
     ...page,
+    options: page.options.map((option) => ({ ...option, ability: option.ability || "—" })),
     speakLanguageOptions: references.languages.map(({ id, name }) => ({ id, name })),
   };
 }

@@ -121,8 +121,11 @@ async function runUiFlow(page) {
   await page.locator("summary.codex-nav-item").filter({ hasText: "Play" }).click();
   const characterLink = page.getByRole("link", { name: /Characters/ });
   await characterLink.waitFor();
-  assert.match(await characterLink.getAttribute("href") ?? "", /\/characters\/new$/);
+  assert.match(await characterLink.getAttribute("href") ?? "", /\/characters$/);
   await characterLink.click();
+  await page.waitForURL(`${origin}/characters`);
+  await page.getByRole("heading", { name: "Characters", exact: true }).waitFor();
+  await page.getByRole("link", { name: "Create character", exact: true }).click();
   await page.waitForURL(`${origin}/characters/new`);
   await page.getByRole("heading", { name: "Forge an adventurer" }).waitFor();
 
@@ -198,7 +201,7 @@ async function runUiFlow(page) {
   assert.match((await page.locator(".creator-complete").textContent()) ?? "", /Ready/);
   assert.match((await page.locator(".creator-character-id").textContent()) ?? "", /Character ID:\s*[0-9a-f-]+/i);
 
-  console.log("✓ UI E2E: Play → Characters opens the full creator and completes a Dwarf Barbarian");
+  console.log("✓ UI E2E: Play → Characters opens the library, then the full creator completes a Dwarf Barbarian");
 }
 
 try {

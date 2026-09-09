@@ -274,12 +274,17 @@ async function savePowerSection(db: CharacterDatabase, userId: string, character
   return uniqueIds;
 }
 
-function selectionsByTrack(input: z.infer<typeof selectionSchema>, firstClasses: FirstClass[]) {
+function selectionsByTrack(input: z.infer<typeof selectionSchema>, firstClasses: FirstClass[]): Map<number, string[]> {
   if (input.tracks) {
     if (new Set(input.tracks.map(({ track }) => track)).size !== input.tracks.length) throw new ValidationError("Each gestalt track can submit selections only once.");
-    return new Map(input.tracks.map(({ track, ids }) => [track, ids]));
+    return new Map<number, string[]>(input.tracks.map(({ track, ids }) => [track, ids]));
   }
-  return new Map([[1, input.ids ?? []], ...firstClasses.filter(({ track }) => track === 2).map(({ track }) => [track, []] as const)]);
+  const selections = new Map<number, string[]>();
+  selections.set(1, input.ids ?? []);
+  for (const { track } of firstClasses) {
+    if (track === 2) selections.set(2, []);
+  }
+  return selections;
 }
 
 export const characterCastingCreationRoutes = new Hono<CharacterCreationEnv>()

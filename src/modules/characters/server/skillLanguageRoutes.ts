@@ -7,6 +7,7 @@ import { z } from "zod";
 import { createDatabase } from "@/infrastructure/database/client";
 import {
   characterAbilityScores,
+  characterClassLevels,
   characterCreationProgress,
   characterLanguages,
   characterSkills,
@@ -290,26 +291,18 @@ export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
           remaining: budget - spent,
         });
       }
+      if (values.length === 0) {
+        throw new ValidationError("At least one trained skill is required at first level.");
+      }
 
-      const operations = [
+      await db.batch([
         db.delete(characterSkills).where(eq(characterSkills.characterId, row.character.id)),
-        ...(values.length > 0 ? [db.insert(characterSkills).values(values)] : []),
-      ];
-      await db.batch(operations as [typeof operations[number], ...typeof operations]);
-      await db
-        .update(
-          // Use the canonical first class-level row to retain the audited point total.
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (await import("@/infrastructure/database/schema")).characterClassLevels as any,
-        )
-        .set({ skillPointsSpent: budget, updatedAt: new Date() })
-        .where(
-          eq(
-            (await import("@/infrastructure/database/schema")).characterClassLevels.id,
-            firstClass.characterClassLevelId,
-          ),
-        )
-        .run();
+        db.insert(characterSkills).values(values),
+        db
+          .update(characterClassLevels)
+          .set({ skillPointsSpent: budget, updatedAt: new Date() })
+          .where(eq(characterClassLevels.id, firstClass.characterClassLevelId)),
+      ]);
       await ensureCreationProgress(db, row.character.id);
       await db
         .update(characterCreationProgress)
@@ -418,11 +411,15 @@ export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
         throw new ValidationError("Bonus language choices must be unique.");
       }
       if (uniqueBonus.size !== required) {
-        throw new ValidationError(`Choose exactly ${required} bonus language${required === 1 ? "" : "s"}.`);
+        throw new ValidationError(
+          `Choose exactly ${required} bonus language${required === 1 ? "" : "s"}.`,
+        );
       }
       for (const languageId of uniqueBonus) {
         if (!bonusAllowed.has(languageId)) {
-          throw new ValidationError(`Language is not an available racial bonus language: ${languageId}.`);
+          throw new ValidationError(
+            `Language is not an available racial bonus language: ${languageId}.`,
+          );
         }
       }
 
@@ -432,22 +429,28 @@ export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
         ...speakLanguageRows.map(({ languageId }) => languageId).filter(Boolean),
       ]);
       if (firstClass.classSlug === "druid") {
-        if (!druidic) throw new ValidationError("The Druidic language is unavailable in the rules catalog.");
+        if (!druidic) {
+          throw new ValidationError("The Druidic language is unavailable in the rules catalog.");
+        }
         selected.add(druidic.id);
       }
       const values = [...selected].map((languageId) => ({
         characterId: row.character.id,
         languageId,
       }));
+      if (values.length === 0) {
+        throw new ValidationError("The selected race grants no automatic language.");
+      }
       await db.batch([
         db.delete(characterLanguages).where(eq(characterLanguages.characterId, row.character.id)),
-        ...(values.length > 0 ? [db.insert(characterLanguages).values(values)] : []),
-      ] as [
-        ReturnType<typeof db.delete>,
-        ...Array<ReturnType<typeof db.insert>>,
+        db.insert(characterLanguages).values(values),
       ]);
       await markCreationStep(db, row.character.id, "languagesFinalized");
 
-      return c.json({ characterId: row.character.id, languageIds: [...selected], bonusChoices: required });
+      return c.json({
+        characterId: row.character.id,
+        languageIds: [...selected],
+        bonusChoices: required,
+      });
     },
   );

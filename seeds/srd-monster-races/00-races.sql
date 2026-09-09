@@ -70,7 +70,8 @@ SELECT
   (SELECT ct.id FROM dnd35_creature_types ct WHERE ct.slug=d.type_slug AND ct.owner_user_id IS NULL LIMIT 1),
   d.favored_class_id,
   CASE WHEN d.favored_class_id IS NULL THEN 'none' ELSE 'specific' END,
-  d.size,d.speed,d.la,d.rhd,d.rhd_die,d.natural_armor,0,0
+  d.size,d.speed,d.la,d.rhd,d.rhd_die,d.natural_armor,0,
+  CASE WHEN d.rhd > 1 THEN 1 + CAST((d.rhd + 1) / 3 AS INTEGER) ELSE 0 END
 FROM desired d
 WHERE 1
 ON CONFLICT(id) DO UPDATE SET
@@ -80,7 +81,11 @@ ON CONFLICT(id) DO UPDATE SET
   favored_class_rule=excluded.favored_class_rule, size=excluded.size,
   base_speed_feet=excluded.base_speed_feet, level_adjustment=excluded.level_adjustment,
   racial_hit_dice=excluded.racial_hit_dice, racial_hit_die=excluded.racial_hit_die,
-  natural_armor=excluded.natural_armor;
+  natural_armor=excluded.natural_armor,
+  bonus_feats_at_first_level=excluded.bonus_feats_at_first_level;
+
+-- Retained racial Hit Dice grant general feat slots by total Hit Dice. The creator stores
+-- these as race-granted feat selections so monster PCs can choose all feats earned before play.
 
 -- Racial ability adjustments. Trumpet Archon modifiers use the SRD monster-PC
 -- conversion rule (subtract 10 from even scores or 11 from odd scores).

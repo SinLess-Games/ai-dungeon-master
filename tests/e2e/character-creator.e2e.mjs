@@ -12,6 +12,7 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react-swc";
 import tailwindcss from "@tailwindcss/vite";
 import { createServer } from "vite";
+import tsconfigPaths from "vite-tsconfig-paths";
 import { getPlatformProxy, unstable_readConfig as readConfig } from "wrangler";
 
 const directory = await mkdtemp(join(tmpdir(), "codex-creator-e2e-"));
@@ -64,9 +65,7 @@ function splitSqlStatements(sql) {
       if (single && next === "'") {
         current += next;
         index += 1;
-      } else {
-        single = !single;
-      }
+      } else single = !single;
       continue;
     }
     if (character === '"' && !single) {
@@ -88,13 +87,9 @@ function splitSqlStatements(sql) {
 }
 
 async function applyMigrations(db) {
-  const files = (await readdir("drizzle")).filter((name) => name.endsWith(".sql")).sort();
-  for (const file of files) {
+  for (const file of (await readdir("drizzle")).filter((name) => name.endsWith(".sql")).sort()) {
     const sql = await readFile(join("drizzle", file), "utf8");
-    for (const statement of sql
-      .split("--> statement-breakpoint")
-      .map((value) => value.trim())
-      .filter(Boolean)) {
+    for (const statement of sql.split("--> statement-breakpoint").map((value) => value.trim()).filter(Boolean)) {
       await db.prepare(statement).run();
     }
   }
@@ -103,8 +98,9 @@ async function applyMigrations(db) {
 async function applySeeds(db) {
   for (const seedDirectory of seedDirectories) {
     for (const file of await sqlFiles(join("seeds", seedDirectory))) {
-      const sql = stripLineComments(await readFile(file, "utf8"));
-      for (const statement of splitSqlStatements(sql)) await db.prepare(statement).run();
+      for (const statement of splitSqlStatements(stripLineComments(await readFile(file, "utf8")))) {
+        await db.prepare(statement).run();
+      }
     }
   }
 }
@@ -126,27 +122,15 @@ async function api(page, method, path, data, status = 200) {
 
 async function baseCharacter(page, { name, classLevelId, hitPointsGained, alignment = "N" }) {
   const suffix = randomBytes(4).toString("hex");
-  const campaign = await api(
-    page,
-    "POST",
-    "/api/campaigns",
-    {
-      name: `${name} Campaign ${suffix}`,
-      slug: `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${suffix}`,
-      playMode: "solo",
-      gameMasterMode: "ai",
-      timeMode: "paused",
-      visibility: "private",
-    },
-    201,
-  );
-  const character = await api(
-    page,
-    "POST",
-    `/api/campaigns/${campaign.id}/characters`,
-    { name },
-    201,
-  );
+  const campaign = await api(page, "POST", "/api/campaigns", {
+    name: `${name} Campaign ${suffix}`,
+    slug: `${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${suffix}`,
+    playMode: "solo",
+    gameMasterMode: "ai",
+    timeMode: "paused",
+    visibility: "private",
+  }, 201);
+  const character = await api(page, "POST", `/api/campaigns/${campaign.id}/characters`, { name }, 201);
   await api(page, "PATCH", `/api/characters/${character.id}`, {
     raceId: "phb-race-human",
     alignment,
@@ -159,43 +143,35 @@ async function baseCharacter(page, { name, classLevelId, hitPointsGained, alignm
     wis: 12,
     cha: 10,
   });
-  await api(
-    page,
-    "POST",
-    `/api/characters/${character.id}/class-levels`,
-    { classLevelId, hitPointsGained, skillPointsSpent: 0, track: 1 },
-    201,
-  );
+  await api(page, "POST", `/api/characters/${character.id}/class-levels`, {
+    classLevelId,
+    hitPointsGained,
+    skillPointsSpent: 0,
+    track: 1,
+  }, 201);
   return { campaign, character };
 }
 
-function exactSkills(page) {
-  let remaining = page.budget;
+function exactSkills(skillPage) {
+  let remaining = skillPage.budget;
   const selections = [];
-  for (const option of page.options.filter(
-    (candidate) =>
-      candidate.isClassSkill &&
-      !candidate.requiresSpecialization &&
-      candidate.slug !== "speak-language",
-  )) {
+  for (const option of skillPage.options.filter((candidate) =>
+    candidate.isClassSkill && !candidate.requiresSpecialization && candidate.slug !== "speak-language")) {
     if (remaining === 0) break;
     const ranks = Math.min(option.maximumRanks, remaining);
     if (!Number.isInteger(ranks) || ranks <= 0) continue;
     selections.push({ skillId: option.id, ranks });
     remaining -= ranks;
   }
-  assert.equal(remaining, 0, `Unable to spend exact skill budget ${page.budget}.`);
+  assert.equal(remaining, 0, `Unable to spend exact skill budget ${skillPage.budget}.`);
   return selections;
 }
 
-function simpleFeat(page, preferredSlug, used) {
-  const feat =
-    page.options.find(
-      (option) => option.slug === preferredSlug && option.choiceKind === "none" && !used.has(option.id),
-    ) ??
-    page.options.find(
-      (option) => option.choiceKind === "none" && !option.explanation && !used.has(option.id),
-    );
+function simpleFeat(featPage, preferredSlug, used) {
+  const feat = featPage.options.find((option) =>
+    option.slug === preferredSlug && option.choiceKind === "none" && !used.has(option.id)) ??
+    featPage.options.find((option) =>
+      option.choiceKind === "none" && !option.explanation && !used.has(option.id));
   assert.ok(feat, "Expected a selectable no-choice feat.");
   used.add(feat.id);
   return { featId: feat.id };
@@ -208,9 +184,7 @@ async function wizardEndToEnd(page) {
     hitPointsGained: 4,
   });
   const id = character.id;
-  const early = await page.request.post(`${origin}/api/characters/${id}/ready`, {
-    headers: { Origin: origin },
-  });
+  const early = await page.request.post(`${origin}/api/characters/${id}/ready`, { headers: { Origin: origin } });
   assert.equal(early.status(), 400);
   assert.match(await early.text(), /Finish every character-creation step/i);
 
@@ -221,9 +195,7 @@ async function wizardEndToEnd(page) {
   assert.ok(languages.automatic.length > 0);
   assert.ok(languages.bonusOptions.length >= languages.bonusChoicesRequired);
   await api(page, "PUT", `/api/characters/${id}/languages`, {
-    bonusLanguageIds: languages.bonusOptions
-      .slice(0, languages.bonusChoicesRequired)
-      .map((entry) => entry.languageId),
+    bonusLanguageIds: languages.bonusOptions.slice(0, languages.bonusChoicesRequired).map((entry) => entry.languageId),
   });
 
   const feats = await api(page, "GET", `/api/characters/${id}/creation/feats`);
@@ -253,10 +225,7 @@ async function wizardEndToEnd(page) {
 
   await api(page, "PUT", `/api/characters/${id}/powers`, { ids: [] });
   await api(page, "PUT", `/api/characters/${id}/divine`, { deityId: null, domainIds: [] });
-  const companion = await api(page, "PUT", `/api/characters/${id}/companions`, {
-    creatureName: "Cat",
-    name: "Mote",
-  });
+  const companion = await api(page, "PUT", `/api/characters/${id}/companions`, { creatureName: "Cat", name: "Mote" });
   assert.equal(companion.selected.creatureName, "Cat");
 
   const readiness = await api(page, "GET", `/api/characters/${id}/creation/readiness`);
@@ -274,11 +243,7 @@ async function wizardEndToEnd(page) {
 }
 
 async function wizardSpecializationSmoke(page) {
-  const { character } = await baseCharacter(page, {
-    name: "Specialist Wizard",
-    classLevelId: "phb-class-level-wizard-01",
-    hitPointsGained: 4,
-  });
+  const { character } = await baseCharacter(page, { name: "Specialist Wizard", classLevelId: "phb-class-level-wizard-01", hitPointsGained: 4 });
   const id = character.id;
   const choices = await api(page, "GET", `/api/characters/${id}/creation/class-choices`);
   const evocation = choices.schools.find((school) => school.slug === "evocation");
@@ -286,10 +251,7 @@ async function wizardSpecializationSmoke(page) {
   const necromancy = choices.schools.find((school) => school.slug === "necromancy");
   assert.ok(evocation && enchantment && necromancy);
   await api(page, "PUT", `/api/characters/${id}/class-choices`, {
-    wizardSpecialization: {
-      schoolId: evocation.id,
-      prohibitedSchoolIds: [enchantment.id, necromancy.id],
-    },
+    wizardSpecialization: { schoolId: evocation.id, prohibitedSchoolIds: [enchantment.id, necromancy.id] },
   });
   const spells = await api(page, "GET", `/api/characters/${id}/creation/spells`);
   assert.ok(spells.options.every((spell) => ![enchantment.id, necromancy.id].includes(spell.schoolId)));
@@ -297,45 +259,27 @@ async function wizardSpecializationSmoke(page) {
 }
 
 async function clericDomainSmoke(page) {
-  const { character } = await baseCharacter(page, {
-    name: "Domain Cleric",
-    classLevelId: "phb-class-level-cleric-01",
-    hitPointsGained: 8,
-  });
+  const { character } = await baseCharacter(page, { name: "Domain Cleric", classLevelId: "phb-class-level-cleric-01", hitPointsGained: 8 });
   const id = character.id;
   const divine = await api(page, "GET", `/api/characters/${id}/creation/divine`);
   assert.equal(divine.required, true);
   const domainIds = divine.domainOptions.slice(0, 2).map((domain) => domain.id);
   assert.equal(domainIds.length, 2);
-  const selected = await api(page, "PUT", `/api/characters/${id}/divine`, {
-    deityId: null,
-    domainIds,
-  });
+  const selected = await api(page, "PUT", `/api/characters/${id}/divine`, { deityId: null, domainIds });
   assert.deepEqual(new Set(selected.domainIds), new Set(domainIds));
   console.log("✓ smoke: Cleric domains validate and persist");
 }
 
 async function druidCompanionSmoke(page) {
-  const { character } = await baseCharacter(page, {
-    name: "Companion Druid",
-    classLevelId: "phb-class-level-druid-01",
-    hitPointsGained: 8,
-  });
-  const selected = await api(page, "PUT", `/api/characters/${character.id}/companions`, {
-    creatureName: "Wolf",
-    name: "Briar",
-  });
+  const { character } = await baseCharacter(page, { name: "Companion Druid", classLevelId: "phb-class-level-druid-01", hitPointsGained: 8 });
+  const selected = await api(page, "PUT", `/api/characters/${character.id}/companions`, { creatureName: "Wolf", name: "Briar" });
   assert.equal(selected.selected.kind, "animal_companion");
   assert.equal(selected.selected.creatureName, "Wolf");
   console.log("✓ smoke: Druid animal companion validates and persists");
 }
 
 async function rangerFavoredEnemySmoke(page) {
-  const { character } = await baseCharacter(page, {
-    name: "Favored Enemy Ranger",
-    classLevelId: "phb-class-level-ranger-01",
-    hitPointsGained: 8,
-  });
+  const { character } = await baseCharacter(page, { name: "Favored Enemy Ranger", classLevelId: "phb-class-level-ranger-01", hitPointsGained: 8 });
   const id = character.id;
   const choices = await api(page, "GET", `/api/characters/${id}/creation/class-choices`);
   const humanoid = choices.options.find((option) => option.slug === "humanoid");
@@ -355,11 +299,7 @@ async function rangerFavoredEnemySmoke(page) {
 }
 
 async function psionPowerSmoke(page) {
-  const { character } = await baseCharacter(page, {
-    name: "Discipline Psion",
-    classLevelId: "xph-class-level-psion-01",
-    hitPointsGained: 4,
-  });
+  const { character } = await baseCharacter(page, { name: "Discipline Psion", classLevelId: "xph-class-level-psion-01", hitPointsGained: 4 });
   const id = character.id;
   const choices = await api(page, "GET", `/api/characters/${id}/creation/class-choices`);
   assert.equal(choices.choice, "psionic-discipline");
@@ -380,27 +320,21 @@ async function psionPowerSmoke(page) {
 try {
   const original = readConfig({ config: "wrangler.jsonc" });
   const configPath = join(directory, "wrangler.json");
-  await writeFile(
-    configPath,
-    JSON.stringify({
-      name: original.name,
-      main: fileURLToPath(new URL("../../src/server/worker.ts", import.meta.url)),
-      compatibility_date: original.compatibility_date,
-      compatibility_flags: original.compatibility_flags,
-      d1_databases: original.d1_databases,
-      assets: original.assets,
-      vars: {
-        BETTER_AUTH_URL: origin,
-        BETTER_AUTH_SECRET: secret,
-        GITHUB_REPOSITORY: "SinLess-Games/ai-dungeon-master",
-      },
-    }),
-  );
-  proxy = await getPlatformProxy({
-    configPath,
-    persist: { path: join(directory, "v3") },
-    remoteBindings: false,
-  });
+  await writeFile(configPath, JSON.stringify({
+    name: original.name,
+    main: fileURLToPath(new URL("../../src/server/worker.ts", import.meta.url)),
+    compatibility_date: original.compatibility_date,
+    compatibility_flags: original.compatibility_flags,
+    d1_databases: original.d1_databases,
+    assets: original.assets,
+    vars: {
+      BETTER_AUTH_URL: origin,
+      BETTER_AUTH_SECRET: secret,
+      GITHUB_REPOSITORY: "SinLess-Games/ai-dungeon-master",
+    },
+  }));
+
+  proxy = await getPlatformProxy({ configPath, persist: { path: join(directory, "v3") }, remoteBindings: false });
   await applyMigrations(proxy.env.DB);
   await applySeeds(proxy.env.DB);
   assert.ok((await scalar(proxy.env.DB, "SELECT count(*) AS n FROM dnd35_classes")) >= 15);
@@ -416,26 +350,18 @@ try {
 
   server = await createServer({
     configFile: false,
-    resolve: { alias: { "@": fileURLToPath(new URL("../../src", import.meta.url)) } },
     plugins: [
-      tanstackRouter({
-        target: "react",
-        autoCodeSplitting: true,
-        routesDirectory: "./src/app/routes",
-        generatedRouteTree: "./src/routeTree.gen.ts",
-      }),
+      tanstackRouter({ target: "react", autoCodeSplitting: true, routesDirectory: "./src/app/routes", generatedRouteTree: "./src/routeTree.gen.ts" }),
       react(),
+      tsconfigPaths(),
       tailwindcss(),
-      cloudflare({
-        configPath,
-        persistState: { path: directory },
-        remoteBindings: false,
-        inspectorPort: false,
-      }),
+      cloudflare({ configPath, persistState: { path: directory }, remoteBindings: false, inspectorPort: false }),
     ],
+    resolve: { dedupe: ["react", "react-dom"] },
     server: { host: "localhost", port: 5187, strictPort: true },
   });
   await server.listen();
+
   browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   page.setDefaultTimeout(15_000);
@@ -455,11 +381,7 @@ try {
   await page.getByLabel("Confirm password", { exact: true }).fill(password);
   await page.locator("form").getByRole("button", { name: "Create Account", exact: true }).click();
   await page.locator(".auth-user-menu summary").waitFor();
-  assert.ok(
-    (await page.context().cookies()).some(
-      (cookie) => cookie.httpOnly && cookie.name.includes("session_token"),
-    ),
-  );
+  assert.ok((await page.context().cookies()).some((cookie) => cookie.httpOnly && cookie.name.includes("session_token")));
   console.log("✓ smoke: browser signup creates an authenticated creator session");
 
   await wizardEndToEnd(page);

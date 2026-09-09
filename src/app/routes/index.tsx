@@ -1,6 +1,5 @@
 import { useAuthModal } from "@/shared/stores/authModal.store";
 import { authClient } from "@/modules/auth/client/authClient";
-import { toast } from "sonner";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { ArrowRight, BookOpen, Compass, Dices, Users } from "lucide-react";
 import background from "@/assets/background.png";
@@ -61,19 +60,23 @@ function HomePage() {
               and the Dungeon Master never forgets.
             </p>
             <div className="codex-hero-actions">
-              <button
-                type="button"
-                className="codex-cta-primary"
-                onClick={() =>
-                  session
-                    ? toast.info("Campaign creation is coming soon.")
-                    : useAuthModal.getState().openSignup()
-                }
-              >
-                <Compass aria-hidden="true" />
-                Enter the Codex
-                <ArrowRight size={19} aria-hidden="true" />
-              </button>
+              {session ? (
+                <Link to="/characters/new" className="codex-cta-primary">
+                  <Compass aria-hidden="true" />
+                  Create a Character
+                  <ArrowRight size={19} aria-hidden="true" />
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  className="codex-cta-primary"
+                  onClick={() => useAuthModal.getState().openSignup()}
+                >
+                  <Compass aria-hidden="true" />
+                  Enter the Codex
+                  <ArrowRight size={19} aria-hidden="true" />
+                </button>
+              )}
               <a href="#features" className="codex-cta-secondary">
                 <BookOpen aria-hidden="true" />
                 Learn More

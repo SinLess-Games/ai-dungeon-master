@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './app/routes/__root'
 import { Route as IndexRouteImport } from './app/routes/index'
 import { Route as StatusRouteImport } from './app/routes/status'
+import { Route as CharactersNewRouteImport } from './app/routes/characters/new'
 import { Route as DevblogIndexRouteImport } from './app/routes/devblog/index'
 import { Route as DevblogSlugRouteImport } from './app/routes/devblog/$slug'
 import { Route as DevblogAdminRouteImport } from './app/routes/devblog/admin'
@@ -25,6 +26,11 @@ const IndexRoute = IndexRouteImport.update({
 const StatusRoute = StatusRouteImport.update({
   id: '/status',
   path: '/status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CharactersNewRoute = CharactersNewRouteImport.update({
+  id: '/characters/new',
+  path: '/characters/new',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DevblogIndexRoute = DevblogIndexRouteImport.update({
@@ -56,6 +62,7 @@ const UserProfileRoute = UserProfileRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/status': typeof StatusRoute
+  '/characters/new': typeof CharactersNewRoute
   '/devblog/$slug': typeof DevblogSlugRoute
   '/devblog/admin': typeof DevblogAdminRoute
   '/user/admin': typeof UserAdminRoute
@@ -65,6 +72,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/status': typeof StatusRoute
+  '/characters/new': typeof CharactersNewRoute
   '/devblog/$slug': typeof DevblogSlugRoute
   '/devblog/admin': typeof DevblogAdminRoute
   '/user/admin': typeof UserAdminRoute
@@ -75,6 +83,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/status': typeof StatusRoute
+  '/characters/new': typeof CharactersNewRoute
   '/devblog/$slug': typeof DevblogSlugRoute
   '/devblog/admin': typeof DevblogAdminRoute
   '/user/admin': typeof UserAdminRoute
@@ -86,6 +95,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/status'
+    | '/characters/new'
     | '/devblog/$slug'
     | '/devblog/admin'
     | '/user/admin'
@@ -95,6 +105,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/status'
+    | '/characters/new'
     | '/devblog/$slug'
     | '/devblog/admin'
     | '/user/admin'
@@ -104,6 +115,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/status'
+    | '/characters/new'
     | '/devblog/$slug'
     | '/devblog/admin'
     | '/user/admin'
@@ -114,6 +126,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   StatusRoute: typeof StatusRoute
+  CharactersNewRoute: typeof CharactersNewRoute
   DevblogSlugRoute: typeof DevblogSlugRoute
   DevblogAdminRoute: typeof DevblogAdminRoute
   UserAdminRoute: typeof UserAdminRoute
@@ -135,6 +148,13 @@ declare module '@tanstack/react-router' {
       path: '/status'
       fullPath: '/status'
       preLoaderRoute: typeof StatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/characters/new': {
+      id: '/characters/new'
+      path: '/characters/new'
+      fullPath: '/characters/new'
+      preLoaderRoute: typeof CharactersNewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/devblog/': {
@@ -178,6 +198,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   StatusRoute: StatusRoute,
+  CharactersNewRoute: CharactersNewRoute,
   DevblogSlugRoute: DevblogSlugRoute,
   DevblogAdminRoute: DevblogAdminRoute,
   UserAdminRoute: UserAdminRoute,

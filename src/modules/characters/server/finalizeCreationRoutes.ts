@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDatabase } from "@/infrastructure/database/client";
 import {
@@ -10,6 +10,7 @@ import {
   characterCreationProgress,
   characters,
   dnd35Characters,
+  raceAbilities,
 } from "@/infrastructure/database/schema";
 import { createAuth, type AuthEnv } from "@/modules/auth/server/auth";
 import { requireUser } from "@/modules/auth/server/requireAuth";
@@ -147,7 +148,20 @@ export const characterFinalizeCreationRoutes = new Hono<CharacterCreationEnv>()
     if (conScore == null) {
       throw new ValidationError("A Constitution score is required for a playable character.");
     }
-    const conModifier = abilityModifier(conScore);
+    const racialConstitution = extension?.raceId
+      ? await db
+          .select({ modifier: raceAbilities.modifier })
+          .from(raceAbilities)
+          .where(
+            and(
+              eq(raceAbilities.raceId, extension.raceId),
+              eq(raceAbilities.ability, "con"),
+            ),
+          )
+          .get()
+      : undefined;
+    const effectiveConstitution = conScore + (racialConstitution?.modifier ?? 0);
+    const conModifier = abilityModifier(effectiveConstitution);
     const maximumHitPoints = classRows.reduce(
       (total, level) => total + Math.max(1, level.hitPointsGained + conModifier),
       0,

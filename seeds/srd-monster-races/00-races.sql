@@ -72,6 +72,7 @@ SELECT
   CASE WHEN d.favored_class_id IS NULL THEN 'none' ELSE 'specific' END,
   d.size,d.speed,d.la,d.rhd,d.rhd_die,d.natural_armor,0,0
 FROM desired d
+WHERE 1
 ON CONFLICT(id) DO UPDATE SET
   source_id=excluded.source_id, source_page=excluded.source_page, name=excluded.name,
   description=excluded.description, rules_text=excluded.rules_text, is_enabled=1,
@@ -97,6 +98,7 @@ INSERT INTO dnd35_race_abilities (race_id,ability,modifier)
 SELECT r.id,d.ability,d.modifier
 FROM desired d
 JOIN dnd35_races r ON r.slug=d.race_slug AND r.source_id='srd-monster-races-3.5'
+WHERE 1
 ON CONFLICT(race_id,ability) DO UPDATE SET modifier=excluded.modifier;
 
 -- Additional movement modes represented by the SRD race entries.
@@ -131,6 +133,7 @@ SELECT r.id,l.id,'automatic'
 FROM automatic d
 JOIN dnd35_races r ON r.slug=d.race_slug AND r.source_id='srd-monster-races-3.5'
 JOIN dnd35_languages l ON l.slug=d.language_slug AND l.owner_user_id IS NULL
+WHERE 1
 ON CONFLICT(race_id,language_id) DO UPDATE SET kind=excluded.kind;
 
 WITH bonus(race_slug,language_slug) AS (VALUES
@@ -147,4 +150,5 @@ SELECT r.id,l.id,'bonus'
 FROM bonus d
 JOIN dnd35_races r ON r.slug=d.race_slug AND r.source_id='srd-monster-races-3.5'
 JOIN dnd35_languages l ON l.slug=d.language_slug AND l.owner_user_id IS NULL
+WHERE 1
 ON CONFLICT(race_id,language_id) DO UPDATE SET kind=excluded.kind;

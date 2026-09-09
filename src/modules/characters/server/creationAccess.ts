@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { createDatabase } from "@/infrastructure/database/client";
 import {
   campaignMemberships,
@@ -67,16 +67,18 @@ export async function requireCharacterCreatorEditor(input: {
   return row;
 }
 
-export async function requireFirstCharacterClass(db: CharacterDatabase, characterId: string) {
-  const row = await db
+export async function requireFirstCharacterClasses(db: CharacterDatabase, characterId: string) {
+  const rows = await db
     .select({
       characterClassLevelId: characterClassLevels.id,
+      track: characterClassLevels.track,
       classLevelId: classLevels.id,
       characterLevel: characterClassLevels.characterLevel,
       classLevel: classLevels.level,
       classId: classes.id,
       classSlug: classes.slug,
       className: classes.name,
+      hitDie: classes.hitDie,
       skillPointsPerLevel: classes.skillPointsPerLevel,
       baseAttackBonus: classLevels.baseAttackBonus,
       fort: classLevels.fort,
@@ -92,13 +94,22 @@ export async function requireFirstCharacterClass(db: CharacterDatabase, characte
     .where(
       and(
         eq(characterClassLevels.characterId, characterId),
-        eq(characterClassLevels.track, 1),
         eq(characterClassLevels.characterLevel, 1),
       ),
     )
-    .get();
-  if (!row) throw new ValidationError("Choose the first class before completing this creator step.");
-  return row;
+    .orderBy(asc(characterClassLevels.track))
+    .all();
+  if (rows.length === 0) {
+    throw new ValidationError("Choose the first class before completing this creator step.");
+  }
+  return rows;
+}
+
+export async function requireFirstCharacterClass(db: CharacterDatabase, characterId: string) {
+  const rows = await requireFirstCharacterClasses(db, characterId);
+  const primary = rows.find(({ track }) => track === 1);
+  if (!primary) throw new ValidationError("Choose the primary first class before completing this creator step.");
+  return primary;
 }
 
 export async function ensureCreationProgress(db: CharacterDatabase, characterId: string) {

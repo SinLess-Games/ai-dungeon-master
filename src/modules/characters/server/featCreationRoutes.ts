@@ -13,6 +13,7 @@ import {
   classFeatures,
   classSpellcasting,
   classSpellcastingProgression,
+  creatureTypes,
   dnd35Characters,
   featCategoryAssignments,
   featPrerequisites,
@@ -35,6 +36,10 @@ import {
   type Dnd35RuleExtension,
 } from "@/rulesets/dnd35/prerequisites";
 import { ValidationError } from "@/server/middleware/errors";
+import {
+  generalFeatSlotsForTotalHitDice,
+  racialBaseBonuses,
+} from "../domain/monsterRaceCreation";
 import {
   markCreationStep,
   requireCharacterCreatorEditor,
@@ -135,10 +140,11 @@ export const characterFeatCreationRoutes = new Hono<CharacterCreationEnv>()
     });
     return c.json({
       required: {
-        level: race.racialHitDice > 1 ? 0 : 1,
+        level: generalFeatSlotsForTotalHitDice(race.racialHitDice + 1),
         racialBonus: race.bonusFeatsAtFirstLevel,
         classBonusFeatures,
       },
+      totalHitDice: race.racialHitDice + 1,
       classes: firstClasses.map(({ track, classId, classSlug, className }) => ({ track, classId, classSlug, className })),
       options,
       selected,
@@ -157,7 +163,12 @@ export const characterFeatCreationRoutes = new Hono<CharacterCreationEnv>()
     const classesById = classMap(firstClasses);
 
     const [race, baseAbilities, racialModifiers, skillRows, featureRows, spellcastingRows, bonusFeatureRows] = await Promise.all([
-      db.select({ bonusFeatsAtFirstLevel: races.bonusFeatsAtFirstLevel, racialHitDice: races.racialHitDice }).from(races).where(eq(races.id, extension.raceId)).get(),
+      db.select({
+        slug: races.slug,
+        creatureTypeId: races.creatureTypeId,
+        bonusFeatsAtFirstLevel: races.bonusFeatsAtFirstLevel,
+        racialHitDice: races.racialHitDice,
+      }).from(races).where(eq(races.id, extension.raceId)).get(),
       db.select({ ability: characterAbilityScores.ability, baseScore: characterAbilityScores.baseScore }).from(characterAbilityScores).where(eq(characterAbilityScores.characterId, row.character.id)).all(),
       db.select({ ability: raceAbilities.ability, modifier: raceAbilities.modifier }).from(raceAbilities).where(eq(raceAbilities.raceId, extension.raceId)).all(),
       db.select({ skillId: characterSkills.skillId, specialization: characterSkills.specialization, ranks: characterSkills.ranks, skillName: skills.name }).from(characterSkills).innerJoin(skills, eq(characterSkills.skillId, skills.id)).where(eq(characterSkills.characterId, row.character.id)).all(),
@@ -167,8 +178,10 @@ export const characterFeatCreationRoutes = new Hono<CharacterCreationEnv>()
     ]);
     if (!race) throw new ValidationError("Selected race is unavailable.");
     if (baseAbilities.length !== 6 || baseAbilities.some(({ baseScore }) => baseScore === null)) throw new ValidationError("Set all six ability scores before selecting feats.");
-    const requiredLevelFeats = race.racialHitDice > 1 ? 0 : 1;
-    if (input.levelFeats.length !== requiredLevelFeats) throw new ValidationError(requiredLevelFeats === 1 ? "A 1st-level character must choose exactly one level feat." : "A race with more than 1 racial Hit Die does not gain another feat merely for taking its first class level.");
+    const requiredLevelFeats = generalFeatSlotsForTotalHitDice(race.racialHitDice + 1);
+    if (input.levelFeats.length !== requiredLevelFeats) {
+      throw new ValidationError(`Choose exactly ${requiredLevelFeats} general feat${requiredLevelFeats === 1 ? "" : "s"} for ${race.racialHitDice + 1} total Hit Die${race.racialHitDice + 1 === 1 ? "" : "ce"}.`);
+    }
     if (input.racialBonusFeats.length !== race.bonusFeatsAtFirstLevel) throw new ValidationError(`This race grants exactly ${race.bonusFeatsAtFirstLevel} bonus feat${race.bonusFeatsAtFirstLevel === 1 ? "" : "s"} at 1st level.`);
     if (input.classBonusFeats.length !== bonusFeatureRows.length) throw new ValidationError(`The selected class track${firstClasses.length === 1 ? "" : "s"} require ${bonusFeatureRows.length} class bonus feat choice${bonusFeatureRows.length === 1 ? "" : "s"} at 1st level.`);
     const classFeatureIds = new Set(bonusFeatureRows.map(({ id }) => id));
@@ -240,15 +253,37 @@ export const characterFeatCreationRoutes = new Hono<CharacterCreationEnv>()
       if (found.length !== new Set(spellChoiceIds).size) throw new ValidationError("A selected spell is unavailable.");
     }
 
-    const baseAttackBonus = Math.max(...firstClasses.map(({ baseAttackBonus }) => baseAttackBonus));
+    const creatureType = race.racialHitDice > 0 && race.creatureTypeId
+      ? await db.select({
+          hitDie: creatureTypes.hitDie,
+          skillPointsPerHitDie: creatureTypes.skillPointsPerHitDie,
+          babProgression: creatureTypes.babProgression,
+          fortProgression: creatureTypes.fortProgression,
+          refProgression: creatureTypes.refProgression,
+          willProgression: creatureTypes.willProgression,
+        }).from(creatureTypes).where(eq(creatureTypes.id, race.creatureTypeId)).get()
+      : undefined;
+    const racialBonuses = racialBaseBonuses({
+      raceSlug: race.slug,
+      racialHitDice: race.racialHitDice,
+      racialHitDie: creatureType?.hitDie ?? null,
+      levelAdjustment: 0,
+      creatureSkillPointsPerHitDie: creatureType?.skillPointsPerHitDie ?? null,
+      creatureBabProgression: creatureType?.babProgression ?? null,
+      creatureFortProgression: creatureType?.fortProgression ?? null,
+      creatureRefProgression: creatureType?.refProgression ?? null,
+      creatureWillProgression: creatureType?.willProgression ?? null,
+    });
+    const classBaseAttackBonus = Math.max(...firstClasses.map(({ baseAttackBonus }) => baseAttackBonus));
+    const baseAttackBonus = racialBonuses.baseAttackBonus + classBaseAttackBonus;
     const saves = {
-      fort: Math.max(...firstClasses.map(({ fort }) => fort)),
-      ref: Math.max(...firstClasses.map(({ ref }) => ref)),
-      will: Math.max(...firstClasses.map(({ will }) => will)),
+      fort: racialBonuses.fort + Math.max(...firstClasses.map(({ fort }) => fort)),
+      ref: racialBonuses.ref + Math.max(...firstClasses.map(({ ref }) => ref)),
+      will: racialBonuses.will + Math.max(...firstClasses.map(({ will }) => will)),
     };
     const commonFacts: Omit<Dnd35PrerequisiteFacts, "evaluateCustom"> = {
       abilities: effectiveAbilities,
-      characterLevel: 1,
+      characterLevel: race.racialHitDice + 1,
       baseAttackBonus,
       casterLevel,
       manifesterLevel,
@@ -309,10 +344,10 @@ export const characterFeatCreationRoutes = new Hono<CharacterCreationEnv>()
     const occurrenceByFeat = new Map<string, number>();
     const values = allSelections.map(({ selection, grantKind }) => {
       const occurrence = (occurrenceByFeat.get(selection.featId) ?? 0) + 1; occurrenceByFeat.set(selection.featId, occurrence);
-      return { id: crypto.randomUUID(), characterId: row.character.id, featId: selection.featId, occurrence, grantKind, grantedAtLevel: 1, choices: selection.choices as RuleChoice[] | undefined };
+      return { id: crypto.randomUUID(), characterId: row.character.id, featId: selection.featId, occurrence, grantKind, grantedAtLevel: race.racialHitDice + 1, choices: selection.choices as RuleChoice[] | undefined };
     });
     await db.delete(characterFeats).where(eq(characterFeats.characterId, row.character.id)).run();
     if (values.length > 0) await db.insert(characterFeats).values(values).run();
     await markCreationStep(db, row.character.id, "featsFinalized");
-    return c.json({ characterId: row.character.id, selections: values });
+    return c.json({ characterId: row.character.id, totalHitDice: race.racialHitDice + 1, selections: values });
   });

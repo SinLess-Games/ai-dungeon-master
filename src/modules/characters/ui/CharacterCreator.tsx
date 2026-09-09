@@ -454,19 +454,16 @@ function AsyncStep({
 }
 
 function StepActions({
-  onComplete,
   onSave,
   saving,
   disabled,
   label = "Save & continue",
 }: {
-  onComplete?: () => void;
   onSave: () => void;
   saving: boolean;
   disabled?: boolean;
   label?: string;
 }) {
-  void onComplete;
   return (
     <div className="creator-step-actions">
       <button className="creator-primary" disabled={saving || disabled} onClick={onSave}>
@@ -556,7 +553,7 @@ function HeritageStep({ races, raceId, setRaceId, alignment, setAlignment }: {
 function AbilitiesStep({ abilities, setAbilities, selectedRace }: {
   abilities: Record<AbilityKey, number>;
   setAbilities: (value: Record<AbilityKey, number>) => void;
-  selectedRace?: RaceOption;
+  selectedRace: RaceOption | undefined;
 }) {
   return (
     <div className="creator-step-content">
@@ -626,6 +623,7 @@ function ClassChoicesStep({ characterId, onComplete }: { characterId: string; on
     const data = page.data;
     if (!data?.selected.length) return;
     const selected = data.selected[0];
+    if (!selected) return;
     if (data.choice === "favored-enemy") {
       setTypeId(selected.contentId ?? "");
       const subtype = selected.parameters?.["subtypeId"];
@@ -775,7 +773,7 @@ function FeatsStep({ characterId, onComplete }: { characterId: string; onComplet
     mutationFn: () => saveFeats(characterId, {
       levelFeats: level.map(toSelection),
       racialBonusFeats: racial.map(toSelection),
-      classBonusFeats: classBonus.map((slot, index): ClassFeatSelection => ({ ...toSelection(slot), classFeatureId: page.data!.required.classBonusFeatures[index].id })),
+      classBonusFeats: classBonus.map((slot, index): ClassFeatSelection => ({ ...toSelection(slot), classFeatureId: page.data!.required.classBonusFeatures[index]!.id })),
     }),
     onSuccess: onComplete,
     onError: (error) => toast.error(errorMessage(error)),
@@ -801,7 +799,7 @@ function FeatSlot({ label, slot, setSlot, options, choiceOptions }: {
   slot: FeatSlotState;
   setSlot: (value: FeatSlotState) => void;
   options: FeatOption[];
-  choiceOptions?: Partial<Record<Exclude<FeatChoiceKind, "none" | "other">, Array<{ id: string; name: string; slug?: string }>>>;
+  choiceOptions: Partial<Record<Exclude<FeatChoiceKind, "none" | "other">, Array<{ id: string; name: string; slug?: string }>>> | undefined;
 }) {
   const feat = options.find((option) => option.id === slot.featId);
   const choices = feat && feat.choiceKind !== "none" && feat.choiceKind !== "other" ? choiceOptions?.[feat.choiceKind] ?? [] : [];
@@ -912,7 +910,7 @@ function MagicStep({ characterId, onComplete }: { characterId: string; onComplet
       <div className="creator-step-content">
         <StepHeading icon={<WandSparkles />} eyebrow="Magic & psionics" title="Choose spells or powers" body="The creator only asks for selections your first class actually makes at level 1." />
         {spells.data?.required || spells.data?.mode === "spellbook" ? (
-          <section className="creator-subsection"><div className="creator-subsection-heading"><BookOpen /><div><h3>Spells</h3><p>{spells.data.mode === "spellbook" ? `Choose ${wizardRequired} 1st-level spells. Eligible cantrips are added automatically.` : "Choose exactly the spells known required at each level."}</p></div></div><div className="creator-magic-grid">{spells.data.options.filter((spell) => spells.data.mode !== "spellbook" || spell.spellLevel === 1).map((spell) => <button key={spell.id} className={spellIds.includes(spell.id) ? "selected" : ""} onClick={() => setSpellIds((current) => current.includes(spell.id) ? current.filter((id) => id !== spell.id) : [...current, spell.id])}><span>Level {spell.spellLevel}</span><strong>{spell.name}</strong><small>{spell.slug.replaceAll("-", " ")}</small></button>)}</div></section>
+          <section className="creator-subsection"><div className="creator-subsection-heading"><BookOpen /><div><h3>Spells</h3><p>{spells.data.mode === "spellbook" ? `Choose ${wizardRequired} 1st-level spells. Eligible cantrips are added automatically.` : "Choose exactly the spells known required at each level."}</p></div></div><div className="creator-magic-grid">{spells.data.options.filter((spell) => spells.data?.mode !== "spellbook" || spell.spellLevel === 1).map((spell) => <button key={spell.id} className={spellIds.includes(spell.id) ? "selected" : ""} onClick={() => setSpellIds((current) => current.includes(spell.id) ? current.filter((id) => id !== spell.id) : [...current, spell.id])}><span>Level {spell.spellLevel}</span><strong>{spell.name}</strong><small>{spell.slug.replaceAll("-", " ")}</small></button>)}</div></section>
         ) : <NotRequired title="No spell choices" body="This class does not choose individual spells at 1st level." />}
         {powers.data?.required ? (
           <section className="creator-subsection"><div className="creator-subsection-heading"><Sparkles /><div><h3>Psionic powers</h3><p>Choose exactly {powers.data.count} power{powers.data.count === 1 ? "" : "s"} known.</p></div></div><div className="creator-magic-grid">{powers.data.options.map((power) => <button key={power.id} className={powerIds.includes(power.id) ? "selected" : ""} onClick={() => setPowerIds((current) => current.includes(power.id) ? current.filter((id) => id !== power.id) : current.length < powers.data!.count ? [...current, power.id] : current)}><span>Level {power.powerLevel}</span><strong>{power.name}</strong><small>{power.slug.replaceAll("-", " ")}</small></button>)}</div></section>
@@ -968,8 +966,8 @@ function CompanionStep({ characterId, onComplete }: { characterId: string; onCom
 
 function ReviewStep({ characterId, race, characterClass, alignment, abilities, name, campaignName, onReady }: {
   characterId: string;
-  race?: RaceOption;
-  characterClass?: ClassOption;
+  race: RaceOption | undefined;
+  characterClass: ClassOption | undefined;
   alignment: Alignment;
   abilities: Record<AbilityKey, number>;
   name: string;
@@ -997,11 +995,11 @@ function NotRequired({ title, body }: { title: string; body: string }) {
 
 function CreatorSummary({ currentStep, campaignName, name, alignment, race, characterClass, abilities, characterId }: {
   currentStep: number;
-  campaignName?: string;
+  campaignName: string | undefined;
   name: string;
   alignment: Alignment;
-  race?: RaceOption;
-  characterClass?: ClassOption;
+  race: RaceOption | undefined;
+  characterClass: ClassOption | undefined;
   abilities: Record<AbilityKey, number>;
   characterId: string | null;
 }) {

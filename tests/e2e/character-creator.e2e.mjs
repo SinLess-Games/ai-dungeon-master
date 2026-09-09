@@ -185,7 +185,7 @@ async function wizardEndToEnd(page) {
   });
   const id = character.id;
   const early = await page.request.post(`${origin}/api/characters/${id}/ready`, { headers: { Origin: origin } });
-  assert.equal(early.status(), 400);
+  assert.equal(early.status(), 422);
   assert.match(await early.text(), /Finish every character-creation step/i);
 
   const skills = await api(page, "GET", `/api/characters/${id}/creation/skills`);

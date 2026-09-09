@@ -31,7 +31,7 @@ type Alignment = "LG" | "NG" | "CG" | "LN" | "N" | "CN" | "LE" | "NE" | "CE";
 
 const divineSelectionSchema = z.object({
   deityId: z.string().trim().min(1).nullable(),
-  domainIds: z.array(z.string().trim().min(1)).length(2),
+  domainIds: z.array(z.string().trim().min(1)).max(2),
 });
 
 function alignmentAxes(alignment: Alignment): [number, number] {
@@ -162,10 +162,18 @@ export const characterDivineCreationRoutes = new Hono<CharacterCreationEnv>()
       if (!extension) throw new ValidationError("D&D 3.5 character data is unavailable.");
 
       if (firstClass.classSlug !== "cleric") {
-        if (input.deityId !== null || input.domainIds.length !== 2) {
-          throw new ValidationError(`${firstClass.className} does not make a cleric domain selection at 1st level.`);
+        if (input.deityId !== null || input.domainIds.length !== 0) {
+          throw new ValidationError(`${firstClass.className} does not make a cleric deity/domain selection at 1st level.`);
         }
-        throw new ValidationError("Use the class-choice endpoint for non-cleric religious choices.");
+        await db.batch([
+          db.delete(characterDomains).where(eq(characterDomains.characterId, row.character.id)),
+          db
+            .update(dnd35Characters)
+            .set({ deityId: null, updatedAt: new Date() })
+            .where(eq(dnd35Characters.characterId, row.character.id)),
+        ]);
+        await markCreationStep(db, row.character.id, "divineFinalized");
+        return c.json({ characterId: row.character.id, deityId: null, domainIds: [], required: false });
       }
 
       const uniqueDomains = [...new Set(input.domainIds)];

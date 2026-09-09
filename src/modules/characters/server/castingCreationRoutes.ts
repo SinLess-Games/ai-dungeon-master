@@ -355,7 +355,7 @@ export const characterCastingCreationRoutes = new Hono<CharacterCreationEnv>()
           throw new ValidationError(`A 1st-level wizard must choose exactly ${required} 1st-level spells for the starting spellbook.`);
         }
         const cantrips = await db
-          .select({ id: spells.id })
+          .select({ id: spells.id, schoolId: spells.schoolId })
           .from(spellClassLevels)
           .innerJoin(spells, eq(spellClassLevels.spellId, spells.id))
           .where(
@@ -369,11 +369,8 @@ export const characterCastingCreationRoutes = new Hono<CharacterCreationEnv>()
           .all();
         persistedSpellIds = [
           ...cantrips
-            .map(({ id }) => id)
-            .filter((id) => {
-              const row = selectedRows.find((spell) => spell.id === id);
-              return !row || !specialization.prohibitedSchoolIds.includes(row.schoolId);
-            }),
+            .filter(({ schoolId }) => !specialization.prohibitedSchoolIds.includes(schoolId))
+            .map(({ id }) => id),
           ...uniqueIds,
         ];
       }

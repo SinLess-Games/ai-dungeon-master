@@ -1,19 +1,21 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { zValidator } from "@hono/zod-validator";
-import { and, asc, eq, isNull, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { createDatabase } from "@/infrastructure/database/client";
 import {
   characterAbilityScores,
   characterClassLevels,
+  characterCreationChoices,
   characterCreationProgress,
   characterLanguages,
   characterSkills,
   classSkills,
   dnd35Characters,
   languages,
+  powerDisciplines,
   raceAbilities,
   raceLanguages,
   races,
@@ -23,13 +25,17 @@ import { createAuth, type AuthEnv } from "@/modules/auth/server/auth";
 import { requireUser } from "@/modules/auth/server/requireAuth";
 import { abilityModifier } from "@/rulesets/dnd35";
 import { ValidationError } from "@/server/middleware/errors";
-import { firstLevelBonusLanguageCount } from "../domain/creationRules";
+import {
+  firstLevelBonusLanguageCount,
+  psionDisciplineClassSkills,
+} from "../domain/creationRules";
 import {
   ensureCreationProgress,
   markCreationStep,
   requireCharacterCreatorEditor,
   requireCharacterDatabase,
   requireFirstCharacterClass,
+  type CharacterDatabase,
 } from "./creationAccess";
 
 interface CharacterCreationBindings extends AuthEnv {
@@ -37,6 +43,8 @@ interface CharacterCreationBindings extends AuthEnv {
 }
 
 type CharacterCreationEnv = { Bindings: CharacterCreationBindings };
+
+type FirstClass = Awaited<ReturnType<typeof requireFirstCharacterClass>>;
 
 const skillSelectionSchema = z.object({
   skillId: z.string().trim().min(1),
@@ -57,7 +65,7 @@ function normalizeSpecialization(value: string | undefined): string {
 }
 
 async function requireRaceAndIntelligence(
-  db: ReturnType<typeof createDatabase>,
+  db: CharacterDatabase,
   characterId: string,
 ) {
   const [extension, intelligenceRow] = await Promise.all([
@@ -103,6 +111,55 @@ async function requireRaceAndIntelligence(
   return { race, effectiveIntelligence, intelligenceModifier: abilityModifier(effectiveIntelligence) };
 }
 
+async function classSkillIdSet(
+  db: CharacterDatabase,
+  characterId: string,
+  firstClass: FirstClass,
+): Promise<Set<string>> {
+  const baseRows = await db
+    .select({ skillId: classSkills.skillId })
+    .from(classSkills)
+    .where(eq(classSkills.classId, firstClass.classId))
+    .all();
+  const result = new Set(baseRows.map(({ skillId }) => skillId));
+  if (firstClass.classSlug !== "psion") return result;
+
+  const disciplineChoice = await db
+    .select({ contentId: characterCreationChoices.contentId })
+    .from(characterCreationChoices)
+    .where(
+      and(
+        eq(characterCreationChoices.characterId, characterId),
+        eq(characterCreationChoices.choiceKey, "psion-discipline"),
+      ),
+    )
+    .get();
+  if (!disciplineChoice?.contentId) {
+    throw new ValidationError("Choose the psion's discipline before allocating skill points.");
+  }
+  const discipline = await db
+    .select({ slug: powerDisciplines.slug })
+    .from(powerDisciplines)
+    .where(eq(powerDisciplines.id, disciplineChoice.contentId))
+    .get();
+  if (!discipline) throw new ValidationError("The selected psion discipline is unavailable.");
+
+  const additionalSlugs = psionDisciplineClassSkills(discipline.slug);
+  if (additionalSlugs.length === 0) {
+    throw new ValidationError(`No class-skill mapping exists for psion discipline: ${discipline.slug}.`);
+  }
+  const additionalRows = await db
+    .select({ id: skills.id })
+    .from(skills)
+    .where(and(inArray(skills.slug, [...additionalSlugs]), eq(skills.isEnabled, true)))
+    .all();
+  if (additionalRows.length !== additionalSlugs.length) {
+    throw new ValidationError("One or more psion discipline class skills are missing from the rules catalog.");
+  }
+  for (const { id } of additionalRows) result.add(id);
+  return result;
+}
+
 export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
   .use("/api/characters/*", async (c, next) => {
     c.header("Cache-Control", "no-store");
@@ -121,12 +178,8 @@ export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
       db,
       row.character.id,
     );
-    const [classSkillRows, availableSkills, selections] = await Promise.all([
-      db
-        .select({ skillId: classSkills.skillId })
-        .from(classSkills)
-        .where(eq(classSkills.classId, firstClass.classId))
-        .all(),
+    const [classSkillIds, availableSkills, selections] = await Promise.all([
+      classSkillIdSet(db, row.character.id, firstClass),
       db
         .select({
           id: skills.id,
@@ -156,7 +209,6 @@ export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
       (Math.max(1, firstClass.skillPointsPerLevel + intelligenceModifier) +
         Math.max(0, race.bonusSkillPointsPerLevel)) *
       4;
-    const classSkillIds = new Set(classSkillRows.map(({ skillId }) => skillId));
     return c.json({
       budget,
       effectiveIntelligence,
@@ -192,12 +244,8 @@ export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
         row.character.id,
       );
 
-      const [classSkillRows, availableSkills, availableLanguages] = await Promise.all([
-        db
-          .select({ skillId: classSkills.skillId })
-          .from(classSkills)
-          .where(eq(classSkills.classId, firstClass.classId))
-          .all(),
+      const [classSkillIds, availableSkills, availableLanguages] = await Promise.all([
+        classSkillIdSet(db, row.character.id, firstClass),
         db
           .select({
             id: skills.id,
@@ -229,7 +277,6 @@ export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
         (Math.max(1, firstClass.skillPointsPerLevel + intelligenceModifier) +
           Math.max(0, race.bonusSkillPointsPerLevel)) *
         4;
-      const classSkillIds = new Set(classSkillRows.map(({ skillId }) => skillId));
       const skillsById = new Map(availableSkills.map((skill) => [skill.id, skill]));
       const languagesById = new Map(availableLanguages.map((language) => [language.id, language]));
       const seen = new Set<string>();

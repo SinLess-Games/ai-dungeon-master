@@ -289,7 +289,7 @@ async function rangerFavoredEnemySmoke(page) {
     headers: { Origin: origin },
     data: { favoredEnemyTypeId: humanoid.id },
   });
-  assert.equal(missingSubtype.status(), 400);
+  assert.equal(missingSubtype.status(), 422);
   const selected = await api(page, "PUT", `/api/characters/${id}/class-choices`, {
     favoredEnemyTypeId: humanoid.id,
     favoredEnemySubtypeId: human.id,

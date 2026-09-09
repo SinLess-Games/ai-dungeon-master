@@ -22,6 +22,7 @@ import {
   pointBuyTotal,
   type AbilityGenerationMethod,
 } from "../domain/abilityGeneration";
+import { monsterEffectiveCharacterLevel } from "../domain/monsterRaceCreation";
 import { ValidationError } from "@/server/middleware/errors";
 import {
   requireCharacterCreatorEditor,
@@ -112,6 +113,7 @@ export const characterAdvancedCreationRoutes = new Hono<CharacterCreationEnv>()
         raceId: dnd35Characters.raceId,
         raceName: races.name,
         levelAdjustment: races.levelAdjustment,
+        racialHitDice: races.racialHitDice,
       })
       .from(characters)
       .innerJoin(campaigns, eq(characters.campaignId, campaigns.id))
@@ -145,7 +147,19 @@ export const characterAdvancedCreationRoutes = new Hono<CharacterCreationEnv>()
     }
 
     return c.json({
-      items: rows.map((row) => ({ ...row, classes: classesByCharacter.get(row.id) ?? [] })),
+      items: rows.map((row) => {
+        const characterClasses = classesByCharacter.get(row.id) ?? [];
+        const classLevelCount = new Set(characterClasses.map(({ characterLevel }) => characterLevel)).size;
+        const racialHitDice = row.racialHitDice ?? 0;
+        const levelAdjustment = row.levelAdjustment ?? 0;
+        return {
+          ...row,
+          racialHitDice,
+          totalHitDice: racialHitDice + classLevelCount,
+          effectiveCharacterLevel: monsterEffectiveCharacterLevel(racialHitDice, classLevelCount, levelAdjustment),
+          classes: characterClasses,
+        };
+      }),
     });
   })
   .put(

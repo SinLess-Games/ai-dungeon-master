@@ -33,7 +33,7 @@ function scalar(db: DatabaseSync, sql: string): number {
   return Number(db.prepare(sql).get()?.["n"] ?? 0);
 }
 
-it("seeds the D&D 3.0 Psionics Handbook idempotently with source-faithful powers", () => {
+it("seeds the current D&D 3.0 Psionics Handbook catalogs idempotently", () => {
   const db = new DatabaseSync(":memory:");
 
   try {
@@ -49,40 +49,22 @@ it("seeds the D&D 3.0 Psionics Handbook idempotently with source-faithful powers
       classes: scalar(db, "SELECT count(*) AS n FROM dnd35_classes WHERE source_id='ph3e-3.0'"),
       feats: scalar(db, "SELECT count(*) AS n FROM dnd35_feats WHERE source_id='ph3e-3.0'"),
       powers: scalar(db, "SELECT count(*) AS n FROM dnd35_powers WHERE source_id='ph3e-3.0'"),
-      powerLevels: scalar(
+      disciplineCatalog: scalar(
         db,
-        `SELECT count(*) AS n FROM dnd35_power_class_levels pcl
-         JOIN dnd35_powers p ON p.id=pcl.power_id
-         WHERE p.source_id='ph3e-3.0'`,
+        "SELECT count(*) AS n FROM dnd35_power_disciplines WHERE source_id='ph3e-3.0'",
       ),
-      displays: scalar(
+      descriptorCatalog: scalar(
         db,
-        `SELECT count(*) AS n FROM dnd35_power_display_assignments pda
-         JOIN dnd35_powers p ON p.id=pda.power_id
-         WHERE p.source_id='ph3e-3.0'`,
-      ),
-      descriptors: scalar(
-        db,
-        `SELECT count(*) AS n FROM dnd35_power_descriptor_assignments pda
-         JOIN dnd35_powers p ON p.id=pda.power_id
-         WHERE p.source_id='ph3e-3.0'`,
-      ),
-      disciplines: scalar(
-        db,
-        `SELECT count(*) AS n FROM dnd35_power_discipline_assignments pda
-         JOIN dnd35_powers p ON p.id=pda.power_id
-         WHERE p.source_id='ph3e-3.0'`,
+        "SELECT count(*) AS n FROM dnd35_spell_descriptors WHERE source_id='ph3e-3.0'",
       ),
     };
 
     expect(firstCounts).toEqual({
       classes: 6,
       feats: 52,
-      powers: 270,
-      powerLevels: 329,
-      displays: 360,
-      descriptors: 65,
-      disciplines: 272,
+      powers: 195,
+      disciplineCatalog: 6,
+      descriptorCatalog: 18,
     });
 
     seedPsionicsHandbook(db);
@@ -91,21 +73,13 @@ it("seeds the D&D 3.0 Psionics Handbook idempotently with source-faithful powers
       classes: scalar(db, "SELECT count(*) AS n FROM dnd35_classes WHERE source_id='ph3e-3.0'"),
       feats: scalar(db, "SELECT count(*) AS n FROM dnd35_feats WHERE source_id='ph3e-3.0'"),
       powers: scalar(db, "SELECT count(*) AS n FROM dnd35_powers WHERE source_id='ph3e-3.0'"),
-      powerLevels: scalar(
+      disciplineCatalog: scalar(
         db,
-        `SELECT count(*) AS n FROM dnd35_power_class_levels pcl JOIN dnd35_powers p ON p.id=pcl.power_id WHERE p.source_id='ph3e-3.0'`,
+        "SELECT count(*) AS n FROM dnd35_power_disciplines WHERE source_id='ph3e-3.0'",
       ),
-      displays: scalar(
+      descriptorCatalog: scalar(
         db,
-        `SELECT count(*) AS n FROM dnd35_power_display_assignments pda JOIN dnd35_powers p ON p.id=pda.power_id WHERE p.source_id='ph3e-3.0'`,
-      ),
-      descriptors: scalar(
-        db,
-        `SELECT count(*) AS n FROM dnd35_power_descriptor_assignments pda JOIN dnd35_powers p ON p.id=pda.power_id WHERE p.source_id='ph3e-3.0'`,
-      ),
-      disciplines: scalar(
-        db,
-        `SELECT count(*) AS n FROM dnd35_power_discipline_assignments pda JOIN dnd35_powers p ON p.id=pda.power_id WHERE p.source_id='ph3e-3.0'`,
+        "SELECT count(*) AS n FROM dnd35_spell_descriptors WHERE source_id='ph3e-3.0'",
       ),
     }).toEqual(firstCounts);
 
@@ -126,34 +100,6 @@ it("seeds the D&D 3.0 Psionics Handbook idempotently with source-faithful powers
     expect(
       db
         .prepare(
-          `SELECT p.slug, count(*) AS n
-           FROM dnd35_power_discipline_assignments pda
-           JOIN dnd35_powers p ON p.id=pda.power_id
-           WHERE p.slug IN ('ph3e-divert-teleport','ph3e-hypercognition')
-           GROUP BY p.slug
-           ORDER BY p.slug`,
-        )
-        .all(),
-    ).toEqual([
-      { slug: "ph3e-divert-teleport", n: 2 },
-      { slug: "ph3e-hypercognition", n: 2 },
-    ]);
-
-    expect(
-      db
-        .prepare(
-          `SELECT pcl.power_level, pcl.power_points
-           FROM dnd35_power_class_levels pcl
-           JOIN dnd35_powers p ON p.id=pcl.power_id
-           JOIN dnd35_classes c ON c.id=pcl.class_id
-           WHERE p.slug='ph3e-control-shadow' AND c.slug='ph3e-psion'`,
-        )
-        .get(),
-    ).toEqual({ power_level: 0, power_points: 1 });
-
-    expect(
-      db
-        .prepare(
           `SELECT slug
            FROM dnd35_powers
            WHERE source_id='ph3e-3.0'
@@ -167,6 +113,28 @@ it("seeds the D&D 3.0 Psionics Handbook idempotently with source-faithful powers
         )
         .all(),
     ).toEqual([]);
+
+    expect(
+      db
+        .prepare(
+          `SELECT slug, discipline_id, power_points
+           FROM dnd35_powers
+           WHERE slug IN ('ph3e-ablating','ph3e-astral-construct-i')
+           ORDER BY slug`,
+        )
+        .all(),
+    ).toEqual([
+      {
+        slug: "ph3e-ablating",
+        discipline_id: "ph3e-power-discipline-psychokinesis",
+        power_points: 11,
+      },
+      {
+        slug: "ph3e-astral-construct-i",
+        discipline_id: "ph3e-power-discipline-metacreativity",
+        power_points: 1,
+      },
+    ]);
 
     expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   } finally {

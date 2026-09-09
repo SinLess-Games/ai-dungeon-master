@@ -20,12 +20,12 @@ import { UserMenu } from "@/modules/auth/ui/UserMenu";
 import logo from "@/assets/favicon.png";
 import "./site-header.css";
 
-const sections = [
+const playItems = [
   { label: "Campaigns", icon: Swords },
-  { label: "Characters", icon: Users },
+  { label: "Characters", icon: Users, to: "/characters/new" as const },
   { label: "Dice", icon: Dices },
   { label: "Wiki", icon: BookOpen },
-];
+] as const;
 
 export function SiteHeader() {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -99,6 +99,11 @@ export function SiteHeader() {
   const pages = [
     { name: "Home", description: "Welcome to Endless Codex", to: "/" as const },
     {
+      name: "Create Character",
+      description: "Build a rules-valid D&D 3.5 adventurer",
+      to: "/characters/new" as const,
+    },
+    {
       name: "Service status",
       description: "Check the service availability",
       to: "/status" as const,
@@ -142,24 +147,43 @@ export function SiteHeader() {
                 <span>Devblog</span>
               </Link>
               <details ref={playDropdown} className="codex-play-dropdown">
-                <summary className="codex-nav-item">
+                <summary
+                  className={`codex-nav-item ${pathname.startsWith("/characters") ? "is-active" : ""}`}
+                >
                   <Swords aria-hidden="true" />
                   <span>Play</span>
                   <ChevronDown className="codex-play-chevron" aria-hidden="true" />
                 </summary>
                 <div className="codex-play-options">
-                  {sections.map(({ label, icon: Icon }) => (
-                    <button
-                      key={label}
-                      type="button"
-                      aria-disabled="true"
-                      title={`${label} — coming soon`}
-                    >
-                      <Icon aria-hidden="true" />
-                      <span>{label}</span>
-                      <small>Coming soon</small>
-                    </button>
-                  ))}
+                  {playItems.map((item) => {
+                    const Icon = item.icon;
+                    if ("to" in item) {
+                      return (
+                        <Link
+                          key={item.label}
+                          to={item.to}
+                          className="codex-play-option-link"
+                          onClick={() => playDropdown.current?.removeAttribute("open")}
+                        >
+                          <Icon aria-hidden="true" />
+                          <span>{item.label}</span>
+                          <small>Open</small>
+                        </Link>
+                      );
+                    }
+                    return (
+                      <button
+                        key={item.label}
+                        type="button"
+                        aria-disabled="true"
+                        title={`${item.label} — coming soon`}
+                      >
+                        <Icon aria-hidden="true" />
+                        <span>{item.label}</span>
+                        <small>Coming soon</small>
+                      </button>
+                    );
+                  })}
                 </div>
               </details>
               <button
@@ -249,7 +273,7 @@ export function SiteHeader() {
                     </Link>
                   ))}
                   {pages.length === 0 && (
-                    <p>No pages found. Play, Characters, Dice, and Wiki are coming soon.</p>
+                    <p>No pages found. Campaigns, Dice, and Wiki are coming soon.</p>
                   )}
                 </div>
               </>

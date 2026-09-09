@@ -143,7 +143,7 @@ export interface SpellOption {
 }
 export interface SpellPage {
   required: boolean;
-  classId: string;
+  classId?: string;
   mode: "limited" | "all_list" | "spellbook" | "none" | null;
   automaticSpellIds?: string[];
   firstLevelChoicesRequired?: number;
@@ -162,7 +162,7 @@ export interface PowerOption {
 }
 export interface PowerPage {
   required: boolean;
-  classId: string;
+  classId?: string;
   count: number;
   disciplineId?: string | null;
   options: PowerOption[];
@@ -233,6 +233,14 @@ export interface ReadyResult {
   creationComplete: boolean;
 }
 
+export interface CreatorReferenceOptions {
+  languages: FeatChoiceOption[];
+  featChoiceOptions: Partial<
+    Record<Exclude<FeatChoiceKind, "none" | "other">, FeatChoiceOption[]>
+  >;
+  deityDomainIds: Record<string, string[]>;
+}
+
 interface ErrorEnvelope {
   error?: string | { message?: string };
   message?: string;
@@ -262,6 +270,17 @@ export async function requestJson<T>(input: RequestInfo | URL, init?: RequestIni
 
 const characterPath = (characterId: string, suffix = "") =>
   `/api/characters/${encodeURIComponent(characterId)}${suffix}`;
+
+let referenceOptionsPromise: Promise<CreatorReferenceOptions> | undefined;
+function getCreatorReferenceOptions(): Promise<CreatorReferenceOptions> {
+  referenceOptionsPromise ??= requestJson<CreatorReferenceOptions>(
+    "/api/dnd35/character-creation-reference-options",
+  ).catch((error) => {
+    referenceOptionsPromise = undefined;
+    throw error;
+  });
+  return referenceOptionsPromise;
+}
 
 export async function listDraftCampaigns(): Promise<CampaignSummary[]> {
   const response = await requestJson<{ items: CampaignSummary[] }>("/api/campaigns");
@@ -340,7 +359,16 @@ export async function createCharacterFoundation(input: {
   return { characterId: character.id };
 }
 
-export const getSkills = (id: string) => requestJson<SkillPage>(characterPath(id, "/creation/skills"));
+export async function getSkills(id: string): Promise<SkillPage> {
+  const [page, references] = await Promise.all([
+    requestJson<SkillPage>(characterPath(id, "/creation/skills")),
+    getCreatorReferenceOptions(),
+  ]);
+  return {
+    ...page,
+    speakLanguageOptions: references.languages.map(({ id, name }) => ({ id, name })),
+  };
+}
 export const saveSkills = (id: string, selections: Array<{ skillId: string; specialization?: string; ranks: number }>) =>
   requestJson(characterPath(id, "/skills"), { method: "PUT", body: JSON.stringify({ selections }) });
 
@@ -348,7 +376,13 @@ export const getLanguages = (id: string) => requestJson<LanguagePage>(characterP
 export const saveLanguages = (id: string, bonusLanguageIds: string[]) =>
   requestJson(characterPath(id, "/languages"), { method: "PUT", body: JSON.stringify({ bonusLanguageIds }) });
 
-export const getFeats = (id: string) => requestJson<FeatPage>(characterPath(id, "/creation/feats"));
+export async function getFeats(id: string): Promise<FeatPage> {
+  const [page, references] = await Promise.all([
+    requestJson<FeatPage>(characterPath(id, "/creation/feats")),
+    getCreatorReferenceOptions(),
+  ]);
+  return { ...page, choiceOptions: references.featChoiceOptions };
+}
 export const saveFeats = (id: string, input: { levelFeats: FeatSelection[]; racialBonusFeats: FeatSelection[]; classBonusFeats: ClassFeatSelection[] }) =>
   requestJson(characterPath(id, "/feats"), { method: "PUT", body: JSON.stringify(input) });
 
@@ -373,7 +407,13 @@ export const saveClassChoices = (id: string, input: {
   psionDisciplineId?: string | null;
 }) => requestJson(characterPath(id, "/class-choices"), { method: "PUT", body: JSON.stringify(input) });
 
-export const getDivine = (id: string) => requestJson<DivinePage>(characterPath(id, "/creation/divine"));
+export async function getDivine(id: string): Promise<DivinePage> {
+  const [page, references] = await Promise.all([
+    requestJson<DivinePage>(characterPath(id, "/creation/divine")),
+    getCreatorReferenceOptions(),
+  ]);
+  return { ...page, deityDomainIds: references.deityDomainIds };
+}
 export const saveDivine = (id: string, deityId: string | null, domainIds: string[]) =>
   requestJson(characterPath(id, "/divine"), { method: "PUT", body: JSON.stringify({ deityId, domainIds }) });
 

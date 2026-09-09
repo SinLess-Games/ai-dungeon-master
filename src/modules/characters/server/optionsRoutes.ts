@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { and, asc, eq, isNull, or } from "drizzle-orm";
+import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { Hono } from "hono";
 import { createDatabase } from "@/infrastructure/database/client";
 import {
@@ -36,7 +37,7 @@ function requireDatabase(binding: D1Database | undefined): D1Database {
   return binding;
 }
 
-function visibleToUser(ownerUserId: typeof races.ownerUserId, userId: string) {
+function visibleToUser(ownerUserId: AnySQLiteColumn, userId: string) {
   return or(isNull(ownerUserId), eq(ownerUserId, userId));
 }
 

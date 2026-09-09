@@ -1,0 +1,14 @@
+-- D&D 3.0 Psionics Handbook class power-point/progression values.
+-- Prestige-class +PP values are retained exactly as printed in Tables 6-1 through 6-4.
+WITH desired(class_slug,level,base_power_points,powers_known,max_power_level) AS (VALUES
+('psion',1,2,NULL,1),('psion',2,3,NULL,1),('psion',3,4,NULL,1),('psion',4,7,NULL,2),('psion',5,10,NULL,2),('psion',6,15,NULL,3),('psion',7,20,NULL,3),('psion',8,27,NULL,4),('psion',9,34,NULL,4),('psion',10,43,NULL,5),('psion',11,52,NULL,5),('psion',12,63,NULL,6),('psion',13,74,NULL,6),('psion',14,87,NULL,7),('psion',15,100,NULL,7),('psion',16,115,NULL,8),('psion',17,130,NULL,8),('psion',18,147,NULL,9),('psion',19,164,NULL,9),('psion',20,183,NULL,9),
+('psychic-warrior',1,2,NULL,NULL),('psychic-warrior',2,3,NULL,NULL),('psychic-warrior',3,4,NULL,1),('psychic-warrior',4,5,NULL,1),('psychic-warrior',5,8,NULL,2),('psychic-warrior',6,11,NULL,2),('psychic-warrior',7,16,NULL,3),('psychic-warrior',8,21,NULL,3),('psychic-warrior',9,26,NULL,3),('psychic-warrior',10,33,NULL,4),('psychic-warrior',11,40,NULL,4),('psychic-warrior',12,47,NULL,4),('psychic-warrior',13,56,NULL,5),('psychic-warrior',14,65,NULL,5),('psychic-warrior',15,74,NULL,5),('psychic-warrior',16,85,NULL,6),('psychic-warrior',17,96,NULL,6),('psychic-warrior',18,107,NULL,6),('psychic-warrior',19,118,NULL,6),('psychic-warrior',20,129,NULL,6),
+('metamind',1,5,2,NULL),('metamind',2,5,3,NULL),('metamind',3,7,4,1),('metamind',4,7,5,1),('metamind',5,7,7,2),('metamind',6,9,8,2),('metamind',7,9,9,3),('metamind',8,11,10,3),('metamind',9,11,11,3),('metamind',10,11,12,4),
+('pyrokineticist',1,3,0,NULL),('pyrokineticist',2,5,0,NULL),('pyrokineticist',3,5,0,NULL),('pyrokineticist',4,5,1,NULL),('pyrokineticist',5,7,2,NULL),('pyrokineticist',6,7,3,1),('pyrokineticist',7,7,4,1),('pyrokineticist',8,9,5,2),('pyrokineticist',9,9,6,2),('pyrokineticist',10,9,7,3),
+('slayer',1,3,0,NULL),('slayer',2,5,0,NULL),('slayer',3,5,0,NULL),('slayer',4,5,1,NULL),('slayer',5,7,2,NULL),('slayer',6,7,3,1),('slayer',7,7,4,1),('slayer',8,9,5,2),('slayer',9,9,6,2),('slayer',10,9,7,3),
+('soulknife',1,3,0,NULL),('soulknife',2,5,0,NULL),('soulknife',3,5,0,NULL),('soulknife',4,5,1,NULL),('soulknife',5,7,2,NULL),('soulknife',6,7,3,1),('soulknife',7,7,4,1),('soulknife',8,9,5,2),('soulknife',9,9,6,2),('soulknife',10,9,7,3))
+UPDATE dnd35_class_levels AS cl SET
+ base_power_points=(SELECT d.base_power_points FROM desired d WHERE d.class_slug=replace(cl.class_id,'ph3e-class-','') AND d.level=cl.level),
+ powers_known=(SELECT d.powers_known FROM desired d WHERE d.class_slug=replace(cl.class_id,'ph3e-class-','') AND d.level=cl.level),
+ max_power_level=(SELECT d.max_power_level FROM desired d WHERE d.class_slug=replace(cl.class_id,'ph3e-class-','') AND d.level=cl.level)
+WHERE EXISTS (SELECT 1 FROM desired d WHERE cl.class_id='ph3e-class-'||d.class_slug AND d.level=cl.level);

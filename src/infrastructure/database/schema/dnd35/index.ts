@@ -5,6 +5,7 @@ export * from "./characterAbilityScore";
 export * from "./characterClassLevel";
 export * from "./characterCondition";
 export * from "./characterCreation";
+export * from "./characterCreationProgress";
 export * from "./characterFeat";
 export * from "./characterInventory";
 export * from "./characterPower";

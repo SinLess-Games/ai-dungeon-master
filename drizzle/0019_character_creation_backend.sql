@@ -28,8 +28,7 @@ CREATE TABLE `dnd35_character_wealth` (
   CONSTRAINT `dnd35_character_wealth_start_valid` CHECK(`starting_wealth_copper` is null or `starting_wealth_copper` >= 0),
   CONSTRAINT `dnd35_character_wealth_current_valid` CHECK(`current_copper` >= 0),
   CONSTRAINT `dnd35_character_wealth_spent_valid` CHECK(`equipment_spent_copper` >= 0),
-  CONSTRAINT `dnd35_character_wealth_roll_results_json` CHECK(case when `roll_results` is null then 1 when json_valid(`roll_results`) then json_type(`roll_results`) = 'array' else 0 end),
-  CONSTRAINT `dnd35_character_wealth_balance_valid` CHECK(`starting_wealth_copper` is null or `current_copper` + `equipment_spent_copper` <= `starting_wealth_copper`)
+  CONSTRAINT `dnd35_character_wealth_roll_results_json` CHECK(case when `roll_results` is null then 1 when json_valid(`roll_results`) then json_type(`roll_results`) = 'array' else 0 end)
 );
 --> statement-breakpoint
 CREATE TABLE `dnd35_character_creation_choices` (
@@ -54,6 +53,8 @@ CREATE TABLE `dnd35_character_creation_choices` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `dnd35_character_creation_choices_slot_uq` ON `dnd35_character_creation_choices` (`character_id`,`class_feature_id`,`choice_key`);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `dnd35_character_creation_choices_generic_slot_uq` ON `dnd35_character_creation_choices` (`character_id`,`choice_key`) WHERE `class_feature_id` is null;
 --> statement-breakpoint
 CREATE INDEX `dnd35_character_creation_choices_character_idx` ON `dnd35_character_creation_choices` (`character_id`);
 --> statement-breakpoint

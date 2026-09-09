@@ -114,7 +114,50 @@ async function saveAndWait(page, nextHeading) {
   await page.getByRole("heading", { name: nextHeading }).waitFor();
 }
 
-async function runUiFlow(page) {
+async function assignLowIntelligence(page) {
+  const intCard = page.locator(".creator-ability-card").filter({ hasText: "INT" });
+  const chaCard = page.locator(".creator-ability-card").filter({ hasText: "CHA" });
+  await intCard.locator("select").selectOption("8");
+  assert.equal(await intCard.locator("select").inputValue(), "8");
+  assert.equal(await chaCard.locator("select").inputValue(), "12", "Used standard-array scores should swap automatically.");
+}
+
+async function spendClassSkillBudget(page) {
+  const budgetText = (await page.locator(".creator-budget-bar strong").first().textContent()) ?? "";
+  const match = budgetText.match(/(\d+)\s*\/\s*(\d+)/);
+  assert.ok(match, `Expected a skill budget, received: ${budgetText}`);
+  let remaining = Number(match[2]);
+  const rows = page.locator(".creator-table tbody tr");
+  const count = await rows.count();
+  for (let index = 0; index < count && remaining > 0; index += 1) {
+    const row = rows.nth(index);
+    if (await row.locator(".creator-pill.good").count() === 0) continue;
+    if (await row.locator(".creator-inline-input").count() > 0) continue;
+    const input = row.locator('input[type="number"]');
+    const maximum = Number(await input.getAttribute("max") ?? 0);
+    const ranks = Math.min(maximum, remaining);
+    if (!Number.isInteger(ranks) || ranks <= 0) continue;
+    await input.fill(String(ranks));
+    remaining -= ranks;
+  }
+  assert.equal(remaining, 0, `Unable to spend exact visible class-skill budget ${match[2]}.`);
+}
+
+async function startNewCharacter(page, campaignName, characterName) {
+  await page.getByRole("link", { name: "Create character", exact: true }).click();
+  await page.waitForURL(`${origin}/characters/new`);
+  await page.getByRole("heading", { name: "Forge an adventurer" }).waitFor();
+  await page.getByPlaceholder("New campaign name").fill(campaignName);
+  await page.getByPlaceholder("New campaign name").locator("xpath=..").getByRole("button", { name: "Create", exact: true }).click();
+  await page.waitForFunction(() => {
+    const select = document.querySelector("label.creator-field select");
+    return select?.tagName === "SELECT" && typeof select.value === "string" && select.value.length > 0;
+  });
+  await page.getByLabel("Character name").fill(characterName);
+  await page.locator(".creator-footer").getByRole("button", { name: /Continue/ }).click();
+}
+
+async function runStandardUiFlow(page) {
   const campaignName = `UI E2E Campaign ${randomBytes(4).toString("hex")}`;
   const characterName = "UI E2E Barbarian";
 
@@ -126,29 +169,19 @@ async function runUiFlow(page) {
   await characterLink.click();
   await page.waitForURL(`${origin}/characters`);
   await page.getByRole("heading", { name: "Characters", exact: true }).waitFor();
-  await page.getByRole("link", { name: "Create character", exact: true }).click();
-  await page.waitForURL(`${origin}/characters/new`);
-  await page.getByRole("heading", { name: "Forge an adventurer" }).waitFor();
-
-  await page.getByPlaceholder("New campaign name").fill(campaignName);
-  await page.getByPlaceholder("New campaign name").locator("xpath=..").getByRole("button", { name: "Create", exact: true }).click();
-  await page.waitForFunction(() => {
-    const select = document.querySelector("label.creator-field select");
-    return select?.tagName === "SELECT" && typeof select.value === "string" && select.value.length > 0;
-  });
-  await page.getByLabel("Character name").fill(characterName);
-  await page.locator(".creator-footer").getByRole("button", { name: /Continue/ }).click();
+  await startNewCharacter(page, campaignName, characterName);
 
   await page.getByRole("heading", { name: "Choose race and alignment" }).waitFor();
+  const trumpetArchon = page.getByRole("button", { name: /^Trumpet Archon\b/ }).first();
+  await trumpetArchon.waitFor();
+  const trumpetText = (await trumpetArchon.textContent()) ?? "";
+  assert.match(trumpetText, /LA \+8/);
+  assert.match(trumpetText, /12d8 racial HD/);
   await page.getByRole("button", { name: /Dwarf/ }).first().click();
   await page.locator(".creator-footer").getByRole("button", { name: /Continue/ }).click();
 
   await page.getByRole("heading", { name: "Choose how ability scores are generated" }).waitFor();
-  const intCard = page.locator(".creator-ability-card").filter({ hasText: "INT" });
-  const chaCard = page.locator(".creator-ability-card").filter({ hasText: "CHA" });
-  await intCard.locator("select").selectOption("8");
-  assert.equal(await intCard.locator("select").inputValue(), "8");
-  assert.equal(await chaCard.locator("select").inputValue(), "12", "Used standard-array scores should swap automatically.");
+  await assignLowIntelligence(page);
   await page.locator(".creator-footer").getByRole("button", { name: /Continue/ }).click();
 
   await page.getByRole("heading", { name: "Choose class progression" }).waitFor();
@@ -211,7 +244,85 @@ async function runUiFlow(page) {
   assert.match((await savedCard.textContent()) ?? "", /Dwarf\s*·\s*Barbarian/);
   assert.match((await savedCard.textContent()) ?? "", /Ready/i);
 
-  console.log("✓ UI E2E: Play → Characters opens the library, the full creator completes a Dwarf Barbarian, and the saved character appears in the library");
+  console.log("✓ UI E2E: LA +8 is visible and a standard Dwarf Barbarian completes and persists");
+}
+
+async function runGestaltCasterFlow(page) {
+  const campaignName = `Gestalt UI E2E ${randomBytes(4).toString("hex")}`;
+  const characterName = "UI E2E Gestalt Mage";
+  await startNewCharacter(page, campaignName, characterName);
+
+  await page.getByRole("heading", { name: "Choose race and alignment" }).waitFor();
+  await page.getByRole("button", { name: /Dwarf/ }).first().click();
+  await page.locator(".creator-footer").getByRole("button", { name: /Continue/ }).click();
+
+  await page.getByRole("heading", { name: "Choose how ability scores are generated" }).waitFor();
+  await assignLowIntelligence(page);
+  await page.locator(".creator-footer").getByRole("button", { name: /Continue/ }).click();
+
+  await page.getByRole("heading", { name: "Choose class progression" }).waitFor();
+  await page.getByRole("button", { name: /^Gestalt\b/ }).click();
+  const classGrids = page.locator(".creator-class-grid");
+  assert.equal(await classGrids.count(), 2);
+  await classGrids.nth(0).getByRole("button", { name: /^Wizard\b/ }).click();
+  await classGrids.nth(1).getByRole("button", { name: /^Rogue\b/ }).click();
+  const begin = page.locator(".creator-footer").getByRole("button", { name: "Begin rules-driven creation" });
+  assert.equal(await begin.isEnabled(), true);
+  await begin.click();
+
+  await page.getByRole("heading", { name: "Resolve first-level class choices" }).waitFor();
+  await page.getByRole("button", { name: "Generalist", exact: true }).waitFor();
+  await saveAndWait(page, "Spend skill points");
+  await page.getByText("Gestalt class-skill union", { exact: true }).waitFor();
+  await spendClassSkillBudget(page);
+  await saveAndWait(page, "Choose feats from full rule cards");
+
+  const featSlot = page.locator(".creator-feat-slot").first();
+  await featSlot.getByRole("button", { name: /^Alertness\b/ }).click();
+  await saveAndWait(page, "Browse the complete language catalog");
+  assert.match((await page.locator(".creator-selection-count").textContent()) ?? "", /0\s*\/\s*0/);
+  await saveAndWait(page, "Roll class starting wealth");
+
+  await page.getByRole("button", { name: "Roll starting wealth" }).click();
+  await page.getByRole("button", { name: "Continue to equipment" }).click();
+  await page.getByRole("heading", { name: "Purchase starting gear" }).waitFor();
+  await saveAndWait(page, "Choose spells and powers by class track");
+
+  const wizardSpells = page.locator(".creator-track-section").filter({ hasText: "Wizard spells" }).first();
+  await wizardSpells.waitFor();
+  const note = (await wizardSpells.locator(".creator-track-note").textContent()) ?? "";
+  const requiredMatch = note.match(/Choose (\d+) 1st-level spells/);
+  assert.ok(requiredMatch, `Expected Wizard spellbook choice count, received: ${note}`);
+  const requiredSpells = Number(requiredMatch[1]);
+  const spellCards = wizardSpells.locator(".creator-magic-detail-grid button");
+  assert.ok(await spellCards.count() >= requiredSpells);
+  for (let index = 0; index < requiredSpells; index += 1) await spellCards.nth(index).click();
+  await saveAndWait(page, "Choose deity and domains");
+
+  await page.getByText("No divine choice required", { exact: true }).waitFor();
+  await saveAndWait(page, "Choose familiars and animal companions");
+  const wizardCompanion = page.locator(".creator-track-section").filter({ hasText: "Wizard" }).first();
+  await wizardCompanion.getByRole("button", { name: "Cat", exact: true }).click();
+  await saveAndWait(page, "Ready the adventurer");
+
+  await page.getByText("All creator phases are complete", { exact: true }).waitFor();
+  const readyButton = page.getByRole("button", { name: "Mark character ready" });
+  assert.equal(await readyButton.isEnabled(), true);
+  await readyButton.click();
+  await page.getByText("CHARACTER COMPLETE", { exact: true }).waitFor();
+  const completeText = (await page.locator(".creator-complete").textContent()) ?? "";
+  assert.match(completeText, /Dwarf Wizard \/\/ Rogue/);
+  assert.match(completeText, /Gestalt/);
+
+  await page.getByRole("link", { name: "View my characters" }).click();
+  await page.waitForURL(`${origin}/characters`);
+  const savedCard = page.locator(".character-library-card").filter({ hasText: characterName });
+  await savedCard.waitFor();
+  assert.match((await savedCard.textContent()) ?? "", /Wizard \/\/ Rogue/);
+  assert.match((await savedCard.textContent()) ?? "", /Gestalt/);
+  assert.equal(await page.locator(".character-library-card").count(), 2);
+
+  console.log("✓ UI E2E: gestalt Wizard // Rogue completes spell selection and persists in the character library");
 }
 
 try {
@@ -266,9 +377,10 @@ try {
   await page.locator("form").getByRole("button", { name: "Create Account", exact: true }).click();
   await page.locator(".auth-user-menu summary").waitFor();
 
-  await runUiFlow(page);
+  await runStandardUiFlow(page);
+  await runGestaltCasterFlow(page);
   assert.deepEqual(pageErrors, []);
-  console.log("\n✓ Browser-driven character creator E2E passed.");
+  console.log("\n✓ Browser-driven standard, high-LA visibility, gestalt, caster, and character-library E2E passed.");
 } finally {
   if (browser) await browser.close();
   if (server) await server.close();

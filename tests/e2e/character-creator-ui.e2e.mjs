@@ -142,7 +142,7 @@ async function runUiFlow(page) {
   await page.getByRole("button", { name: /Dwarf/ }).first().click();
   await page.locator(".creator-footer").getByRole("button", { name: /Continue/ }).click();
 
-  await page.getByRole("heading", { name: "Assign the standard array" }).waitFor();
+  await page.getByRole("heading", { name: "Choose how ability scores are generated" }).waitFor();
   const intCard = page.locator(".creator-ability-card").filter({ hasText: "INT" });
   const chaCard = page.locator(".creator-ability-card").filter({ hasText: "CHA" });
   await intCard.locator("select").selectOption("8");
@@ -150,7 +150,7 @@ async function runUiFlow(page) {
   assert.equal(await chaCard.locator("select").inputValue(), "12", "Used standard-array scores should swap automatically.");
   await page.locator(".creator-footer").getByRole("button", { name: /Continue/ }).click();
 
-  await page.getByRole("heading", { name: "Choose a first class" }).waitFor();
+  await page.getByRole("heading", { name: "Choose class progression" }).waitFor();
   await page.getByRole("button", { name: /Barbarian/ }).first().click();
   const begin = page.locator(".creator-footer").getByRole("button", { name: "Begin rules-driven creation" });
   assert.equal(await begin.isEnabled(), true);
@@ -164,14 +164,14 @@ async function runUiFlow(page) {
     await row.locator('input[type="number"]').fill("4");
   }
   assert.match((await page.locator(".creator-budget-bar strong").first().textContent()) ?? "", /12\s*\/\s*12/);
-  await saveAndWait(page, "Choose first-level feats");
+  await saveAndWait(page, "Choose feats from full rule cards");
 
-  const featSelect = page.locator(".creator-slot-card select").first();
-  await featSelect.selectOption({ label: "Alertness" });
-  await saveAndWait(page, "Choose bonus languages");
+  const featSlot = page.locator(".creator-feat-slot").first();
+  await featSlot.getByRole("button", { name: /^Alertness\b/ }).click();
+  await saveAndWait(page, "Browse the complete language catalog");
 
   assert.match((await page.locator(".creator-selection-count").textContent()) ?? "", /0\s*\/\s*0/);
-  await saveAndWait(page, "Roll starting gold");
+  await saveAndWait(page, "Roll class starting wealth");
 
   await page.getByRole("button", { name: "Roll starting wealth" }).click();
   const continueEquipment = page.getByRole("button", { name: "Continue to equipment" });
@@ -179,13 +179,13 @@ async function runUiFlow(page) {
   await continueEquipment.click();
   await page.getByRole("heading", { name: "Purchase starting gear" }).waitFor();
 
-  await saveAndWait(page, "Choose spells or powers");
+  await saveAndWait(page, "Choose spells and powers by class track");
   await page.getByText("No spell choices", { exact: true }).waitFor();
   await page.getByText("No psionic power choices", { exact: true }).waitFor();
   await saveAndWait(page, "Choose deity and domains");
 
   await page.getByText("No divine choice required", { exact: true }).waitFor();
-  await saveAndWait(page, "Choose a familiar or animal companion");
+  await saveAndWait(page, "Choose familiars and animal companions");
 
   await page.getByText("No companion feature", { exact: true }).waitFor();
   await saveAndWait(page, "Ready the adventurer");
@@ -197,9 +197,11 @@ async function runUiFlow(page) {
 
   await page.getByText("CHARACTER COMPLETE", { exact: true }).waitFor();
   await page.getByRole("heading", { name: characterName }).waitFor();
-  assert.match((await page.locator(".creator-complete").textContent()) ?? "", /Level 1 Dwarf Barbarian/);
-  assert.match((await page.locator(".creator-complete").textContent()) ?? "", /Ready/);
-  assert.match((await page.locator(".creator-character-id").textContent()) ?? "", /Character ID:\s*[0-9a-f-]+/i);
+  const completeText = (await page.locator(".creator-complete").textContent()) ?? "";
+  assert.match(completeText, /Level 1 Dwarf Barbarian/);
+  assert.match(completeText, /Standard/);
+  assert.ok(completeText.includes(campaignName));
+  await page.getByRole("link", { name: "View my characters" }).waitFor();
 
   console.log("✓ UI E2E: Play → Characters opens the library, then the full creator completes a Dwarf Barbarian");
 }

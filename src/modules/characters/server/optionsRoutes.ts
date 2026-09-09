@@ -20,6 +20,7 @@ import {
   raceAbilities,
   races,
   skills,
+  sources,
   spellSchools,
   spells,
   weapons,
@@ -126,11 +127,13 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>()
           levelOneSkillPoints: classLevels.skillPoints,
         })
         .from(classes)
+        .innerJoin(sources, eq(classes.sourceId, sources.id))
         .innerJoin(classLevels, and(eq(classLevels.classId, classes.id), eq(classLevels.level, 1)))
         .where(
           and(
             eq(classes.isEnabled, true),
             eq(classes.category, "base"),
+            eq(sources.edition, "3.5"),
             visibleToUser(classes.ownerUserId, session.user.id),
           ),
         )

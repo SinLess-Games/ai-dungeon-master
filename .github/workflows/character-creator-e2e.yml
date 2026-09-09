@@ -47,10 +47,24 @@ jobs:
         run: npm ci
 
       - name: Local D1 migrate and seed bootstrap
-        run: npm run db:seed:local
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run db:seed:local 2>&1 | tee character-creator-e2e.log
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
       - name: Character creator API and browser E2E tests
-        run: npm run test:e2e:creator
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:e2e:creator 2>&1 | tee -a character-creator-e2e.log
+
+      - name: Upload failing E2E log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: character-creator-e2e-log
+          path: character-creator-e2e.log
+          if-no-files-found: warn

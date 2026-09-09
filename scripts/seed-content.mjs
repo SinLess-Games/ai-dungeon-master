@@ -18,6 +18,7 @@ const preferredSeedOrder = [
   "phb-feats",
   "phb-divine",
   "phb-creatures",
+  "srd-monster-races",
   "phb-spells",
   "phb-rules",
   "dmg-rules",

@@ -2,6 +2,7 @@
 
 import { Hono } from "hono";
 import type { AuthEnv } from "@/modules/auth/server/auth";
+import { characterAdvancedCreationRoutes } from "./advancedCreationRoutes";
 import { characterCastingCreationRoutes } from "./castingCreationRoutes";
 import { characterClassChoiceCreationRoutes } from "./classChoiceCreationRoutes";
 import { characterCompanionCreationRoutes } from "./companionCreationRoutes";
@@ -18,6 +19,7 @@ interface CharacterCreationBindings extends AuthEnv {
 type CharacterCreationEnv = { Bindings: CharacterCreationBindings };
 
 export const characterCreationRoutes = new Hono<CharacterCreationEnv>()
+  .route("/", characterAdvancedCreationRoutes)
   .route("/", characterOptionRoutes)
   .route("/", characterFinalizeCreationRoutes)
   .route("/", characterSkillLanguageRoutes)

@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { zValidator } from "@hono/zod-validator";
-import { and, asc, eq, isNull, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { createDatabase } from "@/infrastructure/database/client";
@@ -21,7 +21,7 @@ import {
   markCreationStep,
   requireCharacterCreatorEditor,
   requireCharacterDatabase,
-  requireFirstCharacterClass,
+  requireFirstCharacterClasses,
 } from "./creationAccess";
 
 interface CharacterCreationBindings extends AuthEnv {
@@ -29,6 +29,8 @@ interface CharacterCreationBindings extends AuthEnv {
 }
 
 type CharacterCreationEnv = { Bindings: CharacterCreationBindings };
+
+type WealthFormula = typeof classStartingWealth.$inferSelect;
 
 const equipmentSelectionSchema = z.object({
   selections: z
@@ -40,6 +42,51 @@ const equipmentSelectionSchema = z.object({
     )
     .max(200),
 });
+
+function richerFormula(formulas: WealthFormula[]): WealthFormula | undefined {
+  return [...formulas].sort((a, b) => {
+    const expectedA = a.diceCount * (a.dieSides + 1) * a.multiplierGp;
+    const expectedB = b.diceCount * (b.dieSides + 1) * b.multiplierGp;
+    return expectedB - expectedA;
+  })[0];
+}
+
+async function startingWealthContext(
+  db: ReturnType<typeof createDatabase>,
+  characterId: string,
+) {
+  const firstClasses = await requireFirstCharacterClasses(db, characterId);
+  const classIds = firstClasses.map(({ classId }) => classId);
+  const formulas = classIds.length
+    ? await db
+        .select()
+        .from(classStartingWealth)
+        .where(inArray(classStartingWealth.classId, classIds))
+        .all()
+    : [];
+  const formulaByClass = new Map(formulas.map((formula) => [formula.classId, formula]));
+  const missing = firstClasses.filter(({ classId }) => !formulaByClass.has(classId));
+  if (missing.length > 0) {
+    throw new ValidationError(
+      `Starting-wealth formula is unavailable for ${missing.map(({ className }) => className).join(" / ")}.`,
+    );
+  }
+  const selected = richerFormula(formulas);
+  if (!selected) throw new ValidationError("Starting-wealth formula is unavailable for this character.");
+  const selectedClass = firstClasses.find(({ classId }) => classId === selected.classId)!;
+  return {
+    firstClasses,
+    selected,
+    selectedClass,
+    classFormulas: firstClasses.map((characterClass) => ({
+      track: characterClass.track,
+      classId: characterClass.classId,
+      classSlug: characterClass.classSlug,
+      className: characterClass.className,
+      formula: formulaByClass.get(characterClass.classId)!,
+    })),
+  };
+}
 
 export const characterEquipmentCreationRoutes = new Hono<CharacterCreationEnv>()
   .use("/api/characters/*", async (c, next) => {
@@ -54,13 +101,8 @@ export const characterEquipmentCreationRoutes = new Hono<CharacterCreationEnv>()
       characterId: c.req.param("characterId"),
       userId: session.user.id,
     });
-    const firstClass = await requireFirstCharacterClass(db, row.character.id);
-    const [formula, wealth, inventory, availableItems] = await Promise.all([
-      db
-        .select()
-        .from(classStartingWealth)
-        .where(eq(classStartingWealth.classId, firstClass.classId))
-        .get(),
+    const context = await startingWealthContext(db, row.character.id);
+    const [wealth, inventory, availableItems] = await Promise.all([
       db
         .select()
         .from(characterWealth)
@@ -98,8 +140,23 @@ export const characterEquipmentCreationRoutes = new Hono<CharacterCreationEnv>()
         .all(),
     ]);
     return c.json({
-      class: { id: firstClass.classId, slug: firstClass.classSlug, name: firstClass.className },
-      formula: formula ?? null,
+      class: {
+        id: context.selectedClass.classId,
+        slug: context.selectedClass.classSlug,
+        name: context.selectedClass.className,
+      },
+      classes: context.firstClasses.map(({ track, classId, classSlug, className }) => ({
+        track,
+        id: classId,
+        slug: classSlug,
+        name: className,
+      })),
+      classFormulas: context.classFormulas,
+      wealthRule:
+        context.firstClasses.length > 1
+          ? "Gestalt starting wealth uses the class formula with the higher expected value; gestalt does not double starting funds."
+          : "Starting wealth uses the selected class formula.",
+      formula: context.selected,
       wealth: wealth ?? null,
       inventory,
       options: availableItems.filter((item) => item.priceCopper !== null),
@@ -113,28 +170,18 @@ export const characterEquipmentCreationRoutes = new Hono<CharacterCreationEnv>()
       characterId: c.req.param("characterId"),
       userId: session.user.id,
     });
-    const firstClass = await requireFirstCharacterClass(db, row.character.id);
-    const [existing, formula] = await Promise.all([
-      db
-        .select()
-        .from(characterWealth)
-        .where(eq(characterWealth.characterId, row.character.id))
-        .get(),
-      db
-        .select()
-        .from(classStartingWealth)
-        .where(eq(classStartingWealth.classId, firstClass.classId))
-        .get(),
-    ]);
+    const context = await startingWealthContext(db, row.character.id);
+    const existing = await db
+      .select()
+      .from(characterWealth)
+      .where(eq(characterWealth.characterId, row.character.id))
+      .get();
     if (existing?.startingWealthCopper !== null && existing?.startingWealthCopper !== undefined) {
       await markCreationStep(db, row.character.id, "wealthFinalized");
       return c.json({ characterId: row.character.id, wealth: existing, alreadyRolled: true });
     }
-    if (!formula) {
-      throw new ValidationError(`Starting-wealth formula is unavailable for ${firstClass.className}.`);
-    }
 
-    const result = rollStartingWealth(formula);
+    const result = rollStartingWealth(context.selected);
     await db
       .insert(characterWealth)
       .values({
@@ -165,7 +212,9 @@ export const characterEquipmentCreationRoutes = new Hono<CharacterCreationEnv>()
     return c.json(
       {
         characterId: row.character.id,
-        classId: firstClass.classId,
+        classId: context.selectedClass.classId,
+        className: context.selectedClass.className,
+        wealthRule: context.firstClasses.length > 1 ? "higher-expected-formula" : "class-formula",
         rollResults: result.rolls,
         startingGoldPieces: result.goldPieces,
         startingWealthCopper: result.copperPieces,
@@ -185,7 +234,7 @@ export const characterEquipmentCreationRoutes = new Hono<CharacterCreationEnv>()
         characterId: c.req.param("characterId"),
         userId: session.user.id,
       });
-      await requireFirstCharacterClass(db, row.character.id);
+      await requireFirstCharacterClasses(db, row.character.id);
       const wealth = await db
         .select()
         .from(characterWealth)
@@ -212,9 +261,7 @@ export const characterEquipmentCreationRoutes = new Hono<CharacterCreationEnv>()
               ownerUserId: items.ownerUserId,
             })
             .from(items)
-            .where(
-              or(isNull(items.ownerUserId), eq(items.ownerUserId, session.user.id)),
-            )
+            .where(or(isNull(items.ownerUserId), eq(items.ownerUserId, session.user.id)))
             .all()
         : [];
       const byId = new Map(availableItems.map((item) => [item.id, item]));

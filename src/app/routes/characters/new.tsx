@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CharacterCreator } from "@/modules/characters/ui/CharacterCreator";
+import { AdvancedCharacterCreator } from "@/modules/characters/ui/AdvancedCharacterCreator";
 
 export const Route = createFileRoute("/characters/new")({
-  component: CharacterCreator,
+  component: AdvancedCharacterCreator,
 });

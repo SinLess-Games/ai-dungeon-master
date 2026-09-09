@@ -22,7 +22,7 @@ import "./site-header.css";
 
 const playItems = [
   { label: "Campaigns", icon: Swords },
-  { label: "Characters", icon: Users, to: "/characters/new" as const },
+  { label: "Characters", icon: Users, to: "/characters" as const },
   { label: "Dice", icon: Dices },
   { label: "Wiki", icon: BookOpen },
 ] as const;
@@ -98,6 +98,11 @@ export function SiteHeader() {
 
   const pages = [
     { name: "Home", description: "Welcome to Endless Codex", to: "/" as const },
+    {
+      name: "Characters",
+      description: "View all of your saved adventurers",
+      to: "/characters" as const,
+    },
     {
       name: "Create Character",
       description: "Build a rules-valid D&D 3.5 adventurer",

@@ -1,12 +1,12 @@
 import { sql } from "drizzle-orm";
-import { check, integer, sqliteTable, text, primaryKey, uniqueIndex, index } from "drizzle-orm/sqlite-core";
+import { check, index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { dnd35Characters } from "./character";
+import { characterClassLevels } from "./characterClassLevel";
 import { classes } from "./class";
 import { classFeatures } from "./classFeature";
-import { characterClassLevels } from "./characterClassLevel";
 import { monsters } from "./monster";
-import { uuid, timestamps, enumCheck, nonNegative, positive, jsonCheck } from "./schemaUtils";
 import type { JsonValue } from "./primitives";
+import { enumCheck, jsonCheck, nonNegative, positive, timestamps, uuid } from "./schemaUtils";
 
 /** Source-backed starting-wealth formula for a class. Values are kept as dice, not pre-rolled money. */
 export const classStartingWealth = sqliteTable(
@@ -20,9 +20,18 @@ export const classStartingWealth = sqliteTable(
     multiplierGp: integer("multiplier_gp").notNull().default(1),
   },
   (t) => [
-    check("dnd35_class_starting_wealth_dice_count_integer", sql`typeof(${t.diceCount}) = 'integer'`),
-    check("dnd35_class_starting_wealth_die_sides_integer", sql`typeof(${t.dieSides}) = 'integer'`),
-    check("dnd35_class_starting_wealth_multiplier_integer", sql`typeof(${t.multiplierGp}) = 'integer'`),
+    check(
+      "dnd35_class_starting_wealth_dice_count_integer",
+      sql`typeof(${t.diceCount}) = 'integer'`,
+    ),
+    check(
+      "dnd35_class_starting_wealth_die_sides_integer",
+      sql`typeof(${t.dieSides}) = 'integer'`,
+    ),
+    check(
+      "dnd35_class_starting_wealth_multiplier_integer",
+      sql`typeof(${t.multiplierGp}) = 'integer'`,
+    ),
     positive("dnd35_class_starting_wealth_dice_count_valid", t.diceCount),
     positive("dnd35_class_starting_wealth_die_sides_valid", t.dieSides),
     positive("dnd35_class_starting_wealth_multiplier_valid", t.multiplierGp),
@@ -31,7 +40,7 @@ export const classStartingWealth = sqliteTable(
 export type ClassStartingWealth = typeof classStartingWealth.$inferSelect;
 export type NewClassStartingWealth = typeof classStartingWealth.$inferInsert;
 
-/** Character money used by creation and later gameplay. Copper is the canonical accounting unit. */
+/** Character money. Starting/spent values retain creation audit data; currentCopper may later grow. */
 export const characterWealth = sqliteTable(
   "dnd35_character_wealth",
   {
@@ -49,16 +58,18 @@ export const characterWealth = sqliteTable(
       "dnd35_character_wealth_start_integer",
       sql`${t.startingWealthCopper} is null or typeof(${t.startingWealthCopper}) = 'integer'`,
     ),
-    check("dnd35_character_wealth_current_integer", sql`typeof(${t.currentCopper}) = 'integer'`),
-    check("dnd35_character_wealth_spent_integer", sql`typeof(${t.equipmentSpentCopper}) = 'integer'`),
+    check(
+      "dnd35_character_wealth_current_integer",
+      sql`typeof(${t.currentCopper}) = 'integer'`,
+    ),
+    check(
+      "dnd35_character_wealth_spent_integer",
+      sql`typeof(${t.equipmentSpentCopper}) = 'integer'`,
+    ),
     nonNegative("dnd35_character_wealth_start_valid", t.startingWealthCopper),
     nonNegative("dnd35_character_wealth_current_valid", t.currentCopper),
     nonNegative("dnd35_character_wealth_spent_valid", t.equipmentSpentCopper),
     jsonCheck("dnd35_character_wealth_roll_results_json", t.rollResults, "array"),
-    check(
-      "dnd35_character_wealth_balance_valid",
-      sql`${t.startingWealthCopper} is null or ${t.currentCopper} + ${t.equipmentSpentCopper} <= ${t.startingWealthCopper}`,
-    ),
   ],
 );
 export type CharacterWealth = typeof characterWealth.$inferSelect;
@@ -94,9 +105,10 @@ export const characterCreationChoices = sqliteTable(
     characterId: text("character_id")
       .notNull()
       .references(() => dnd35Characters.characterId, { onDelete: "cascade" }),
-    characterClassLevelId: text("character_class_level_id").references(() => characterClassLevels.id, {
-      onDelete: "cascade",
-    }),
+    characterClassLevelId: text("character_class_level_id").references(
+      () => characterClassLevels.id,
+      { onDelete: "cascade" },
+    ),
     classFeatureId: text("class_feature_id").references(() => classFeatures.id, {
       onDelete: "restrict",
     }),
@@ -113,9 +125,15 @@ export const characterCreationChoices = sqliteTable(
       t.classFeatureId,
       t.choiceKey,
     ),
+    uniqueIndex("dnd35_character_creation_choices_generic_slot_uq")
+      .on(t.characterId, t.choiceKey)
+      .where(sql`${t.classFeatureId} is null`),
     index("dnd35_character_creation_choices_character_idx").on(t.characterId),
     enumCheck("dnd35_character_creation_choices_kind_valid", t.kind, creationChoiceKinds),
-    check("dnd35_character_creation_choices_key_nonempty", sql`length(trim(${t.choiceKey})) > 0`),
+    check(
+      "dnd35_character_creation_choices_key_nonempty",
+      sql`length(trim(${t.choiceKey})) > 0`,
+    ),
     check(
       "dnd35_character_creation_choices_value_present",
       sql`${t.contentId} is not null or ${t.valueText} is not null or ${t.parameters} is not null`,
@@ -137,7 +155,9 @@ export const characterCompanions = sqliteTable(
     classFeatureId: text("class_feature_id")
       .notNull()
       .references(() => classFeatures.id, { onDelete: "restrict" }),
-    kind: text("kind", { enum: ["familiar", "animal_companion", "special_mount", "other"] }).notNull(),
+    kind: text("kind", {
+      enum: ["familiar", "animal_companion", "special_mount", "other"],
+    }).notNull(),
     monsterId: text("monster_id").references(() => monsters.id, { onDelete: "restrict" }),
     creatureName: text("creature_name").notNull(),
     name: text("name"),
@@ -153,7 +173,10 @@ export const characterCompanions = sqliteTable(
       "special_mount",
       "other",
     ]),
-    check("dnd35_character_companions_creature_nonempty", sql`length(trim(${t.creatureName})) > 0`),
+    check(
+      "dnd35_character_companions_creature_nonempty",
+      sql`length(trim(${t.creatureName})) > 0`,
+    ),
     jsonCheck("dnd35_character_companions_details_json", t.details),
   ],
 );

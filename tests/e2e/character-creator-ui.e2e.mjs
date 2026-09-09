@@ -124,7 +124,7 @@ async function runUiFlow(page) {
   await page.getByPlaceholder("New campaign name").locator("xpath=..").getByRole("button", { name: "Create", exact: true }).click();
   await page.waitForFunction(() => {
     const select = document.querySelector("label.creator-field select");
-    return select instanceof HTMLSelectElement && select.value.length > 0;
+    return select?.tagName === "SELECT" && typeof select.value === "string" && select.value.length > 0;
   });
   await page.getByLabel("Character name").fill(characterName);
   await page.locator(".creator-footer").getByRole("button", { name: /Continue/ }).click();

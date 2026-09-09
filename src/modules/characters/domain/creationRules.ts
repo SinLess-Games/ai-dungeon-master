@@ -90,6 +90,37 @@ export function psionDisciplineClassSkills(disciplineSlug: string): readonly str
   return psionDisciplineClassSkillSlugs[disciplineSlug.trim().toLowerCase()] ?? [];
 }
 
+export interface DragonShamanTotemRule {
+  name: string;
+  alignments: readonly string[];
+  classSkills: readonly string[];
+  breathWeapon: string;
+}
+
+/** PHB II Totem Dragon table. Descriptions are concise mechanical data for creator validation. */
+export const dragonShamanTotems: Readonly<Record<string, DragonShamanTotemRule>> = {
+  black: { name: "Black", alignments: ["NE", "CE", "CN"], classSkills: ["hide", "move-silently", "swim"], breathWeapon: "Line of acid" },
+  blue: { name: "Blue", alignments: ["NE", "LE", "LN"], classSkills: ["bluff", "hide", "spellcraft"], breathWeapon: "Line of electricity" },
+  brass: { name: "Brass", alignments: ["NG", "CG", "CN"], classSkills: ["bluff", "gather-information", "survival"], breathWeapon: "Line of fire" },
+  bronze: { name: "Bronze", alignments: ["NG", "LG", "LN"], classSkills: ["disguise", "survival", "swim"], breathWeapon: "Line of electricity" },
+  copper: { name: "Copper", alignments: ["NG", "CG", "CN"], classSkills: ["bluff", "hide", "jump"], breathWeapon: "Line of acid" },
+  gold: { name: "Gold", alignments: ["NG", "LG", "LN"], classSkills: ["disguise", "heal", "swim"], breathWeapon: "Cone of fire" },
+  green: { name: "Green", alignments: ["NE", "LE", "LN"], classSkills: ["bluff", "hide", "move-silently"], breathWeapon: "Cone of acid" },
+  red: { name: "Red", alignments: ["NE", "CE", "CN"], classSkills: ["appraise", "bluff", "jump"], breathWeapon: "Cone of fire" },
+  silver: { name: "Silver", alignments: ["NG", "LG", "LN"], classSkills: ["bluff", "disguise", "jump"], breathWeapon: "Cone of cold" },
+  white: { name: "White", alignments: ["NE", "CE", "CN"], classSkills: ["hide", "move-silently", "swim"], breathWeapon: "Cone of cold" },
+};
+
+export function dragonShamanTotemOptions(alignment: string) {
+  return Object.entries(dragonShamanTotems)
+    .filter(([, rule]) => rule.alignments.includes(alignment))
+    .map(([slug, rule]) => ({ slug, ...rule }));
+}
+
+export function dragonShamanTotemClassSkills(totemSlug: string): readonly string[] {
+  return dragonShamanTotems[totemSlug.trim().toLowerCase()]?.classSkills ?? [];
+}
+
 export const standardFamiliarChoices = [
   "bat",
   "cat",

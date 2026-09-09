@@ -2,7 +2,8 @@ name: Temporary creator CI repair
 
 on:
   push:
-    branches: [feature/creator-advanced-options]
+    branches:
+      - feature/creator-advanced-options
 
 permissions:
   contents: write
@@ -15,82 +16,7 @@ jobs:
         with:
           ref: feature/creator-advanced-options
       - name: Apply targeted TypeScript repairs
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          def replace_target(path: str, old: str, new: str) -> None:
-              file = Path(path)
-              text = file.read_text()
-              if old in text:
-                  file.write_text(text.replace(old, new, 1))
-              elif new not in text:
-                  raise SystemExit(f"Neither old nor repaired text was found in {path}")
-
-          replace_target(
-              "src/modules/characters/server/featCreationRoutes.ts",
-              '      spellLevelAccess: spellAccess as Dnd35PrerequisiteFacts["spellLevelAccess"],',
-              '      spellLevelAccess: spellAccess,',
-          )
-
-          ui = "src/modules/characters/ui/AdvancedCharacterCreator.tsx"
-          replace_target(
-              ui,
-              "  type FeatSelection,\n  type PointBuyBudget,",
-              "  type FeatSelection,\n  type LanguageOption,\n  type PointBuyBudget,",
-          )
-          replace_target(
-              ui,
-              '''    options: data.options,
-          schools: data.schools,
-          generalistAllowed: data.generalistAllowed,
-          subtypeRequiredFor: data.subtypeRequiredFor,
-          subtypeOptions: data.subtypeOptions,''',
-              '''    ...(data.options !== undefined ? { options: data.options } : {}),
-          ...(data.schools !== undefined ? { schools: data.schools } : {}),
-          ...(data.generalistAllowed !== undefined ? { generalistAllowed: data.generalistAllowed } : {}),
-          ...(data.subtypeRequiredFor !== undefined ? { subtypeRequiredFor: data.subtypeRequiredFor } : {}),
-          ...(data.subtypeOptions !== undefined ? { subtypeOptions: data.subtypeOptions } : {}),''',
-          )
-          replace_target(
-              ui,
-              "  const all = page.data?.allOptions ?? [",
-              "  const all: LanguageOption[] = page.data?.allOptions ?? [",
-          )
-          replace_target(
-              ui,
-              '''  return data.sections ?? [{ track: data.track ?? 1, classId: data.classId ?? "", className: data.className ?? "Class", required: data.required, mode: data.mode, automaticSpellIds: data.automaticSpellIds, firstLevelChoicesRequired: data.firstLevelChoicesRequired, specialization: data.specialization, knownByLevel: data.knownByLevel, options: data.options, selected: data.selected }];''',
-              '''  return data.sections ?? [{
-          track: data.track ?? 1,
-          classId: data.classId ?? "",
-          className: data.className ?? "Class",
-          required: data.required,
-          mode: data.mode,
-          ...(data.automaticKnown !== undefined ? { automaticKnown: data.automaticKnown } : {}),
-          ...(data.automaticSpellIds !== undefined ? { automaticSpellIds: data.automaticSpellIds } : {}),
-          ...(data.firstLevelChoicesRequired !== undefined ? { firstLevelChoicesRequired: data.firstLevelChoicesRequired } : {}),
-          ...(data.specialization !== undefined ? { specialization: data.specialization } : {}),
-          ...(data.knownByLevel !== undefined ? { knownByLevel: data.knownByLevel } : {}),
-          options: data.options,
-          selected: data.selected,
-        }];''',
-          )
-          replace_target(
-              ui,
-              '''  return data.sections ?? [{ track: data.track ?? 1, classId: data.classId ?? "", className: data.className ?? "Class", required: data.required, count: data.count, maximumPowerLevel: data.maximumPowerLevel ?? 0, disciplineId: data.disciplineId, options: data.options, selected: data.selected }];''',
-              '''  return data.sections ?? [{
-          track: data.track ?? 1,
-          classId: data.classId ?? "",
-          className: data.className ?? "Class",
-          required: data.required,
-          count: data.count,
-          maximumPowerLevel: data.maximumPowerLevel ?? 0,
-          ...(data.disciplineId !== undefined ? { disciplineId: data.disciplineId } : {}),
-          options: data.options,
-          selected: data.selected,
-        }];''',
-          )
-          PY
+        run: node scripts/temporary-ci-repair.mjs
       - name: Commit repairs
         run: |
           if git diff --quiet; then

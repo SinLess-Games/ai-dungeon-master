@@ -9,6 +9,7 @@ import { characterDivineCreationRoutes } from "./divineCreationRoutes";
 import { characterEquipmentCreationRoutes } from "./equipmentCreationRoutes";
 import { characterFeatCreationRoutes } from "./featCreationRoutes";
 import { characterFinalizeCreationRoutes } from "./finalizeCreationRoutes";
+import { characterOptionRoutes } from "./optionsRoutes";
 import { characterSkillLanguageRoutes } from "./skillLanguageRoutes";
 
 interface CharacterCreationBindings extends AuthEnv {
@@ -17,6 +18,7 @@ interface CharacterCreationBindings extends AuthEnv {
 type CharacterCreationEnv = { Bindings: CharacterCreationBindings };
 
 export const characterCreationRoutes = new Hono<CharacterCreationEnv>()
+  .route("/", characterOptionRoutes)
   .route("/", characterFinalizeCreationRoutes)
   .route("/", characterSkillLanguageRoutes)
   .route("/", characterFeatCreationRoutes)

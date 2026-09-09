@@ -41,6 +41,7 @@ it("seeds the Expanded Psionics Handbook idempotently and preserves exact psioni
     execFile(db, "drizzle/0000_dnd35_schema.sql");
     execFile(db, "drizzle/0015_psionics_seed_support.sql");
     execFile(db, "drizzle/0016_power_class_level_costs.sql");
+    execFile(db, "drizzle/0019_character_creation_backend.sql");
 
     seedXph(db);
 

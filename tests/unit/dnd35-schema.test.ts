@@ -106,7 +106,7 @@ describe("D&D 3.5 SQLite migration", () => {
       .all()
       .map((row) => row["name"]);
     expect(actual).toEqual(exported);
-    expect(exported.filter((name) => name.startsWith("dnd35_")).length).toBe(96);
+    expect(exported.filter((name) => name.startsWith("dnd35_")).length).toBe(101);
     for (const name of exported) {
       // SQLite detects invalid composite FK targets when preparing DML, not CREATE TABLE.
       expect(() => db.prepare(`DELETE FROM "${name}" WHERE 0`).run()).not.toThrow();

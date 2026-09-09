@@ -13,7 +13,11 @@ const SEEDS_ROOT = resolve(process.cwd(), "seeds");
 // should resolve to the revised canonical row instead of creating duplicates.
 const preferredSeedOrder = [
   "phb-classes",
+  "phb-races",
+  "phb-skills",
   "phb-feats",
+  "phb-divine",
+  "phb-creatures",
   "phb-spells",
   "phb-rules",
   "dmg-rules",
@@ -152,7 +156,9 @@ async function main() {
     );
   }
 
-  const selectedSeeds = orderSeeds(requestedSeeds.length > 0 ? [...new Set(requestedSeeds)] : availableSeeds);
+  const selectedSeeds = orderSeeds(
+    requestedSeeds.length > 0 ? [...new Set(requestedSeeds)] : availableSeeds,
+  );
   const target = remote ? "REMOTE Cloudflare D1" : "LOCAL D1";
 
   console.log(`Seeding ${target} through binding ${DATABASE_BINDING}.`);

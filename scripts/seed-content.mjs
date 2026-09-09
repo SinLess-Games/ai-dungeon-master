@@ -13,6 +13,7 @@ const SEEDS_ROOT = resolve(process.cwd(), "seeds");
 // should resolve to the revised canonical row instead of creating duplicates.
 const preferredSeedOrder = [
   "phb-classes",
+  "phb-races",
   "phb-skills",
   "phb-feats",
   "phb-spells",

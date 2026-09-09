@@ -12,7 +12,7 @@ export interface StartingWealthRoll {
   copperPieces: number;
 }
 
-/** Roll PHB starting wealth once. The injected roller makes the rule deterministic in tests. */
+/** Roll source-backed starting wealth once. The injected roller makes the rule deterministic in tests. */
 export function rollStartingWealth(
   formula: StartingWealthFormula,
   rollDie: (sides: number) => number = secureDie,
@@ -63,17 +63,31 @@ const ALIGNMENT_AXES: Record<string, readonly [number, number]> = {
   CE: [-1, -1],
 };
 
-/** PHB cleric alignment must be within one step of the deity; neutral clerics need a neutral deity. */
+/** PHB cleric alignment must be within one step along one alignment axis; a neutral cleric needs a neutral deity. */
 export function clericAlignmentMatchesDeity(characterAlignment: string, deityAlignment: string): boolean {
   const character = ALIGNMENT_AXES[characterAlignment];
   const deity = ALIGNMENT_AXES[deityAlignment];
   if (!character || !deity) return false;
-  if (characterAlignment === "N" && deityAlignment !== "N") return false;
-  return Math.max(Math.abs(character[0] - deity[0]), Math.abs(character[1] - deity[1])) <= 1;
+  if (characterAlignment === "N") return deityAlignment === "N";
+  return Math.abs(character[0] - deity[0]) + Math.abs(character[1] - deity[1]) <= 1;
 }
 
 export function firstLevelBonusLanguageCount(effectiveIntelligence: number): number {
   return Math.max(0, abilityModifier(effectiveIntelligence));
+}
+
+/** XPH p.20: a psion's primary discipline adds these class skills to the shared psion list. */
+export const psionDisciplineClassSkillSlugs: Readonly<Record<string, readonly string[]>> = {
+  clairsentience: ["gather-information", "listen", "spot"],
+  metacreativity: ["bluff", "disguise", "use-psionic-device"],
+  psychokinesis: ["autohypnosis", "disable-device", "intimidate"],
+  psychometabolism: ["autohypnosis", "balance", "heal"],
+  psychoportation: ["climb", "jump", "ride", "survival", "swim"],
+  telepathy: ["bluff", "diplomacy", "gather-information", "sense-motive"],
+};
+
+export function psionDisciplineClassSkills(disciplineSlug: string): readonly string[] {
+  return psionDisciplineClassSkillSlugs[disciplineSlug.trim().toLowerCase()] ?? [];
 }
 
 export const standardFamiliarChoices = [
@@ -84,7 +98,7 @@ export const standardFamiliarChoices = [
   "owl",
   "rat",
   "raven",
-  "snake",
+  "tiny viper snake",
   "toad",
   "weasel",
 ] as const;
@@ -101,8 +115,8 @@ export const standardDruidAnimalCompanionChoices = [
   "light horse",
   "owl",
   "pony",
-  "small viper",
-  "medium viper",
+  "small viper snake",
+  "medium viper snake",
   "wolf",
 ] as const;
 

@@ -282,7 +282,7 @@ export const characterFeatCreationRoutes = new Hono<CharacterCreationEnv>()
             .all(),
         ]);
       if (!race) throw new ValidationError("Selected race is unavailable.");
-      if (baseAbilities.length !== 6) {
+      if (baseAbilities.length !== 6 || baseAbilities.some(({ baseScore }) => baseScore === null)) {
         throw new ValidationError("Set all six ability scores before selecting feats.");
       }
       if (input.levelFeats.length !== 1) {
@@ -365,17 +365,22 @@ export const characterFeatCreationRoutes = new Hono<CharacterCreationEnv>()
       }
 
       const effectiveAbilities = Object.fromEntries(
-        baseAbilities.map(({ ability, baseScore }) => [
-          ability,
-          baseScore + (racialModifiers.find((modifier) => modifier.ability === ability)?.modifier ?? 0),
-        ]),
+        baseAbilities.map(({ ability, baseScore }) => {
+          if (baseScore === null) {
+            throw new ValidationError(`${ability.toUpperCase()} must have a score before selecting feats.`);
+          }
+          return [
+            ability,
+            baseScore + (racialModifiers.find((modifier) => modifier.ability === ability)?.modifier ?? 0),
+          ];
+        }),
       ) as Dnd35PrerequisiteFacts["abilities"];
-      const selectedFeatFacts = allSelections.map(({ selection }) => ({
-        featId: selection.featId,
-        choice: primaryChoice(selection),
-      }));
+      const selectedFeatFacts = allSelections.map(({ selection }) => {
+        const choice = primaryChoice(selection);
+        return choice ? { featId: selection.featId, choice } : { featId: selection.featId };
+      });
       if (firstClass.classSlug === "monk") {
-        selectedFeatFacts.push({ featId: "phb-feat-improved-unarmed-strike", choice: undefined });
+        selectedFeatFacts.push({ featId: "phb-feat-improved-unarmed-strike" });
       }
       const skillRanks: Record<string, number> = {};
       const skillRanksByName = new Map<string, number>();
@@ -549,7 +554,7 @@ export const characterFeatCreationRoutes = new Hono<CharacterCreationEnv>()
               evaluateCustom: (rule) => evaluateCustom(rule, entry.selection),
             },
           );
-          if (!evaluation.met) {
+          if (!evaluation.passed) {
             throw new ValidationError(
               `${feat.name} prerequisites are not met${feat.explanation ? `: ${feat.explanation}` : "."}`,
               { failures: evaluation.failures },

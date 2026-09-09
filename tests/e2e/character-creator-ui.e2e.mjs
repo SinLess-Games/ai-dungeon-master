@@ -117,7 +117,13 @@ async function runUiFlow(page) {
   const campaignName = `UI E2E Campaign ${randomBytes(4).toString("hex")}`;
   const characterName = "UI E2E Barbarian";
 
-  await page.goto(`${origin}/characters/new`);
+  await page.goto(origin);
+  await page.locator("summary.codex-nav-item").filter({ hasText: "Play" }).click();
+  const characterLink = page.getByRole("link", { name: /Characters/ });
+  await characterLink.waitFor();
+  assert.match(await characterLink.getAttribute("href") ?? "", /\/characters\/new$/);
+  await characterLink.click();
+  await page.waitForURL(`${origin}/characters/new`);
   await page.getByRole("heading", { name: "Forge an adventurer" }).waitFor();
 
   await page.getByPlaceholder("New campaign name").fill(campaignName);
@@ -192,7 +198,7 @@ async function runUiFlow(page) {
   assert.match((await page.locator(".creator-complete").textContent()) ?? "", /Ready/);
   assert.match((await page.locator(".creator-character-id").textContent()) ?? "", /Character ID:\s*[0-9a-f-]+/i);
 
-  console.log("✓ UI E2E: Dwarf Barbarian completes the full browser creator and becomes ready");
+  console.log("✓ UI E2E: Play → Characters opens the full creator and completes a Dwarf Barbarian");
 }
 
 try {

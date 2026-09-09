@@ -15,6 +15,7 @@ on:
       - "src/modules/auth/**"
       - "src/server/**"
       - "tests/e2e/character-creator.e2e.mjs"
+      - "tests/e2e/character-creator-ui.e2e.mjs"
   workflow_dispatch:
 
 permissions:
@@ -46,5 +47,5 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Character creator E2E and smoke tests
+      - name: Character creator API and browser E2E tests
         run: npm run test:e2e:creator

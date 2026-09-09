@@ -259,7 +259,7 @@ export const characterFeatCreationRoutes = new Hono<CharacterCreationEnv>()
       saves,
       feats: selectedFeatFacts,
       skillRanks,
-      spellLevelAccess: spellAccess as Dnd35PrerequisiteFacts["spellLevelAccess"],
+      spellLevelAccess: spellAccess,
       raceId: extension.raceId,
       alignment: extension.alignment,
       classFeatures: featureFacts,

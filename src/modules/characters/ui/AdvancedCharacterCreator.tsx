@@ -60,6 +60,7 @@ import {
   type FeatChoiceKind,
   type FeatOption,
   type FeatSelection,
+  type LanguageOption,
   type PointBuyBudget,
   type PowerSection,
   type ProgressionMode,
@@ -725,11 +726,11 @@ function normalizedClassChoiceSections(data: Awaited<ReturnType<typeof getClassC
     className: data.className,
     required: data.required,
     choice: data.choice,
-    options: data.options,
-    schools: data.schools,
-    generalistAllowed: data.generalistAllowed,
-    subtypeRequiredFor: data.subtypeRequiredFor,
-    subtypeOptions: data.subtypeOptions,
+    ...(data.options !== undefined ? { options: data.options } : {}),
+    ...(data.schools !== undefined ? { schools: data.schools } : {}),
+    ...(data.generalistAllowed !== undefined ? { generalistAllowed: data.generalistAllowed } : {}),
+    ...(data.subtypeRequiredFor !== undefined ? { subtypeRequiredFor: data.subtypeRequiredFor } : {}),
+    ...(data.subtypeOptions !== undefined ? { subtypeOptions: data.subtypeOptions } : {}),
     selected: data.selected,
   }];
 }
@@ -846,7 +847,7 @@ function LanguagesStep({ characterId, onComplete }: { characterId: string; onCom
   const [filter, setFilter] = useState("");
   useEffect(() => { if (!page.data) return; const automatic = new Set(page.data.automatic.map((entry) => entry.languageId)); const bonusAllowed = new Set(page.data.bonusOptions.map((entry) => entry.languageId)); setSelected(page.data.selected.map((entry) => entry.id).filter((id) => !automatic.has(id) && bonusAllowed.has(id))); }, [page.data]);
   const required = page.data?.bonusChoicesRequired ?? 0;
-  const all = page.data?.allOptions ?? [
+  const all: LanguageOption[] = page.data?.allOptions ?? [
     ...(page.data?.automatic ?? []).map((entry) => ({ id: entry.languageId, slug: entry.slug, name: entry.name })),
     ...(page.data?.bonusOptions ?? []).map((entry) => ({ id: entry.languageId, slug: entry.slug, name: entry.name })),
   ];
@@ -878,11 +879,34 @@ function EquipmentStep({ characterId, onComplete }: { characterId: string; onCom
 
 function normalizeSpellSections(data: Awaited<ReturnType<typeof getSpells>> | undefined): SpellSection[] {
   if (!data) return [];
-  return data.sections ?? [{ track: data.track ?? 1, classId: data.classId ?? "", className: data.className ?? "Class", required: data.required, mode: data.mode, automaticSpellIds: data.automaticSpellIds, firstLevelChoicesRequired: data.firstLevelChoicesRequired, specialization: data.specialization, knownByLevel: data.knownByLevel, options: data.options, selected: data.selected }];
+  return data.sections ?? [{
+    track: data.track ?? 1,
+    classId: data.classId ?? "",
+    className: data.className ?? "Class",
+    required: data.required,
+    mode: data.mode,
+    ...(data.automaticKnown !== undefined ? { automaticKnown: data.automaticKnown } : {}),
+    ...(data.automaticSpellIds !== undefined ? { automaticSpellIds: data.automaticSpellIds } : {}),
+    ...(data.firstLevelChoicesRequired !== undefined ? { firstLevelChoicesRequired: data.firstLevelChoicesRequired } : {}),
+    ...(data.specialization !== undefined ? { specialization: data.specialization } : {}),
+    ...(data.knownByLevel !== undefined ? { knownByLevel: data.knownByLevel } : {}),
+    options: data.options,
+    selected: data.selected,
+  }];
 }
 function normalizePowerSections(data: Awaited<ReturnType<typeof getPowers>> | undefined): PowerSection[] {
   if (!data) return [];
-  return data.sections ?? [{ track: data.track ?? 1, classId: data.classId ?? "", className: data.className ?? "Class", required: data.required, count: data.count, maximumPowerLevel: data.maximumPowerLevel ?? 0, disciplineId: data.disciplineId, options: data.options, selected: data.selected }];
+  return data.sections ?? [{
+    track: data.track ?? 1,
+    classId: data.classId ?? "",
+    className: data.className ?? "Class",
+    required: data.required,
+    count: data.count,
+    maximumPowerLevel: data.maximumPowerLevel ?? 0,
+    ...(data.disciplineId !== undefined ? { disciplineId: data.disciplineId } : {}),
+    options: data.options,
+    selected: data.selected,
+  }];
 }
 
 function MagicStep({ characterId, onComplete }: { characterId: string; onComplete: () => void }) {

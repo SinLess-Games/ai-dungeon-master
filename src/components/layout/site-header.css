@@ -478,15 +478,28 @@
   background: #0c1218;
   box-shadow: 0 12px 30px #0008;
 }
-.codex-play-options button {
+.codex-play-options button,
+.codex-play-options .codex-play-option-link {
   display: flex;
   align-items: center;
   gap: 12px;
   width: 100%;
   padding: 12px 10px;
-  color: #aaa99f;
   text-align: left;
+  text-decoration: none;
+  border-radius: 5px;
+}
+.codex-play-options button {
+  color: #aaa99f;
   cursor: not-allowed;
+}
+.codex-play-options .codex-play-option-link {
+  color: #d8d4c9;
+  cursor: pointer;
+}
+.codex-play-options .codex-play-option-link:hover {
+  color: #f3dda1;
+  background: #bb965318;
 }
 .codex-play-options svg {
   width: 22px;
@@ -497,6 +510,9 @@
   margin-left: auto;
   font-size: 11px;
   color: #92938b;
+}
+.codex-play-options .codex-play-option-link small {
+  color: #d6b76e;
 }
 @media (max-width: 800px) {
   .codex-play-dropdown {

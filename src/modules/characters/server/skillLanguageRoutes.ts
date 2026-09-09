@@ -13,6 +13,7 @@ import {
   characterLanguages,
   characterSkills,
   classSkills,
+  creatureTypes,
   dnd35Characters,
   languages,
   powerDisciplines,
@@ -30,6 +31,11 @@ import {
   firstLevelBonusLanguageCount,
   psionDisciplineClassSkills,
 } from "../domain/creationRules";
+import {
+  firstClassSkillPointBudget,
+  monsterRaceClassSkillSlugs,
+  racialSkillPointBudget,
+} from "../domain/monsterRaceCreation";
 import {
   ensureCreationProgress,
   markCreationStep,
@@ -84,7 +90,10 @@ async function requireRaceAndIntelligence(db: CharacterDatabase, characterId: st
     db
       .select({
         id: races.id,
+        slug: races.slug,
         name: races.name,
+        creatureTypeId: races.creatureTypeId,
+        racialHitDice: races.racialHitDice,
         bonusSkillPointsPerLevel: races.bonusSkillPointsPerLevel,
       })
       .from(races)
@@ -97,8 +106,20 @@ async function requireRaceAndIntelligence(db: CharacterDatabase, characterId: st
       .get(),
   ]);
   if (!race) throw new ValidationError("Selected race is not available.");
+  const creatureType = race.racialHitDice > 0 && race.creatureTypeId
+    ? await db
+        .select({ skillPointsPerHitDie: creatureTypes.skillPointsPerHitDie })
+        .from(creatureTypes)
+        .where(eq(creatureTypes.id, race.creatureTypeId))
+        .get()
+    : undefined;
   const effectiveIntelligence = intelligenceRow.baseScore + (racialIntelligence?.modifier ?? 0);
-  return { race, effectiveIntelligence, intelligenceModifier: abilityModifier(effectiveIntelligence) };
+  return {
+    race,
+    creatureSkillPointsPerHitDie: creatureType?.skillPointsPerHitDie ?? null,
+    effectiveIntelligence,
+    intelligenceModifier: abilityModifier(effectiveIntelligence),
+  };
 }
 
 async function addSkillsBySlug(
@@ -123,6 +144,7 @@ async function classSkillIdSet(
   db: CharacterDatabase,
   characterId: string,
   firstClasses: FirstClass[],
+  raceSlug: string,
 ): Promise<Set<string>> {
   const classIds = [...new Set(firstClasses.map(({ classId }) => classId))];
   const baseRows = await db
@@ -131,6 +153,8 @@ async function classSkillIdSet(
     .where(inArray(classSkills.classId, classIds))
     .all();
   const result = new Set(baseRows.map(({ skillId }) => skillId));
+
+  await addSkillsBySlug(db, result, monsterRaceClassSkillSlugs(raceSlug), "monster race");
 
   if (firstClasses.some(({ classSlug }) => classSlug === "psion")) {
     const disciplineChoice = await db
@@ -184,6 +208,27 @@ function skillPointRate(firstClasses: FirstClass[]): number {
   return Math.max(...firstClasses.map(({ skillPointsPerLevel }) => skillPointsPerLevel));
 }
 
+function creatorSkillBudget(input: {
+  racialHitDice: number;
+  creatureSkillPointsPerHitDie: number | null;
+  classSkillPointsPerLevel: number;
+  intelligenceModifier: number;
+  racialBonusSkillPointsPerLevel: number;
+}) {
+  const racialBudget = racialSkillPointBudget(
+    input.racialHitDice,
+    input.creatureSkillPointsPerHitDie,
+    input.intelligenceModifier,
+  );
+  const classBudget = firstClassSkillPointBudget(
+    input.racialHitDice,
+    input.classSkillPointsPerLevel,
+    input.intelligenceModifier,
+    input.racialBonusSkillPointsPerLevel,
+  );
+  return { racialBudget, classBudget, budget: racialBudget + classBudget };
+}
+
 export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
   .use("/api/characters/*", async (c, next) => {
     c.header("Cache-Control", "no-store");
@@ -194,9 +239,14 @@ export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
     const db = createDatabase(requireCharacterDatabase(c.env.DB));
     const row = await requireCharacterCreatorEditor({ db, characterId: c.req.param("characterId"), userId: session.user.id });
     const firstClasses = await requireFirstCharacterClasses(db, row.character.id);
-    const { race, effectiveIntelligence, intelligenceModifier } = await requireRaceAndIntelligence(db, row.character.id);
+    const {
+      race,
+      creatureSkillPointsPerHitDie,
+      effectiveIntelligence,
+      intelligenceModifier,
+    } = await requireRaceAndIntelligence(db, row.character.id);
     const [classSkillIds, availableSkills, selections] = await Promise.all([
-      classSkillIdSet(db, row.character.id, firstClasses),
+      classSkillIdSet(db, row.character.id, firstClasses, race.slug),
       db
         .select({
           id: skills.id,
@@ -213,11 +263,21 @@ export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
         .all(),
       db.select().from(characterSkills).where(eq(characterSkills.characterId, row.character.id)).all(),
     ]);
-    const budget =
-      (Math.max(1, skillPointRate(firstClasses) + intelligenceModifier) + Math.max(0, race.bonusSkillPointsPerLevel)) * 4;
-    const characterLevel = Math.max(...firstClasses.map(({ characterLevel }) => characterLevel));
+    const budgets = creatorSkillBudget({
+      racialHitDice: race.racialHitDice,
+      creatureSkillPointsPerHitDie,
+      classSkillPointsPerLevel: skillPointRate(firstClasses),
+      intelligenceModifier,
+      racialBonusSkillPointsPerLevel: Math.max(0, race.bonusSkillPointsPerLevel),
+    });
+    const classLevel = Math.max(...firstClasses.map(({ characterLevel }) => characterLevel));
+    const totalHitDice = race.racialHitDice + classLevel;
     return c.json({
-      budget,
+      budget: budgets.budget,
+      racialBudget: budgets.racialBudget,
+      classBudget: budgets.classBudget,
+      racialHitDice: race.racialHitDice,
+      totalHitDice,
       effectiveIntelligence,
       intelligenceModifier,
       classId: firstClasses[0]!.classId,
@@ -226,7 +286,7 @@ export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
       options: availableSkills.map((skill) => ({
         ...skill,
         isClassSkill: classSkillIds.has(skill.id),
-        maximumRanks: classSkillIds.has(skill.id) ? characterLevel + 3 : (characterLevel + 3) / 2,
+        maximumRanks: classSkillIds.has(skill.id) ? totalHitDice + 3 : (totalHitDice + 3) / 2,
         pointCostPerRank: classSkillIds.has(skill.id) ? 1 : 2,
       })),
       selections,
@@ -241,9 +301,14 @@ export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
       const db = createDatabase(requireCharacterDatabase(c.env.DB));
       const row = await requireCharacterCreatorEditor({ db, characterId: c.req.param("characterId"), userId: session.user.id });
       const firstClasses = await requireFirstCharacterClasses(db, row.character.id);
-      const { race, effectiveIntelligence, intelligenceModifier } = await requireRaceAndIntelligence(db, row.character.id);
+      const {
+        race,
+        creatureSkillPointsPerHitDie,
+        effectiveIntelligence,
+        intelligenceModifier,
+      } = await requireRaceAndIntelligence(db, row.character.id);
       const [classSkillIds, availableSkills, availableLanguages] = await Promise.all([
-        classSkillIdSet(db, row.character.id, firstClasses),
+        classSkillIdSet(db, row.character.id, firstClasses, race.slug),
         db
           .select({ id: skills.id, slug: skills.slug, name: skills.name, requiresSpecialization: skills.requiresSpecialization })
           .from(skills)
@@ -256,9 +321,15 @@ export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
           .all(),
       ]);
 
-      const budget =
-        (Math.max(1, skillPointRate(firstClasses) + intelligenceModifier) + Math.max(0, race.bonusSkillPointsPerLevel)) * 4;
-      const characterLevel = Math.max(...firstClasses.map(({ characterLevel }) => characterLevel));
+      const budgets = creatorSkillBudget({
+        racialHitDice: race.racialHitDice,
+        creatureSkillPointsPerHitDie,
+        classSkillPointsPerLevel: skillPointRate(firstClasses),
+        intelligenceModifier,
+        racialBonusSkillPointsPerLevel: Math.max(0, race.bonusSkillPointsPerLevel),
+      });
+      const classLevel = Math.max(...firstClasses.map(({ characterLevel }) => characterLevel));
+      const totalHitDice = race.racialHitDice + classLevel;
       const skillsById = new Map(availableSkills.map((skill) => [skill.id, skill]));
       const languagesById = new Map(availableLanguages.map((language) => [language.id, language]));
       const seen = new Set<string>();
@@ -280,25 +351,31 @@ export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
         seen.add(uniqueKey);
 
         const isClassSkill = classSkillIds.has(selection.skillId);
-        const maximumRanks = isClassSkill ? characterLevel + 3 : (characterLevel + 3) / 2;
+        const maximumRanks = isClassSkill ? totalHitDice + 3 : (totalHitDice + 3) / 2;
         if (selection.ranks > maximumRanks) {
-          throw new ValidationError(`${skill.name} exceeds the level-${characterLevel} ${isClassSkill ? "class" : "cross-class"} rank cap of ${maximumRanks}.`);
+          throw new ValidationError(`${skill.name} exceeds the ${totalHitDice}-HD ${isClassSkill ? "class" : "cross-class"} rank cap of ${maximumRanks}.`);
         }
         if (isClassSkill && !Number.isInteger(selection.ranks)) throw new ValidationError(`${skill.name} class-skill ranks must be whole numbers.`);
         spent += isClassSkill ? selection.ranks : selection.ranks * 2;
         return { characterId: row.character.id, skillId: selection.skillId, specialization, ranks: selection.ranks };
       });
 
-      if (!Number.isInteger(spent) || spent !== budget) {
-        throw new ValidationError(`Spend exactly ${budget} first-level skill points.`, { budget, spent, remaining: budget - spent });
+      if (!Number.isInteger(spent) || spent !== budgets.budget) {
+        throw new ValidationError(`Spend exactly ${budgets.budget} creation skill points.`, {
+          budget: budgets.budget,
+          racialBudget: budgets.racialBudget,
+          classBudget: budgets.classBudget,
+          spent,
+          remaining: budgets.budget - spent,
+        });
       }
-      if (values.length === 0) throw new ValidationError("At least one trained skill is required at first level.");
+      if (values.length === 0) throw new ValidationError("At least one trained skill is required at character creation.");
 
       await db.delete(characterSkills).where(eq(characterSkills.characterId, row.character.id)).run();
       await db.insert(characterSkills).values(values).run();
       await db
         .update(characterClassLevels)
-        .set({ skillPointsSpent: budget, updatedAt: new Date() })
+        .set({ skillPointsSpent: budgets.classBudget, updatedAt: new Date() })
         .where(inArray(characterClassLevels.id, firstClasses.map(({ characterClassLevelId }) => characterClassLevelId)))
         .run();
       await ensureCreationProgress(db, row.character.id);
@@ -312,7 +389,11 @@ export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
         characterId: row.character.id,
         effectiveIntelligence,
         intelligenceModifier,
-        budget,
+        budget: budgets.budget,
+        racialBudget: budgets.racialBudget,
+        classBudget: budgets.classBudget,
+        racialHitDice: race.racialHitDice,
+        totalHitDice,
         spent,
         selections: values.map(({ skillId, specialization, ranks }) => ({ skillId, specialization, ranks, isClassSkill: classSkillIds.has(skillId) })),
       });

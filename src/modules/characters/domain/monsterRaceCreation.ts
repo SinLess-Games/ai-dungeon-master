@@ -51,6 +51,10 @@ const racialClassSkills: Readonly<Record<string, readonly string[]>> = {
   aranea: ["climb", "concentration", "escape-artist", "jump", "listen", "spot"],
   locathah: ["craft", "listen", "spot", "swim"],
   lamia: ["bluff", "concentration", "diplomacy", "disguise", "hide", "intimidate", "spot"],
+  couatl: ["concentration", "diplomacy", "jump", "knowledge", "listen", "search", "sense-motive", "spellcraft", "spot", "survival", "tumble", "use-magic-device"],
+  lillend: ["appraise", "concentration", "diplomacy", "knowledge-arcana", "listen", "perform", "sense-motive", "spellcraft", "spot", "survival"],
+  triton: ["craft", "diplomacy", "hide", "listen", "move-silently", "ride", "search", "sense-motive", "spot", "survival", "swim"],
+  xill: ["balance", "climb", "diplomacy", "escape-artist", "intimidate", "listen", "move-silently", "sense-motive", "spot", "tumble", "use-rope"],
   "trumpet-archon": [
     "concentration",
     "diplomacy",

@@ -39,6 +39,15 @@ const racialClassSkills: Readonly<Record<string, readonly string[]>> = {
   "hill-giant": ["climb", "jump", "listen", "spot"],
   "stone-giant": ["climb", "hide", "listen", "spot"],
   troll: ["listen", "spot"],
+  bugbear: ["climb", "hide", "listen", "move-silently", "search", "spot"],
+  gnoll: ["listen", "spot"],
+  lizardfolk: ["balance", "jump", "swim"],
+  troglodyte: ["hide", "listen"],
+  "kuo-toa": ["craft", "knowledge", "escape-artist", "listen", "move-silently", "search", "spot", "swim"],
+  drider: ["climb", "concentration", "hide", "listen", "move-silently", "spot"],
+  "mind-flayer": ["bluff", "concentration", "hide", "intimidate", "knowledge", "listen", "move-silently", "spot"],
+  "yuan-ti-halfblood": ["concentration", "craft", "knowledge", "hide", "listen", "spot"],
+  "yuan-ti-abomination": ["concentration", "craft", "knowledge", "hide", "listen", "move-silently", "spot"],
   "trumpet-archon": [
     "concentration",
     "diplomacy",
@@ -53,6 +62,20 @@ const racialClassSkills: Readonly<Record<string, readonly string[]>> = {
     "spot",
     "use-rope",
   ],
+};
+
+/**
+ * Humanoid racial Hit Dice do not have one universal good-save progression: the
+ * good save depends on the specific humanoid race. Keep the exact MM racial-HD
+ * chassis here until race progression is represented relationally in content data.
+ */
+const racialBaseBonusOverrides: Readonly<
+  Record<string, { racialHitDice: number; bonuses: RacialBaseBonuses }>
+> = {
+  bugbear: { racialHitDice: 3, bonuses: { baseAttackBonus: 2, fort: 1, ref: 3, will: 1 } },
+  gnoll: { racialHitDice: 2, bonuses: { baseAttackBonus: 1, fort: 3, ref: 0, will: 0 } },
+  lizardfolk: { racialHitDice: 2, bonuses: { baseAttackBonus: 1, fort: 0, ref: 3, will: 0 } },
+  troglodyte: { racialHitDice: 2, bonuses: { baseAttackBonus: 1, fort: 3, ref: 0, will: 0 } },
 };
 
 function nonNegativeInteger(value: number, label: string): number {
@@ -126,6 +149,16 @@ export function racialHitPoints(
 export function racialBaseBonuses(progression: MonsterRaceProgression): RacialBaseBonuses {
   const levels = nonNegativeInteger(progression.racialHitDice, "Racial Hit Dice");
   if (levels === 0) return { baseAttackBonus: 0, fort: 0, ref: 0, will: 0 };
+
+  const raceSlug = progression.raceSlug.trim().toLowerCase();
+  const override = racialBaseBonusOverrides[raceSlug];
+  if (override) {
+    if (override.racialHitDice !== levels) {
+      throw new RangeError(`Racial Hit Dice do not match the source-backed progression for ${progression.raceSlug}.`);
+    }
+    return override.bonuses;
+  }
+
   if (!progression.creatureBabProgression || progression.creatureBabProgression === "custom") {
     throw new RangeError(`Creature BAB progression is unavailable for ${progression.raceSlug}.`);
   }

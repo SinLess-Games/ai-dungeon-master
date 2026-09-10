@@ -5,8 +5,8 @@ import {
 } from "@/modules/characters/domain/racialAbilityScores";
 
 describe("DMG monster-PC ability score conversion", () => {
-  it("matches the DMG minotaur Intelligence example", () => {
-    expect(monsterPcAbilityScore(10, 7, "int")).toBe(6);
+  it("matches the DMG monster-PC Intelligence lookup table", () => {
+    expect(monsterPcAbilityScore(10, 7, "int")).toBe(7);
   });
 
   it("uses the separate Intelligence lookup table and preserves the minimum of 3", () => {

@@ -48,6 +48,9 @@ const racialClassSkills: Readonly<Record<string, readonly string[]>> = {
   "mind-flayer": ["bluff", "concentration", "hide", "intimidate", "knowledge", "listen", "move-silently", "spot"],
   "yuan-ti-halfblood": ["concentration", "craft", "knowledge", "hide", "listen", "spot"],
   "yuan-ti-abomination": ["concentration", "craft", "knowledge", "hide", "listen", "move-silently", "spot"],
+  aranea: ["climb", "concentration", "escape-artist", "jump", "listen", "spot"],
+  locathah: ["craft", "listen", "spot", "swim"],
+  lamia: ["bluff", "concentration", "diplomacy", "disguise", "hide", "intimidate", "spot"],
   "trumpet-archon": [
     "concentration",
     "diplomacy",
@@ -76,6 +79,7 @@ const racialBaseBonusOverrides: Readonly<
   gnoll: { racialHitDice: 2, bonuses: { baseAttackBonus: 1, fort: 3, ref: 0, will: 0 } },
   lizardfolk: { racialHitDice: 2, bonuses: { baseAttackBonus: 1, fort: 0, ref: 3, will: 0 } },
   troglodyte: { racialHitDice: 2, bonuses: { baseAttackBonus: 1, fort: 3, ref: 0, will: 0 } },
+  locathah: { racialHitDice: 2, bonuses: { baseAttackBonus: 1, fort: 3, ref: 0, will: 0 } },
 };
 
 function nonNegativeInteger(value: number, label: string): number {

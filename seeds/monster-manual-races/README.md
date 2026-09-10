@@ -1,10 +1,10 @@
 # Monster Manual playable races
 
-This seed pack materializes the **no-retained-racial-HD** Monster Manual v3.5
-player races and subraces first. These options can use the current character
-creation runtime without guessing race-specific racial-HD save progression.
+This seed pack materializes source-backed **Monster Manual v3.5** player races for The Endless Codex. It now includes ordinary humanoid/subrace options, retained-racial-HD monster PCs, movement modes, languages, racial traits, named special abilities, and the race-specific progression exceptions needed by the character creator.
 
-## Materialized and enabled
+## Materialized here
+
+### No retained racial Hit Dice
 
 - Deep Dwarf
 - Duergar
@@ -21,49 +21,59 @@ creation runtime without guessing race-specific racial-HD save progression.
 - Orc
 - Githyanki
 - Githzerai
+- Tiefling
+- Pixie (base LA +4 version)
+- Merfolk
 
-The pack includes ability modifiers, size, speed, LA, favored class, subtypes,
-additional movement, languages, racial traits, and named spell-like /
-supernatural abilities.
+### Retained racial Hit Dice
+
+- Azer
+- Aranea
+- Bugbear
+- Centaur
+- Couatl
+- Drider
+- Gargoyle
+- Gnoll
+- Hill Giant
+- Janni
+- Kuo-toa
+- Lamia
+- Lillend
+- Lizardfolk
+- Locathah
+- Mind Flayer
+- Ogre
+- Satyr
+- Stone Giant
+- Triton
+- Troglodyte
+- Troll
+- Xill
+- Yuan-ti Abomination
+- Yuan-ti Halfblood
+- Yuan-ti Pureblood
 
 ## Existing canonical races reused
 
-The broader Monster Manual list also names races that are already complete in
-other seed packs. They are **not duplicated** here. Examples include Aasimar,
-Doppelganger, Hound Archon, Minotaur, Ogre Mage, Svirfneblin, and the existing
-Pixie variant.
+The wider Monster Manual/DMG player-race set also includes races already materialized in other seed packs. They are not duplicated here when an enabled shared canonical row exists. Examples include Aasimar, Doppelganger, Hound Archon, Minotaur, Ogre Mage, Svirfneblin, Trumpet Archon, and the existing Pixie variant with irresistible dance.
 
-## Deferred Monster Manual races
+## Accuracy rules
 
-Monster races with retained racial Hit Dice are handled in later passes. The
-current runtime derives BAB and all three saves from the creature-type chassis,
-but humanoid racial Hit Dice can use race-specific good-save progressions
-(Bugbear and Lizardfolk use good Reflex while Gnoll uses good Fortitude).
-Those races are not enabled until the runtime/schema can represent their
-source-accurate racial-HD progression without applying the wrong saves.
+- Monster-PC ECL is racial Hit Dice + class levels + level adjustment.
+- General feats earned from racial Hit Dice are allocated from total Hit Dice; `bonus_feats_at_first_level` is reserved for true selectable racial bonus feats.
+- Monster-entry skills are racial-HD class skills.
+- Humanoid racial Hit Dice can have race-specific good-save progressions, so source-backed overrides are used where the generic creature-type chassis is insufficient.
+- A creature with 1 racial Hit Die or less uses its first class level instead of retaining that racial Hit Die when required by the DMG monster-PC rules.
+- Fixed racial bonus feats are currently recorded as traits where the runtime does not yet have a dedicated fixed-race-feat grant model.
+- Racial spellcasting and similar abilities are stored as normalized traits/special abilities even when the character runtime does not yet automate every downstream spell-selection rule.
 
-Templates such as Lycanthrope remain in the template system and are never
-flattened into `dnd35_races`.
+## Intentionally deferred
 
-## Duplicate policy
+A catalog row is not enabled merely because a source prints a numeric level adjustment. Entries remain disabled when accurate implementation requires mechanics the runtime cannot safely represent yet, such as the DMG low-ability-score lookup conversion, nonabilities, template application, or unresolved source verification. Cohort-only creatures and explicit non-PC entries are excluded.
 
-Before materializing a canonical row, this pack removes only disabled shared
-placeholders for the same slug. Existing enabled shared content wins.
-User-owned/homebrew content is untouched.
-
-## Validation
-
-A local SQLite harness matching the affected D1 tables applied all three SQL
-files twice with stable results:
-
-- 15 race rows
-- 94 normalized race traits
-- 7 reusable special abilities
-- 108 race-language links
-- 0 duplicate shared race slugs
+Medusa is specifically not a player race in the v3.5 Monster Manual entry: its level adjustment is `—`, so it remains excluded from runtime race materialization.
 
 ## Files
 
-- `00-races.sql`
-- `10-traits.sql`
-- `20-languages.sql`
+Files are ordered numerically. Each materialization batch generally consists of a race-definition file followed by trait/special-ability and language files. Re-running the seed pack is intended to be idempotent and preserves enabled shared canonical content instead of creating duplicate race slugs.

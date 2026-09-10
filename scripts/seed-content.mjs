@@ -22,6 +22,7 @@ const preferredSeedOrder = [
   "srd-monster-races",
   "monster-manual-races",
   "monster-manual-3-races",
+  "monster-manual-4-races",
   "monster-manual-5-races",
   "phb-spells",
   "phb-rules",

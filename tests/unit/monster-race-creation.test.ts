@@ -53,6 +53,18 @@ describe("D&D 3.5 monster PC creation rules", () => {
       creatureRefProgression: "good",
       creatureWillProgression: "good",
     })).toEqual({ baseAttackBonus: 12, fort: 8, ref: 8, will: 8 });
+
+    expect(racialBaseBonuses({
+      raceSlug: "astral-deva",
+      racialHitDice: 12,
+      racialHitDie: 8,
+      levelAdjustment: 8,
+      creatureSkillPointsPerHitDie: 8,
+      creatureBabProgression: "full",
+      creatureFortProgression: "good",
+      creatureRefProgression: "good",
+      creatureWillProgression: "good",
+    })).toEqual({ baseAttackBonus: 12, fort: 8, ref: 8, will: 8 });
   });
 
   it("uses source-backed save overrides for humanoid racial Hit Dice", () => {
@@ -96,6 +108,10 @@ describe("D&D 3.5 monster PC creation rules", () => {
     expect(monsterRaceClassSkillSlugs("lillend")).toContain("knowledge-arcana");
     expect(monsterRaceClassSkillSlugs("triton")).toContain("swim");
     expect(monsterRaceClassSkillSlugs("xill")).toContain("tumble");
+    expect(monsterRaceClassSkillSlugs("astral-deva")).toContain("intimidate");
+    expect(monsterRaceClassSkillSlugs("bralani")).toContain("handle-animal");
+    expect(monsterRaceClassSkillSlugs("djinni")).toContain("appraise");
+    expect(monsterRaceClassSkillSlugs("erinyes")).toContain("search");
     expect(monsterRaceClassSkillSlugs("aasimar")).toEqual([]);
   });
 });

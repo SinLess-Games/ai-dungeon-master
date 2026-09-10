@@ -14,6 +14,7 @@ INSERT INTO dnd35_special_abilities
   (id,source_id,source_page,slug,name,description,rules_text,is_homebrew,owner_user_id,is_enabled,category,action_type,effects,parameters)
 SELECT id,'mm1-3.5',source_page,slug,name,description,rules_text,0,NULL,1,category,action_type,NULL,NULL
 FROM abilities
+WHERE 1
 ON CONFLICT(id) DO UPDATE SET
   source_id=excluded.source_id,
   source_page=excluded.source_page,
@@ -68,6 +69,7 @@ INSERT INTO dnd35_race_traits
 SELECT t.id,r.id,t.special_ability_id,t.name,t.rules_text,t.position,NULL,NULL
 FROM traits t
 JOIN dnd35_races r ON r.id='mm1-race-'||t.race_slug
+WHERE 1
 ON CONFLICT(id) DO UPDATE SET
   race_id=excluded.race_id,
   special_ability_id=excluded.special_ability_id,

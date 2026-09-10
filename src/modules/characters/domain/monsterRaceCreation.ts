@@ -38,6 +38,7 @@ const racialBaseBonusOverrides: Readonly<
   troglodyte: { racialHitDice: 2, bonuses: { baseAttackBonus: 1, fort: 3, ref: 0, will: 0 } },
   locathah: { racialHitDice: 2, bonuses: { baseAttackBonus: 1, fort: 3, ref: 0, will: 0 } },
   flind: { racialHitDice: 2, bonuses: { baseAttackBonus: 1, fort: 3, ref: 0, will: 0 } },
+  varag: { racialHitDice: 3, bonuses: { baseAttackBonus: 2, fort: 1, ref: 3, will: 1 } },
 };
 
 function nonNegativeInteger(value: number, label: string): number {

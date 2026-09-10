@@ -84,8 +84,8 @@ function validateAbilityMethod(method: AbilityGenerationMethod, values: number[]
     return;
   }
 
-  const minimum = method === "roll-4d6-reroll-1-2" ? 12 : 3;
-  const maximum = method === "roll-4d6-reroll-1-2" ? 24 : 18;
+  const minimum = method === "roll-4d6-reroll-1-2" ? 9 : 3;
+  const maximum = 18;
   if (values.some((score) => score < minimum || score > maximum)) {
     throw new ValidationError(`Rolled scores for ${method} must be between ${minimum} and ${maximum}.`);
   }

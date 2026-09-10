@@ -1,0 +1,28 @@
+slug,name,source_id,kind,eligibility,level_adjustment,legacy_ecl_offset,verification
+abeil-queen,Abeil Queen,mm2-3.0,legacy-monster-pc,pc,,21,source-verified
+abeil-soldier,Abeil Soldier,mm2-3.0,legacy-monster-pc,pc,,11,source-verified
+abeil-vassal,Abeil Vassal,mm2-3.0,legacy-monster-pc,pc,,3,source-verified
+avolakia,Avolakia,mm2-3.0,legacy-monster-pc,pc,,15,source-verified
+bladeling,Bladeling,mm2-3.0,legacy-monster-pc,pc,,1,source-verified
+braxat,Braxat,mm2-3.0,legacy-monster-pc,pc,,16,source-verified
+chaond,Chaond,mm2-3.0,legacy-monster-pc,pc,,1,source-verified
+death-knight,Death Knight,mm2-3.0,template,template-option,,5,source-verified
+desmodu,Desmodu,mm2-3.0,legacy-monster-pc,pc,,14,source-verified
+durzagon,Durzagon,mm2-3.0,legacy-monster-pc,pc,,7,source-verified
+firbolg,Firbolg,mm2-3.0,legacy-monster-pc,pc,,18,source-verified
+fomorian,Fomorian,mm2-3.0,legacy-monster-pc,pc,,17,source-verified
+forest-giant-mm2,Forest Giant,mm2-3.0,legacy-monster-pc,pc,,16,source-verified
+glimmerskin,Glimmerskin,mm2-3.0,legacy-monster-pc,pc,,15,source-verified
+ixitxachitl,Ixitxachitl,mm2-3.0,legacy-monster-pc,pc,,2,source-verified
+loxo,Loxo,mm2-3.0,legacy-monster-pc,pc,,7,source-verified
+mountain-giant,Mountain Giant,mm2-3.0,legacy-monster-pc,pc,,25,source-verified
+neogi,Neogi,mm2-3.0,legacy-monster-pc,pc,,8,source-verified
+ocean-giant,Ocean Giant,mm2-3.0,legacy-monster-pc,pc,,23,source-verified
+ocean-strider,Ocean Strider,mm2-3.0,legacy-monster-pc,pc,,35,source-verified
+scorpionfolk,Scorpionfolk,mm2-3.0,legacy-monster-pc,pc,,16,source-verified
+sun-giant,Sun Giant,mm2-3.0,legacy-monster-pc,pc,,16,source-verified
+thri-kreen,Thri-kreen,mm2-3.0,legacy-monster-pc,pc,,3,source-verified
+thri-kreen-psionic,Thri-kreen (Psionic),mm2-3.0,legacy-monster-pc,pc,,5,source-verified
+vampiric-ixitxachitl,Vampiric Ixitxachitl,mm2-3.0,legacy-monster-pc,pc,,5,source-verified
+yak-folk,Yak Folk,mm2-3.0,legacy-monster-pc,pc,,7,source-verified
+zenythri,Zenythri,mm2-3.0,legacy-monster-pc,pc,,1,source-verified

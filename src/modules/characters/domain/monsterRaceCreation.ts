@@ -24,25 +24,21 @@ export interface RacialBaseBonuses {
   will: number;
 }
 
-const racialClassSkills: Readonly<Record<string, readonly string[]>> = {
-  minotaur: ["intimidate", "jump", "listen", "search", "spot"],
-  doppelganger: ["bluff", "diplomacy", "disguise", "intimidate", "listen", "sense-motive", "spot"],
-  "hound-archon": ["concentration", "hide", "jump", "listen", "move-silently", "sense-motive", "spot", "survival"],
-  "ogre-mage": ["concentration", "listen", "spellcraft", "spot"],
-  "trumpet-archon": [
-    "concentration",
-    "diplomacy",
-    "escape-artist",
-    "handle-animal",
-    "knowledge-planes",
-    "listen",
-    "move-silently",
-    "perform",
-    "ride",
-    "sense-motive",
-    "spot",
-    "use-rope",
-  ],
+/**
+ * Humanoid racial Hit Dice do not have one universal good-save progression: the
+ * good save depends on the specific humanoid race. Keep the exact MM racial-HD
+ * chassis here until race progression is represented relationally in content data.
+ */
+const racialBaseBonusOverrides: Readonly<
+  Record<string, { racialHitDice: number; bonuses: RacialBaseBonuses }>
+> = {
+  bugbear: { racialHitDice: 3, bonuses: { baseAttackBonus: 2, fort: 1, ref: 3, will: 1 } },
+  gnoll: { racialHitDice: 2, bonuses: { baseAttackBonus: 1, fort: 3, ref: 0, will: 0 } },
+  lizardfolk: { racialHitDice: 2, bonuses: { baseAttackBonus: 1, fort: 0, ref: 3, will: 0 } },
+  troglodyte: { racialHitDice: 2, bonuses: { baseAttackBonus: 1, fort: 3, ref: 0, will: 0 } },
+  locathah: { racialHitDice: 2, bonuses: { baseAttackBonus: 1, fort: 3, ref: 0, will: 0 } },
+  flind: { racialHitDice: 2, bonuses: { baseAttackBonus: 1, fort: 3, ref: 0, will: 0 } },
+  varag: { racialHitDice: 3, bonuses: { baseAttackBonus: 2, fort: 1, ref: 3, will: 1 } },
 };
 
 function nonNegativeInteger(value: number, label: string): number {
@@ -116,6 +112,16 @@ export function racialHitPoints(
 export function racialBaseBonuses(progression: MonsterRaceProgression): RacialBaseBonuses {
   const levels = nonNegativeInteger(progression.racialHitDice, "Racial Hit Dice");
   if (levels === 0) return { baseAttackBonus: 0, fort: 0, ref: 0, will: 0 };
+
+  const raceSlug = progression.raceSlug.trim().toLowerCase();
+  const override = racialBaseBonusOverrides[raceSlug];
+  if (override) {
+    if (override.racialHitDice !== levels) {
+      throw new RangeError(`Racial Hit Dice do not match the source-backed progression for ${progression.raceSlug}.`);
+    }
+    return override.bonuses;
+  }
+
   if (!progression.creatureBabProgression || progression.creatureBabProgression === "custom") {
     throw new RangeError(`Creature BAB progression is unavailable for ${progression.raceSlug}.`);
   }
@@ -130,9 +136,4 @@ export function racialBaseBonuses(progression: MonsterRaceProgression): RacialBa
     ref: baseSaveBonusForClass(levels, progression.creatureRefProgression),
     will: baseSaveBonusForClass(levels, progression.creatureWillProgression),
   };
-}
-
-/** Monster-entry skills are class skills for racial Hit Dice. */
-export function monsterRaceClassSkillSlugs(raceSlug: string): readonly string[] {
-  return racialClassSkills[raceSlug.trim().toLowerCase()] ?? [];
 }

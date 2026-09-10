@@ -1,0 +1,6 @@
+slug,name,source_id,kind,eligibility,level_adjustment,legacy_ecl_offset,verification
+craa-ghoran-giant,Craa’ghoran Giant,mm4-3.5,monster-pc,pc,4,,cross-checked-needs-local-source-review
+varag,Varag,mm4-3.5,monster-pc,pc,2,,cross-checked-needs-local-source-review
+verdant-prince,Verdant Prince,mm4-3.5,monster-pc,pc,4,,cross-checked-needs-local-source-review
+windrazor,Windrazor,mm4-3.5,monster-pc,needs-review,,,needs-source-review
+windscythe,Windscythe,mm4-3.5,monster-pc,needs-review,,,needs-source-review

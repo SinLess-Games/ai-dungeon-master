@@ -18,6 +18,7 @@ import {
   languages,
   powerDisciplines,
   raceAbilities,
+  raceClassSkills,
   raceLanguages,
   races,
   skills,
@@ -33,7 +34,6 @@ import {
 } from "../domain/creationRules";
 import {
   firstClassSkillPointBudget,
-  monsterRaceClassSkillSlugs,
   racialSkillPointBudget,
 } from "../domain/monsterRaceCreation";
 import {
@@ -144,17 +144,22 @@ async function classSkillIdSet(
   db: CharacterDatabase,
   characterId: string,
   firstClasses: FirstClass[],
-  raceSlug: string,
+  raceId: string,
 ): Promise<Set<string>> {
   const classIds = [...new Set(firstClasses.map(({ classId }) => classId))];
-  const baseRows = await db
-    .select({ skillId: classSkills.skillId })
-    .from(classSkills)
-    .where(inArray(classSkills.classId, classIds))
-    .all();
-  const result = new Set(baseRows.map(({ skillId }) => skillId));
-
-  await addSkillsBySlug(db, result, monsterRaceClassSkillSlugs(raceSlug), "monster race");
+  const [baseRows, racialRows] = await Promise.all([
+    db
+      .select({ skillId: classSkills.skillId })
+      .from(classSkills)
+      .where(inArray(classSkills.classId, classIds))
+      .all(),
+    db
+      .select({ skillId: raceClassSkills.skillId })
+      .from(raceClassSkills)
+      .where(eq(raceClassSkills.raceId, raceId))
+      .all(),
+  ]);
+  const result = new Set([...baseRows, ...racialRows].map(({ skillId }) => skillId));
 
   if (firstClasses.some(({ classSlug }) => classSlug === "psion")) {
     const disciplineChoice = await db
@@ -246,7 +251,7 @@ export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
       intelligenceModifier,
     } = await requireRaceAndIntelligence(db, row.character.id);
     const [classSkillIds, availableSkills, selections] = await Promise.all([
-      classSkillIdSet(db, row.character.id, firstClasses, race.slug),
+      classSkillIdSet(db, row.character.id, firstClasses, race.id),
       db
         .select({
           id: skills.id,
@@ -308,7 +313,7 @@ export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
         intelligenceModifier,
       } = await requireRaceAndIntelligence(db, row.character.id);
       const [classSkillIds, availableSkills, availableLanguages] = await Promise.all([
-        classSkillIdSet(db, row.character.id, firstClasses, race.slug),
+        classSkillIdSet(db, row.character.id, firstClasses, race.id),
         db
           .select({ id: skills.id, slug: skills.slug, name: skills.name, requiresSpecialization: skills.requiresSpecialization })
           .from(skills)
@@ -426,11 +431,12 @@ export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
         .orderBy(asc(languages.name))
         .all(),
     ]);
+    const bonusOptions = access.filter((entry) => entry.kind === "bonus" && !entry.isSecret);
     return c.json({
       automatic: access.filter((entry) => entry.kind === "automatic"),
-      bonusOptions: access.filter((entry) => entry.kind === "bonus" && !entry.isSecret),
+      bonusOptions,
       allOptions: allLanguages,
-      bonusChoicesRequired: firstLevelBonusLanguageCount(effectiveIntelligence),
+      bonusChoicesRequired: Math.min(firstLevelBonusLanguageCount(effectiveIntelligence), bonusOptions.length),
       druidicGranted: firstClasses.some(({ classSlug }) => classSlug === "druid"),
       selected,
     });
@@ -459,7 +465,7 @@ export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
       const automatic = access.filter((entry) => entry.kind === "automatic").map((entry) => entry.languageId);
       const bonusAllowed = new Set(access.filter((entry) => entry.kind === "bonus").map((entry) => entry.languageId));
       const uniqueBonus = new Set(input.bonusLanguageIds);
-      const required = firstLevelBonusLanguageCount(effectiveIntelligence);
+      const required = Math.min(firstLevelBonusLanguageCount(effectiveIntelligence), bonusAllowed.size);
       if (uniqueBonus.size !== input.bonusLanguageIds.length) throw new ValidationError("Bonus language choices must be unique.");
       if (uniqueBonus.size !== required) throw new ValidationError(`Choose exactly ${required} bonus language${required === 1 ? "" : "s"}.`);
       for (const languageId of uniqueBonus) {

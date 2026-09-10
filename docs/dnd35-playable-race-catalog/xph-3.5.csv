@@ -1,0 +1,7 @@
+slug,name,source_id,kind,eligibility,level_adjustment,legacy_ecl_offset,verification
+dromite,Dromite,xph-3.5,race,pc,1,,source-verified
+duergar-psionic,Duergar (Psionic),xph-3.5,race,pc,1,,source-verified
+elan,Elan,xph-3.5,race,pc,0,,source-verified
+half-giant,Half-Giant,xph-3.5,race,pc,1,,source-verified
+maenad,Maenad,xph-3.5,race,pc,0,,source-verified
+xeph,Xeph,xph-3.5,race,pc,0,,source-verified

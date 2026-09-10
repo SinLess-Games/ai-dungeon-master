@@ -1,0 +1,38 @@
+slug,name,source_id,kind,eligibility,level_adjustment,legacy_ecl_offset,verification
+abrian,Abrian,ff-3x,monster-pc,pc,1,,source-verified
+canomorph-haraknin,Canomorph (Haraknin),ff-3x,monster-pc,pc,3,,source-verified
+canomorph-shadurakul,Canomorph (Shadurakul),ff-3x,monster-pc,pc,4,,source-verified
+canomorph-vultivor,Canomorph (Vultivor),ff-3x,monster-pc,pc,4,,source-verified
+dark-creeper,Dark Creeper,ff-3x,monster-pc,pc,4,,source-verified
+dark-stalker,Dark Stalker,ff-3x,monster-pc,pc,5,,source-verified
+ethergaunt-black,Ethergaunt (Black),ff-3x,monster-pc,pc,7,,source-verified
+ethergaunt-red,Ethergaunt (Red),ff-3x,monster-pc,pc,4,,source-verified
+ethergaunt-white,Ethergaunt (White),ff-3x,monster-pc,pc,5,,source-verified
+fensir,Fensir,ff-3x,monster-pc,pc,4,,source-verified
+feytouched,Feytouched,ff-3x,monster-pc,pc,1,,source-verified
+half-fey,Half-Fey,ff-3x,template,template-option,2,,source-verified
+half-illithid,Half-Illithid,ff-3x,template,template-option,5,,source-verified
+half-troll,Half-Troll,ff-3x,template,template-option,4,,source-verified
+huecuva,Huecuva,ff-3x,template,template-option,4,,source-verified
+jackal-lord,Jackal Lord,ff-3x,monster-pc,pc,4,,source-verified
+kaorti,Kaorti,ff-3x,monster-pc,pc,2,,source-verified
+keeper,Keeper,ff-3x,monster-pc,pc,3,,source-verified
+kelpie,Kelpie,ff-3x,monster-pc,pc,3,,source-verified
+maug,Maug,ff-3x,monster-pc,pc,3,,source-verified
+mongrelfolk,Mongrelfolk,ff-3x,monster-pc,pc,0,,source-verified
+nerra-kalareem,Nerra (Kalareem),ff-3x,monster-pc,pc,6,,source-verified
+nerra-sillit,Nerra (Sillit),ff-3x,monster-pc,pc,18,,source-verified
+octopus-tree,Octopus Tree,ff-3x,monster-pc,pc,3,,source-verified
+planetouched-adu-ja,Planetouched Variant,ff-3x,monster-pc,pc,1,,source-verified
+quth-maren,Quth-Maren,ff-3x,monster-pc,pc,3,,source-verified
+rilmani-aurumach,Rilmani (Aurumach),ff-3x,monster-pc,pc,9,,source-verified
+rilmani-argental,Rilmani Variant,ff-3x,monster-pc,pc,5,,source-verified
+selkie,Selkie,ff-3x,monster-pc,pc,1,,source-verified
+shadar-kai,Shadar-kai,ff-3x,monster-pc,pc,1,,source-verified
+shedu,Shedu,ff-3x,monster-pc,pc,2,,source-verified
+spriggan,Spriggan,ff-3x,monster-pc,pc,2,,source-verified
+ti-khana,Ti-khana,ff-3x,template,template-option,4,,source-verified
+wendigo,Wendigo,ff-3x,template,template-option,4,,source-verified
+wispling,Wispling,ff-3x,monster-pc,pc,1,,source-verified
+yuan-ti-anathema,Yuan-ti Anathema,ff-3x,monster-pc,pc,6,,source-verified
+yurian,Yurian,ff-3x,monster-pc,pc,4,,source-verified

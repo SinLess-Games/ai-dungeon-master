@@ -102,6 +102,18 @@ describe("D&D 3.5 monster PC creation rules", () => {
       creatureRefProgression: "custom",
       creatureWillProgression: "custom",
     })).toEqual({ baseAttackBonus: 1, fort: 3, ref: 0, will: 0 });
+
+    expect(racialBaseBonuses({
+      raceSlug: "varag",
+      racialHitDice: 3,
+      racialHitDie: 8,
+      levelAdjustment: 2,
+      creatureSkillPointsPerHitDie: 2,
+      creatureBabProgression: "three_quarters",
+      creatureFortProgression: "custom",
+      creatureRefProgression: "custom",
+      creatureWillProgression: "custom",
+    })).toEqual({ baseAttackBonus: 2, fort: 1, ref: 3, will: 1 });
   });
 
   it("uses average racial Hit Dice plus Constitution and a one-hit-point-per-HD floor", () => {

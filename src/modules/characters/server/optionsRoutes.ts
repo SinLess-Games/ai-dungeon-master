@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { zValidator } from "@hono/zod-validator";
-import { and, asc, eq, isNull, lte, or } from "drizzle-orm";
+import { and, asc, eq, isNull, or } from "drizzle-orm";
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -86,7 +86,6 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>()
           and(
             eq(races.isEnabled, true),
             visibleToUser(races.ownerUserId, session.user.id),
-            or(isNull(races.levelAdjustment), lte(races.levelAdjustment, 8)),
           ),
         )
         .orderBy(asc(races.levelAdjustment), asc(races.name))
@@ -103,7 +102,6 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>()
           and(
             eq(races.isEnabled, true),
             visibleToUser(races.ownerUserId, session.user.id),
-            or(isNull(races.levelAdjustment), lte(races.levelAdjustment, 8)),
           ),
         )
         .all(),
@@ -180,6 +178,10 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>()
     }
     const wealthByClass = new Map(wealthRows.map((row) => [row.classId, row]));
     const prerequisitesByClass = new Map(prerequisiteRows.map((row) => [row.classId, row]));
+    const maximumLevelAdjustment = Math.max(
+      0,
+      ...raceRows.map((race) => race.levelAdjustment ?? 0),
+    );
 
     return c.json({
       races: raceRows.map((race) => ({
@@ -207,7 +209,7 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>()
         pointBuyBudgets,
         rollMethods: ["roll-4d6-drop-lowest", "roll-4d6-reroll-1-2"],
       },
-      maximumLevelAdjustment: 8,
+      maximumLevelAdjustment,
       progressionModes: ["standard", "gestalt"],
     });
   })

@@ -1,11 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { BookOpen, Plus, Shield, Swords, UserRound } from "lucide-react";
+import { BookOpen, Plus, Shield, Swords, Trash2, UserRound } from "lucide-react";
+import { toast } from "sonner";
 import { authClient } from "@/modules/auth/client/authClient";
 import { useAuthModal } from "@/shared/stores/authModal.store";
-import { listCharacters, type CharacterLibraryItem } from "../client/creatorApi";
+import { listCharacters, requestJson, type CharacterLibraryItem } from "../client/creatorApi";
 import "./character-creator.css";
 import "./advanced-character-creator.css";
+
+type CharacterLibraryItemWithSystem = CharacterLibraryItem & {
+  rulesetId: string;
+  rulesetVersion: string;
+};
 
 function classSummary(character: CharacterLibraryItem) {
   const firstLevel = character.classes.filter(({ characterLevel }) => characterLevel === 1);
@@ -20,12 +26,33 @@ function readableStatus(status: string) {
   return status.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function systemLabel(character: CharacterLibraryItemWithSystem) {
+  if (character.rulesetId === "dnd35" && character.rulesetVersion === "3.5") {
+    return "Dungeons & Dragons 3.5";
+  }
+  return `${character.rulesetId} ${character.rulesetVersion}`.trim();
+}
+
 export function CharacterLibrary() {
   const session = authClient.useSession();
+  const queryClient = useQueryClient();
   const characters = useQuery({
     queryKey: ["characters", "library"],
     queryFn: listCharacters,
     enabled: Boolean(session.data),
+  });
+  const deleteCharacter = useMutation({
+    mutationFn: async (character: CharacterLibraryItemWithSystem) => {
+      return requestJson<{ characterId: string; deleted: true }>(
+        `/api/characters/${encodeURIComponent(character.id)}`,
+        { method: "DELETE" },
+      );
+    },
+    onSuccess: async (_result, character) => {
+      await queryClient.invalidateQueries({ queryKey: ["characters"] });
+      toast.success(`${character.name} deleted.`);
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Character could not be deleted."),
   });
 
   if (session.isPending) {
@@ -78,7 +105,7 @@ export function CharacterLibrary() {
     );
   }
 
-  const items = characters.data ?? [];
+  const items = (characters.data ?? []) as CharacterLibraryItemWithSystem[];
   return (
     <main className="character-library-page" id="main-content">
       <div className="character-library-shell">
@@ -110,16 +137,32 @@ export function CharacterLibrary() {
                   <span className="creator-pill">{readableStatus(character.status)}</span>
                 </div>
                 <div className="character-library-badges">
+                  <span>{systemLabel(character)}</span>
                   <span>LA +{character.levelAdjustment ?? 0}</span>
                   {character.progressionMode === "gestalt" && <span className="gestalt">Gestalt</span>}
                   {character.progressionMode !== "gestalt" && <span>Standard</span>}
                   <span>{readableStatus(character.campaignStatus)} campaign</span>
                 </div>
                 <div className="character-library-meta">
+                  <div><span>System</span><strong>{systemLabel(character)}</strong></div>
                   <div><span>Campaign</span><strong>{character.campaignName}</strong></div>
                   <div><span>Classes</span><strong>{classSummary(character)}</strong></div>
                   <div><span>Character ID</span><strong>{character.id.slice(0, 8)}…</strong></div>
                   <div><span>Updated</span><strong>{new Date(character.updatedAt).toLocaleDateString()}</strong></div>
+                </div>
+                <div className="creator-step-actions">
+                  <button
+                    type="button"
+                    className="creator-secondary"
+                    disabled={deleteCharacter.isPending}
+                    onClick={() => {
+                      if (window.confirm(`Delete ${character.name}? This permanently removes the character and its creator data.`)) {
+                        deleteCharacter.mutate(character);
+                      }
+                    }}
+                  >
+                    <Trash2 size={16} /> {deleteCharacter.isPending && deleteCharacter.variables?.id === character.id ? "Deleting…" : "Delete character"}
+                  </button>
                 </div>
               </article>
             ))}

@@ -24,57 +24,6 @@ export interface RacialBaseBonuses {
   will: number;
 }
 
-const racialClassSkills: Readonly<Record<string, readonly string[]>> = {
-  minotaur: ["intimidate", "jump", "listen", "search", "spot"],
-  doppelganger: ["bluff", "diplomacy", "disguise", "intimidate", "listen", "sense-motive", "spot"],
-  "hound-archon": ["concentration", "hide", "jump", "listen", "move-silently", "sense-motive", "spot", "survival"],
-  "ogre-mage": ["concentration", "listen", "spellcraft", "spot"],
-  centaur: ["listen", "move-silently", "spot", "survival"],
-  gargoyle: ["hide", "listen", "spot"],
-  janni: ["appraise", "concentration", "craft", "escape-artist", "listen", "move-silently", "ride", "sense-motive", "spot"],
-  "yuan-ti-pureblood": ["concentration", "disguise", "hide", "knowledge", "listen", "spot"],
-  azer: ["appraise", "climb", "craft", "hide", "jump", "listen", "search", "spot"],
-  satyr: ["bluff", "hide", "knowledge-nature", "listen", "move-silently", "perform", "spot"],
-  ogre: ["climb", "listen", "spot"],
-  "hill-giant": ["climb", "jump", "listen", "spot"],
-  "stone-giant": ["climb", "hide", "listen", "spot"],
-  troll: ["listen", "spot"],
-  bugbear: ["climb", "hide", "listen", "move-silently", "search", "spot"],
-  gnoll: ["listen", "spot"],
-  lizardfolk: ["balance", "jump", "swim"],
-  troglodyte: ["hide", "listen"],
-  "kuo-toa": ["craft", "knowledge", "escape-artist", "listen", "move-silently", "search", "spot", "swim"],
-  drider: ["climb", "concentration", "hide", "listen", "move-silently", "spot"],
-  "mind-flayer": ["bluff", "concentration", "hide", "intimidate", "knowledge", "listen", "move-silently", "spot"],
-  "yuan-ti-halfblood": ["concentration", "craft", "knowledge", "hide", "listen", "spot"],
-  "yuan-ti-abomination": ["concentration", "craft", "knowledge", "hide", "listen", "move-silently", "spot"],
-  aranea: ["climb", "concentration", "escape-artist", "jump", "listen", "spot"],
-  locathah: ["craft", "listen", "spot", "swim"],
-  lamia: ["bluff", "concentration", "diplomacy", "disguise", "hide", "intimidate", "spot"],
-  couatl: ["concentration", "diplomacy", "jump", "knowledge", "listen", "search", "sense-motive", "spellcraft", "spot", "survival", "tumble", "use-magic-device"],
-  lillend: ["appraise", "concentration", "diplomacy", "knowledge-arcana", "listen", "perform", "sense-motive", "spellcraft", "spot", "survival"],
-  triton: ["craft", "diplomacy", "hide", "listen", "move-silently", "ride", "search", "sense-motive", "spot", "survival", "swim"],
-  xill: ["balance", "climb", "diplomacy", "escape-artist", "intimidate", "listen", "move-silently", "sense-motive", "spot", "tumble", "use-rope"],
-  "astral-deva": ["concentration", "craft", "knowledge", "diplomacy", "escape-artist", "hide", "intimidate", "listen", "move-silently", "sense-motive", "spot", "use-rope"],
-  bralani: ["concentration", "diplomacy", "escape-artist", "handle-animal", "hide", "jump", "listen", "move-silently", "ride", "sense-motive", "spot", "tumble", "use-rope"],
-  djinni: ["appraise", "concentration", "craft", "diplomacy", "escape-artist", "knowledge", "listen", "move-silently", "sense-motive", "spellcraft", "spot", "use-rope"],
-  erinyes: ["concentration", "diplomacy", "escape-artist", "hide", "knowledge", "listen", "move-silently", "search", "sense-motive", "spot", "survival", "use-rope"],
-  "trumpet-archon": [
-    "concentration",
-    "diplomacy",
-    "escape-artist",
-    "handle-animal",
-    "knowledge-planes",
-    "listen",
-    "move-silently",
-    "perform",
-    "ride",
-    "sense-motive",
-    "spot",
-    "use-rope",
-  ],
-};
-
 /**
  * Humanoid racial Hit Dice do not have one universal good-save progression: the
  * good save depends on the specific humanoid race. Keep the exact MM racial-HD
@@ -88,6 +37,7 @@ const racialBaseBonusOverrides: Readonly<
   lizardfolk: { racialHitDice: 2, bonuses: { baseAttackBonus: 1, fort: 0, ref: 3, will: 0 } },
   troglodyte: { racialHitDice: 2, bonuses: { baseAttackBonus: 1, fort: 3, ref: 0, will: 0 } },
   locathah: { racialHitDice: 2, bonuses: { baseAttackBonus: 1, fort: 3, ref: 0, will: 0 } },
+  flind: { racialHitDice: 2, bonuses: { baseAttackBonus: 1, fort: 3, ref: 0, will: 0 } },
 };
 
 function nonNegativeInteger(value: number, label: string): number {
@@ -185,9 +135,4 @@ export function racialBaseBonuses(progression: MonsterRaceProgression): RacialBa
     ref: baseSaveBonusForClass(levels, progression.creatureRefProgression),
     will: baseSaveBonusForClass(levels, progression.creatureWillProgression),
   };
-}
-
-/** Monster-entry skills are class skills for racial Hit Dice. */
-export function monsterRaceClassSkillSlugs(raceSlug: string): readonly string[] {
-  return racialClassSkills[raceSlug.trim().toLowerCase()] ?? [];
 }

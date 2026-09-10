@@ -55,6 +55,10 @@ const racialClassSkills: Readonly<Record<string, readonly string[]>> = {
   lillend: ["appraise", "concentration", "diplomacy", "knowledge-arcana", "listen", "perform", "sense-motive", "spellcraft", "spot", "survival"],
   triton: ["craft", "diplomacy", "hide", "listen", "move-silently", "ride", "search", "sense-motive", "spot", "survival", "swim"],
   xill: ["balance", "climb", "diplomacy", "escape-artist", "intimidate", "listen", "move-silently", "sense-motive", "spot", "tumble", "use-rope"],
+  "astral-deva": ["concentration", "craft", "knowledge", "diplomacy", "escape-artist", "hide", "intimidate", "listen", "move-silently", "sense-motive", "spot", "use-rope"],
+  bralani: ["concentration", "diplomacy", "escape-artist", "handle-animal", "hide", "jump", "listen", "move-silently", "ride", "sense-motive", "spot", "tumble", "use-rope"],
+  djinni: ["appraise", "concentration", "craft", "diplomacy", "escape-artist", "knowledge", "listen", "move-silently", "sense-motive", "spellcraft", "spot", "use-rope"],
+  erinyes: ["concentration", "diplomacy", "escape-artist", "hide", "knowledge", "listen", "move-silently", "search", "sense-motive", "spot", "survival", "use-rope"],
   "trumpet-archon": [
     "concentration",
     "diplomacy",

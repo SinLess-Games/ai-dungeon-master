@@ -14,11 +14,13 @@ const SEEDS_ROOT = resolve(process.cwd(), "seeds");
 const preferredSeedOrder = [
   "phb-classes",
   "phb-races",
+  "dmg-races",
   "phb-skills",
   "phb-feats",
   "phb-divine",
   "phb-creatures",
   "srd-monster-races",
+  "monster-manual-races",
   "phb-spells",
   "phb-rules",
   "dmg-rules",
@@ -32,10 +34,12 @@ const preferredSeedOrder = [
   "expanded-psionics-handbook-feats",
   "expanded-psionics-handbook-powers",
   "expanded-psionics-handbook-rules",
+  "expanded-psionics-handbook-races",
   "psionics-handbook-classes",
   "psionics-handbook-feats",
   "psionics-handbook-powers",
   "psionics-handbook-rules",
+  "playable-race-catalog",
 ];
 
 function parseArgs(argv) {

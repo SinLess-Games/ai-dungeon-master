@@ -1,6 +1,6 @@
 # D&D 3.5 Playable Race Catalog
 
-This directory is the source-qualified inventory for playable ancestry options in **The Endless Codex**. It is deliberately separate from executable SQL seeds: cataloged does not mean fully implemented.
+This directory is the source-qualified inventory for playable ancestry options in **The Endless Codex**. Cataloged does not automatically mean fully materialized in executable character-creation data.
 
 ## Rules
 
@@ -14,7 +14,7 @@ This directory is the source-qualified inventory for playable ancestry options i
 
 ## Inventory
 
-The source CSVs contain **222 catalog rows**: **188** source-qualified PC races/monster-PC options, **17** template/transformation options, **16** entries requiring source-section review, and **1** explicit class-level-only/non-PC entry.
+The source CSVs contain **222 catalog rows**: **187** source-qualified PC races/monster-PC options, **17** template/transformation options, **16** entries requiring source-section review, and **2** explicit non-PC entries.
 
 Source IDs:
 - `phb-3.5` — Player’s Handbook
@@ -29,4 +29,8 @@ Source IDs:
 
 ## Runtime status
 
-This commit is **catalog only**. It does not remove the character creator’s current LA +8 filter and does not automatically seed every entry. The next step is to convert verified rows into source-specific race seed packs with full racial HD, traits, movement, languages, abilities, favored class, and tests.
+The catalog now has companion executable seed packs for PHB races, DMG/MM monster PCs, a growing Monster Manual I set, and Expanded Psionics Handbook races. Materialized races include structured ability adjustments, racial Hit Dice where applicable, movement modes, languages, traits, and named special abilities.
+
+The character-creation API no longer uses a hard-coded LA +8 ceiling: the maximum level adjustment is calculated from the enabled race data. It also exposes source metadata and normalized racial traits/special abilities for the creator UI.
+
+Materialization is still intentionally incomplete for entries that require source review, legacy-edition reconciliation, template support, nonability support, racial spellcasting/manifesting support, or other mechanics that cannot yet be represented accurately. Those entries remain disabled rather than being filled with guessed rules.

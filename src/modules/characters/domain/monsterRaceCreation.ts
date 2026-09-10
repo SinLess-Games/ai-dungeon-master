@@ -29,6 +29,9 @@ const racialClassSkills: Readonly<Record<string, readonly string[]>> = {
   doppelganger: ["bluff", "diplomacy", "disguise", "intimidate", "listen", "sense-motive", "spot"],
   "hound-archon": ["concentration", "hide", "jump", "listen", "move-silently", "sense-motive", "spot", "survival"],
   "ogre-mage": ["concentration", "listen", "spellcraft", "spot"],
+  centaur: ["listen", "move-silently", "spot", "survival"],
+  gargoyle: ["hide", "listen", "spot"],
+  janni: ["appraise", "concentration", "craft", "escape-artist", "listen", "move-silently", "ride", "sense-motive", "spot"],
   "trumpet-archon": [
     "concentration",
     "diplomacy",

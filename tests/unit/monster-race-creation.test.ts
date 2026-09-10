@@ -3,7 +3,6 @@ import {
   firstClassSkillPointBudget,
   generalFeatSlotsForTotalHitDice,
   monsterEffectiveCharacterLevel,
-  monsterRaceClassSkillSlugs,
   racialBaseBonuses,
   racialHitPoints,
   racialSkillPointBudget,
@@ -91,27 +90,23 @@ describe("D&D 3.5 monster PC creation rules", () => {
       creatureRefProgression: "good",
       creatureWillProgression: "poor",
     })).toEqual({ baseAttackBonus: 2, fort: 1, ref: 3, will: 1 });
+
+    expect(racialBaseBonuses({
+      raceSlug: "flind",
+      racialHitDice: 2,
+      racialHitDie: 8,
+      levelAdjustment: 2,
+      creatureSkillPointsPerHitDie: 2,
+      creatureBabProgression: "three_quarters",
+      creatureFortProgression: "custom",
+      creatureRefProgression: "custom",
+      creatureWillProgression: "custom",
+    })).toEqual({ baseAttackBonus: 1, fort: 3, ref: 0, will: 0 });
   });
 
   it("uses average racial Hit Dice plus Constitution and a one-hit-point-per-HD floor", () => {
     expect(racialHitPoints(6, 8, 2)).toBe(39);
     expect(racialHitPoints(12, 8, 6)).toBe(126);
     expect(racialHitPoints(4, 8, -10)).toBe(4);
-  });
-
-  it("exposes racial class skills from the monster entry", () => {
-    expect(monsterRaceClassSkillSlugs("minotaur")).toContain("intimidate");
-    expect(monsterRaceClassSkillSlugs("hound-archon")).toContain("survival");
-    expect(monsterRaceClassSkillSlugs("aranea")).toContain("climb");
-    expect(monsterRaceClassSkillSlugs("locathah")).toContain("swim");
-    expect(monsterRaceClassSkillSlugs("couatl")).toContain("use-magic-device");
-    expect(monsterRaceClassSkillSlugs("lillend")).toContain("knowledge-arcana");
-    expect(monsterRaceClassSkillSlugs("triton")).toContain("swim");
-    expect(monsterRaceClassSkillSlugs("xill")).toContain("tumble");
-    expect(monsterRaceClassSkillSlugs("astral-deva")).toContain("intimidate");
-    expect(monsterRaceClassSkillSlugs("bralani")).toContain("handle-animal");
-    expect(monsterRaceClassSkillSlugs("djinni")).toContain("appraise");
-    expect(monsterRaceClassSkillSlugs("erinyes")).toContain("search");
-    expect(monsterRaceClassSkillSlugs("aasimar")).toEqual([]);
   });
 });

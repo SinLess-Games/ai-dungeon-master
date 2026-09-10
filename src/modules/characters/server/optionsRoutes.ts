@@ -19,8 +19,10 @@ import {
   languages,
   raceAbilities,
   races,
+  raceTraits,
   skills,
   sources,
+  specialAbilities,
   spellSchools,
   spells,
   weapons,
@@ -62,6 +64,7 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>()
     const [
       raceRows,
       racialAbilityRows,
+      racialTraitRows,
       classRows,
       prerequisiteRows,
       classSkillRows,
@@ -70,6 +73,10 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>()
       db
         .select({
           id: races.id,
+          sourceId: races.sourceId,
+          sourcePage: races.sourcePage,
+          sourceName: sources.name,
+          sourceAbbreviation: sources.abbreviation,
           name: races.name,
           description: races.description,
           rulesText: races.rulesText,
@@ -82,6 +89,7 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>()
           isHomebrew: races.isHomebrew,
         })
         .from(races)
+        .leftJoin(sources, eq(races.sourceId, sources.id))
         .where(
           and(
             eq(races.isEnabled, true),
@@ -104,6 +112,31 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>()
             visibleToUser(races.ownerUserId, session.user.id),
           ),
         )
+        .all(),
+      db
+        .select({
+          id: raceTraits.id,
+          raceId: raceTraits.raceId,
+          name: raceTraits.name,
+          rulesText: raceTraits.rulesText,
+          position: raceTraits.position,
+          specialAbilityId: raceTraits.specialAbilityId,
+          specialAbilityName: specialAbilities.name,
+          specialAbilityDescription: specialAbilities.description,
+          specialAbilityRulesText: specialAbilities.rulesText,
+          specialAbilityCategory: specialAbilities.category,
+          specialAbilityActionType: specialAbilities.actionType,
+        })
+        .from(raceTraits)
+        .innerJoin(races, eq(raceTraits.raceId, races.id))
+        .leftJoin(specialAbilities, eq(raceTraits.specialAbilityId, specialAbilities.id))
+        .where(
+          and(
+            eq(races.isEnabled, true),
+            visibleToUser(races.ownerUserId, session.user.id),
+          ),
+        )
+        .orderBy(asc(raceTraits.raceId), asc(raceTraits.position))
         .all(),
       db
         .select({
@@ -170,6 +203,13 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>()
       modifiersByRace.set(row.raceId, modifiers);
     }
 
+    const traitsByRace = new Map<string, typeof racialTraitRows>();
+    for (const row of racialTraitRows) {
+      const list = traitsByRace.get(row.raceId) ?? [];
+      list.push(row);
+      traitsByRace.set(row.raceId, list);
+    }
+
     const skillsByClass = new Map<string, Array<{ id: string; slug: string; name: string }>>();
     for (const row of classSkillRows) {
       const list = skillsByClass.get(row.classId) ?? [];
@@ -184,10 +224,29 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>()
     );
 
     return c.json({
-      races: raceRows.map((race) => ({
-        ...race,
-        abilityModifiers: modifiersByRace.get(race.id) ?? {},
-      })),
+      races: raceRows.map((race) => {
+        const racialTraits = traitsByRace.get(race.id) ?? [];
+        const traitDetails = racialTraits.map((trait) => {
+          const linkedRules = trait.specialAbilityRulesText?.trim();
+          const traitRules = trait.rulesText.trim();
+          if (!linkedRules || linkedRules === traitRules) return `${trait.name}: ${traitRules}`;
+          return `${trait.name}: ${traitRules} Special ability: ${linkedRules}`;
+        });
+        const sourceLabel = race.sourceAbbreviation ?? race.sourceName ?? race.sourceId;
+        const expandedDescription = [
+          race.description,
+          sourceLabel ? `Source: ${sourceLabel}${race.sourcePage ? ` p. ${race.sourcePage}` : ""}.` : "",
+          traitDetails.length ? `Racial traits and special abilities: ${traitDetails.join(" • ")}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n\n");
+        return {
+          ...race,
+          description: expandedDescription,
+          abilityModifiers: modifiersByRace.get(race.id) ?? {},
+          racialTraits,
+        };
+      }),
       classes: classRows.map((characterClass) => {
         const prerequisite = prerequisitesByClass.get(characterClass.id);
         const condition = prerequisite?.expression.condition;

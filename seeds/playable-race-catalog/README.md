@@ -1,38 +1,43 @@
 # Playable race catalog seed mirrors
 
-These SQL files mirror the race-like rows from `docs/dnd35-playable-race-catalog/*.csv`
-into database seed files.
+This seed pack materializes both the existing CSV race catalog and the user's by-book
+playable-race index as database seed rows.
 
-## Safety model
+## Duplicate policy
 
-The catalog CSVs contain source identity, classification, eligibility, level adjustment /
-legacy ECL metadata, and verification state. They do **not** contain enough mechanics to
-create a rules-complete `dnd35_races` row: size, movement, creature type, racial Hit Dice,
-natural armor, ability modifiers, languages, traits, special abilities, and favored-class
-data are missing for most entries.
+The by-book index contains **424 source-list entries across 59 books/magazines**.
+Equivalent entries are canonicalized by shared race slug before SQL generation, leaving
+**354 unique race options**. The Player's Handbook core seven are not re-seeded here
+because `seeds/phb-races/` already owns those complete rows.
 
-For that reason, a race-like catalog entry that does not already exist under the same
-`source_id + slug` is inserted as a **disabled placeholder**:
+The generated SQL never creates a second canonical shared race when one already exists:
+
+- an existing enabled race wins;
+- an earlier canonical `userlist-race-*` row wins;
+- an existing row from the same source wins;
+- a disabled placeholder from a different source does not block the canonical by-book row;
+- `zz-dedupe.sql` removes superseded disabled placeholders at the end.
+
+This applies only to shared seeded content (`owner_user_id IS NULL`). It does not collapse
+user-owned/homebrew content.
+
+## Placeholder safety
+
+The by-book list identifies playable options and source books, but it does not include
+the complete mechanics needed for a rules-valid race. Newly discovered rows remain disabled:
 
 - `is_enabled = 0`
 - `base_speed_feet = 0` is a sentinel
 - `size = 'medium'` is a schema placeholder only
-- catalog LA is preserved when it is a real 3.5 level adjustment
-- Monster Manual II legacy PC ECL offsets are preserved in `rules_text` and are **not**
-  copied into `level_adjustment`
+- known LA is inherited from an older catalog row with the same slug when available
+- creature type, RHD, movement, ability modifiers, languages, traits, special abilities,
+  favored class, and other mechanics still require source-backed materialization
 
-Do not enable one of these placeholders until its full source-backed mechanics have been
-materialized. Existing complete race rows are never overwritten.
+Existing complete rows are never overwritten.
 
-## Non-race catalog rows
+## Existing CSV mirror files
 
-Template entries are intentionally not inserted into `dnd35_races`; they belong in
-`dnd35_templates` and need a dedicated, source-backed template seed pass. Entries marked
-`not-pc` are also excluded. `needs-review` race-like entries are present but remain disabled.
-
-## Files
-
-- `00-sources.sql` — source rows used by the CSV mirrors
+- `00-sources.sql`
 - `10-phb-3.5.sql`
 - `20-dmg-mm1-3.5.sql`
 - `30-mm1-3.5.sql`
@@ -43,5 +48,10 @@ Template entries are intentionally not inserted into `dnd35_races`; they belong 
 - `80-mm5-3.5.sql`
 - `90-xph-3.5.sql`
 
-The seed runner automatically discovers this directory. It sorts after the explicitly
-preferred seed packs, so complete PHB/SRD race seeds are created first and are left intact.
+## Additional by-book seed files
+
+- `100-by-book-playable-races.sql` — canonical sourcebook/magazine rows from the supplied by-book list
+- `zz-dedupe.sql` — final canonical shared-slug cleanup
+
+The seed runner discovers this directory automatically after the preferred complete seed
+packs, so complete PHB/SRD content exists before placeholders are considered.

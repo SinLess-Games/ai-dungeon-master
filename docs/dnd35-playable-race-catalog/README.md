@@ -14,7 +14,7 @@ This directory is the source-qualified inventory for playable ancestry options i
 
 ## Inventory
 
-The source CSVs contain **222 catalog rows**: **187** source-qualified PC races/monster-PC options, **17** template/transformation options, **16** entries requiring source-section review, and **2** explicit non-PC entries.
+The source CSVs contain **222 catalog rows**: **186** source-qualified PC races/monster-PC options, **17** template/transformation options, **16** entries requiring source-section review, and **3** explicit non-PC entries.
 
 Source IDs:
 - `phb-3.5` — Player’s Handbook

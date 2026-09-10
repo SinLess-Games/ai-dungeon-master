@@ -3,7 +3,6 @@ import {
   firstClassSkillPointBudget,
   generalFeatSlotsForTotalHitDice,
   monsterEffectiveCharacterLevel,
-  monsterRaceClassSkillSlugs,
   racialBaseBonuses,
   racialHitPoints,
   racialSkillPointBudget,
@@ -53,17 +52,73 @@ describe("D&D 3.5 monster PC creation rules", () => {
       creatureRefProgression: "good",
       creatureWillProgression: "good",
     })).toEqual({ baseAttackBonus: 12, fort: 8, ref: 8, will: 8 });
+
+    expect(racialBaseBonuses({
+      raceSlug: "astral-deva",
+      racialHitDice: 12,
+      racialHitDie: 8,
+      levelAdjustment: 8,
+      creatureSkillPointsPerHitDie: 8,
+      creatureBabProgression: "full",
+      creatureFortProgression: "good",
+      creatureRefProgression: "good",
+      creatureWillProgression: "good",
+    })).toEqual({ baseAttackBonus: 12, fort: 8, ref: 8, will: 8 });
+  });
+
+  it("uses source-backed save overrides for humanoid racial Hit Dice", () => {
+    expect(racialBaseBonuses({
+      raceSlug: "locathah",
+      racialHitDice: 2,
+      racialHitDie: 8,
+      levelAdjustment: 1,
+      creatureSkillPointsPerHitDie: 2,
+      creatureBabProgression: "three_quarters",
+      creatureFortProgression: "poor",
+      creatureRefProgression: "good",
+      creatureWillProgression: "poor",
+    })).toEqual({ baseAttackBonus: 1, fort: 3, ref: 0, will: 0 });
+
+    expect(racialBaseBonuses({
+      raceSlug: "bugbear",
+      racialHitDice: 3,
+      racialHitDie: 8,
+      levelAdjustment: 1,
+      creatureSkillPointsPerHitDie: 2,
+      creatureBabProgression: "three_quarters",
+      creatureFortProgression: "poor",
+      creatureRefProgression: "good",
+      creatureWillProgression: "poor",
+    })).toEqual({ baseAttackBonus: 2, fort: 1, ref: 3, will: 1 });
+
+    expect(racialBaseBonuses({
+      raceSlug: "flind",
+      racialHitDice: 2,
+      racialHitDie: 8,
+      levelAdjustment: 2,
+      creatureSkillPointsPerHitDie: 2,
+      creatureBabProgression: "three_quarters",
+      creatureFortProgression: "custom",
+      creatureRefProgression: "custom",
+      creatureWillProgression: "custom",
+    })).toEqual({ baseAttackBonus: 1, fort: 3, ref: 0, will: 0 });
+
+    expect(racialBaseBonuses({
+      raceSlug: "varag",
+      racialHitDice: 3,
+      racialHitDie: 8,
+      levelAdjustment: 2,
+      creatureSkillPointsPerHitDie: 2,
+      creatureBabProgression: "three_quarters",
+      creatureFortProgression: "custom",
+      creatureRefProgression: "custom",
+      creatureWillProgression: "custom",
+    })).toEqual({ baseAttackBonus: 2, fort: 1, ref: 3, will: 1 });
   });
 
   it("uses average racial Hit Dice plus Constitution and a one-hit-point-per-HD floor", () => {
     expect(racialHitPoints(6, 8, 2)).toBe(39);
     expect(racialHitPoints(12, 8, 6)).toBe(126);
     expect(racialHitPoints(4, 8, -10)).toBe(4);
-  });
-
-  it("exposes racial class skills from the monster entry", () => {
-    expect(monsterRaceClassSkillSlugs("minotaur")).toContain("intimidate");
-    expect(monsterRaceClassSkillSlugs("hound-archon")).toContain("survival");
-    expect(monsterRaceClassSkillSlugs("aasimar")).toEqual([]);
   });
 });

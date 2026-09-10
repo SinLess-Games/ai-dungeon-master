@@ -65,7 +65,8 @@ export function rollAbilityScore(
     while (value <= 2) value = validatedRoll(rollDie);
     rolls.push(value);
   }
-  return { score: rolls.reduce((sum, value) => sum + value, 0), rolls };
+  const score = rolls.reduce((sum, value) => sum + value, 0) - Math.min(...rolls);
+  return { score, rolls };
 }
 
 export function rollAbilitySet(

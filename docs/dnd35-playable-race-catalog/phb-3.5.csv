@@ -1,0 +1,8 @@
+slug,name,source_id,kind,eligibility,level_adjustment,legacy_ecl_offset,verification
+dwarf,Dwarf (Hill),phb-3.5,race,pc,0,,source-verified
+elf,Elf (High),phb-3.5,race,pc,0,,source-verified
+gnome,Gnome (Rock),phb-3.5,race,pc,0,,source-verified
+half-elf,Half-Elf,phb-3.5,race,pc,0,,source-verified
+half-orc,Half-Orc,phb-3.5,race,pc,0,,source-verified
+halfling,Halfling (Lightfoot),phb-3.5,race,pc,0,,source-verified
+human,Human,phb-3.5,race,pc,0,,source-verified

@@ -1,0 +1,43 @@
+slug,name,source_id,kind,eligibility,level_adjustment,legacy_ecl_offset,verification
+aasimar,Aasimar,dmg-mm1-3.5,monster-pc,pc,1,,source-verified
+aquatic-elf,Aquatic Elf,dmg-mm1-3.5,subrace,pc,0,,source-verified
+bugbear,Bugbear,dmg-mm1-3.5,monster-pc,pc,1,,source-verified
+centaur,Centaur,dmg-mm1-3.5,monster-pc,pc,2,,source-verified
+deep-dwarf,Deep Dwarf,dmg-mm1-3.5,subrace,pc,0,,source-verified
+deep-halfling,Deep Halfling,dmg-mm1-3.5,subrace,pc,0,,source-verified
+drider,Drider,dmg-mm1-3.5,monster-pc,pc,4,,source-verified
+drow,Drow,dmg-mm1-3.5,subrace,pc,2,,source-verified
+duergar,Duergar,dmg-mm1-3.5,subrace,pc,1,,source-verified
+forest-gnome,Forest Gnome,dmg-mm1-3.5,subrace,pc,0,,source-verified
+gargoyle,Gargoyle,dmg-mm1-3.5,monster-pc,pc,5,,source-verified
+githyanki,Githyanki,dmg-mm1-3.5,monster-pc,pc,2,,source-verified
+githzerai,Githzerai,dmg-mm1-3.5,monster-pc,pc,2,,source-verified
+gnoll,Gnoll,dmg-mm1-3.5,monster-pc,pc,1,,source-verified
+goblin,Goblin,dmg-mm1-3.5,monster-pc,pc,0,,source-verified
+gray-elf,Gray Elf,dmg-mm1-3.5,subrace,pc,0,,source-verified
+hill-giant,Hill Giant,dmg-mm1-3.5,monster-pc,pc,4,,source-verified
+hobgoblin,Hobgoblin,dmg-mm1-3.5,monster-pc,pc,1,,source-verified
+janni,Janni,dmg-mm1-3.5,monster-pc,pc,5,,source-verified
+kobold,Kobold,dmg-mm1-3.5,monster-pc,pc,0,,source-verified
+kuo-toa,Kuo-toa,dmg-mm1-3.5,monster-pc,pc,3,,source-verified
+lizardfolk,Lizardfolk,dmg-mm1-3.5,monster-pc,pc,1,,source-verified
+lycanthrope-afflicted,Lycanthrope (Afflicted),dmg-mm1-3.5,template,template-option,2,,source-verified
+lycanthrope-natural,Lycanthrope (Natural),dmg-mm1-3.5,template,template-option,3,,source-verified
+mind-flayer,Mind Flayer,dmg-mm1-3.5,monster-pc,pc,7,,source-verified
+minotaur,Minotaur,dmg-mm1-3.5,monster-pc,pc,2,,source-verified
+mountain-dwarf,Mountain Dwarf,dmg-mm1-3.5,subrace,pc,0,,source-verified
+ogre,Ogre,dmg-mm1-3.5,monster-pc,pc,2,,source-verified
+ogre-mage,Ogre Mage,dmg-mm1-3.5,monster-pc,pc,7,,source-verified
+orc,Orc,dmg-mm1-3.5,monster-pc,pc,0,,source-verified
+pixie,Pixie,dmg-mm1-3.5,monster-pc,pc,4,,source-verified
+satyr,Satyr,dmg-mm1-3.5,monster-pc,pc,2,,source-verified
+svirfneblin,Svirfneblin,dmg-mm1-3.5,subrace,pc,3,,source-verified
+tallfellow-halfling,Tallfellow Halfling,dmg-mm1-3.5,subrace,pc,0,,source-verified
+tiefling,Tiefling,dmg-mm1-3.5,monster-pc,pc,1,,source-verified
+troglodyte,Troglodyte,dmg-mm1-3.5,monster-pc,pc,2,,source-verified
+troll,Troll,dmg-mm1-3.5,monster-pc,pc,5,,source-verified
+vampire,Vampire,dmg-mm1-3.5,monster-pc,pc,8,,source-verified
+wild-elf,Wild Elf,dmg-mm1-3.5,subrace,pc,0,,source-verified
+wood-elf,Wood Elf,dmg-mm1-3.5,subrace,pc,0,,source-verified
+yuan-ti-halfblood,Yuan-ti Halfblood,dmg-mm1-3.5,monster-pc,pc,5,,source-verified
+yuan-ti-pureblood,Yuan-ti Pureblood,dmg-mm1-3.5,monster-pc,pc,2,,source-verified

@@ -46,6 +46,7 @@ export * from "./prerequisite";
 export * from "./primitives";
 export * from "./race";
 export * from "./raceAbility";
+export * from "./raceClassSkill";
 export * from "./raceLanguage";
 export * from "./raceTrait";
 export * from "./rule";

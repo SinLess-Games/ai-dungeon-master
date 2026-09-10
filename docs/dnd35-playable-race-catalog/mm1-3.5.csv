@@ -1,0 +1,37 @@
+slug,name,source_id,kind,eligibility,level_adjustment,legacy_ecl_offset,verification
+aranea,Aranea,mm1-3.5,monster-pc,pc,4,,source-verified
+astral-deva,Astral Deva,mm1-3.5,monster-pc,pc,8,,source-verified
+azer,Azer,mm1-3.5,monster-pc,pc,4,,source-verified
+bearded-devil,Bearded Devil,mm1-3.5,monster-pc,pc,6,,source-verified
+bralani,Bralani Eladrin,mm1-3.5,monster-pc,pc,5,,source-verified
+chain-devil,Chain Devil,mm1-3.5,monster-pc,pc,6,,source-verified
+couatl,Couatl,mm1-3.5,monster-pc,pc,7,,source-verified
+displacer-beast,Displacer Beast,mm1-3.5,monster-pc,pc,4,,source-verified
+djinni,Djinni,mm1-3.5,monster-pc,pc,6,,source-verified
+dretch,Dretch,mm1-3.5,monster-pc,pc,2,,source-verified
+erinyes,Erinyes,mm1-3.5,monster-pc,pc,7,,source-verified
+ettercap,Ettercap,mm1-3.5,monster-pc,pc,4,,source-verified
+ettin,Ettin,mm1-3.5,monster-pc,pc,5,,source-verified
+fire-giant,Fire Giant,mm1-3.5,monster-pc,pc,4,,source-verified
+frost-giant,Frost Giant,mm1-3.5,monster-pc,pc,4,,source-verified
+half-celestial,Half-Celestial,mm1-3.5,template,template-option,4,,source-verified
+half-dragon,Half-Dragon,mm1-3.5,template,template-option,3,,source-verified
+half-fiend,Half-Fiend,mm1-3.5,template,template-option,4,,source-verified
+harpy,Harpy,mm1-3.5,monster-pc,pc,3,,source-verified
+hound-archon,Hound Archon,mm1-3.5,monster-pc,pc,5,,source-verified
+invisible-stalker,Invisible Stalker,mm1-3.5,monster-pc,pc,7,,source-verified
+lamia,Lamia,mm1-3.5,monster-pc,pc,4,,source-verified
+lammasu,Lammasu,mm1-3.5,monster-pc,pc,5,,source-verified
+lich,Lich,mm1-3.5,template,template-option,4,,source-verified
+lillend,Lillend,mm1-3.5,monster-pc,pc,6,,source-verified
+locathah,Locathah,mm1-3.5,monster-pc,pc,1,,source-verified
+medusa,Medusa,mm1-3.5,monster-pc,pc,3,,source-verified
+merfolk,Merfolk,mm1-3.5,monster-pc,pc,1,,source-verified
+rakshasa,Rakshasa,mm1-3.5,monster-pc,pc,7,,source-verified
+stone-giant,Stone Giant,mm1-3.5,monster-pc,pc,4,,source-verified
+succubus,Succubus,mm1-3.5,monster-pc,pc,6,,source-verified
+triton,Triton,mm1-3.5,monster-pc,pc,2,,source-verified
+trumpet-archon,Trumpet Archon,mm1-3.5,monster-pc,pc,8,,source-verified
+vrock,Vrock,mm1-3.5,monster-pc,pc,8,,source-verified
+xill,Xill,mm1-3.5,monster-pc,pc,4,,source-verified
+yuan-ti-abomination,Yuan-ti Abomination,mm1-3.5,monster-pc,pc,7,,source-verified

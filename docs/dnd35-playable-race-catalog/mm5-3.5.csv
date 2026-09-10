@@ -1,0 +1,19 @@
+slug,name,source_id,kind,eligibility,level_adjustment,legacy_ecl_offset,verification
+arcadian-avenger,Arcadian Avenger,mm5-3.5,monster-pc,needs-review,2,,needs-section-verification
+banshrae,Banshrae,mm5-3.5,monster-pc,needs-review,4,,needs-section-verification
+dragon-of-the-great-game,Dragon of the Great Game,mm5-3.5,monster-pc,needs-review,2,,needs-section-verification
+elemental-mage,Elemental Mage,mm5-3.5,monster-pc,needs-review,5,,needs-section-verification
+ethereal-defiler,Ethereal Defiler,mm5-3.5,monster-pc,needs-review,4,,needs-section-verification
+god-blooded-creature,God-Blooded Creature,mm5-3.5,template,template-option,1,,needs-section-verification
+greenspawn-zealot,Greenspawn Zealot,mm5-3.5,monster-pc,needs-review,2,,needs-section-verification
+hobgoblin-spellscourge,Hobgoblin Spellscourge,mm5-3.5,monster-pc,pc,2,,source-verified
+hobgoblin-warcaster,Hobgoblin Warcaster,mm5-3.5,monster-pc,pc,3,,source-verified
+hobgoblin-warsoul,Hobgoblin Warsoul,mm5-3.5,class-level-monster,not-pc,4,,source-verified
+jaebrin,Jaebrin,mm5-3.5,monster-pc,needs-review,1,,needs-section-verification
+kuo-toa-exalted-whip,Kuo-toa Exalted Whip,mm5-3.5,monster-pc,needs-review,3,,needs-section-verification
+kuo-toa-monitor,Kuo-toa Monitor,mm5-3.5,monster-pc,needs-review,4,,needs-section-verification
+kuo-toa-whip,Kuo-toa Whip,mm5-3.5,monster-pc,needs-review,3,,needs-section-verification
+shaedling,Shaedling,mm5-3.5,monster-pc,needs-review,3,,needs-section-verification
+ushemoi-hadrimoi,Ushemoi (Hadrimoi),mm5-3.5,monster-pc,needs-review,4,,needs-section-verification
+ushemoi-lashemoi,Ushemoi (Lashemoi),mm5-3.5,monster-pc,needs-review,2,,needs-section-verification
+ushemoi-other,Ushemoi Variant,mm5-3.5,monster-pc,needs-review,4,,needs-section-verification

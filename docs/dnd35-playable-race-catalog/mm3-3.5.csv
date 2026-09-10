@@ -1,0 +1,45 @@
+slug,name,source_id,kind,eligibility,level_adjustment,legacy_ecl_offset,verification
+ak-chazar-rakshasa,Ak’chazar Rakshasa,mm3-3.5,monster-pc,pc,5,,source-verified
+armand,Armand,mm3-3.5,monster-pc,pc,3,,source-verified
+astral-stalker,Astral Stalker,mm3-3.5,monster-pc,pc,6,,source-verified
+blackscale-lizardfolk,Blackscale Lizardfolk,mm3-3.5,monster-pc,pc,3,,source-verified
+canoloth,Canoloth,mm3-3.5,monster-pc,pc,5,,source-verified
+cave-troll,Cave Troll,mm3-3.5,monster-pc,pc,6,,source-verified
+changeling,Changeling,mm3-3.5,monster-pc,pc,0,,source-verified
+deathshrieker,Deathshrieker,mm3-3.5,monster-pc,pc,8,,source-verified
+dracotaur,Dracotaur,mm3-3.5,monster-pc,pc,5,,source-verified
+flind,Flind,mm3-3.5,monster-pc,pc,2,,source-verified
+forest-troll,Forest Troll,mm3-3.5,monster-pc,pc,5,,source-verified
+forestkith-goblin,Forestkith Goblin,mm3-3.5,monster-pc,pc,1,,source-verified
+glaistig,Glaistig,mm3-3.5,monster-pc,pc,4,,source-verified
+goatfolk,Goatfolk (Ibixian),mm3-3.5,monster-pc,pc,1,,source-verified
+grimwierd,Grimwierd,mm3-3.5,monster-pc,pc,3,,source-verified
+gulgar,Gulgar,mm3-3.5,monster-pc,pc,5,,source-verified
+harssaf,Harssaf,mm3-3.5,monster-pc,pc,4,,source-verified
+kenku,Kenku,mm3-3.5,monster-pc,pc,0,,source-verified
+lhosk,Lhosk,mm3-3.5,monster-pc,pc,3,,source-verified
+lumi,Lumi,mm3-3.5,monster-pc,pc,2,,source-verified
+mezzoloth,Mezzoloth,mm3-3.5,monster-pc,pc,5,,source-verified
+mountain-troll,Mountain Troll,mm3-3.5,monster-pc,pc,5,,source-verified
+naztharune-rakshasa,Naztharune Rakshasa,mm3-3.5,monster-pc,pc,5,,source-verified
+nycaloth,Nycaloth,mm3-3.5,monster-pc,pc,5,,source-verified
+nycter,Nycter,mm3-3.5,monster-pc,pc,2,,source-verified
+phoelarch,Phoelarch,mm3-3.5,monster-pc,pc,5,,source-verified
+poison-dusk-lizardfolk,Poison Dusk Lizardfolk,mm3-3.5,monster-pc,pc,1,,source-verified
+quaraphon,Quaraphon,mm3-3.5,monster-pc,pc,5,,source-verified
+redcap,Redcap,mm3-3.5,monster-pc,pc,4,,source-verified
+rejkar,Rejkar,mm3-3.5,monster-pc,pc,6,,source-verified
+salt-mummy,Salt Mummy,mm3-3.5,monster-pc,pc,6,,source-verified
+sand-giant,Sand Giant,mm3-3.5,monster-pc,pc,4,,source-verified
+shifter,Shifter,mm3-3.5,monster-pc,pc,0,,source-verified
+skullcrusher-ogre,Skullcrusher Ogre,mm3-3.5,monster-pc,pc,3,,source-verified
+spellwarped-creature,Spellwarped Creature,mm3-3.5,template,template-option,3,,source-verified
+splinterwaif,Splinterwaif,mm3-3.5,monster-pc,pc,4,,source-verified
+voidmind-creature,Voidmind Creature,mm3-3.5,template,template-option,3,,source-verified
+war-troll,War Troll,mm3-3.5,monster-pc,pc,6,,source-verified
+warforged,Warforged,mm3-3.5,monster-pc,pc,0,,source-verified
+warforged-charger,Warforged Charger,mm3-3.5,monster-pc,pc,4,,source-verified
+warforged-scout,Warforged Scout,mm3-3.5,monster-pc,pc,0,,source-verified
+witchknife,Witchknife,mm3-3.5,monster-pc,pc,3,,source-verified
+wood-woad,Wood Woad,mm3-3.5,monster-pc,pc,3,,source-verified
+woodling,Woodling,mm3-3.5,template,template-option,3,,source-verified

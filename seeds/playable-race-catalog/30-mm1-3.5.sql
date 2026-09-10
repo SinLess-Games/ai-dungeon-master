@@ -12,9 +12,9 @@
 --   Lich (lich) -> dnd35_templates in a dedicated template seed pass.
 -- Explicit not-PC entries are also excluded from dnd35_races.
 
--- Remove an older disabled catalog placeholder that incorrectly treated Medusa as a PC.
+-- Remove older disabled catalog placeholders for entries whose MM stat blocks have LA —.
 DELETE FROM dnd35_races
-WHERE id='catalog-race-mm1-3.5-medusa'
+WHERE id IN ('catalog-race-mm1-3.5-medusa','catalog-race-mm1-3.5-invisible-stalker')
   AND owner_user_id IS NULL
   AND is_enabled=0;
 
@@ -36,7 +36,7 @@ WITH desired(slug,name,kind,eligibility,level_adjustment,legacy_ecl_offset,verif
   ('frost-giant','Frost Giant','monster-pc','pc',4,NULL,'source-verified'),
   ('harpy','Harpy','monster-pc','pc',3,NULL,'source-verified'),
   ('hound-archon','Hound Archon','monster-pc','pc',5,NULL,'source-verified'),
-  ('invisible-stalker','Invisible Stalker','monster-pc','pc',7,NULL,'source-verified'),
+  ('invisible-stalker','Invisible Stalker','monster','not-pc',NULL,NULL,'source-verified'),
   ('lamia','Lamia','monster-pc','pc',4,NULL,'source-verified'),
   ('lammasu','Lammasu','monster-pc','pc',5,NULL,'source-verified'),
   ('lillend','Lillend','monster-pc','pc',6,NULL,'source-verified'),

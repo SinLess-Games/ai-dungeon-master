@@ -10,6 +10,13 @@
 --   Half-Dragon (half-dragon) -> dnd35_templates in a dedicated template seed pass.
 --   Half-Fiend (half-fiend) -> dnd35_templates in a dedicated template seed pass.
 --   Lich (lich) -> dnd35_templates in a dedicated template seed pass.
+-- Explicit not-PC entries are also excluded from dnd35_races.
+
+-- Remove an older disabled catalog placeholder that incorrectly treated Medusa as a PC.
+DELETE FROM dnd35_races
+WHERE id='catalog-race-mm1-3.5-medusa'
+  AND owner_user_id IS NULL
+  AND is_enabled=0;
 
 WITH desired(slug,name,kind,eligibility,level_adjustment,legacy_ecl_offset,verification) AS (VALUES
   ('aranea','Aranea','monster-pc','pc',4,NULL,'source-verified'),
@@ -34,7 +41,7 @@ WITH desired(slug,name,kind,eligibility,level_adjustment,legacy_ecl_offset,verif
   ('lammasu','Lammasu','monster-pc','pc',5,NULL,'source-verified'),
   ('lillend','Lillend','monster-pc','pc',6,NULL,'source-verified'),
   ('locathah','Locathah','monster-pc','pc',1,NULL,'source-verified'),
-  ('medusa','Medusa','monster-pc','pc',3,NULL,'source-verified'),
+  ('medusa','Medusa','monster','not-pc',NULL,NULL,'source-verified'),
   ('merfolk','Merfolk','monster-pc','pc',1,NULL,'source-verified'),
   ('rakshasa','Rakshasa','monster-pc','pc',7,NULL,'source-verified'),
   ('stone-giant','Stone Giant','monster-pc','pc',4,NULL,'source-verified'),
@@ -60,8 +67,9 @@ SELECT
   NULL,NULL,'none','medium',0,d.level_adjustment,
   0,NULL,0,0,0
 FROM desired d
-WHERE NOT EXISTS (
-  SELECT 1
-  FROM dnd35_races r
-  WHERE r.source_id='mm1-3.5' AND r.slug=d.slug AND r.owner_user_id IS NULL
-);
+WHERE d.eligibility='pc'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM dnd35_races r
+    WHERE r.source_id='mm1-3.5' AND r.slug=d.slug AND r.owner_user_id IS NULL
+  );

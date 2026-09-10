@@ -39,6 +39,7 @@ import {
   getSkills,
   getSpells,
   listDraftCampaigns,
+  requestJson,
   rollAbilityScores,
   rollStartingWealth,
   saveClassChoices,
@@ -67,6 +68,7 @@ import {
   type RaceOption,
   type ReadyResult,
   type RuleChoice,
+  type SkillOption,
   type SpellSection,
 } from "../client/creatorApi";
 import {
@@ -299,6 +301,37 @@ export function AdvancedCharacterCreator() {
     onError: (error) => toast.error(errorMessage(error)),
   });
 
+  const resetFoundation = useMutation({
+    mutationFn: async (targetStep: number) => {
+      if (characterId) {
+        await requestJson(`/api/characters/${encodeURIComponent(characterId)}`, { method: "DELETE" });
+      }
+      return targetStep;
+    },
+    onSuccess: (targetStep) => {
+      setCharacterId(null);
+      setReady(null);
+      setCompleted(new Set(Array.from({ length: targetStep }, (_, index) => index)));
+      setStep(targetStep);
+      void queryClient.invalidateQueries({ queryKey: ["characters"] });
+      toast.success("Draft reset. You can revise the foundation choices.");
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  });
+
+  const goToPreviousStep = (targetStep: number) => {
+    if (targetStep >= step || resetFoundation.isPending) return;
+    if (characterId && targetStep < 4) {
+      const confirmed = window.confirm(
+        "Going back to the foundation resets the saved draft and later creator choices. Continue?",
+      );
+      if (!confirmed) return;
+      resetFoundation.mutate(targetStep);
+      return;
+    }
+    setStep(targetStep);
+  };
+
   if (session.isPending) {
     return <CreatorState title="Opening the Codex…" body="Loading your account and character rules." />;
   }
@@ -392,8 +425,8 @@ export function AdvancedCharacterCreator() {
             <button
               key={label}
               className={index === step ? "active" : completed.has(index) ? "complete" : ""}
-              disabled={characterId !== null ? index < 4 || index > step : index > step}
-              onClick={() => { if (index < step && (characterId === null || index >= 4)) setStep(index); }}
+              disabled={index > step || resetFoundation.isPending}
+              onClick={() => goToPreviousStep(index)}
             >
               <span>{completed.has(index) ? <Check size={14} /> : index + 1}</span>{label}
             </button>
@@ -518,15 +551,15 @@ export function AdvancedCharacterCreator() {
 
         {step < 4 && (
           <footer className="creator-footer">
-            <button className="creator-secondary" disabled={step === 0 || foundation.isPending} onClick={() => setStep((value) => value - 1)}>
+            <button className="creator-secondary" disabled={step === 0 || foundation.isPending || resetFoundation.isPending} onClick={() => setStep((value) => value - 1)}>
               <ChevronLeft size={18} /> Back
             </button>
             {step < 3 ? (
-              <button className="creator-primary" disabled={!canBaseContinue} onClick={() => { setCompleted((current) => new Set([...current, step])); setStep((value) => value + 1); }}>
+              <button className="creator-primary" disabled={!canBaseContinue || resetFoundation.isPending} onClick={() => { setCompleted((current) => new Set([...current, step])); setStep((value) => value + 1); }}>
                 Continue <ChevronRight size={18} />
               </button>
             ) : (
-              <button className="creator-primary" disabled={!canBaseContinue || foundation.isPending} onClick={() => foundation.mutate()}>
+              <button className="creator-primary" disabled={!canBaseContinue || foundation.isPending || resetFoundation.isPending} onClick={() => foundation.mutate()}>
                 <Sparkles size={18} /> {foundation.isPending ? "Inscribing choices…" : "Begin rules-driven creation"}
               </button>
             )}
@@ -651,10 +684,17 @@ function AbilitiesStep(props: {
     if (other) next[other] = current;
     props.setAbilities(next);
   };
+  const adjustPointBuy = (ability: AbilityKey, delta: -1 | 1) => {
+    const nextScore = props.abilities[ability] + delta;
+    if (nextScore < 8 || nextScore > 18) return;
+    const next = { ...props.abilities, [ability]: nextScore };
+    if (pointBuySpent(next) > props.pointBuyBudget) return;
+    props.setAbilities(next);
+  };
   const chooseMethod = (method: AbilityGenerationMethod) => props.setMethod(method);
   return (
     <div className="creator-step-content">
-      <StepHeading icon={<Dices />} eyebrow="Ability scores" title="Choose how ability scores are generated" body="Point-buy totals are validated on the server. Random methods are rolled by the server, then you assign the six results." />
+      <StepHeading icon={<Dices />} eyebrow="Ability scores" title="Choose how ability scores are generated" body="Point-buy totals are enforced as you allocate them and validated again on the server. Random methods are rolled by the server, then you assign the six results." />
       <div className="creator-method-grid">
         <button className={props.method === "standard-array" ? "selected" : ""} onClick={() => chooseMethod("standard-array")}><strong>Standard array</strong><span>15, 14, 13, 12, 10, 8</span></button>
         {[22, 32, 52, 72].map((budget) => <button key={budget} className={props.method === `point-buy-${budget}` ? "selected" : ""} onClick={() => { props.setPointBuyBudget(budget as PointBuyBudget); chooseMethod(`point-buy-${budget}` as AbilityGenerationMethod); }}><strong>{budget} point buy</strong><span>Buy scores from 8 through 18</span></button>)}
@@ -674,11 +714,13 @@ function AbilitiesStep(props: {
         {abilityKeys.map((ability) => {
           const racial = props.selectedRace?.abilityModifiers[ability] ?? 0;
           const total = props.abilities[ability] + racial;
+          const nextScore = props.abilities[ability] + 1;
+          const canIncrease = nextScore <= 18 && pointBuySpent({ ...props.abilities, [ability]: nextScore }) <= props.pointBuyBudget;
           return (
             <div className="creator-ability-card" key={ability}>
               <span>{ability.toUpperCase()}</span><h3>{abilityNames[ability]}</h3>
               {props.method === "standard-array" && <select value={props.abilities[ability]} onChange={(event) => swapStandard(ability, Number(event.target.value))}>{standardArray.map((score) => <option key={score} value={score}>{score}</option>)}</select>}
-              {props.method.startsWith("point-buy-") && <div className="creator-point-score"><button disabled={props.abilities[ability] <= 8} onClick={() => props.setAbilities({ ...props.abilities, [ability]: props.abilities[ability] - 1 })}>−</button><strong>{props.abilities[ability]}</strong><button disabled={props.abilities[ability] >= 18} onClick={() => props.setAbilities({ ...props.abilities, [ability]: props.abilities[ability] + 1 })}>+</button><small>{pointBuyCosts[props.abilities[ability]] ?? "—"} pts</small></div>}
+              {props.method.startsWith("point-buy-") && <div className="creator-point-score"><button disabled={props.abilities[ability] <= 8} onClick={() => adjustPointBuy(ability, -1)}>−</button><strong>{props.abilities[ability]}</strong><button disabled={!canIncrease} onClick={() => adjustPointBuy(ability, 1)}>+</button><small>{pointBuyCosts[props.abilities[ability]] ?? "—"} pts</small></div>}
               {(props.method === "roll-4d6-drop-lowest" || props.method === "roll-4d6-reroll-1-2") && <select disabled={!props.rolledSet} value={props.rollAssignments[ability]} onChange={(event) => props.assignRoll(ability, Number(event.target.value))}>{(props.rolledSet?.scores ?? []).map((score, index) => <option key={index} value={index}>{score} · [{props.rolledSet?.rolls[index]?.join(", ")}]</option>)}</select>}
               <div className="creator-score-math"><span>Base {props.abilities[ability]}</span><span>Race {signed(racial)}</span><strong>{total}</strong></div>
               <p>Modifier <b>{signed(abilityModifier(total))}</b></p>
@@ -811,9 +853,26 @@ function SkillsStep({ characterId, onComplete }: { characterId: string; onComple
   const [filter, setFilter] = useState("");
   useEffect(() => { if (!page.data) return; const nextRanks: Record<string, number> = {}; const nextSpecs: Record<string, string> = {}; for (const selection of page.data.selections) { nextRanks[selection.skillId] = selection.ranks; nextSpecs[selection.skillId] = selection.specialization; } setRanks(nextRanks); setSpecializations(nextSpecs); }, [page.data]);
   const spent = useMemo(() => page.data?.options.reduce((sum, option) => sum + (ranks[option.id] ?? 0) * option.pointCostPerRank, 0) ?? 0, [page.data, ranks]);
+  const updateRanks = (option: SkillOption, requested: number) => {
+    setRanks((current) => {
+      const budget = page.data?.budget ?? 0;
+      const currentSpent = (page.data?.options ?? []).reduce(
+        (sum, entry) => sum + (current[entry.id] ?? 0) * entry.pointCostPerRank,
+        0,
+      );
+      const currentValue = current[option.id] ?? 0;
+      const otherSpent = currentSpent - currentValue * option.pointCostPerRank;
+      const rankStep = option.isClassSkill ? 1 : 0.5;
+      const affordableRanks = Math.max(0, (budget - otherSpent) / option.pointCostPerRank);
+      const requestedRanks = Number.isFinite(requested) ? requested : 0;
+      const capped = Math.min(option.maximumRanks, affordableRanks, Math.max(0, requestedRanks));
+      const snapped = Math.floor((capped + 1e-9) / rankStep) * rankStep;
+      return { ...current, [option.id]: snapped };
+    });
+  };
   const visible = page.data?.options.filter((option) => `${option.name} ${option.ability ?? ""}`.toLowerCase().includes(filter.toLowerCase())) ?? [];
   const save = useMutation({ mutationFn: () => saveSkills(characterId, (page.data?.options ?? []).flatMap((option) => { const value = ranks[option.id] ?? 0; if (value <= 0) return []; const specialization = specializations[option.id]?.trim(); return [{ skillId: option.id, ranks: value, ...(specialization ? { specialization } : {}) }]; })), onSuccess: onComplete, onError: (error) => toast.error(errorMessage(error)) });
-  return <AsyncStep title="Loading skill rules" loading={page.isLoading} error={page.error}><div className="creator-step-content"><StepHeading icon={<ListChecks />} eyebrow="Training" title="Spend skill points" body="Every skill is shown with its class/cross-class status. Gestalt uses the union of both class skill lists." />{page.data?.classes && page.data.classes.length > 1 && <div className="creator-info-card"><Swords /><div><strong>Gestalt class-skill union</strong><span>{page.data.classes.map((entry) => `Track ${entry.track}: ${entry.className}`).join(" · ")}</span></div></div>}<div className="creator-budget-bar"><div><span>Skill-point budget</span><strong>{spent} / {page.data?.budget ?? 0}</strong></div><progress value={spent} max={page.data?.budget ?? 1} /></div><label className="creator-search"><Search size={17} /><input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Filter skills…" /></label><div className="creator-table-wrap"><table className="creator-table"><thead><tr><th>Skill</th><th>Ability</th><th>Type</th><th>Max</th><th>Ranks</th></tr></thead><tbody>{visible.map((option) => <tr key={option.id}><td><strong>{option.name}</strong>{option.trainedOnly ? <small>Trained only</small> : null}{option.requiresSpecialization && option.slug !== "speak-language" ? <input className="creator-inline-input" placeholder="Specialization" value={specializations[option.id] ?? ""} onChange={(event) => setSpecializations((current) => ({ ...current, [option.id]: event.target.value }))} /> : null}{option.slug === "speak-language" ? <select className="creator-inline-input" value={specializations[option.id] ?? ""} onChange={(event) => setSpecializations((current) => ({ ...current, [option.id]: event.target.value }))}><option value="">Choose language…</option>{page.data?.speakLanguageOptions?.map((language) => <option key={language.id} value={language.id}>{language.name}</option>)}</select> : null}</td><td>{option.ability?.toUpperCase() ?? "—"}</td><td><span className={option.isClassSkill ? "creator-pill good" : "creator-pill"}>{option.isClassSkill ? "Class" : "Cross-class"}</span><small>{option.pointCostPerRank} pt / rank</small></td><td>{option.maximumRanks}</td><td><input type="number" min={0} max={option.maximumRanks} step={option.isClassSkill ? 1 : 0.5} value={ranks[option.id] ?? 0} onChange={(event) => setRanks((current) => ({ ...current, [option.id]: Number(event.target.value) }))} /></td></tr>)}</tbody></table></div><StepActions onSave={() => save.mutate()} saving={save.isPending} disabled={spent !== page.data?.budget || spent <= 0} /></div></AsyncStep>;
+  return <AsyncStep title="Loading skill rules" loading={page.isLoading} error={page.error}><div className="creator-step-content"><StepHeading icon={<ListChecks />} eyebrow="Training" title="Spend skill points" body="Every skill is shown with its class/cross-class status. Gestalt uses the union of both class skill lists, and rank inputs stop at the remaining point budget." />{page.data?.classes && page.data.classes.length > 1 && <div className="creator-info-card"><Swords /><div><strong>Gestalt class-skill union</strong><span>{page.data.classes.map((entry) => `Track ${entry.track}: ${entry.className}`).join(" · ")}</span></div></div>}<div className="creator-budget-bar"><div><span>Skill-point budget</span><strong>{spent} / {page.data?.budget ?? 0} · {Math.max(0, (page.data?.budget ?? 0) - spent)} remaining</strong></div><progress value={Math.min(spent, page.data?.budget ?? 0)} max={page.data?.budget ?? 1} /></div><label className="creator-search"><Search size={17} /><input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Filter skills…" /></label><div className="creator-table-wrap"><table className="creator-table"><thead><tr><th>Skill</th><th>Ability</th><th>Type</th><th>Max</th><th>Ranks</th></tr></thead><tbody>{visible.map((option) => <tr key={option.id}><td><strong>{option.name}</strong>{option.trainedOnly ? <small>Trained only</small> : null}{option.requiresSpecialization && option.slug !== "speak-language" ? <input className="creator-inline-input" placeholder="Specialization" value={specializations[option.id] ?? ""} onChange={(event) => setSpecializations((current) => ({ ...current, [option.id]: event.target.value }))} /> : null}{option.slug === "speak-language" ? <select className="creator-inline-input" value={specializations[option.id] ?? ""} onChange={(event) => setSpecializations((current) => ({ ...current, [option.id]: event.target.value }))}><option value="">Choose language…</option>{page.data?.speakLanguageOptions?.map((language) => <option key={language.id} value={language.id}>{language.name}</option>)}</select> : null}</td><td>{option.ability?.toUpperCase() ?? "—"}</td><td><span className={option.isClassSkill ? "creator-pill good" : "creator-pill"}>{option.isClassSkill ? "Class" : "Cross-class"}</span><small>{option.pointCostPerRank} pt / rank</small></td><td>{option.maximumRanks}</td><td><input type="number" min={0} max={option.maximumRanks} step={option.isClassSkill ? 1 : 0.5} value={ranks[option.id] ?? 0} onChange={(event) => updateRanks(option, Number(event.target.value))} /></td></tr>)}</tbody></table></div><StepActions onSave={() => save.mutate()} saving={save.isPending} disabled={spent !== page.data?.budget || spent <= 0} /></div></AsyncStep>;
 }
 
 function FeatsStep({ characterId, onComplete }: { characterId: string; onComplete: () => void }) {

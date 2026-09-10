@@ -94,8 +94,7 @@ SELECT
     SELECT 1 FROM dnd35_classes c
     WHERE c.slug=d.favored_slug AND c.owner_user_id IS NULL
   ) THEN 'specific' ELSE 'none' END,
-  d.size,d.speed,d.la,d.rhd,d.rhd_die,d.natural_armor,0,
-  CASE WHEN d.rhd > 1 THEN 1 + CAST((d.rhd + 1) / 3 AS INTEGER) ELSE 0 END
+  d.size,d.speed,d.la,d.rhd,d.rhd_die,d.natural_armor,0,0
 FROM desired d
 WHERE NOT EXISTS (
   SELECT 1 FROM dnd35_races existing
@@ -123,7 +122,11 @@ ON CONFLICT(id) DO UPDATE SET
   racial_hit_die=excluded.racial_hit_die,
   natural_armor=excluded.natural_armor,
   bonus_skill_points_per_level=excluded.bonus_skill_points_per_level,
-  bonus_feats_at_first_level=excluded.bonus_feats_at_first_level;
+  bonus_feats_at_first_level=0;
+
+-- General feat slots earned from racial Hit Dice are allocated from total Hit Dice by the
+-- character feat workflow. bonus_feats_at_first_level is reserved for true selectable
+-- racial bonus feats and must never duplicate those racial-HD feat slots.
 
 -- Replace the structured racial ability modifiers for canonical XPH rows.
 DELETE FROM dnd35_race_abilities

@@ -33,6 +33,12 @@ const racialClassSkills: Readonly<Record<string, readonly string[]>> = {
   gargoyle: ["hide", "listen", "spot"],
   janni: ["appraise", "concentration", "craft", "escape-artist", "listen", "move-silently", "ride", "sense-motive", "spot"],
   "yuan-ti-pureblood": ["concentration", "disguise", "hide", "knowledge", "listen", "spot"],
+  azer: ["appraise", "climb", "craft", "hide", "jump", "listen", "search", "spot"],
+  satyr: ["bluff", "hide", "knowledge-nature", "listen", "move-silently", "perform", "spot"],
+  ogre: ["climb", "listen", "spot"],
+  "hill-giant": ["climb", "jump", "listen", "spot"],
+  "stone-giant": ["climb", "hide", "listen", "spot"],
+  troll: ["listen", "spot"],
   "trumpet-archon": [
     "concentration",
     "diplomacy",

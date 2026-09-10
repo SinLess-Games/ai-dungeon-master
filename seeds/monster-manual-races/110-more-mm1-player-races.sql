@@ -87,6 +87,7 @@ INSERT INTO dnd35_race_abilities (race_id,ability,modifier)
 SELECT r.id,d.ability,d.modifier
 FROM desired d
 JOIN dnd35_races r ON r.id='mm1-race-'||d.race_slug
+WHERE 1
 ON CONFLICT(race_id,ability) DO UPDATE SET modifier=excluded.modifier;
 
 WITH desired(race_slug,subtype_slug) AS (VALUES
@@ -110,6 +111,7 @@ INSERT INTO dnd35_race_movements
 SELECT r.id,d.mode,d.feet,NULL,d.maneuverability,d.rules_text
 FROM desired d
 JOIN dnd35_races r ON r.id='mm1-race-'||d.race_slug
+WHERE 1
 ON CONFLICT(race_id,mode) DO UPDATE SET
   feet=excluded.feet,
   base_speed_multiplier=NULL,

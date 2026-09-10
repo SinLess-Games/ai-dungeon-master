@@ -11,4 +11,5 @@ SELECT r.id,l.id,'automatic'
 FROM automatic d
 JOIN dnd35_races r ON r.id='mm1-race-'||d.race_slug
 JOIN dnd35_languages l ON l.slug=d.language_slug AND l.owner_user_id IS NULL
+WHERE 1
 ON CONFLICT(race_id,language_id) DO UPDATE SET kind=excluded.kind;

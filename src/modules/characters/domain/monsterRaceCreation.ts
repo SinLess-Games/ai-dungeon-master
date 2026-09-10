@@ -32,6 +32,7 @@ const racialClassSkills: Readonly<Record<string, readonly string[]>> = {
   centaur: ["listen", "move-silently", "spot", "survival"],
   gargoyle: ["hide", "listen", "spot"],
   janni: ["appraise", "concentration", "craft", "escape-artist", "listen", "move-silently", "ride", "sense-motive", "spot"],
+  "yuan-ti-pureblood": ["concentration", "disguise", "hide", "knowledge", "listen", "spot"],
   "trumpet-archon": [
     "concentration",
     "diplomacy",

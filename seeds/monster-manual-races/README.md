@@ -27,12 +27,16 @@ This seed pack materializes source-backed **Monster Manual v3.5** player races f
 
 ### Retained racial Hit Dice
 
+- Astral Deva
 - Azer
 - Aranea
+- Bralani Eladrin
 - Bugbear
 - Centaur
 - Couatl
+- Djinni
 - Drider
+- Erinyes
 - Gargoyle
 - Gnoll
 - Hill Giant
@@ -72,7 +76,7 @@ The wider Monster Manual/DMG player-race set also includes races already materia
 
 A catalog row is not enabled merely because a source prints a numeric level adjustment. Entries remain disabled when accurate implementation requires mechanics the runtime cannot safely represent yet, such as the DMG low-ability-score lookup conversion, nonabilities, template application, or unresolved source verification. Cohort-only creatures and explicit non-PC entries are excluded.
 
-Medusa is specifically not a player race in the v3.5 Monster Manual entry: its level adjustment is `—`, so it remains excluded from runtime race materialization.
+Medusa and Invisible Stalker are specifically not player races in their v3.5 Monster Manual entries: both have level adjustment `—`, so they remain excluded from runtime race materialization.
 
 ## Files
 

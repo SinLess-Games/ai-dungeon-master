@@ -23,7 +23,7 @@ import {
   type AbilityGenerationMethod,
 } from "../domain/abilityGeneration";
 import { monsterEffectiveCharacterLevel } from "../domain/monsterRaceCreation";
-import { ValidationError } from "@/server/middleware/errors";
+import { ForbiddenError, ValidationError } from "@/server/middleware/errors";
 import {
   requireCharacterCreatorEditor,
   requireCharacterDatabase,
@@ -107,6 +107,8 @@ export const characterAdvancedCreationRoutes = new Hono<CharacterCreationEnv>()
         campaignId: characters.campaignId,
         campaignName: campaigns.name,
         campaignStatus: campaigns.status,
+        rulesetId: characters.rulesetId,
+        rulesetVersion: characters.rulesetVersion,
         updatedAt: characters.updatedAt,
         readyAt: characters.readyAt,
         progressionMode: dnd35Characters.progressionMode,
@@ -161,6 +163,26 @@ export const characterAdvancedCreationRoutes = new Hono<CharacterCreationEnv>()
         };
       }),
     });
+  })
+  .delete("/api/characters/:characterId", async (c) => {
+    const session = await requireUser(createAuth(c.env), c.req.raw.headers);
+    const db = createDatabase(requireCharacterDatabase(c.env.DB));
+    const row = await requireCharacterCreatorEditor({
+      db,
+      characterId: c.req.param("characterId"),
+      userId: session.user.id,
+    });
+
+    if (row.character.ownerUserId !== session.user.id) {
+      throw new ForbiddenError("You can only delete your own character.");
+    }
+
+    await db.batch([
+      db.delete(dnd35Characters).where(eq(dnd35Characters.characterId, row.character.id)),
+      db.delete(characters).where(eq(characters.id, row.character.id)),
+    ]);
+
+    return c.json({ characterId: row.character.id, deleted: true as const });
   })
   .put(
     "/api/characters/:characterId/creation/abilities",

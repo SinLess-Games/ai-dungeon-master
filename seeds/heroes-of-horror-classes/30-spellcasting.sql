@@ -47,7 +47,7 @@ level_rows AS (
 ),
 expanded AS (
   SELECT l.class_slug,l.class_level,
-         CASE WHEN l.class_slug IN ('corrupt-avenger','death-delver') THEN CAST(slot.key AS INTEGER)+1 ELSE CAST(slot.key AS INTEGER) END AS spell_level,
+         CASE WHEN l.class_slug IN ('dread-necromancer','corrupt-avenger','death-delver') THEN CAST(slot.key AS INTEGER)+1 ELSE CAST(slot.key AS INTEGER) END AS spell_level,
          CAST(slot.value AS INTEGER) AS slots_per_day
   FROM level_rows l,json_each(l.slots_json) slot
 )

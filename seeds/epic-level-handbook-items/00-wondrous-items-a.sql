@@ -1,6 +1,6 @@
 -- Epic Level Handbook wondrous items, batch A.
 -- Source: Epic Level Handbook, Chapter 4, pp. 144-146. Mechanical text is summarized; source remains authoritative.
--- Craft gp/XP fields are left NULL unless the source explicitly supplies them; market prices are exact source prices.
+-- Craft gp/XP and aura fields are left NULL unless the retrieved source explicitly supplies them; market prices are exact source prices.
 
 INSERT OR IGNORE INTO dnd35_sources
   (id,slug,name,abbreviation,publisher,system,edition,description,url,is_official,is_homebrew,owner_user_id)
@@ -26,8 +26,8 @@ WITH desired(id,page,slug,name,description,rules_text,price_copper,weight_pounds
  24200000,1.0),
 ('elh-item-horseshoes-peerless-steed','145-146','horseshoes-of-the-peerless-steed','Horseshoes of the Peerless Steed',
  'Epic horseshoes that turn a mount and rider into exceptional mounted combatants.',
- 'Grant the wearer or rider, as appropriate, the benefits of Trample, Ride-By Attack, and Spirited Charge. The wearer gains spell resistance 32 against enchantment effects, and its ground speed doubles. CL 20th. Prerequisites: Craft Wondrous Item, Craft Epic Wondrous Item, Ride skill, haste, spell resistance.',
- 21700000,4.0),
+ 'Grant the wearer or rider, as appropriate, the benefits of Trample, Ride-By Attack, and Spirited Charge. The wearer gains spell resistance 32 against enchantment effects, and its ground speed doubles. CL 20th. Prerequisites: Craft Wondrous Item, Craft Epic Wondrous Item, Ride skill, haste, spell resistance. The source states Weight: 1 lb. each; aggregate set weight is intentionally not inferred here.',
+ 21700000,NULL),
 ('elh-item-bracers-relentless-might','145','bracers-of-relentless-might','Bracers of Relentless Might',
  'Adamantine epic bracers that massively increase physical might and effective combat size.',
  'Grant +12 enhancement Strength and +12 enhancement Constitution. For combat-related opposed checks whose modifier depends on size, including bull rush, grapple, and trip, the wearer is treated as two size categories larger, to a maximum of Colossal. CL 20th. Prerequisites: Craft Wondrous Item, Craft Epic Wondrous Item, bull''s strength, endurance, enlarge.',
@@ -54,6 +54,6 @@ WITH desired(item_id,caster_level,activation,activation_text,slot,crafting_text)
 INSERT OR IGNORE INTO dnd35_magic_items
   (item_id,aura_school_id,caster_level,manifester_level,aura_strength,activation,activation_text,slot,
    maximum_charges,recharge_text,enhancement_bonus,craft_cost_copper,craft_xp_cost,crafting_text,crafting_prerequisites)
-SELECT d.item_id,NULL,d.caster_level,NULL,'strong',d.activation,d.activation_text,d.slot,
+SELECT d.item_id,NULL,d.caster_level,NULL,NULL,d.activation,d.activation_text,d.slot,
        NULL,NULL,0,NULL,NULL,d.crafting_text,NULL
 FROM desired d;

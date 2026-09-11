@@ -5,7 +5,7 @@ WITH desired(slug,name,source_page,category,kind,is_variant,default_enabled,summ
 ('hoh-nightly-nightmares','Nightly Nightmare Consequences','54','dreamscape','subsystem',1,0,
  'Nightmares suffered every night prevent meaningful rest and progressively impose fatigue, exhaustion, and possible depravity.',
  '["horror","dream","nightmare","rest","taint"]',
- '{"frequency_requirement":"nightly","arcane_spell_recovery":false,"fatigue_after_days":"Constitution modifier, minimum 1","exhaustion_after_days":"14 + Constitution modifier, minimum modifier contribution 1","after_exhaustion":{"save":"Will","dc":"10 + 1 per night beyond two weeks","failure":"depravity +1"},"escape_examples":["remove a curse","appease or resolve the entity or cause producing the nightmares"]}'),
+ '{"frequency_requirement":"nightly","arcane_spell_recovery":false,"fatigue_after_days":"Constitution modifier, minimum 1","exhaustion_after_days":"14 + Constitution modifier","after_exhaustion":{"save":"Will","dc":"10 + 1 per night beyond two weeks","failure":"depravity +1"},"escape_examples":["remove a curse","appease or resolve the entity or cause producing the nightmares"]}'),
 ('hoh-dreamscape-spell-distortion','Spells in the Dreamscape','57','dreamscape','table',1,0,
  'Spells and spell-like abilities in a nightmare realm can be distorted; higher-level magic is more likely to twist.',
  '["horror","dream","nightmare","magic","wild-magic"]',

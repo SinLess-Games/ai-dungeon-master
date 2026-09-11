@@ -29,7 +29,7 @@ WITH desired(slug,name,description,repeatable,choice_kind,repeatability_text) AS
  ('instant-reload','Instant Reload','Reload a selected ranged weapon type as a free action.',1,'weapon','May be selected for different weapon types.'),
  ('intensify-spell','Intensify Spell','Maximize and double applicable variable numeric spell effects at a very large spell-slot adjustment.',0,'none',NULL),
  ('keen-strike','Keen Strike','Natural weapons gain an improved threat range.',0,'none',NULL),
- ('last-ing-inspiration','Lasting Inspiration','Greatly extend the duration of bardic inspiration after performance ends.',0,'none',NULL),
+ ('lasting-inspiration','Lasting Inspiration','Greatly extend the duration of bardic inspiration after performance ends.',0,'none',NULL),
  ('legendary-climber','Legendary Climber','Climb at normal speed and use extraordinary climbing options without the normal penalties.',0,'none',NULL),
  ('legendary-commander','Legendary Commander','Multiply the number of followers attracted through Leadership.',0,'none',NULL),
  ('legendary-leaper','Legendary Leaper','Remove normal jumping-distance constraints and improve exceptional jumping.',0,'none',NULL),

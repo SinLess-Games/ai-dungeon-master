@@ -112,7 +112,7 @@ WITH desired(
  'For a wearer who already has power points per day, increases the daily total by 87. A night''s rest is required before the increased total becomes available.',49000000,NULL,29,'continuous','Continuous while worn, but access to the increased daily total requires a night''s rest.',NULL,NULL,'Craft Universal Item; Craft Epic Universal Item; great emulation.'),
 ('elh-item-ring-epic-psionics-8','135','ring-of-epic-psionics-8','Ring of Epic Psionics VIII',
  'A crystal ring that magnifies a psionic wearer''s daily power-point capacity.',
- 'For a wearer who already has power points per day, increases the daily total by 115. A night''s rest is required before the increased total becomes available.',64000000,NULL,32,'continuous','Continuous while worn, but access to the increased daily total requires a night''s rest.',NULL,NULL,'Craft Universal Item; Craft Epic Universal Item; great emulation.'),
+ 'For a wearer who already has power points per day, increases the daily total by 115. A night''s rest is required before the increased daily total becomes available.',64000000,NULL,32,'continuous','Continuous while worn, but access to the increased daily total requires a night''s rest.',NULL,NULL,'Craft Universal Item; Craft Epic Universal Item; great emulation.'),
 ('elh-item-ring-epic-psionics-9','135','ring-of-epic-psionics-9','Ring of Epic Psionics IX',
  'A crystal ring that magnifies a psionic wearer''s daily power-point capacity.',
  'For a wearer who already has power points per day, increases the daily total by 147. A night''s rest is required before the increased total becomes available.',81000000,NULL,35,'continuous','Continuous while worn, but access to the increased daily total requires a night''s rest.',NULL,NULL,'Craft Universal Item; Craft Epic Universal Item; great emulation.')
@@ -164,6 +164,6 @@ WITH desired(
 INSERT OR IGNORE INTO dnd35_magic_items
   (item_id,aura_school_id,caster_level,manifester_level,aura_strength,activation,activation_text,slot,
    maximum_charges,recharge_text,enhancement_bonus,craft_cost_copper,craft_xp_cost,crafting_text,crafting_prerequisites)
-SELECT d.item_id,NULL,d.caster_level,d.manifester_level,NULL,d.activation,d.activation_text,'ring',
+SELECT d.item_id,NULL,d.caster_level,d.manifester_level,NULL,d.activation,d.activation_text,'other',
        NULL,NULL,0,d.craft_cost_copper,d.craft_xp_cost,d.crafting_text,NULL
 FROM desired d;

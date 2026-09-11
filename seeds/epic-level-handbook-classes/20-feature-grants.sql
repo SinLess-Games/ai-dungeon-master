@@ -1,0 +1,153 @@
+-- Epic Level Handbook epic-prestige feature progression.
+-- Parameters include the source cadence so an engine can extrapolate beyond 10th class level.
+
+WITH desired(class_slug,level,feature_slug,parameters,rules_text) AS (VALUES
+  -- Agent retriever.
+  ('agent-retriever',1,'uncanny-location','{"extension":{"key":"dnd35.elh.agent-retriever.uncanny-location","version":1,"parameters":{"attunement":"1 day","effect":"discern location","maintainWhileExclusivePursuit":true}}}',NULL),
+  ('agent-retriever',1,'tracking-bonus','{"rank":10,"extension":{"key":"dnd35.elh.agent-retriever.tracking-bonus","version":1,"parameters":{"bonusType":"insight","skill":"survival","purpose":"track current quarry","initial":10,"increase":10,"everyClassLevels":5,"nextIncreaseLevel":6}}}',NULL),
+  ('agent-retriever',2,'plane-shift','{"uses":1,"period":"day","extension":{"key":"dnd35.spell-like-ability","version":1,"parameters":{"spellSlug":"plane-shift","casterLevel":14,"initialClassLevel":2,"increaseUsesBy":1,"everyClassLevels":5}}}',NULL),
+  ('agent-retriever',3,'force-sphere','{"uses":1,"period":"day","extension":{"key":"dnd35.elh.agent-retriever.force-sphere","version":1,"parameters":{"rangeFeet":30,"maxRadiusFeet":50,"save":"reflex","saveDcFormula":"20 + floor(class level / 2) + dex modifier","maximumDurationDays":7,"increaseUsesBy":1,"everyClassLevels":5}}}',NULL),
+  ('agent-retriever',4,'ethereal-jaunt','{"uses":1,"period":"day","extension":{"key":"dnd35.spell-like-ability","version":1,"parameters":{"spellSlug":"ethereal-jaunt","casterLevel":14,"initialClassLevel":4,"increaseUsesBy":1,"everyClassLevels":5}}}',NULL),
+  ('agent-retriever',5,'bonus-feat','{"extension":{"key":"dnd35.epic.bonus-feat","version":1,"parameters":{"initialClassLevel":5,"everyClassLevels":5,"allowed":["epic-endurance","epic-prowess","epic-speed","epic-toughness","epic-weapon-focus","fast-healing","improved-combat-casting","improved-spell-capacity","legendary-climber","legendary-rider","legendary-tracker","perfect-health","permanent-emanation","spontaneous-spell","storm-of-throws","swarm-of-arrows","uncanny-accuracy"]}}}',NULL),
+  ('agent-retriever',6,'tracking-bonus','{"rank":20}',NULL),
+  ('agent-retriever',7,'plane-shift','{"uses":2,"period":"day"}',NULL),
+  ('agent-retriever',8,'force-sphere','{"uses":2,"period":"day"}',NULL),
+  ('agent-retriever',9,'ethereal-jaunt','{"uses":2,"period":"day"}',NULL),
+  ('agent-retriever',10,'bonus-feat','{"rank":2}',NULL),
+
+  -- Cosmic descryer.
+  ('cosmic-descryer',1,'superior-planar-summoning','{"rank":4,"extension":{"key":"dnd35.elh.cosmic-descryer.superior-planar-summoning","version":1,"parameters":{"extraHitDice":4,"increase":4,"everyClassLevels":4,"affectedSpells":["elemental-swarm","gate","planar-ally-greater","planar-binding-greater","summon-monster-ix","summon-natures-ally-ix"]}}}',NULL),
+  ('cosmic-descryer',2,'naturalization','{"rank":1,"extension":{"key":"dnd35.elh.cosmic-descryer.naturalization","version":1,"parameters":{"planes":1,"addPlaneEveryClassLevels":2,"requiresVisitedPlane":true}}}',NULL),
+  ('cosmic-descryer',3,'enduring-gate','{"rank":1,"extension":{"key":"dnd35.elh.cosmic-descryer.enduring-gate","version":1,"parameters":{"durationDays":1,"increaseDaysBy":1,"everyClassLevels":3,"activation":"full-round action"}}}',NULL),
+  ('cosmic-descryer',4,'naturalization','{"rank":2}',NULL),
+  ('cosmic-descryer',5,'bonus-feat','{"extension":{"key":"dnd35.epic.bonus-feat","version":1,"parameters":{"initialClassLevel":5,"everyClassLevels":5,"allowed":["augmented-alchemy","automatic-quicken-spell","automatic-silent-spell","automatic-still-spell","combat-casting","craft-epic-magic-arms-and-armor","craft-epic-rod","craft-epic-staff","craft-epic-wondrous-item","efficient-item-creation","enhance-spell","epic-spell-focus","epic-spell-penetration","epic-spellcasting","familiar-spell","forge-epic-ring","ignore-material-components","improved-combat-casting","improved-heighten-spell","improved-metamagic","improved-spell-capacity","intensify-spell","multispell","permanent-emanation","scribe-epic-scroll","spell-focus","spell-knowledge","spell-mastery","spell-opportunity","spell-penetration","spell-stowaway","spontaneous-spell","tenacious-magic"]}}}',NULL),
+  ('cosmic-descryer',5,'superior-planar-summoning','{"rank":8}',NULL),
+  ('cosmic-descryer',6,'naturalization','{"rank":3}',NULL),
+  ('cosmic-descryer',6,'enduring-gate','{"rank":2}',NULL),
+  ('cosmic-descryer',7,'cosmic-connection','{"uses":1,"period":"day","extension":{"key":"dnd35.elh.cosmic-descryer.cosmic-connection","version":1,"parameters":{"durationMinutesFormula":"class level","criticalHitImmunity":true,"nativeOnEveryPlane":true,"dimensionDoorAtWillCasterLevel":20,"selfDamagePerBonus":5,"bonusAppliesTo":["attack roll","saving throw","skill check","ability check","caster level for one spell"],"increaseUsesBy":1,"everyClassLevels":5}}}',NULL),
+  ('cosmic-descryer',8,'naturalization','{"rank":4}',NULL),
+  ('cosmic-descryer',9,'superior-planar-summoning','{"rank":12}',NULL),
+  ('cosmic-descryer',9,'enduring-gate','{"rank":3}',NULL),
+  ('cosmic-descryer',10,'naturalization','{"rank":5}',NULL),
+  ('cosmic-descryer',10,'bonus-feat','{"rank":2}',NULL),
+
+  -- Divine emissary.
+  ('divine-emissary',1,'special-mount-progression','{"extension":{"key":"dnd35.elh.divine-emissary.special-mount","version":1,"parameters":{"improveEveryClassLevels":5,"firstImprovementAfterLevel":1,"bonusHitDice":2,"naturalArmorIncrease":2,"strengthAdjustmentIncrease":1,"intelligenceIncrease":1,"spellResistanceFormula":"divine emissary class level + class level that granted mount + 5"}}}',NULL),
+  ('divine-emissary',1,'granted-domain','{"rank":1}',NULL),
+  ('divine-emissary',1,'divine-inspiration','{"uses":1,"period":"day","extension":{"key":"dnd35.elh.divine-emissary.divine-inspiration","version":1,"parameters":{"luckAttackBonus":2,"luckDamageBonus":2,"durationRounds":10,"increaseUsesBy":1,"everyClassLevels":3}}}',NULL),
+  ('divine-emissary',2,'extra-smite','{"uses":2,"period":"day","extension":{"key":"dnd35.elh.divine-emissary.extra-smite","version":1,"parameters":{"extraUses":2,"increaseUsesBy":1,"everyClassLevels":3,"smiteDamageLevelFormula":"divine emissary levels + levels in class that granted smite"}}}',NULL),
+  ('divine-emissary',3,'greater-planar-ally','{"uses":1,"period":"day","extension":{"key":"dnd35.spell-like-ability","version":1,"parameters":{"spellSlug":"planar-ally-greater","returnFavorRequired":false,"increaseUsesBy":1,"everyClassLevels":10}}}',NULL),
+  ('divine-emissary',4,'divine-inspiration','{"uses":2,"period":"day"}',NULL),
+  ('divine-emissary',5,'extra-smite','{"uses":3,"period":"day"}',NULL),
+  ('divine-emissary',6,'bonus-feat','{"extension":{"key":"dnd35.epic.bonus-feat","version":1,"parameters":{"initialClassLevel":6,"everyClassLevels":10,"allowed":["armor-skin","devastating-critical","epic-leadership","epic-prowess","epic-reputation","epic-toughness","epic-weapon-focus","great-smiting","holy-strike","improved-aura-of-courage","improved-combat-casting","improved-spell-capacity","legendary-commander","legendary-rider","overwhelming-critical","perfect-health","permanent-emanation","planar-turning","positive-energy-aura","spectral-strike","spontaneous-spell","widen-aura-of-courage"]}}}',NULL),
+  ('divine-emissary',7,'divine-inspiration','{"uses":3,"period":"day"}',NULL),
+  ('divine-emissary',8,'extra-smite','{"uses":4,"period":"day"}',NULL),
+  ('divine-emissary',9,'divine-hand','{"uses":1,"period":"day","extension":{"key":"dnd35.elh.divine-emissary.divine-hand","version":1,"parameters":{"activation":"free","attackBonus":20,"bonusType":"sacred-or-profane-as-appropriate","weapon":"patron deity favored weapon","increaseUsesBy":1,"everyClassLevels":10}}}',NULL),
+  ('divine-emissary',10,'divine-inspiration','{"uses":4,"period":"day"}',NULL),
+
+  -- Epic infiltrator.
+  ('epic-infiltrator',1,'weapon-armor-proficiency',NULL,NULL),
+  ('epic-infiltrator',1,'improved-cover-identity','{"rank":3,"extension":{"key":"dnd35.elh.epic-infiltrator.cover-identity","version":1,"parameters":{"identities":3,"newIdentityEveryClassLevels":4,"baseBonuses":{"disguise":4,"bluff":2,"gatherInformation":2},"improvedIdentityAdditionalBonus":2,"alignmentUndetectableByDivination":true,"switchMinutes":"1d3","armorChangeTimeMultiplier":0.5}}}',NULL),
+  ('epic-infiltrator',1,'sneak-attack','{"dice":"1d6","extension":{"key":"dnd35.sneak-attack","version":1,"parameters":{"increaseDice":"1d6","everyClassLevels":3,"nextIncreaseLevel":4,"stacksWithOtherSneakAttack":true}}}',NULL),
+  ('epic-infiltrator',2,'specialist-training','{"rank":1,"extension":{"key":"dnd35.elh.epic-infiltrator.specialist-training","version":1,"parameters":{"bonus":3,"repeatEveryClassLevels":3,"categories":{"concealment":["bluff","disguise","forgery","innuendo"],"subterfuge":["hide","move silently","open lock","pick pocket"],"espionage":["listen","read lips","search","spot"],"interaction":["diplomacy","gather information","intimidate","sense motive"]},"sameCategoryMayRepeat":true}}}',NULL),
+  ('epic-infiltrator',3,'read-thoughts','{"uses":1,"period":"day","extension":{"key":"dnd35.elh.epic-infiltrator.read-thoughts","version":1,"parameters":{"effect":"detect thoughts","casterLevel":15,"singleTarget":true,"increaseUsesBy":1,"everyClassLevels":4}}}',NULL),
+  ('epic-infiltrator',3,'mind-blank','{"uses":1,"period":"day","extension":{"key":"dnd35.spell-like-ability","version":1,"parameters":{"spellSlug":"mind-blank","casterLevel":15,"increaseUsesBy":1,"everyClassLevels":8}}}',NULL),
+  ('epic-infiltrator',4,'far-senses','{"uses":1,"period":"day","extension":{"key":"dnd35.elh.epic-infiltrator.far-senses","version":1,"parameters":{"rangeFeetFormula":"20 + 20 * class level","requiresPreviouslyVisitedLocation":true,"effect":"clairaudience/clairvoyance","casterLevel":15,"canRelayReadThoughts":true,"increaseUsesBy":1,"everyClassLevels":2}}}',NULL),
+  ('epic-infiltrator',4,'sneak-attack','{"dice":"2d6"}',NULL),
+  ('epic-infiltrator',5,'specialist-training','{"rank":2}',NULL),
+  ('epic-infiltrator',5,'improved-cover-identity','{"rank":4}',NULL),
+  ('epic-infiltrator',6,'far-senses','{"uses":2,"period":"day"}',NULL),
+  ('epic-infiltrator',7,'read-thoughts','{"uses":2,"period":"day"}',NULL),
+  ('epic-infiltrator',7,'sneak-attack','{"dice":"3d6"}',NULL),
+  ('epic-infiltrator',8,'far-senses','{"uses":3,"period":"day"}',NULL),
+  ('epic-infiltrator',8,'specialist-training','{"rank":3}',NULL),
+  ('epic-infiltrator',9,'improved-cover-identity','{"rank":5}',NULL),
+  ('epic-infiltrator',10,'far-senses','{"uses":4,"period":"day"}',NULL),
+  ('epic-infiltrator',10,'sneak-attack','{"dice":"4d6"}',NULL),
+
+  -- Guardian paramount.
+  ('guardian-paramount',1,'weapon-armor-proficiency',NULL,NULL),
+  ('guardian-paramount',1,'bonus-feat','{"extension":{"key":"dnd35.epic.bonus-feat","version":1,"parameters":{"initialClassLevel":1,"everyClassLevels":3,"allowed":["bulwark-of-defense","combat-archery","damage-reduction","dexterous-fortitude","dexterous-will","epic-dodge","epic-fortitude","epic-reflexes","epic-reputation","epic-skill-focus","epic-speed","epic-toughness","epic-will","exceptional-deflection","fast-healing","great-dexterity","improved-combat-reflexes","improved-sneak-attack","improved-spell-resistance","infinite-deflection","legendary-climber","lingering-damage","mobile-defense","perfect-health","reflect-arrows","self-concealment","sneak-attack-of-opportunity","spellcasting-harrier","trap-sense","uncanny-accuracy"]}}}',NULL),
+  ('guardian-paramount',1,'uncanny-dodge-enabler','{"uses":3,"period":"day","extension":{"key":"dnd35.elh.guardian-paramount.uncanny-dodge-enabler","version":1,"parameters":{"rangeFeet":5,"designatedCreatures":1,"increaseUsesBy":1,"everyClassLevels":3}}}',NULL),
+  ('guardian-paramount',2,'evasive-preceptor','{"uses":1,"period":"day","extension":{"key":"dnd35.elh.guardian-paramount.evasive-preceptor","version":1,"parameters":{"rangeFeet":5,"extends":"evasion or improved evasion","increaseUsesBy":1,"everyClassLevels":3}}}',NULL),
+  ('guardian-paramount',3,'protective-aura','{"uses":1,"period":"day","extension":{"key":"dnd35.elh.guardian-paramount.protective-aura","version":1,"parameters":{"baseSpell":"shield other","casterLevel":8,"transferredDamageType":"nonlethal","increaseUsesBy":1,"everyClassLevels":3}}}',NULL),
+  ('guardian-paramount',4,'bonus-feat','{"rank":2}',NULL),
+  ('guardian-paramount',4,'uncanny-dodge-enabler','{"uses":4,"period":"day"}',NULL),
+  ('guardian-paramount',5,'adjust-probability','{"uses":2,"period":"day","extension":{"key":"dnd35.elh.guardian-paramount.adjust-probability","version":1,"parameters":{"rangeFeet":25,"reroll":["attack roll","check","saving throw"],"afterOutcomeKnown":true,"secondRollMandatory":true,"requiresSight":true,"unavailableFlatFooted":true,"increaseUsesBy":1,"everyClassLevels":3}}}',NULL),
+  ('guardian-paramount',5,'evasive-preceptor','{"uses":2,"period":"day"}',NULL),
+  ('guardian-paramount',6,'call-back','{"uses":1,"period":"day","extension":{"key":"dnd35.elh.guardian-paramount.call-back","version":1,"parameters":{"effect":"true resurrection","casterLevel":20,"targetMustHaveReceivedClassAbility":true,"increaseUsesBy":1,"everyClassLevels":6}}}',NULL),
+  ('guardian-paramount',6,'protective-aura','{"uses":2,"period":"day"}',NULL),
+  ('guardian-paramount',7,'bonus-feat','{"rank":3}',NULL),
+  ('guardian-paramount',7,'uncanny-dodge-enabler','{"uses":5,"period":"day"}',NULL),
+  ('guardian-paramount',8,'evasive-preceptor','{"uses":3,"period":"day"}',NULL),
+  ('guardian-paramount',8,'adjust-probability','{"uses":3,"period":"day"}',NULL),
+  ('guardian-paramount',9,'protective-aura','{"uses":3,"period":"day"}',NULL),
+  ('guardian-paramount',10,'bonus-feat','{"rank":4}',NULL),
+  ('guardian-paramount',10,'uncanny-dodge-enabler','{"uses":6,"period":"day"}',NULL),
+
+  -- High proselytizer.
+  ('high-proselytizer',1,'weapon-armor-proficiency',NULL,NULL),
+  ('high-proselytizer',1,'proselytize','{"uses":1,"period":"day","extension":{"key":"dnd35.elh.high-proselytizer.proselytize","version":1,"parameters":{"increaseUsesBy":1,"everyClassLevels":10,"voiceRadiusFeetFormula":"100 + 50 * class level","sanctuaryWhileSpeaking":true,"comprehendLanguagesAudience":true,"saveDcFormula":"20 + floor(class level / 2) + wis modifier","durationMinutesFormula":"10 + 5 * class level","enrapture":"symbol of persuasion / charm person model","sameDeityAutoEnraptureMaxHd":10,"sameAlignmentAutoEnraptureMaxHd":5}}}',NULL),
+  ('high-proselytizer',2,'heal','{"uses":1,"period":"day","extension":{"key":"dnd35.spell-like-ability","version":1,"parameters":{"spellSlug":"heal","increaseUsesBy":1,"everyClassLevels":4}}}',NULL),
+  ('high-proselytizer',3,'deific-touch','{"uses":1,"period":"day","extension":{"key":"dnd35.elh.high-proselytizer.deific-touch","version":1,"parameters":{"usableDuringProselytize":true,"increaseUsesBy":1,"everyClassLevels":10}}}',NULL),
+  ('high-proselytizer',4,'bonus-feat','{"extension":{"key":"dnd35.epic.bonus-feat","version":1,"parameters":{"initialClassLevel":4,"everyClassLevels":4,"allowed":["armor-skin","automatic-quicken-spell","automatic-silent-spell","automatic-still-spell","bonus-domain","enhance-spell","epic-reputation","epic-spell-focus","epic-spell-penetration","epic-spellcasting","epic-will","extended-life-span","great-charisma","great-wisdom","ignore-material-components","improved-alignment-based-casting","improved-combat-casting","improved-heighten-spell","improved-metamagic","improved-spell-capacity","intensify-spell","legendary-commander","multispell","negative-energy-burst","permanent-emanation","planar-turning","polyglot","positive-energy-aura","spectral-strike","spell-stowaway","spell-opportunity","spontaneous-domain-access","spontaneous-spell","tenacious-magic","undead-mastery","zone-of-animation"]}}}',NULL),
+  ('high-proselytizer',5,'deific-word','{"uses":1,"period":"day","extension":{"key":"dnd35.elh.high-proselytizer.deific-word","version":1,"parameters":{"usableDuringProselytize":true,"effect":"triple-strength sound burst","damage":"3d8 sonic","stunRounds":3,"casterLevel":20,"targets":"non-enraptured audience","increaseUsesBy":1,"everyClassLevels":10}}}',NULL),
+  ('high-proselytizer',6,'heal','{"uses":2,"period":"day"}',NULL),
+  ('high-proselytizer',7,'deific-face','{"uses":1,"period":"day","extension":{"key":"dnd35.elh.high-proselytizer.deific-face","version":1,"parameters":{"usableDuringProselytize":true,"effect":"sunburst","casterLevel":20,"targets":"non-enraptured audience","increaseUsesBy":1,"everyClassLevels":10}}}',NULL),
+  ('high-proselytizer',8,'bonus-feat','{"rank":2}',NULL),
+  ('high-proselytizer',9,'deific-aura','{"uses":1,"period":"day","extension":{"key":"dnd35.elh.high-proselytizer.deific-aura","version":1,"parameters":{"usableDuringProselytize":true,"effectByAlignment":["blasphemy","dictum","holy word","word of chaos"],"casterLevel":20,"targets":"non-enraptured audience","increaseUsesBy":1,"everyClassLevels":10}}}',NULL),
+  ('high-proselytizer',10,'heal','{"uses":3,"period":"day"}',NULL),
+
+  -- Legendary dreadnought.
+  ('legendary-dreadnought',1,'weapon-armor-proficiency',NULL,NULL),
+  ('legendary-dreadnought',1,'unstoppable','{"uses":1,"period":"day","extension":{"key":"dnd35.elh.legendary-dreadnought.unstoppable","version":1,"parameters":{"bonus":20,"options":["strength check to break or burst","strength check DC 32 against wall of force","single attack roll"],"increaseUsesBy":1,"everyClassLevels":5}}}',NULL),
+  ('legendary-dreadnought',2,'unmovable','{"uses":1,"period":"day","extension":{"key":"dnd35.elh.legendary-dreadnought.unmovable","version":1,"parameters":{"bonus":20,"options":["grapple check against improved grab","strength check against bull rush/trip/similar","strength check against physical or magical movement","one saving throw"],"canCreateWillSaveAgainstMovement":true,"increaseUsesBy":1,"everyClassLevels":5}}}',NULL),
+  ('legendary-dreadnought',3,'shrug-off-punishment','{"rank":12,"extension":{"key":"dnd35.hit-points.bonus","version":1,"parameters":{"bonusHitPoints":12,"increase":12,"everyClassLevels":5}}}',NULL),
+  ('legendary-dreadnought',4,'thick-skinned','{"rank":3,"extension":{"key":"dnd35.damage-reduction","version":1,"parameters":{"amount":3,"bypass":"none","increase":3,"everyClassLevels":5,"stacking":"does not stack with magic items or nonpermanent magical effects; stacks with permanent magical effects, class features, Damage Reduction feat, and itself"}}}',NULL),
+  ('legendary-dreadnought',5,'bonus-feat','{"extension":{"key":"dnd35.epic.bonus-feat","version":1,"parameters":{"initialClassLevel":5,"everyClassLevels":5,"allowed":["armor-skin","devastating-critical","dire-charge","epic-fortitude","epic-prowess","epic-toughness","epic-weapon-focus","epic-weapon-specialization","fast-healing","great-constitution","great-strength","improved-combat-reflexes","overwhelming-critical","penetrate-damage-reduction"]}}}',NULL),
+  ('legendary-dreadnought',6,'unstoppable','{"uses":2,"period":"day"}',NULL),
+  ('legendary-dreadnought',7,'unmovable','{"uses":2,"period":"day"}',NULL),
+  ('legendary-dreadnought',8,'shrug-off-punishment','{"rank":24}',NULL),
+  ('legendary-dreadnought',9,'thick-skinned','{"rank":6}',NULL),
+  ('legendary-dreadnought',10,'bonus-feat','{"rank":2}',NULL),
+
+  -- Perfect wight.
+  ('perfect-wight',1,'improved-invisibility','{"uses":1,"period":"day","extension":{"key":"dnd35.elh.perfect-wight.improved-invisibility","version":1,"parameters":{"casterLevel":20,"increaseUsesBy":1,"everyClassLevels":5}}}',NULL),
+  ('perfect-wight',2,'improved-legerdemain','{"uses":1,"period":"day","extension":{"key":"dnd35.elh.perfect-wight.improved-legerdemain","version":1,"parameters":{"rangeFeet":30,"skills":["disable device","open lock","sleight of hand","search"],"mayTake10":true,"maximumObjectWeightPounds":100,"alternateUse":"melee sneak or death attack as if flanking","increaseUsesBy":1,"everyClassLevels":5}}}',NULL),
+  ('perfect-wight',3,'incorporeal','{"uses":1,"period":"day","extension":{"key":"dnd35.elh.perfect-wight.incorporeal","version":1,"parameters":{"durationRoundsFormula":"20 + class level","increaseUsesBy":1,"everyClassLevels":5}}}',NULL),
+  ('perfect-wight',4,'shadow-form','{"uses":1,"period":"day","extension":{"key":"dnd35.elh.perfect-wight.shadow-form","version":1,"parameters":{"durationMinutesFormula":"class level","incorporeal":true,"criticalHitImmunity":true,"flyFeet":100,"maneuverability":"good","selfDamagePerBonus":7,"bonusAppliesTo":["attack roll","check","saving throw","effective level for one use"],"increaseUsesBy":1,"everyClassLevels":5}}}',NULL),
+  ('perfect-wight',5,'bonus-feat','{"extension":{"key":"dnd35.epic.bonus-feat","version":1,"parameters":{"initialClassLevel":5,"everyClassLevels":5,"allowed":["blinding-speed","combat-archery","dexterous-fortitude","dexterous-will","epic-dodge","epic-reputation","epic-skill-focus","epic-speed","improved-combat-reflexes","improved-sneak-attack","legendary-climber","lingering-damage","self-concealment","sneak-attack-of-opportunity","spellcasting-harrier","superior-initiative","trap-sense","uncanny-accuracy"]}}}',NULL),
+  ('perfect-wight',6,'improved-invisibility','{"uses":2,"period":"day"}',NULL),
+  ('perfect-wight',7,'improved-legerdemain','{"uses":2,"period":"day"}',NULL),
+  ('perfect-wight',8,'incorporeal','{"uses":2,"period":"day"}',NULL),
+  ('perfect-wight',9,'shadow-form','{"uses":2,"period":"day"}',NULL),
+  ('perfect-wight',10,'bonus-feat','{"rank":2}',NULL),
+
+  -- Union sentinel.
+  ('union-sentinel',1,'weapon-armor-proficiency',NULL,NULL),
+  ('union-sentinel',1,'sending','{"uses":1,"period":"day","extension":{"key":"dnd35.spell-like-ability","version":1,"parameters":{"spellSlug":"sending","casterLevel":15,"increaseUsesBy":1,"everyClassLevels":7}}}',NULL),
+  ('union-sentinel',1,'shield-of-law','{"uses":1,"period":"day","extension":{"key":"dnd35.spell-like-ability","version":1,"parameters":{"spellSlug":"shield-of-law","casterLevel":15,"increaseUsesBy":1,"everyClassLevels":3}}}',NULL),
+  ('union-sentinel',2,'freedom','{"uses":1,"period":"day","extension":{"key":"dnd35.spell-like-ability","version":1,"parameters":{"spellSlug":"freedom","casterLevel":18,"increaseUsesBy":1,"everyClassLevels":6}}}',NULL),
+  ('union-sentinel',2,'knock','{"uses":1,"period":"day","extension":{"key":"dnd35.spell-like-ability","version":1,"parameters":{"spellSlug":"knock","casterLevel":15,"increaseUsesBy":1,"everyClassLevels":4}}}',NULL),
+  ('union-sentinel',3,'dimensional-anchor','{"uses":1,"period":"day","extension":{"key":"dnd35.spell-like-ability","version":1,"parameters":{"spellSlug":"dimensional-anchor","casterLevel":15,"increaseUsesBy":1,"everyClassLevels":3}}}',NULL),
+  ('union-sentinel',4,'portal-guardian','{"uses":1,"period":"day","extension":{"key":"dnd35.elh.union-sentinel.portal-guardian","version":1,"parameters":{"adjacentDistanceFeet":5,"blocks":["portal","gate spell"],"blocksFromBothSides":true,"mustRemainAdjacent":true,"increaseUsesBy":1,"everyClassLevels":6}}}',NULL),
+  ('union-sentinel',4,'shield-of-law','{"uses":2,"period":"day"}',NULL),
+  ('union-sentinel',5,'forcecage','{"uses":1,"period":"day","extension":{"key":"dnd35.spell-like-ability","version":1,"parameters":{"spellSlug":"forcecage","casterLevel":20,"increaseUsesBy":1,"everyClassLevels":5}}}',NULL),
+  ('union-sentinel',6,'dimensional-anchor','{"uses":2,"period":"day"}',NULL),
+  ('union-sentinel',6,'knock','{"uses":2,"period":"day"}',NULL),
+  ('union-sentinel',7,'imprisonment','{"uses":1,"period":"week","extension":{"key":"dnd35.spell-like-ability","version":1,"parameters":{"spellSlug":"imprisonment","casterLevel":20,"increaseUsesBy":1,"everyClassLevels":5}}}',NULL),
+  ('union-sentinel',7,'shield-of-law','{"uses":3,"period":"day"}',NULL),
+  ('union-sentinel',8,'freedom','{"uses":2,"period":"day"}',NULL),
+  ('union-sentinel',8,'sending','{"uses":2,"period":"day"}',NULL),
+  ('union-sentinel',9,'dimensional-anchor','{"uses":3,"period":"day"}',NULL),
+  ('union-sentinel',10,'knock','{"uses":3,"period":"day"}',NULL),
+  ('union-sentinel',10,'forcecage','{"uses":2,"period":"day"}',NULL),
+  ('union-sentinel',10,'portal-guardian','{"uses":2,"period":"day"}',NULL),
+  ('union-sentinel',10,'shield-of-law','{"uses":4,"period":"day"}',NULL)
+)
+INSERT OR IGNORE INTO dnd35_class_feature_grants (class_level_id,class_feature_id,parameters,rules_text)
+SELECT cl.id,cf.id,d.parameters,d.rules_text
+FROM desired d
+JOIN dnd35_classes c ON c.source_id='elh-3.0' AND c.slug=d.class_slug AND c.owner_user_id IS NULL
+JOIN dnd35_class_levels cl ON cl.class_id=c.id AND cl.level=d.level
+JOIN dnd35_class_features cf ON cf.source_id='elh-3.0' AND cf.slug=d.class_slug||'-'||d.feature_slug AND cf.owner_user_id IS NULL;

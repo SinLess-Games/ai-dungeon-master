@@ -26,7 +26,7 @@ SELECT
   'large',5,10,5,0,0,0,
   2,NULL,5,2,3,21,8,15,6,10,7,
   'Any land, aquatic, and underground','Solitary, pair, gang (2-4), or band (5-8)','Standard','CE','Usually chaotic evil','None',NULL,
-  '{"sourceEdition":"3.0","armorClass":{"total":13,"size":-1,"dexterity":-1,"natural":5},"attack":{"slam":"+6 melee","damage":"1d4+5"},"specialAttacks":[],"specialQualities":{"mentalImmunity":true,"poisonImmunity":true,"resistances":{"electricity":20,"fire":20,"acid":20}},"skills":[],"feats":[],"printedFaceReach":"5 ft. by 5 ft./10 ft.","sourceDiscrepancies":[{"field":"creature type","template":"Outsider","printedSample":"Giant","policy":"Preserve printed sample row; use petitioner template for generated creatures."},{"field":"treasure","template":"None","printedSample":"Standard","policy":"Preserve printed sample row."},{"field":"space","printed3_0Face":"5 ft. by 5 ft.","3_5LargeDefault":"10 ft.","policy":"Preserve printed 3.0 face in this source row; runtime 3.5 geometry may derive from size where appropriate."}],"revision3_5":{"specificReplacementInDdUpdate":false}}'
+  '[{"kind":"immunity","subject":"mental effects (printed petitioner mental immunity)"},{"kind":"immunity","subject":"poison"},{"kind":"resistance","damageType":"electricity","amount":20},{"kind":"resistance","damageType":"fire","amount":20},{"kind":"resistance","damageType":"acid","amount":20}]'
 WHERE NOT EXISTS (
   SELECT 1 FROM dnd35_monsters m WHERE m.source_id='dd-3.0' AND m.slug='ogre-petitioner' AND m.owner_user_id IS NULL
 );

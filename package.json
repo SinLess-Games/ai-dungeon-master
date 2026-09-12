@@ -22,7 +22,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "test:e2e:creator": "node tests/e2e/character-creator.e2e.mjs && node tests/e2e/character-creator-ui.e2e.mjs",
+    "test:e2e:creator": "node tests/e2e/character-creator.e2e.mjs && node tests/e2e/character-creator-ui.e2e.mjs && node tests/e2e/character-creator-guardrails.e2e.mjs",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:report": "playwright show-report",

@@ -11,12 +11,13 @@ SET action_type = CASE
   WHEN instr(lower(casting_time), 'move action') > 0 THEN 'move'
   WHEN instr(lower(casting_time), 'standard action') > 0
     OR lower(trim(casting_time)) = '1 action' THEN 'standard'
-  WHEN instr(lower(casting_time), 'full round') > 0
-    OR instr(lower(casting_time), 'round') > 0
+  WHEN instr(lower(casting_time), 'full-round') > 0
+    OR instr(lower(casting_time), 'full round') > 0 THEN 'full_round'
+  WHEN instr(lower(casting_time), 'round') > 0
     OR instr(lower(casting_time), 'minute') > 0
     OR instr(lower(casting_time), 'hour') > 0
-    OR instr(lower(casting_time), 'day') > 0 THEN 'full_round'
-  ELSE 'standard'
+    OR instr(lower(casting_time), 'day') > 0 THEN 'other'
+  ELSE 'other'
 END
 WHERE source_id = 'hoh-3.5'
   AND owner_user_id IS NULL

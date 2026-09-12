@@ -30,7 +30,7 @@ WITH desired(
  '7d8+21 outsider (52 hp). Speed 30 ft. AC 15 from -1 size, +2 Dexterity, and +4 natural armor. Masterwork falchion +9/+4 deals 2d4+3. Three times per day: dimension door and invisibility; once per day: Leomund''s secret chest and plane shift (CL 14th; save DC 12 + spell level). Telepathy 100 ft. with creatures that have a language. SR 25. Mercanes have +4 racial Appraise. Player-character mercanes have level adjustment +7 and favor wizard.',
  'outsider',5,7,8,21,'large',5,10,4,0,0,7,8,7,8,15,15,16,20,17,15,
  'Any land and underground','Company (1-4 mercanes and 3-18 5th-level fighter bodyguards) or progression (1 mercane, 3 14th-level fighters, 1 21st-level fighter/2nd-level Union Sentinel)','Double standard','LN','Always lawful neutral','By character class',7,
- '[{"kind":"custom","extension":{"key":"dnd35.elh.monster.defenses","version":1,"parameters":{"spellResistance":25,"telepathyFeet":100,"appraiseRacialBonus":4,"spellLikeAbilities":{"threePerDay":["dimension door","invisibility"],"onePerDay":["Leomund's secret chest","plane shift"],"casterLevel":14,"saveDc":"12 + spell level"},"favoredClass":"wizard"}}}]'),
+ '[{"kind":"custom","extension":{"key":"dnd35.elh.monster.defenses","version":1,"parameters":{"spellResistance":25,"telepathyFeet":100,"appraiseRacialBonus":4,"spellLikeAbilities":{"threePerDay":["dimension door","invisibility"],"onePerDay":["Leomund''s secret chest","plane shift"],"casterLevel":14,"saveDc":"12 + spell level"},"favoredClass":"wizard"}}}]'),
 
 ('elh-monster-mu-spore','205-206','mu-spore','Mu Spore',
  'A redwood-sized ambulatory fungus with grasping tendrils, a huge upward-facing maw, and clouds of burrowing spores.',

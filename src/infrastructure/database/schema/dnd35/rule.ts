@@ -5,7 +5,7 @@ import type { JsonValue } from "./primitives";
 
 /** Canonical generic kinds. Source catalogs may use more specific non-empty kinds. */
 export const ruleKinds = ["rule", "procedure", "subsystem", "table", "guidance"] as const;
-export type RuleKind = (typeof ruleKinds)[number] | (string & {});
+export type RuleKind = string;
 
 /**
  * Source-backed rules that do not naturally belong to a more specific entity table.

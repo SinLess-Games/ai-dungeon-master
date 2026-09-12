@@ -1,0 +1,87 @@
+name: Temporary Seed Literal Repair
+
+on:
+  push:
+    branches:
+      - content/heroes-of-horror-battle
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: content/heroes-of-horror-battle
+          fetch-depth: 0
+
+      - name: Repair exact malformed seed literals
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_exact(path: str, old: str, new: str, expected: int = 1) -> None:
+              file = Path(path)
+              text = file.read_text()
+              count = text.count(old)
+              if count != expected:
+                  raise SystemExit(f"{path}: expected {expected} occurrence(s) of {old!r}, found {count}")
+              file.write_text(text.replace(old, new))
+              print(f"repaired {path}: {count} replacement(s)")
+
+          replace_exact(
+              "seeds/deities-and-demigods-deities/53-other-religions-dennari.sql",
+              'ability changed."}}}',
+              'ability changed."}}',
+          )
+          replace_exact(
+              "seeds/epic-level-handbook-monsters/17-epic-dragons.sql",
+              '"frightfulPresenceDc":51}}}}]',
+              '"frightfulPresenceDc":51}}}]',
+          )
+          replace_exact(
+              "seeds/epic-level-handbook-monsters/19-genius-orb-gloom-golems.sql",
+              "Bigby's crushing hand",
+              "Bigby''s crushing hand",
+          )
+          replace_exact(
+              "seeds/epic-level-handbook-monsters/20-ha-hagunemnon-hoary-hunefer.sql",
+              "Mordenkainen's disjunction",
+              "Mordenkainen''s disjunction",
+          )
+          replace_exact(
+              "seeds/epic-level-handbook-monsters/21-leshay-vault-mercane-muspore.sql",
+              "vault's current physical location",
+              "vault''s current physical location",
+          )
+          replace_exact(
+              "seeds/epic-level-handbook-monsters/23-sirrush-slaadi.sql",
+              '"telepathyFeet":100}}}}]',
+              '"telepathyFeet":100}}}]',
+              expected=2,
+          )
+          replace_exact(
+              "seeds/epic-level-handbook-monsters/25-final-monsters.sql",
+              'no abilities are invented here."}}}}]',
+              'no abilities are invented here."}}}]',
+          )
+          replace_exact(
+              "seeds/epic-level-handbook-rules/45-abomination-rules.sql",
+              "abomination's imprisonment",
+              "abomination''s imprisonment",
+          )
+          PY
+
+      - name: Commit repaired seeds and remove temporary workflow
+        shell: bash
+        run: |
+          git rm .github/workflows/repair-seed-literals.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add seeds
+          git diff --cached --check
+          git commit -m "fix(seeds): repair remaining JSON and SQL literals"
+          git push origin HEAD:content/heroes-of-horror-battle

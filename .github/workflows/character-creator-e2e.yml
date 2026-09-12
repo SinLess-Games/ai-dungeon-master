@@ -18,6 +18,7 @@ on:
       - "src/server/**"
       - "tests/e2e/character-creator.e2e.mjs"
       - "tests/e2e/character-creator-ui.e2e.mjs"
+      - "tests/e2e/character-creator-guardrails.e2e.mjs"
   workflow_dispatch:
 
 permissions:
@@ -31,7 +32,7 @@ jobs:
   creator-e2e:
     name: creator-e2e
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - name: Checkout

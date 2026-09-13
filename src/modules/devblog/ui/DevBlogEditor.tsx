@@ -69,6 +69,7 @@ function EditorForm({
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
   const lock = useRef(false);
+  const uploadDraftId = useRef<string | null>(id === "new" ? null : id);
   const queryClient = useQueryClient();
 
   useBlocker({
@@ -91,6 +92,7 @@ function EditorForm({
 
   async function prepareDraftForUpload() {
     if (id !== "new") return id;
+    if (uploadDraftId.current) return uploadDraftId.current;
     const parsed = postSchema.safeParse({
       ...draft,
       status: "draft",
@@ -104,6 +106,7 @@ function EditorForm({
       );
     }
     const result = await checked(await api.api.admin.devblog.posts.$post({ json: parsed.data }));
+    uploadDraftId.current = result.id;
     setDirty(false);
     await invalidateBlogQueries();
     return result.id;

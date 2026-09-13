@@ -46,13 +46,30 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Cache only the pre-test D1 fixture. Using restore/save separately avoids
+      # persisting mutations made by the creator E2E suite itself.
+      - name: Restore local D1 test database
+        id: d1-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .wrangler/state/v3/d1
+          key: creator-d1-v1-${{ runner.os }}-${{ hashFiles('drizzle/**/*.sql', 'seeds/**/*.sql', 'seeds/**/*.json', 'scripts/seed-content.mjs', 'wrangler.jsonc', 'package-lock.json') }}
+
       # Seed correctness is validated independently by Seed CI. The creator suite
-      # still needs a populated local D1 database as its test fixture.
+      # only builds this fixture when the exact migration/seed cache is missing.
       - name: Prepare local D1 test database
+        if: steps.d1-cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -o pipefail
           npm run db:seed:local -- --yes 2>&1 | tee character-creator-e2e.log
+
+      - name: Save local D1 test database
+        if: steps.d1-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .wrangler/state/v3/d1
+          key: ${{ steps.d1-cache.outputs.cache-primary-key }}
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium

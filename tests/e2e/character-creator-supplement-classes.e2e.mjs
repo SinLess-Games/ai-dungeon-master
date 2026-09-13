@@ -1,4 +1,4 @@
-/* global console, document */
+/* global console, document, URL */
 /** Browser regression coverage for supplemental D&D 3.5 classes in the creator. */
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";

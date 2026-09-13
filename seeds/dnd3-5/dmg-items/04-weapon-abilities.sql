@@ -1,0 +1,166 @@
+-- Dungeon Master's Guide v3.5 Chapter 7: magic weapon special abilities, pp. 223-226.
+-- Property definitions live in dnd35_rules because they modify a base weapon rather than create standalone inventory rows.
+-- Mechanical summaries are concise; the supplied DMG and appended errata remain authoritative.
+
+INSERT OR IGNORE INTO dnd35_sources
+  (id,slug,name,abbreviation,publisher,system,edition,description,url,is_official,is_homebrew,owner_user_id)
+VALUES ('dmg-3.5','dungeon-masters-guide-3-5','Dungeon Master''s Guide','DMG','Wizards of the Coast','dnd','3.5',
+        'Core Rulebook II; source for D&D v3.5 magic items, treasure, special materials, and Dungeon Master rules.',NULL,1,0,NULL);
+
+WITH desired(slug,name,page,summary,school,aura,caster_level,equivalent_bonus,crafting,mechanics) AS (VALUES
+  ('dmg-weapon-anarchic','Anarchic','223-224',
+   'Makes the weapon chaos-aligned, deals +2d6 damage to lawful creatures, and imposes one persistent negative level on a lawful creature while it wields the weapon. Projectile weapons pass the property to their ammunition.',
+   'evocation [chaotic]','moderate',7,2,'Craft Magic Arms and Armor; chaos hammer; creator must be chaotic.',
+   '{"alignment":"chaotic","extraDamageAgainstAlignment":{"alignment":"lawful","dice":"2d6"},"wrongAlignmentWielder":{"alignment":"lawful","negativeLevels":1,"whileWielded":true,"cannotBecomePermanent":true},"passesToProjectileAmmunition":true}'),
+  ('dmg-weapon-axiomatic','Axiomatic','223-224',
+   'Makes the weapon lawful-aligned, deals +2d6 damage to chaotic creatures, and imposes one persistent negative level on a chaotic creature while it wields the weapon. Projectile weapons pass the property to their ammunition.',
+   'evocation [lawful]','moderate',7,2,'Craft Magic Arms and Armor; order''s wrath; creator must be lawful.',
+   '{"alignment":"lawful","extraDamageAgainstAlignment":{"alignment":"chaotic","dice":"2d6"},"wrongAlignmentWielder":{"alignment":"chaotic","negativeLevels":1,"whileWielded":true,"cannotBecomePermanent":true},"passesToProjectileAmmunition":true}'),
+  ('dmg-weapon-bane','Bane','224',
+   'Against one designated creature type or subtype, the weapon is treated as having an enhancement bonus 2 higher and deals +2d6 damage. Projectile weapons pass the property to their ammunition.',
+   'conjuration','moderate',8,1,'Craft Magic Arms and Armor; summon monster I.',
+   '{"designatedFoe":true,"effectiveEnhancementIncreaseAgainstFoe":2,"extraDamageAgainstFoe":"2d6","passesToProjectileAmmunition":true}'),
+  ('dmg-weapon-brilliant-energy','Brilliant Energy','224',
+   'Transforms the striking portion into light. It ignores nonliving matter and armor bonuses, but cannot harm undead, constructs, or objects. It is limited to melee weapons, thrown weapons, and ammunition.',
+   'transmutation','strong',16,4,'Craft Magic Arms and Armor; gaseous form; continual flame.',
+   '{"allowed":["melee","thrown","ammunition"],"torchLight":true,"ignoresArmorBonuses":true,"ignoresNonlivingMatter":true,"cannotHarm":["undead","constructs","objects"],"weightUnchanged":true}'),
+  ('dmg-weapon-dancing','Dancing','224',
+   'As a standard action the wielder can release the weapon to fight on its own for 4 rounds using the wielder''s base attack bonus, after which it drops. It follows the activator and cannot make attacks of opportunity.',
+   'transmutation','strong',15,4,'Craft Magic Arms and Armor; animate objects.',
+   '{"activationAction":"standard","autonomousRounds":4,"usesActivatorBaseAttackBonus":true,"attacksOfOpportunity":false,"sharesActivatorSpace":true,"followsActivator":true,"retrieveAction":"free","cooldownAfterRetrieveRounds":4}'),
+  ('dmg-weapon-defending','Defending','224',
+   'At the start of the wielder''s turn, some or all of the weapon''s enhancement bonus can be shifted to Armor Class until the next turn.',
+   'abjuration','moderate',8,1,'Craft Magic Arms and Armor; shield or shield of faith.',
+   '{"activationAction":"free","allocationSource":"weapon-enhancement-bonus","target":"armor-class","duration":"until-next-turn","stacksWithOtherAcBonuses":true}'),
+  ('dmg-weapon-disruption','Disruption','224',
+   'A bludgeoning weapon of disruption can destroy an undead creature it strikes if the creature fails a DC 14 Will save.',
+   'conjuration','strong',14,2,'Craft Magic Arms and Armor; heal.',
+   '{"allowedDamageTypes":["bludgeoning"],"trigger":"hit-undead","save":{"type":"will","dc":14},"onFailure":"destroy"}'),
+  ('dmg-weapon-distance','Distance','224',
+   'A ranged weapon of distance has twice its normal range increment.',
+   'divination','moderate',6,1,'Craft Magic Arms and Armor; clairaudience/clairvoyance.',
+   '{"allowed":["ranged"],"rangeIncrementMultiplier":2}'),
+  ('dmg-weapon-flaming','Flaming','224',
+   'On command the weapon deals +1d6 fire damage on successful hits until commanded off. Projectile weapons pass the fire effect to their ammunition.',
+   'evocation','moderate',10,1,'Craft Magic Arms and Armor; flame blade, flame strike, or fireball.',
+   '{"activation":"command-toggle","extraDamage":{"type":"fire","dice":"1d6"},"passesToProjectileAmmunition":true}'),
+  ('dmg-weapon-flaming-burst','Flaming Burst','224-225',
+   'Functions as flaming and also deals extra fire damage on a confirmed critical hit: +1d10 for x2, +2d10 for x3, or +3d10 for x4. The critical burst still applies when the flaming effect is suppressed.',
+   'evocation','strong',12,2,'Craft Magic Arms and Armor; flame blade, flame strike, or fireball.',
+   '{"includes":"flaming","criticalExtraDamage":{"type":"fire","x2":"1d10","x3":"2d10","x4":"3d10"},"criticalBurstWorksWhenToggleOff":true,"passesToProjectileAmmunition":true}'),
+  ('dmg-weapon-frost','Frost','225',
+   'On command the weapon deals +1d6 cold damage on successful hits until commanded off. Projectile weapons pass the cold effect to their ammunition.',
+   'evocation','moderate',8,1,'Craft Magic Arms and Armor; chill metal or ice storm.',
+   '{"activation":"command-toggle","extraDamage":{"type":"cold","dice":"1d6"},"passesToProjectileAmmunition":true}'),
+  ('dmg-weapon-ghost-touch','Ghost Touch','225',
+   'Deals damage normally to incorporeal creatures without the normal incorporeal miss chance and can be handled by incorporeal creatures; it counts as corporeal or incorporeal, whichever favors the wielder.',
+   'conjuration','moderate',9,1,'Craft Magic Arms and Armor; plane shift.',
+   '{"ignoreIncorporealMissChance":true,"usableByIncorporeal":true,"countsAsCorporealOrIncorporealWhicheverBetter":true}'),
+  ('dmg-weapon-holy','Holy','225',
+   'Makes the weapon good-aligned, deals +2d6 damage to evil creatures, and imposes one persistent negative level on an evil creature while it wields the weapon. Projectile weapons pass the property to their ammunition.',
+   'evocation [good]','moderate',7,2,'Craft Magic Arms and Armor; holy smite; creator must be good.',
+   '{"alignment":"good","extraDamageAgainstAlignment":{"alignment":"evil","dice":"2d6"},"wrongAlignmentWielder":{"alignment":"evil","negativeLevels":1,"whileWielded":true,"cannotBecomePermanent":true},"passesToProjectileAmmunition":true}'),
+  ('dmg-weapon-icy-burst','Icy Burst','225',
+   'Functions as frost and adds cold damage on a confirmed critical hit: +1d10 for x2, +2d10 for x3, or +3d10 for x4. The burst applies even when the frost effect is suppressed.',
+   'evocation','moderate',10,2,'Craft Magic Arms and Armor; chill metal or ice storm.',
+   '{"includes":"frost","criticalExtraDamage":{"type":"cold","x2":"1d10","x3":"2d10","x4":"3d10"},"criticalBurstWorksWhenToggleOff":true,"passesToProjectileAmmunition":true}'),
+  ('dmg-weapon-keen','Keen','225',
+   'Doubles the threat range of a piercing or slashing weapon. It does not stack with other threat-range increases such as Improved Critical or keen edge.',
+   'transmutation','moderate',10,1,'Craft Magic Arms and Armor; keen edge.',
+   '{"allowedDamageTypes":["piercing","slashing"],"threatRangeMultiplier":2,"stacksWithOtherThreatRangeIncreases":false}'),
+  ('dmg-weapon-ki-focus','Ki Focus','225',
+   'A melee weapon with ki focus can channel qualifying monk ki attacks and Stunning Fist through the weapon as though the attack were unarmed.',
+   'transmutation','moderate',8,1,'Craft Magic Arms and Armor; creator must be a monk.',
+   '{"allowed":["melee"],"channels":["stunning-attack","ki-strike","quivering-palm","stunning-fist"]}'),
+  ('dmg-weapon-merciful','Merciful','225',
+   'Deals +1d6 damage, but all damage from the weapon is nonlethal. The property can be suppressed or resumed by command. Projectile weapons pass the property to their ammunition.',
+   'conjuration','faint',5,1,'Craft Magic Arms and Armor; cure light wounds.',
+   '{"extraDamage":"1d6","allDamageNonlethal":true,"activation":"command-toggle","passesToProjectileAmmunition":true}'),
+  ('dmg-weapon-mighty-cleaving','Mighty Cleaving','225',
+   'A wielder who has Cleave can make one additional cleave attempt in a round.',
+   'evocation','moderate',8,1,'Craft Magic Arms and Armor; divine power.',
+   '{"requiresFeat":"cleave","additionalCleaveAttemptsPerRound":1}'),
+  ('dmg-weapon-returning','Returning','225',
+   'A throwable weapon returns to its thrower just before the thrower''s next turn. Catching it is a free action; if the thrower cannot catch it or has moved, it drops where it was thrown from.',
+   'transmutation','moderate',7,1,'Craft Magic Arms and Armor; telekinesis.',
+   '{"requiresThrowableWeapon":true,"returnTiming":"just-before-throwers-next-turn","catchAction":"free","dropIfCannotCatch":true,"dropIfThrowerMoved":true}'),
+  ('dmg-weapon-seeking','Seeking','225',
+   'A ranged weapon ignores miss chances such as concealment, but the wielder must still aim at the correct square.',
+   'divination','strong',12,1,'Craft Magic Arms and Armor; true seeing.',
+   '{"allowed":["ranged"],"ignoreMissChance":true,"mustAimAtCorrectSquare":true}'),
+  ('dmg-weapon-shock','Shock','225',
+   'On command the weapon deals +1d6 electricity damage on successful hits until commanded off. Projectile weapons pass the electricity effect to their ammunition.',
+   'evocation','moderate',8,1,'Craft Magic Arms and Armor; call lightning or lightning bolt.',
+   '{"activation":"command-toggle","extraDamage":{"type":"electricity","dice":"1d6"},"passesToProjectileAmmunition":true}'),
+  ('dmg-weapon-shocking-burst','Shocking Burst','225',
+   'Functions as shock and adds electricity damage on a confirmed critical hit: +1d10 for x2, +2d10 for x3, or +3d10 for x4. The burst applies even when shock is suppressed.',
+   'evocation','moderate',10,2,'Craft Magic Arms and Armor; call lightning or lightning bolt.',
+   '{"includes":"shock","criticalExtraDamage":{"type":"electricity","x2":"1d10","x3":"2d10","x4":"3d10"},"criticalBurstWorksWhenToggleOff":true,"passesToProjectileAmmunition":true}'),
+  ('dmg-weapon-speed','Speed','225',
+   'When making a full attack, the wielder gains one additional attack with the weapon at full base attack bonus. This does not stack with haste or similar extra-attack effects.',
+   'transmutation','moderate',7,3,'Craft Magic Arms and Armor; haste.',
+   '{"trigger":"full-attack","additionalAttacks":1,"attackUsesFullBaseAttackBonus":true,"stacksWithSimilarExtraAttackEffects":false}'),
+  ('dmg-weapon-spell-storing','Spell Storing','225-226',
+   'Stores one targeted spell of 3rd level or lower with a standard-action casting time. After the weapon damages a creature, the wielder can release the stored spell into that creature as a free action.',
+   'evocation','strong',12,1,'Craft Magic Arms and Armor; creator must be a spellcaster of at least 12th level.',
+   '{"maximumStoredSpellLevel":3,"requiredCastingTime":"standard","maximumStoredSpells":1,"releaseTrigger":"damaging-hit","releaseAction":"free","wielderKnowsStoredSpellName":true,"randomItemInitiallyLoadedPercent":50}'),
+  ('dmg-weapon-thundering','Thundering','225-226',
+   'On a confirmed critical hit, deals +1d8 sonic damage for x2, +2d8 for x3, or +3d8 for x4. The struck creature must make Fortitude DC 14 or become permanently deafened. Projectile weapons pass the property to ammunition.',
+   'necromancy','faint',5,1,'Craft Magic Arms and Armor; blindness/deafness.',
+   '{"criticalExtraDamage":{"type":"sonic","x2":"1d8","x3":"2d8","x4":"3d8"},"save":{"type":"fortitude","dc":14},"onFailure":{"condition":"deafened","duration":"permanent"},"passesToProjectileAmmunition":true}'),
+  ('dmg-weapon-throwing','Throwing','226',
+   'A melee weapon gains a 10-foot range increment and can be thrown by a wielder proficient with its normal use.',
+   'transmutation','faint',5,1,'Craft Magic Arms and Armor; magic stone.',
+   '{"allowed":["melee"],"rangeIncrementFeet":10,"requiresNormalWeaponProficiency":true}'),
+  ('dmg-weapon-unholy','Unholy','226',
+   'Makes the weapon evil-aligned, deals +2d6 damage to good creatures, and imposes one persistent negative level on a good creature while it wields the weapon. Projectile weapons pass the property to ammunition.',
+   'evocation [evil]','moderate',7,2,'Craft Magic Arms and Armor; unholy blight; creator must be evil.',
+   '{"alignment":"evil","extraDamageAgainstAlignment":{"alignment":"good","dice":"2d6"},"wrongAlignmentWielder":{"alignment":"good","negativeLevels":1,"whileWielded":true,"cannotBecomePermanent":true},"passesToProjectileAmmunition":true}'),
+  ('dmg-weapon-vicious','Vicious','226',
+   'On a successful melee hit, deals +2d6 damage to the target and 1d6 damage to the wielder.',
+   'necromancy','moderate',9,1,'Craft Magic Arms and Armor; enervation.',
+   '{"allowed":["melee"],"extraDamageToTarget":"2d6","damageToWielder":"1d6"}'),
+  ('dmg-weapon-vorpal','Vorpal','226',
+   'A slashing weapon severs an applicable target''s head on a natural 20 followed by a successful critical confirmation. Creatures without meaningful heads or that survive decapitation are unaffected as adjudicated by the DM.',
+   'necromancy and transmutation','strong',18,5,'Craft Magic Arms and Armor; circle of death; keen edge.',
+   '{"allowedDamageTypes":["slashing"],"trigger":{"naturalAttackRoll":20,"confirmCritical":true},"effect":"decapitate-if-applicable","dmAdjudicationForHeadlessOrDecapitationImmune":true}'),
+  ('dmg-weapon-wounding','Wounding','226',
+   'Each successful hit deals 1 Constitution damage from blood loss. The Constitution damage is not multiplied on a critical hit, and creatures immune to critical hits are immune to this Constitution damage.',
+   'evocation','moderate',10,2,'Craft Magic Arms and Armor; Mordenkainen''s sword.',
+   '{"constitutionDamagePerHit":1,"multiplyConstitutionDamageOnCritical":false,"criticalImmuneCreaturesImmuneToConstitutionDamage":true}')
+)
+INSERT INTO dnd35_rules
+  (id,source_id,source_page,slug,name,description,rules_text,is_homebrew,owner_user_id,is_enabled,
+   category,kind,is_variant,default_enabled,parent_slug,supersedes_slug,tags,mechanics)
+SELECT
+  'dmg-rule-'||d.slug,'dmg-3.5',d.page,d.slug,d.name,d.summary,
+  d.summary || ' Aura: ' || d.aura || ' ' || d.school || '; caster level ' || d.caster_level || '. ' || d.crafting,
+  0,NULL,1,'magic-item-properties','property',0,1,NULL,NULL,
+  '["magic-items","weapons","special-ability"]',
+  json_patch(d.mechanics,json_object(
+    'school',d.school,
+    'aura',d.aura,
+    'casterLevel',d.caster_level,
+    'equivalentBonus',d.equivalent_bonus,
+    'crafting',d.crafting
+  ))
+FROM desired d
+WHERE NOT EXISTS (
+  SELECT 1 FROM dnd35_rules r
+  WHERE r.source_id='dmg-3.5' AND r.slug=d.slug AND r.owner_user_id IS NULL
+);
+
+-- Bane's designated foe table is separate so generators can select the creature type/subtype deterministically.
+INSERT INTO dnd35_rules
+  (id,source_id,source_page,slug,name,description,rules_text,is_homebrew,owner_user_id,is_enabled,
+   category,kind,is_variant,default_enabled,parent_slug,supersedes_slug,tags,mechanics)
+SELECT
+  'dmg-rule-dmg-weapon-bane-designated-foe','dmg-3.5','224','dmg-weapon-bane-designated-foe','Bane Designated Foe Table',
+  'Percentile table used to determine the designated foe of a randomly generated bane weapon.',
+  'Percentile table used to determine the designated foe of a randomly generated bane weapon.',0,NULL,1,
+  'magic-items','table',0,1,'dmg-weapon-bane',NULL,'["magic-items","weapons","bane","random-generation"]',
+  '{"ranges":[[1,5,"aberrations"],[6,9,"animals"],[10,16,"constructs"],[17,22,"dragons"],[23,27,"elementals"],[28,32,"fey"],[33,39,"giants"],[40,40,"humanoids-aquatic"],[41,42,"humanoids-dwarf"],[43,44,"humanoids-elf"],[45,45,"humanoids-gnoll"],[46,46,"humanoids-gnome"],[47,49,"humanoids-goblinoid"],[50,50,"humanoids-halfling"],[51,54,"humanoids-human"],[55,57,"humanoids-reptilian"],[58,60,"humanoids-orc"],[61,65,"magical-beasts"],[66,70,"monstrous-humanoids"],[71,72,"oozes"],[73,73,"outsiders-air"],[74,76,"outsiders-chaotic"],[77,77,"outsiders-earth"],[78,80,"outsiders-evil"],[81,81,"outsiders-fire"],[82,84,"outsiders-good"],[85,87,"outsiders-lawful"],[88,88,"outsiders-water"],[89,90,"plants"],[91,98,"undead"],[99,100,"vermin"]]}'
+WHERE NOT EXISTS (
+  SELECT 1 FROM dnd35_rules r
+  WHERE r.source_id='dmg-3.5' AND r.slug='dmg-weapon-bane-designated-foe' AND r.owner_user_id IS NULL
+);

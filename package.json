@@ -19,6 +19,8 @@
     "check": "npm run typecheck && npm run lint && npm run test:unit",
     "test": "vitest run --coverage",
     "test:unit": "vitest run",
+    "test:unit:ci": "vitest run --exclude \"tests/unit/*seed*.test.ts\"",
+    "test:unit:seeds": "vitest run seed",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",

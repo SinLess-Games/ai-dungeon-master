@@ -46,6 +46,7 @@ import {
   requireCharacterDatabase,
   requireFirstCharacterClasses,
 } from "./creationAccess";
+import { filterQualifiedFeatOptions } from "./featEligibility";
 
 interface CharacterCreationBindings extends AuthEnv { DB?: D1Database; }
 type CharacterCreationEnv = { Bindings: CharacterCreationBindings };
@@ -108,16 +109,16 @@ export const characterFeatCreationRoutes = new Hono<CharacterCreationEnv>()
     const db = createDatabase(requireCharacterDatabase(c.env.DB));
     const row = await requireCharacterCreatorEditor({ db, characterId: c.req.param("characterId"), userId: session.user.id });
     const firstClasses = await requireFirstCharacterClasses(db, row.character.id);
-    const extension = await db.select({ raceId: dnd35Characters.raceId }).from(dnd35Characters).where(eq(dnd35Characters.characterId, row.character.id)).get();
+    const extension = await db.select({ raceId: dnd35Characters.raceId, alignment: dnd35Characters.alignment }).from(dnd35Characters).where(eq(dnd35Characters.characterId, row.character.id)).get();
     if (!extension?.raceId) throw new ValidationError("Choose a race before selecting feats.");
     const classLevelIds = firstClasses.map(({ classLevelId }) => classLevelId);
     const [race, options, featureRows, selected] = await Promise.all([
-      db.select({ bonusFeatsAtFirstLevel: races.bonusFeatsAtFirstLevel, racialHitDice: races.racialHitDice }).from(races).where(eq(races.id, extension.raceId)).get(),
+      db.select({ slug: races.slug, creatureTypeId: races.creatureTypeId, bonusFeatsAtFirstLevel: races.bonusFeatsAtFirstLevel, racialHitDice: races.racialHitDice }).from(races).where(eq(races.id, extension.raceId)).get(),
       db
         .select({
           id: feats.id, slug: feats.slug, name: feats.name, description: feats.description, rulesText: feats.rulesText,
           normalText: feats.normalText, specialText: feats.specialText, repeatabilityText: feats.repeatabilityText,
-          repeatable: feats.repeatable, choiceKind: feats.choiceKind, explanation: featPrerequisites.explanation,
+          repeatable: feats.repeatable, choiceKind: feats.choiceKind, prerequisite: featPrerequisites.expression, explanation: featPrerequisites.explanation,
         })
         .from(feats)
         .leftJoin(featPrerequisites, eq(feats.id, featPrerequisites.featId))
@@ -138,6 +139,17 @@ export const characterFeatCreationRoutes = new Hono<CharacterCreationEnv>()
       const owner = classByLevelId.get(feature.classLevelId)!;
       return { ...feature, track: owner.track, classId: owner.classId, classSlug: owner.classSlug, className: owner.className };
     });
+    const qualifiedOptions = await filterQualifiedFeatOptions({
+      db,
+      characterId: row.character.id,
+      raceId: extension.raceId,
+      raceSlug: race.slug,
+      creatureTypeId: race.creatureTypeId,
+      racialHitDice: race.racialHitDice,
+      alignment: extension.alignment,
+      firstClasses,
+      options,
+    });
     return c.json({
       required: {
         level: generalFeatSlotsForTotalHitDice(race.racialHitDice + 1),
@@ -146,7 +158,7 @@ export const characterFeatCreationRoutes = new Hono<CharacterCreationEnv>()
       },
       totalHitDice: race.racialHitDice + 1,
       classes: firstClasses.map(({ track, classId, classSlug, className }) => ({ track, classId, classSlug, className })),
-      options,
+      options: qualifiedOptions,
       selected,
     });
   })

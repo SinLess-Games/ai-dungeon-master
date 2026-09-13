@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './app/routes/__root'
 import { Route as IndexRouteImport } from './app/routes/index'
+import { Route as DiceRouteImport } from './app/routes/dice'
 import { Route as StatusRouteImport } from './app/routes/status'
 import { Route as CharactersIndexRouteImport } from './app/routes/characters/index'
 import { Route as CharactersNewRouteImport } from './app/routes/characters/new'
@@ -22,6 +23,11 @@ import { Route as UserProfileRouteImport } from './app/routes/user/profile'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DiceRoute = DiceRouteImport.update({
+  id: '/dice',
+  path: '/dice',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StatusRoute = StatusRouteImport.update({
@@ -67,6 +73,7 @@ const UserProfileRoute = UserProfileRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/dice': typeof DiceRoute
   '/status': typeof StatusRoute
   '/characters/new': typeof CharactersNewRoute
   '/devblog/$slug': typeof DevblogSlugRoute
@@ -78,6 +85,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/dice': typeof DiceRoute
   '/status': typeof StatusRoute
   '/characters/new': typeof CharactersNewRoute
   '/devblog/$slug': typeof DevblogSlugRoute
@@ -90,6 +98,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/dice': typeof DiceRoute
   '/status': typeof StatusRoute
   '/characters/new': typeof CharactersNewRoute
   '/devblog/$slug': typeof DevblogSlugRoute
@@ -103,6 +112,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/dice'
     | '/status'
     | '/characters/new'
     | '/devblog/$slug'
@@ -114,6 +124,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/dice'
     | '/status'
     | '/characters/new'
     | '/devblog/$slug'
@@ -125,6 +136,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/dice'
     | '/status'
     | '/characters/new'
     | '/devblog/$slug'
@@ -137,6 +149,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DiceRoute: typeof DiceRoute
   StatusRoute: typeof StatusRoute
   CharactersNewRoute: typeof CharactersNewRoute
   DevblogSlugRoute: typeof DevblogSlugRoute
@@ -154,6 +167,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dice': {
+      id: '/dice'
+      path: '/dice'
+      fullPath: '/dice'
+      preLoaderRoute: typeof DiceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/status': {
@@ -217,6 +237,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DiceRoute: DiceRoute,
   StatusRoute: StatusRoute,
   CharactersNewRoute: CharactersNewRoute,
   DevblogSlugRoute: DevblogSlugRoute,

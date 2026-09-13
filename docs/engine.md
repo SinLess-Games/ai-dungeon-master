@@ -36,7 +36,24 @@ Persistent state remains owned by D1/application repositories. The engine takes 
 
 ### Randomness and dice
 
-`random.ts` provides an injectable random source and deterministic seeded PRNG. `dice.ts` parses and rolls bounded single-group tabletop notation such as `d20`, `2d6+3`, and `d%`. More elaborate dice syntax can be layered on top without changing the primitive roll contract.
+`random.ts` provides an injectable random source and deterministic seeded PRNG. `dice.ts` parses and rolls bounded single-group tabletop notation such as `d20`, `2d6+3`, and `d%`.
+
+`diceNotation.ts` layers additive expressions over those primitives without changing
+the existing `rollDice` contract. `parseDiceNotation` validates and normalizes dice
+groups and signed integer modifiers, with a minimum/maximum total.
+`rollDiceNotation` accepts an injected `RandomSource` and returns each group's
+individual dice, signed subtotals, and final total. It validates the entire
+expression before consuming randomness and never evaluates JavaScript.
+
+Supported examples: `1d20+4-8`, `2d6+1d4-3`, `d%`, and `-d6+2`. Limits are d2 through
+d1000, 1,000 dice total, 50 terms, 256 input characters, and modifiers up to one
+billion per term. Multiplication, division, parentheses, decimals, and keep/drop
+notation are not supported by this additive grammar.
+
+The public `/dice` page is available from Play → Dice and site search. Its personal
+roll history keeps the latest 20 rolls during SPA navigation and clears on reload.
+These browser rolls do not mutate campaign state or replace authoritative server
+game commands. See `tests/e2e/dice-roller.spec.ts` for the desktop/mobile flow.
 
 ### Modifiers and prerequisites
 

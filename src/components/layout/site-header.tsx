@@ -23,7 +23,7 @@ import "./site-header.css";
 const playItems = [
   { label: "Campaigns", icon: Swords },
   { label: "Characters", icon: Users, to: "/characters" as const },
-  { label: "Dice", icon: Dices },
+  { label: "Dice", icon: Dices, to: "/dice" as const },
   { label: "Wiki", icon: BookOpen },
 ] as const;
 
@@ -99,6 +99,11 @@ export function SiteHeader() {
   const pages = [
     { name: "Home", description: "Welcome to Endless Codex", to: "/" as const },
     {
+      name: "Dice roller",
+      description: "Roll d2 through d1000 with bonuses and penalties",
+      to: "/dice" as const,
+    },
+    {
       name: "Characters",
       description: "View all of your saved adventurers",
       to: "/characters" as const,
@@ -153,7 +158,7 @@ export function SiteHeader() {
               </Link>
               <details ref={playDropdown} className="codex-play-dropdown">
                 <summary
-                  className={`codex-nav-item ${pathname.startsWith("/characters") ? "is-active" : ""}`}
+                  className={`codex-nav-item ${pathname.startsWith("/characters") || pathname === "/dice" ? "is-active" : ""}`}
                 >
                   <Swords aria-hidden="true" />
                   <span>Play</span>
@@ -277,9 +282,7 @@ export function SiteHeader() {
                       <span>{page.description}</span>
                     </Link>
                   ))}
-                  {pages.length === 0 && (
-                    <p>No pages found. Campaigns, Dice, and Wiki are coming soon.</p>
-                  )}
+                  {pages.length === 0 && <p>No pages found. Campaigns and Wiki are coming soon.</p>}
                 </div>
               </>
             ) : (

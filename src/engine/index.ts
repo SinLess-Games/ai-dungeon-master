@@ -2,6 +2,7 @@ export * from "./actions";
 export * from "./checks";
 export * from "./conditions";
 export * from "./dice";
+export * from "./diceNotation";
 export * from "./effects";
 export * from "./events";
 export * from "./modifiers";

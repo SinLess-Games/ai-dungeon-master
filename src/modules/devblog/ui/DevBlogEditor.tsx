@@ -7,7 +7,9 @@ import { mediaUrl, postSchema, slugify } from "../domain/schemas";
 import { BlogError } from "./BlogShared";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { ImageUploader } from "./ImageUploader";
+
 type Draft = z.infer<typeof postSchema>;
+
 const empty: Draft = {
   title: "",
   slug: "",
@@ -16,6 +18,7 @@ const empty: Draft = {
   status: "draft",
   coverImageId: null,
 };
+
 export function DevBlogEditor({
   userId,
   id,
@@ -43,6 +46,7 @@ export function DevBlogEditor({
     />
   );
 }
+
 function EditorForm({
   id,
   initial,
@@ -65,16 +69,49 @@ function EditorForm({
   const [saved, setSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
   const lock = useRef(false);
+  const uploadDraftId = useRef<string | null>(id === "new" ? null : id);
   const queryClient = useQueryClient();
+
   useBlocker({
     shouldBlockFn: () => dirty && !window.confirm("Discard your unsaved post changes?"),
     enableBeforeUnload: dirty,
   });
+
   function edit(patch: Partial<Draft>) {
     setDraft((value) => ({ ...value, ...patch }));
     setDirty(true);
     setSaved(false);
   }
+
+  async function invalidateBlogQueries() {
+    await queryClient.invalidateQueries({ queryKey: ["devblog"] });
+    await queryClient.invalidateQueries({
+      predicate: (q) => q.queryKey.includes("devblog") && q.queryKey[0] === "admin",
+    });
+  }
+
+  async function prepareDraftForUpload() {
+    if (id !== "new") return id;
+    if (uploadDraftId.current) return uploadDraftId.current;
+    const parsed = postSchema.safeParse({
+      ...draft,
+      status: "draft",
+      coverImageId: null,
+      updatedAt: undefined,
+    });
+    if (!parsed.success) {
+      throw new Error(
+        parsed.error.issues[0]?.message ||
+          "Add a valid post title and URL slug before uploading an image.",
+      );
+    }
+    const result = await checked(await api.api.admin.devblog.posts.$post({ json: parsed.data }));
+    uploadDraftId.current = result.id;
+    setDirty(false);
+    await invalidateBlogQueries();
+    return result.id;
+  }
+
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (lock.current) return;
@@ -106,10 +143,7 @@ function EditorForm({
         setSaved(true);
         refresh();
       }
-      await queryClient.invalidateQueries({ queryKey: ["devblog"] });
-      await queryClient.invalidateQueries({
-        predicate: (q) => q.queryKey.includes("devblog") && q.queryKey[0] === "admin",
-      });
+      await invalidateBlogQueries();
     } catch (error) {
       setError(error instanceof Error ? error.message : "Unable to save post.");
     } finally {
@@ -117,6 +151,7 @@ function EditorForm({
       setBusy(false);
     }
   }
+
   return (
     <div className="blog-editor">
       <button
@@ -218,6 +253,10 @@ function EditorForm({
               </option>
             ))}
           </select>
+          <p className="blog-help">
+            Need a new image? Browse your computer with the uploader below. New posts are saved as
+            drafts automatically before the upload starts.
+          </p>
           {draft.coverImageId && (
             <img
               className="blog-cover-preview"
@@ -254,10 +293,20 @@ function EditorForm({
         )}
       </form>
       {id === "new" ? (
-        <p className="blog-help">Save a draft to upload cover and Markdown images.</p>
+        <ImageUploader
+          preparePost={prepareDraftForUpload}
+          uploaded={(postId) => {
+            created(postId);
+          }}
+        />
       ) : (
         <>
-          <ImageUploader postId={id} uploaded={refresh} />
+          <ImageUploader
+            postId={id}
+            uploaded={() => {
+              refresh();
+            }}
+          />
           <div className="blog-media-library">
             {images.map((image) => (
               <div key={image.id}>

@@ -1,9 +1,19 @@
 import { useState, useRef, type FormEvent } from "react";
 import { api, checked } from "../client/queries";
-export function ImageUploader({ postId, uploaded }: { postId: string; uploaded: () => void }) {
+
+type UploadedImage = { id: string; alt: string };
+
+type ImageUploaderProps = {
+  postId?: string;
+  preparePost?: () => Promise<string>;
+  uploaded: (postId: string, image: UploadedImage) => void | Promise<void>;
+};
+
+export function ImageUploader({ postId, preparePost, uploaded }: ImageUploaderProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const lock = useRef(false);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (lock.current) return;
@@ -28,9 +38,13 @@ export function ImageUploader({ postId, uploaded }: { postId: string; uploaded: 
       bitmap.close();
       if (width > 20000 || height > 20000)
         throw new Error("Image dimensions must be below 20,000 pixels.");
-      await checked(
+
+      const targetPostId = postId ?? (preparePost ? await preparePost() : null);
+      if (!targetPostId) throw new Error("Save the post before uploading an image.");
+
+      const image = await checked(
         await api.api.admin.devblog.posts[":id"].media.$post({
-          param: { id: postId },
+          param: { id: targetPostId },
           form: {
             file,
             alt: String(input.get("alt")),
@@ -40,7 +54,7 @@ export function ImageUploader({ postId, uploaded }: { postId: string; uploaded: 
         }),
       );
       form.reset();
-      uploaded();
+      await uploaded(targetPostId, image);
     } catch (error) {
       setError(error instanceof Error ? error.message : "Unable to upload image.");
     } finally {
@@ -48,6 +62,7 @@ export function ImageUploader({ postId, uploaded }: { postId: string; uploaded: 
       setBusy(false);
     }
   }
+
   return (
     <form className="blog-form blog-upload" onSubmit={(event) => void submit(event)}>
       <h3>Upload an image</h3>

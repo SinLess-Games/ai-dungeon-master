@@ -6,7 +6,7 @@ The public blog is at `/devblog`; posts use `/devblog/:slug`. **Devblog studio**
 
 1. Sign in as an administrator, open Devblog studio, and choose **New post**.
 2. Enter a title (the initial URL slug is generated automatically), excerpt, and Markdown body.
-3. Save a draft to enable image uploads. Supply alt text and choose a PNG, JPEG, or WebP file up to 5 MB.
+3. Use **Upload an image** to browse your computer for a PNG, JPEG, or WebP file up to 5 MB and provide alt text. On a new post, the editor automatically creates a draft before uploading so you do not need to manually save first.
 4. Choose an uploaded cover image, or use **Insert in Markdown** to embed an image. Images are scoped to the post that owns them.
 5. Switch between **Write Markdown** and **Preview**. Headings, emphasis, lists, links, blockquotes, code blocks, GFM tables, rules, and uploaded images are supported.
 6. Choose **Published** and save to make the post public. Choose **Archived** and save to remove it from public pages while preserving its content, comments, and media. Archived posts can be restored.

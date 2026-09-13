@@ -1,12 +1,15 @@
 -- PHB v3.5 Chapter 7 complete weapon and ammunition catalog.
 -- Source: Table 7-5 and adjacent weapon descriptions, pp. 112-122.
+-- D1 does not authorize TEMP tables, so these short-lived staging tables are regular
+-- tables created and dropped inside the seed batch transaction.
 
 INSERT OR IGNORE INTO dnd35_sources
 (id,slug,name,abbreviation,publisher,system,edition,description,url,is_official,is_homebrew,owner_user_id)
 VALUES ('phb-3.5','players-handbook-3-5','Player''s Handbook','PHB','Wizards of the Coast','dnd','3.5',
 'Core Rulebook I; source for D&D v3.5 player equipment, weapons, armor, gear, goods, and services.',NULL,1,0,NULL);
 
-CREATE TEMP TABLE _phb_weapon_seed AS
+DROP TABLE IF EXISTS _phb_weapon_seed;
+CREATE TABLE _phb_weapon_seed AS
 SELECT
  json_extract(value,'$[0]') slug,json_extract(value,'$[1]') name,json_extract(value,'$[2]') proficiency,
  json_extract(value,'$[3]') handedness,json_extract(value,'$[4]') attack_kind,json_extract(value,'$[5]') crit_min,
@@ -29,8 +32,8 @@ SELECT 'phb-item-'||slug,proficiency,handedness,attack_kind,crit_min,crit_mult,r
 FROM _phb_weapon_seed;
 
 INSERT OR IGNORE INTO dnd35_weapon_damage(weapon_id,size,weapon_end,dice)
-SELECT 'phb-item-'||slug,'small',1,dmg_small FROM _phb_weapon_seed
-UNION ALL SELECT 'phb-item-'||slug,'medium',1,dmg_medium FROM _phb_weapon_seed
+SELECT 'phb-item-'||slug,'small',1,dmg_small FROM _phb_weapon_seed WHERE dmg_small IS NOT NULL
+UNION ALL SELECT 'phb-item-'||slug,'medium',1,dmg_medium FROM _phb_weapon_seed WHERE dmg_medium IS NOT NULL
 UNION ALL SELECT 'phb-item-'||slug,'small',2,end2_small FROM _phb_weapon_seed WHERE end2_small IS NOT NULL
 UNION ALL SELECT 'phb-item-'||slug,'medium',2,end2_medium FROM _phb_weapon_seed WHERE end2_medium IS NOT NULL;
 
@@ -38,7 +41,8 @@ INSERT OR IGNORE INTO dnd35_weapon_damage_types(weapon_id,damage_type)
 SELECT 'phb-item-'||w.slug,t.value
 FROM _phb_weapon_seed w, json_each(w.damage_types) t;
 
-CREATE TEMP TABLE _phb_ammo_seed AS
+DROP TABLE IF EXISTS _phb_ammo_seed;
+CREATE TABLE _phb_ammo_seed AS
 SELECT json_extract(value,'$[0]') slug,json_extract(value,'$[1]') name,json_extract(value,'$[2]') kind,
        json_extract(value,'$[3]') qty,json_extract(value,'$[4]') price_copper,json_extract(value,'$[5]') weight_lb,
        json_extract(value,'$[6]') weapon_slugs

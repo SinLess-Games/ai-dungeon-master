@@ -47,7 +47,9 @@ jobs:
         run: npm ci
 
       # Cache only the pre-test D1 fixture. Using restore/save separately avoids
-      # persisting mutations made by the creator E2E suite itself.
+      # persisting mutations made by the creator E2E suite itself. The exact-key
+      # hash invalidates the fixture whenever migrations, seeds, seed tooling,
+      # Wrangler config, or the locked Wrangler/runtime dependency set changes.
       - name: Restore local D1 test database
         id: d1-cache
         uses: actions/cache/restore@v4

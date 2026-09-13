@@ -139,6 +139,7 @@ export const characterEquipmentCreationRoutes = new Hono<CharacterCreationEnv>()
         .orderBy(asc(items.category), asc(items.name))
         .all(),
     ]);
+    const purchaseBudget = wealth?.startingWealthCopper ?? null;
     return c.json({
       class: {
         id: context.selectedClass.classId,
@@ -159,7 +160,13 @@ export const characterEquipmentCreationRoutes = new Hono<CharacterCreationEnv>()
       formula: context.selected,
       wealth: wealth ?? null,
       inventory,
-      options: availableItems.filter((item) => item.priceCopper !== null),
+      options:
+        purchaseBudget === null
+          ? []
+          : availableItems.filter(
+              (item): item is typeof item & { priceCopper: number } =>
+                item.priceCopper !== null && item.priceCopper <= purchaseBudget,
+            ),
     });
   })
   .post("/api/characters/:characterId/starting-wealth/roll", async (c) => {

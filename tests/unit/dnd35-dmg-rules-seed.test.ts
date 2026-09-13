@@ -49,7 +49,7 @@ it("seeds DMG and DMG II rules idempotently without duplicate canonical slugs", 
     expect({
       dmg: scalar(db, "SELECT count(*) AS n FROM dnd35_rules WHERE source_id='dmg-3.5'"),
       dmg2: scalar(db, "SELECT count(*) AS n FROM dnd35_rules WHERE source_id='dmg2-3.5'"),
-    }).toEqual({ dmg: 195, dmg2: 146 });
+    }).toEqual({ dmg: 199, dmg2: 146 });
 
     const firstCount = scalar(db, "SELECT count(*) AS n FROM dnd35_rules");
     seedRules(db);
@@ -110,6 +110,12 @@ it("seeds DMG and DMG II rules idempotently without duplicate canonical slugs", 
         very_difficult: 15,
         overpowering: 5,
       },
+    });
+    expect(mechanics(db, "dmg-leadership")).toMatchObject({
+      minimum_character_level: 6,
+      base_score: "character level + Charisma modifier",
+      cohort_character_level_cap_offset: -2,
+      follower_level_columns: [1, 2, 3, 4, 5, 6],
     });
 
     expect(mechanics(db, "dmg2-mob-trample")).toMatchObject({

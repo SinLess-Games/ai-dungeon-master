@@ -1,0 +1,63 @@
+-- Heroes of Horror: campaign-level alignment, divination, resurrection, and violence variants.
+-- Source: Heroes of Horror, Chapter 4, pp. 76-80. Mechanical text is summarized; source pages remain authoritative.
+
+WITH desired(slug,name,source_page,category,kind,is_variant,default_enabled,summary,tags,mechanics) AS (VALUES
+('hoh-behavioral-alignment','Optional Rule: Behavioral Alignment','76-77','alignment','subsystem',1,0,
+ 'Treat alignment as a description of behavior and codes rather than an intrinsic cosmic force, while preserving class conduct and typical creature behavior.',
+ '["horror","alignment","variant","behavior"]',
+ '{"cosmic_alignment_forces":false,"alignment_is":"general attitudes and behavior","good_evil_monster_subtypes":false,"good_evil_spell_descriptors":false,"class_and_race_restrictions_remain":true,"monster_alignment_entries":"guidelines rather than immutable nature","alignment_spells":{"option_remove":true,"option_reinterpret":true,"detect_evil":"detect current evil intent or activity rather than inherent nature; exceptionally horrific habitual evildoers may always register","magic_circle":"may be collapsed into a single protection spell against attacks by sentient beings"},"limited_use_alignment_abilities":{"option_remove_target_restriction":true,"option_require_active_behavior":true,"example":"smite evil can either work against any enemy or only against a creature actively engaged in evil acts"},"damage_reduction":{"option_default_to":"magic","option_new_categories":true,"divine_example":{"activation":"cleric or paladin spends a turn-undead use to charge a weapon","duration_rounds":"turning level + Charisma modifier"}}}'),
+('hoh-replace-alignment-with-taint','Replacing Alignment with Taint','77','alignment','subsystem',1,0,
+ 'Replace alignment with a tainted-versus-untainted model when taint is central to the campaign.',
+ '["horror","alignment","taint","variant"]',
+ '{"alignment_replaced":true,"states":["tainted","untainted"],"evil_monster_taint":"one-half Charisma score","evil_undead_modifier":1,"evil_outsider_modifier":2,"detect_alignment_replacement":"detect taint","protection_alignment_replacement":"protection or magic circle against taint","smite":"functions against tainted creatures, or against untainted creatures when used by an innately tainted or taint-embracing source","monster_transformation_examples_are_campaign_options":true}'),
+('hoh-working-around-alignment','Working Around Alignment','77-78','alignment','guidance',1,0,
+ 'Keep standard alignment but preserve mystery by using alignment masking selectively, villains for whom discovery is not decisive, and alignment detection as circumstantial evidence rather than proof.',
+ '["horror","alignment","mystery","guidance"]',
+ '{"standard_alignment_retained":true,"villain_countermeasures":"knowledgeable villains may use effects such as undetectable alignment, but overuse is discouraged","alignment_detection":"circumstantial evidence at most","design_goal":"do not make alignment detection useless; sometimes let it matter while avoiding automatic mystery resolution"}'),
+('hoh-divination-in-mysteries','Divination in Horror Mysteries','78','divination','guidance',1,0,
+ 'Reward inventive divination while enforcing each spell''s printed limits so divination supports investigation instead of replacing it.',
+ '["horror","divination","mystery","investigation"]',
+ '{"remove_divination_recommended":false,"principle":"use exact spell parameters","examples":{"detect_thoughts":{"has_will_save":true,"mindless_or_unaware_targets":"may provide no useful identification"},"clairaudience_clairvoyance":{"limited_range":true,"observes":"specific location"},"commune":{"answers":"yes/no","obscure_information":"may be unknown to deity"},"discern_location":{"requires":"caster has seen or touched target, or has something belonging to the individual","reveals":"current location only","identity_guidance":"without a belonging, DM may require actual identity/name/specific title rather than an unknown-role description"},"scrying":{"subject_will_save":true,"unfamiliarity_can_improve_save":true,"view_radius_ft":10,"audio":false,"location_may_remain_ambiguous":true},"true_seeing":{"duration":"1 minute/level","limitation":"must know when and where to use it"}},"villain_counterplay":"intelligent villains may use magical and mundane anti-divination precautions","anti_divination_overuse_discouraged":true,"positive_design":"some mysteries should allow or require divination to obtain key clues"}'),
+('hoh-resurrection-casting-time','Resurrection Variant: Extended Casting Time','78-79','resurrection','rule',1,0,
+ 'Make returning the dead a long ritual measured in hours rather than minutes.',
+ '["horror","death","resurrection","variant"]',
+ '{"casting_time":"hours","exact_duration":"campaign-defined"}'),
+('hoh-resurrection-location','Resurrection Variant: Required Location','79','resurrection','procedure',1,0,
+ 'Require the corpse to be taken to a spiritually appropriate place before resurrection can succeed.',
+ '["horror","death","resurrection","variant","location"]',
+ '{"required_location":true,"identify_location_check":["Knowledge (religion)","bardic knowledge"],"identify_location_dc":15,"example_locations":["temple of a death deity","temple of the deceased character''s deity","spiritually significant underworld-adjacent place","heavenward sacred height"]}'),
+('hoh-resurrection-balance-scales','Resurrection Variant: Balancing the Scales','79','resurrection','guidance',1,0,
+ 'Require another soul to pass to the underworld in exchange for the one being restored, with the exact sacrifice conditions chosen for the campaign.',
+ '["horror","death","resurrection","variant","sacrifice"]',
+ '{"replacement_soul_required":true,"baseline":"sentient soul","optional_constraints":["willing volunteer","same alignment as deceased","same deity as deceased"],"constraints_are_examples":true}'),
+('hoh-resurrection-quest-for-dead','Resurrection Variant: Quest for the Dead','79','resurrection','guidance',1,0,
+ 'Turn resurrection into a bargain or underworld quest to secure and return the deceased soul.',
+ '["horror","death","resurrection","variant","quest"]',
+ '{"possible_methods":["bargain with deity of death","complete task demanded by deity","travel to underworld","locate and retrieve soul"],"resurrection_spell_may_be_optional":true,"spell_may_still_be_required_to_remove_or_reattach_soul":true}'),
+('hoh-coming-back-wrong','Resurrection Variant: Coming Back Wrong','79-80','resurrection','procedure',1,0,
+ 'Require a hidden skill check when returning the dead; failure produces a resurrection mishap in addition to normal level loss.',
+ '["horror","death","resurrection","variant","mishap"]',
+ '{"check_choice":["Knowledge (religion)","Spellcraft"],"roller":"DM","natural_1_always_fails":true,"dc":{"raise_dead":"15 + days dead","reincarnate":"15 + days dead","resurrection":"15 + decades dead","true_resurrection":"15 + decades dead"},"success":"spell works normally","failure":"roll d% on Resurrection Mishaps table","mishap_additional_to_normal_level_loss":true}'),
+('hoh-resurrection-mishaps','Resurrection Mishaps','80','resurrection','table',1,0,
+ 'A d% table of changes or complications that can accompany a failed Coming Back Wrong check.',
+ '["horror","death","resurrection","variant","table"]',
+ '{"source_note":"The printed final ranges overlap at 96: one row is 93-96 and the final row is printed 96-100. This overlap is preserved rather than silently corrected.","rows":[{"min":1,"max":4,"result":"unusually cold touch with lingering discomfort"},{"min":5,"max":8,"result":"eyes change color, tint, size, or shape"},{"min":9,"max":11,"result":"smells of freshly dug earth"},{"min":12,"max":16,"result":"hair and fingernails become brittle and colorless"},{"min":17,"max":20,"result":"becomes reckless and feels death need not be feared"},{"min":21,"max":24,"result":"becomes unusually cautious and protective of the second chance at life"},{"min":25,"max":28,"result":"becomes more generous and caring"},{"min":29,"max":32,"result":"becomes more selfish, withdrawn, and possessive"},{"min":33,"max":36,"result":"becomes fascinated with death and seeks others returned from death"},{"min":37,"max":40,"result":"one feat changes; a caster with a spells-known list also has one known spell changed"},{"min":41,"max":44,"result":"develops a split personality including the personality of someone who once died nearby"},{"min":45,"max":48,"result":"is followed by a shadow creature seeking to kill the subject and those who restored the subject"},{"min":49,"max":52,"result":"becomes owned by an extraplanar entity and must serve it as though summoned"},{"min":53,"max":56,"result":"develops a phobia of things representing death"},{"min":57,"max":60,"result":"develops a taste for raw flesh, carrion, maggots, or a similar repugnant food"},{"min":61,"max":64,"result":"retains a visibly deathlike appearance"},{"min":65,"max":68,"result":"develops or intensifies an abiding interest in religion"},{"min":69,"max":72,"result":"speaks of death still wanting and waiting for the subject"},{"min":73,"max":76,"result":"spurns wealth and possessions"},{"min":77,"max":80,"result":"seeks to ease the suffering of the dead and respectfully bury even hated enemies"},{"min":81,"max":84,"result":"occasionally babbles in unknown languages or channels an unearthly voice"},{"min":85,"max":88,"result":"sleepwalks and may attack people while asleep, usually unarmed"},{"min":89,"max":92,"result":"one body part or skin patch remains dead, rotting, discolored, and carrion-scented"},{"min":93,"max":96,"result":"suffers terrible nightmares and requires 2 to 4 additional hours of rest to be fully rested"},{"min":96,"max":100,"result":"if using taint, gains 1d4 taint and rolls again for a second mishap"}]}'),
+('hoh-resurrection-unchanged','Resurrection Is Unchanged','79-80','resurrection','guidance',1,0,
+ 'If resurrection itself remains unchanged, preserve the consequences of death through cost, time pressure, body loss, enemy counterplay, and the character''s willingness to return.',
+ '["horror","death","resurrection","guidance"]',
+ '{"core_resurrection_rules_retained":true,"pressure_points":["material cost","normal level loss except where core rules say otherwise","party vulnerability while restoring a companion","body destruction or theft can force stronger magic","returning soul must have reason to accept return"],"villains_may_also_be_resurrected":true}'),
+('hoh-violence-causes-taint','Violence and Taint','80','taint','subsystem',1,0,
+ 'In a strongly horror-focused campaign, unnecessary cruelty toward an animal or killing a sentient being can itself inflict taint.',
+ '["horror","taint","violence","variant"]',
+ '{"unnecessary_cruelty_killing_animal_taint":1,"killing_sentient_being_taint":1,"default_taint_type":"depravity","corruption_may_replace_depravity_for":["unnatural magic","killing in intensely mystical regions","killing in intensely holy regions","killing in intensely profane regions"],"experience_guidance":{"bulk_from":"story awards","noncombat_solution_bonus_percent":25,"bonus_is_average_guidance":true}}'),
+('hoh-lesser-evil-violence-taint','The Lesser Evil','80','taint','subsystem',1,0,
+ 'Use a softer violence-and-taint variant that exempts necessary self-defense while still tainting murder, cruelty, and avoidable killing.',
+ '["horror","taint","violence","variant"]',
+ '{"no_taint_examples":["killing in self-defense","slaying an innately evil creature when there is no other choice"],"taint_examples":["murdering innocents","unnecessary cruelty while killing evil beings","killing evil creatures despite having other means of defeating them"]}')
+)
+INSERT INTO dnd35_rules
+  (id,source_id,source_page,slug,name,description,rules_text,is_homebrew,owner_user_id,is_enabled,category,kind,is_variant,default_enabled,parent_slug,supersedes_slug,tags,mechanics)
+SELECT 'hoh-rule-'||d.slug,'hoh-3.5',d.source_page,d.slug,d.name,d.summary,d.summary,0,NULL,1,
+       d.category,d.kind,d.is_variant,d.default_enabled,NULL,NULL,d.tags,d.mechanics
+FROM desired d
+WHERE NOT EXISTS (SELECT 1 FROM dnd35_rules r WHERE r.slug=d.slug AND r.owner_user_id IS NULL);

@@ -1,0 +1,160 @@
+-- Epic Level Handbook epic rods.
+-- Source: Epic Level Handbook, Chapter 4, pp. 137-140.
+-- Mechanical text is summarized; source remains authoritative.
+-- Table 4-19 market prices are preserved where adjacent prose differs.
+
+INSERT OR IGNORE INTO dnd35_sources
+  (id,slug,name,abbreviation,publisher,system,edition,description,url,is_official,is_homebrew,owner_user_id)
+VALUES ('elh-3.0','epic-level-handbook-3-0','Epic Level Handbook','ELH','Wizards of the Coast','dnd','3.0',
+        'Epic Level Handbook (2002): progression beyond 20th level, epic skills and feats, epic spell development, epic magic items, monsters, prestige classes, and campaign rules.',NULL,1,0,NULL);
+
+WITH desired(
+  id,page,slug,name,description,rules_text,price_copper,caster_level,enhancement_bonus,activation,activation_text,
+  craft_cost_copper,craft_xp_cost,crafting_text
+) AS (VALUES
+('elh-item-rod-epic-spellcaster','138','rod-of-the-epic-spellcaster','Rod of the Epic Spellcaster',
+ 'An adamantine epic rod that improves the wielder''s control of epic magic.',
+ 'While held or carried, grants +10 insight on Spellcraft checks made to cast epic spells. Table 4-19 lists 245,000 gp while the prose lists 245,400 gp; the table price is preserved.',
+ 24500000,21,0,'continuous','The Spellcraft bonus functions while the rod is held or carried.',NULL,NULL,'Craft Rod; Craft Epic Rod.'),
+('elh-item-rod-nightmares','139','rod-of-nightmares','Rod of Nightmares',
+ 'A disturbing ebony epic rod that inflicts waking dread and lethal nightmare magic.',
+ 'Creatures within 20 feet other than the wielder must save Will DC 17 or suffer a nightmare effect the next time they sleep. Three times per day a command releases a scream affecting up to twenty of the closest creatures within 30 feet as wail of the banshee (DC 23).',
+ 28400000,21,0,'other','Continuous 20-foot nightmare aura; command word scream up to three times per day.',NULL,NULL,'Craft Rod; Craft Epic Rod; nightmare; permanency; wail of the banshee.'),
+('elh-item-rod-epic-splendor','138','rod-of-epic-splendor','Rod of Epic Splendor',
+ 'A lavish epic rod that enhances Charisma and conjures extraordinary finery and lodging.',
+ 'While held or carried, grants +8 enhancement Charisma. Three times per day it creates valuable clothing and adornments lasting up to 24 hours. Once per week it creates a palatial mansion for up to 250 people lasting three days. Table 4-19 lists 297,000 gp while the prose lists 297,400 gp; the table price is preserved.',
+ 29700000,21,0,'other','Continuous Charisma bonus; created finery three times per day; mansion once per week.',19120000,12124,'Craft Rod; Craft Epic Rod; fabricate; Mordenkainen''s magnificent mansion.'),
+('elh-item-rod-path','139','rod-of-the-path','Rod of the Path',
+ 'A polished-oak epic travel rod that reveals terrain, routes, and hidden features.',
+ 'Grants +30 enhancement on Wilderness Lore checks for tracking and Intuit Direction checks, triples normal visual range, and provides true seeing while peering through its hollow handle. Three times per day it maps an area from 50 feet to 24 miles radius, and three times per day it grants passage through natural growth or water to the wielder plus five creatures. Once per day it creates a 5-foot by 40-foot stone bridge for 1 hour, and once per day grants pass without trace to the wielder plus twenty creatures for 21 minutes.',
+ 30687000,21,0,'other','Continuous travel benefits plus multiple command-activated daily powers.',NULL,NULL,'Craft Rod; Craft Epic Rod; find the path; freedom of movement; pass without trace; wall of stone.'),
+('elh-item-rod-epic-cancellation','137','rod-of-epic-cancellation','Rod of Epic Cancellation',
+ 'A consumable epic rod capable of permanently stripping magic from even epic items.',
+ 'A successful touch drains all magical properties from a magic or epic magic item, but not most artifacts. The target gets Will DC 26; if held, it may use the holder''s Will bonus. After draining three items the rod becomes useless. Lost power requires wish, miracle, or a purpose-built epic spell to restore. It can neutralize a normal sphere of annihilation without being cancelled.',
+ 33000000,25,0,'use_activated','Touch a magic item; three successful drain uses exhaust the rod.',NULL,NULL,'Craft Rod; Craft Epic Rod; dispel magic.'),
+('elh-item-rod-epic-negation','138','rod-of-epic-negation','Rod of Epic Negation',
+ 'An epic rod that temporarily suppresses functions of magic and epic magic items.',
+ 'Three times per day the wielder fires a ray requiring a ranged touch attack. It negates any active function and has a 75% chance to negate each other spell or spell-like function of the target item for 2d4 rounds. Artifacts are unaffected; the target receives no saving throw.',
+ 44600000,24,0,'use_activated','Ray attack up to three times per day.',NULL,NULL,'Craft Rod; Craft Epic Rod; dispel magic; limited wish or miracle.'),
+('elh-item-rod-besiegement','137','rod-of-besiegement','Rod of Besiegement',
+ 'A +3 light-mace epic rod specialized for assaulting fortifications.',
+ 'Functions as a +3 light mace and becomes +6 on a charge. Twice per day it creates a battering ram for 24 rounds; the ram attacks fortifications once per round for 20 damage and has AC 22 and 65 hp. Three times per day it can create one heavy catapult, two light catapults, or three siege towers with 20 shots each for 12 hours. It also casts transmute rock to mud three times per day (CL 24th, DC 17).',
+ 44774500,24,3,'other','Weapon function is continuous; battering ram twice/day; siege engines and transmute rock to mud three times/day.',22402500,14474,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Bigby''s clenched fist; passwall; Rary''s telepathic bond; transmute rock to mud.'),
+('elh-item-rod-fortification','139','rod-of-fortification','Rod of Fortification',
+ 'A +3 light-mace epic rod for constructing and defending strongholds.',
+ 'Functions as a +3 light mace. While the wielder benefits from cover, improves it to nine-tenths cover. Three times per day creates food and water for twenty-four people. Four times per day creates or repairs a fortified stone wall; once per day can add a great iron door. Four times per day creates one heavy catapult, two light catapults, or three ballistae with 20 shots each.',
+ 46566500,24,3,'other','Weapon and improved-cover effects are continuous while held; fortification and supply powers have daily limits.',23198500,14634,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Bigby''s interposing hand; create food and water; major creation; wall of iron; wall of stone.'),
+('elh-item-rod-epic-rulership','138','rod-of-epic-rulership','Rod of Epic Rulership',
+ 'A royal epic scepter that compels mass obedience.',
+ 'As a standard action, commands creatures within 360 feet totaling up to 900 Hit Dice. Creatures with Intelligence 17 or higher receive Will DC 29. Commands contrary to a creature''s nature break the effect for that creature. The rod functions for 1,500 total minutes, not necessarily consecutive, before crumbling to dust.',
+ 57500000,25,0,'use_activated','Standard-action rulership effect drawing from a total 1,500-minute lifetime.',30000000,15500,'Craft Rod; Craft Epic Rod; Improved Heighten Spell; improved heightened mass charm.'),
+('elh-item-rod-invulnerability','139','rod-of-invulnerability','Rod of Invulnerability',
+ 'A stout adamantine epic rod granting a suite of powerful defenses.',
+ 'While held, grants +5 natural armor, +5 resistance on saving throws, damage reduction 50/+3, immunity to critical hits, and spell resistance 32.',
+ 60000000,20,0,'continuous','All defensive benefits function while held.',NULL,NULL,'Craft Rod; Craft Epic Rod; iron body; resistance; spell resistance.'),
+('elh-item-rod-paradise','139','rod-of-paradise','Rod of Paradise',
+ 'An epic rod of security able to shelter enormous groups in a safe extradimensional refuge.',
+ 'Creates a safe nondimensional refuge for the possessor and up to 999 other creatures. Total duration equals 1,000 days divided by the number of creatures using it. Natural healing occurs at five times normal speed; otherwise it functions as a rod of security.',
+ 61000000,24,0,'use_activated','Activates the extradimensional refuge as a rod of security.',NULL,NULL,'Craft Rod; Craft Epic Rod; Improved Heighten Spell; improved heightened gate.'),
+('elh-item-rod-restless-death','139-140','rod-of-restless-death','Rod of Restless Death',
+ 'An epic necromantic rod that strengthens command over undead and creates additional servants.',
+ 'A wielder who can already rebuke or control undead does so as though four levels higher. A command word casts animate dead; skeletons and zombies animated by the rod are automatically controlled up to 42 HD and do not count against the wielder''s normal limit. A second command word casts slay living heightened to 10th level (DC 25).',
+ 62500000,21,0,'other','Continuous rebuking/control boost plus separate command words for animate dead and slay living.',NULL,NULL,'Craft Rod; Craft Epic Rod; animate dead; control undead; slay living.'),
+('elh-item-rod-excellent-magic','138-139','rod-of-excellent-magic','Rod of Excellent Magic',
+ 'An adamantine-headed epic rod that pays extraordinary experience costs for spellcasting and research.',
+ 'Once per day, when casting a nonepic or epic spell with an XP component, the rod supplies up to 2,000 XP. As a special use, it can pay the XP development cost of an epic spell, but doing so permanently drains all power from the rod.',
+ 65000000,21,0,'other','Supplies up to 2,000 casting XP once/day; may be consumed to pay one epic-spell development XP cost.',32500000,26000,'Craft Rod; Craft Epic Rod.'),
+('elh-item-rod-epic-absorption','137','rod-of-epic-absorption','Rod of Epic Absorption',
+ 'An epic absorption rod that captures vastly more spell energy than its nonepic counterpart.',
+ 'Absorbs single-target or ray spells and spell-like abilities, including metamagic effects above 9th level but excluding epic spells. It can absorb up to 150 spell levels and then only discharge remaining stored potential. It cannot be recharged.',
+ 150000000,23,0,'use_activated','Functions as an epic rod of absorption with a 150-spell-level lifetime capacity.',NULL,NULL,'Craft Rod; Craft Epic Rod; Empower Spell; Maximize Spell; empowered maximized spell turning.'),
+('elh-item-rod-wyrm-white','140','rod-of-the-wyrm-white','Rod of the Wyrm (White)',
+ 'A +5 quarterstaff that transforms into an obedient white wyrm.',
+ 'Functions as a +5 quarterstaff. Thrown to the ground with a command word, it becomes a white wyrm by the end of the round. The dragon obeys the owner and reverts if commanded or if more than 500 feet away. If slain, it returns to rod form and cannot transform again for three days. It functions only for a possessor matching the dragon''s alignment.',
+ 145820000,34,5,'command_word','Throw to the ground and speak the command word to transform; reverting is a full-round action.',72940000,24576,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Craft Epic Magic Arms and Armor; Improved Heighten Spell; improved heightened polymorph other; creator must match the dragon''s alignment.'),
+('elh-item-rod-wyrm-brass','140','rod-of-the-wyrm-brass','Rod of the Wyrm (Brass)',
+ 'A +5 quarterstaff that transforms into an obedient brass wyrm.',
+ 'Functions as a +5 quarterstaff. On command it becomes a brass wyrm, obeying the owner within 500 feet. A slain dragon returns to rod form and cannot transform for three days. It functions only for a possessor matching the dragon''s alignment.',
+ 145820000,34,5,'command_word','Throw to the ground and speak the command word to transform; reverting is a full-round action.',72940000,24576,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Craft Epic Magic Arms and Armor; Improved Heighten Spell; improved heightened polymorph other; creator must match the dragon''s alignment.'),
+('elh-item-rod-wyrm-copper','140','rod-of-the-wyrm-copper','Rod of the Wyrm (Copper)',
+ 'A +5 quarterstaff that transforms into an obedient copper wyrm.',
+ 'Functions as a +5 quarterstaff. On command it becomes a copper wyrm, obeying the owner within 500 feet. A slain dragon returns to rod form and cannot transform for three days. It functions only for a possessor matching the dragon''s alignment.',
+ 156260000,35,5,'command_word','Throw to the ground and speak the command word to transform; reverting is a full-round action.',78160000,25620,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Craft Epic Magic Arms and Armor; Improved Heighten Spell; improved heightened polymorph other; creator must match the dragon''s alignment.'),
+('elh-item-rod-wyrm-black','140','rod-of-the-wyrm-black','Rod of the Wyrm (Black)',
+ 'A +5 quarterstaff that transforms into an obedient black wyrm.',
+ 'Functions as a +5 quarterstaff. On command it becomes a black wyrm, obeying the owner within 500 feet. A slain dragon returns to rod form and cannot transform for three days. It functions only for a possessor matching the dragon''s alignment.',
+ 156260000,35,5,'command_word','Throw to the ground and speak the command word to transform; reverting is a full-round action.',78160000,25620,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Craft Epic Magic Arms and Armor; Improved Heighten Spell; improved heightened polymorph other; creator must match the dragon''s alignment.'),
+('elh-item-rod-wyrm-bronze','140','rod-of-the-wyrm-bronze','Rod of the Wyrm (Bronze)',
+ 'A +5 quarterstaff that transforms into an obedient bronze wyrm.',
+ 'Functions as a +5 quarterstaff. On command it becomes a bronze wyrm, obeying the owner within 500 feet. A slain dragon returns to rod form and cannot transform for three days. It functions only for a possessor matching the dragon''s alignment.',
+ 167060000,36,5,'command_word','Throw to the ground and speak the command word to transform; reverting is a full-round action.',83560000,26700,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Craft Epic Magic Arms and Armor; Improved Heighten Spell; improved heightened polymorph other; creator must match the dragon''s alignment.'),
+('elh-item-rod-wyrm-green','140','rod-of-the-wyrm-green','Rod of the Wyrm (Green)',
+ 'A +5 quarterstaff that transforms into an obedient green wyrm.',
+ 'Functions as a +5 quarterstaff. On command it becomes a green wyrm, obeying the owner within 500 feet. A slain dragon returns to rod form and cannot transform for three days. It functions only for a possessor matching the dragon''s alignment.',
+ 167060000,36,5,'command_word','Throw to the ground and speak the command word to transform; reverting is a full-round action.',83560000,26700,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Craft Epic Magic Arms and Armor; Improved Heighten Spell; improved heightened polymorph other; creator must match the dragon''s alignment.'),
+('elh-item-rod-wyrm-blue','140','rod-of-the-wyrm-blue','Rod of the Wyrm (Blue)',
+ 'A +5 quarterstaff that transforms into an obedient blue wyrm.',
+ 'Functions as a +5 quarterstaff. On command it becomes a blue wyrm, obeying the owner within 500 feet. A slain dragon returns to rod form and cannot transform for three days. It functions only for a possessor matching the dragon''s alignment.',
+ 178220000,37,5,'command_word','Throw to the ground and speak the command word to transform; reverting is a full-round action.',89140000,27816,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Craft Epic Magic Arms and Armor; Improved Heighten Spell; improved heightened polymorph other; creator must match the dragon''s alignment.'),
+('elh-item-rod-wyrm-silver','140','rod-of-the-wyrm-silver','Rod of the Wyrm (Silver)',
+ 'A +5 quarterstaff that transforms into an obedient silver wyrm.',
+ 'Functions as a +5 quarterstaff. On command it becomes a silver wyrm, obeying the owner within 500 feet. A slain dragon returns to rod form and cannot transform for three days. It functions only for a possessor matching the dragon''s alignment.',
+ 178220000,37,5,'command_word','Throw to the ground and speak the command word to transform; reverting is a full-round action.',89140000,27816,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Craft Epic Magic Arms and Armor; Improved Heighten Spell; improved heightened polymorph other; creator must match the dragon''s alignment.'),
+('elh-item-rod-wyrm-gold','140','rod-of-the-wyrm-gold','Rod of the Wyrm (Gold)',
+ 'A +5 quarterstaff that transforms into an obedient gold wyrm.',
+ 'Functions as a +5 quarterstaff. On command it becomes a gold wyrm, obeying the owner within 500 feet. A slain dragon returns to rod form and cannot transform for three days. It functions only for a possessor matching the dragon''s alignment.',
+ 189740000,38,5,'command_word','Throw to the ground and speak the command word to transform; reverting is a full-round action.',94900000,28968,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Craft Epic Magic Arms and Armor; Improved Heighten Spell; improved heightened polymorph other; creator must match the dragon''s alignment.'),
+('elh-item-rod-wyrm-red','140','rod-of-the-wyrm-red','Rod of the Wyrm (Red)',
+ 'A +5 quarterstaff that transforms into an obedient red wyrm.',
+ 'Functions as a +5 quarterstaff. On command it becomes a red wyrm, obeying the owner within 500 feet. A slain dragon returns to rod form and cannot transform for three days. It functions only for a possessor matching the dragon''s alignment.',
+ 189740000,38,5,'command_word','Throw to the ground and speak the command word to transform; reverting is a full-round action.',94900000,28968,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Craft Epic Magic Arms and Armor; Improved Heighten Spell; improved heightened polymorph other; creator must match the dragon''s alignment.'),
+('elh-item-rod-epic-might','137-138','rod-of-epic-might','Rod of Epic Might',
+ 'An adamantine epic counterpart to the rod of lordly might with magical, weapon, and utility forms.',
+ 'Once per day each: touch dominate person (Will DC 24), a 10-foot stunning effect patterned on power word stun (Will DC 24), and a touch that deals 10d8 damage and heals the wielder by the same amount (Will DC 26). Unlimited weapon forms: +6 heavy mace, +3 longsword of fiery blasting, +8 battleaxe, or +10 shortspear/longspear. Utility functions include a 5-to-150-foot climbing pole/ladder supporting 10,000 pounds, forcing doors with +24 Strength, and indicating magnetic north plus approximate depth or height.',
+ 429343200,30,6,'other','Multiple buttons select once/day spell-like powers, weapon forms, and unlimited utility functions.',215137200,52841,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Craft Epic Magic Arms and Armor; cure critical wounds; inflict critical wounds; bull''s strength; fireball; dominate person; power word stun.')
+)
+INSERT INTO dnd35_items
+  (id,source_id,source_page,slug,name,description,rules_text,is_homebrew,owner_user_id,is_enabled,
+   category,price_copper,weight_pounds,size,hardness,hit_points)
+SELECT d.id,'elh-3.0',d.page,d.slug,d.name,d.description,d.rules_text,0,NULL,1,
+       'magic',d.price_copper,NULL,NULL,NULL,NULL
+FROM desired d
+WHERE NOT EXISTS (
+  SELECT 1 FROM dnd35_items i WHERE i.source_id='elh-3.0' AND i.slug=d.slug AND i.owner_user_id IS NULL
+);
+
+WITH desired(
+  item_id,caster_level,enhancement_bonus,activation,activation_text,craft_cost_copper,craft_xp_cost,crafting_text
+) AS (VALUES
+('elh-item-rod-epic-spellcaster',21,0,'continuous','The Spellcraft bonus functions while the rod is held or carried.',NULL,NULL,'Craft Rod; Craft Epic Rod.'),
+('elh-item-rod-nightmares',21,0,'other','Continuous 20-foot nightmare aura; command word scream up to three times per day.',NULL,NULL,'Craft Rod; Craft Epic Rod; nightmare; permanency; wail of the banshee.'),
+('elh-item-rod-epic-splendor',21,0,'other','Continuous Charisma bonus; created finery three times per day; mansion once per week.',19120000,12124,'Craft Rod; Craft Epic Rod; fabricate; Mordenkainen''s magnificent mansion.'),
+('elh-item-rod-path',21,0,'other','Continuous travel benefits plus multiple command-activated daily powers.',NULL,NULL,'Craft Rod; Craft Epic Rod; find the path; freedom of movement; pass without trace; wall of stone.'),
+('elh-item-rod-epic-cancellation',25,0,'use_activated','Touch a magic item; three successful drain uses exhaust the rod.',NULL,NULL,'Craft Rod; Craft Epic Rod; dispel magic.'),
+('elh-item-rod-epic-negation',24,0,'use_activated','Ray attack up to three times per day.',NULL,NULL,'Craft Rod; Craft Epic Rod; dispel magic; limited wish or miracle.'),
+('elh-item-rod-besiegement',24,3,'other','Weapon function is continuous; battering ram twice/day; siege engines and transmute rock to mud three times/day.',22402500,14474,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Bigby''s clenched fist; passwall; Rary''s telepathic bond; transmute rock to mud.'),
+('elh-item-rod-fortification',24,3,'other','Weapon and improved-cover effects are continuous while held; fortification and supply powers have daily limits.',23198500,14634,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Bigby''s interposing hand; create food and water; major creation; wall of iron; wall of stone.'),
+('elh-item-rod-epic-rulership',25,0,'use_activated','Standard-action rulership effect drawing from a total 1,500-minute lifetime.',30000000,15500,'Craft Rod; Craft Epic Rod; Improved Heighten Spell; improved heightened mass charm.'),
+('elh-item-rod-invulnerability',20,0,'continuous','All defensive benefits function while held.',NULL,NULL,'Craft Rod; Craft Epic Rod; iron body; resistance; spell resistance.'),
+('elh-item-rod-paradise',24,0,'use_activated','Activates the extradimensional refuge as a rod of security.',NULL,NULL,'Craft Rod; Craft Epic Rod; Improved Heighten Spell; improved heightened gate.'),
+('elh-item-rod-restless-death',21,0,'other','Continuous rebuking/control boost plus separate command words for animate dead and slay living.',NULL,NULL,'Craft Rod; Craft Epic Rod; animate dead; control undead; slay living.'),
+('elh-item-rod-excellent-magic',21,0,'other','Supplies up to 2,000 casting XP once/day; may be consumed to pay one epic-spell development XP cost.',32500000,26000,'Craft Rod; Craft Epic Rod.'),
+('elh-item-rod-epic-absorption',23,0,'use_activated','Functions as an epic rod of absorption with a 150-spell-level lifetime capacity.',NULL,NULL,'Craft Rod; Craft Epic Rod; Empower Spell; Maximize Spell; empowered maximized spell turning.'),
+('elh-item-rod-wyrm-white',34,5,'command_word','Throw to the ground and speak the command word to transform; reverting is a full-round action.',72940000,24576,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Craft Epic Magic Arms and Armor; Improved Heighten Spell; improved heightened polymorph other; creator must match the dragon''s alignment.'),
+('elh-item-rod-wyrm-brass',34,5,'command_word','Throw to the ground and speak the command word to transform; reverting is a full-round action.',72940000,24576,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Craft Epic Magic Arms and Armor; Improved Heighten Spell; improved heightened polymorph other; creator must match the dragon''s alignment.'),
+('elh-item-rod-wyrm-copper',35,5,'command_word','Throw to the ground and speak the command word to transform; reverting is a full-round action.',78160000,25620,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Craft Epic Magic Arms and Armor; Improved Heighten Spell; improved heightened polymorph other; creator must match the dragon''s alignment.'),
+('elh-item-rod-wyrm-black',35,5,'command_word','Throw to the ground and speak the command word to transform; reverting is a full-round action.',78160000,25620,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Craft Epic Magic Arms and Armor; Improved Heighten Spell; improved heightened polymorph other; creator must match the dragon''s alignment.'),
+('elh-item-rod-wyrm-bronze',36,5,'command_word','Throw to the ground and speak the command word to transform; reverting is a full-round action.',83560000,26700,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Craft Epic Magic Arms and Armor; Improved Heighten Spell; improved heightened polymorph other; creator must match the dragon''s alignment.'),
+('elh-item-rod-wyrm-green',36,5,'command_word','Throw to the ground and speak the command word to transform; reverting is a full-round action.',83560000,26700,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Craft Epic Magic Arms and Armor; Improved Heighten Spell; improved heightened polymorph other; creator must match the dragon''s alignment.'),
+('elh-item-rod-wyrm-blue',37,5,'command_word','Throw to the ground and speak the command word to transform; reverting is a full-round action.',89140000,27816,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Craft Epic Magic Arms and Armor; Improved Heighten Spell; improved heightened polymorph other; creator must match the dragon''s alignment.'),
+('elh-item-rod-wyrm-silver',37,5,'command_word','Throw to the ground and speak the command word to transform; reverting is a full-round action.',89140000,27816,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Craft Epic Magic Arms and Armor; Improved Heighten Spell; improved heightened polymorph other; creator must match the dragon''s alignment.'),
+('elh-item-rod-wyrm-gold',38,5,'command_word','Throw to the ground and speak the command word to transform; reverting is a full-round action.',94900000,28968,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Craft Epic Magic Arms and Armor; Improved Heighten Spell; improved heightened polymorph other; creator must match the dragon''s alignment.'),
+('elh-item-rod-wyrm-red',38,5,'command_word','Throw to the ground and speak the command word to transform; reverting is a full-round action.',94900000,28968,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Craft Epic Magic Arms and Armor; Improved Heighten Spell; improved heightened polymorph other; creator must match the dragon''s alignment.'),
+('elh-item-rod-epic-might',30,6,'other','Multiple buttons select once/day spell-like powers, weapon forms, and unlimited utility functions.',215137200,52841,'Craft Rod; Craft Epic Rod; Craft Magic Arms and Armor; Craft Epic Magic Arms and Armor; cure critical wounds; inflict critical wounds; bull''s strength; fireball; dominate person; power word stun.')
+)
+INSERT OR IGNORE INTO dnd35_magic_items
+  (item_id,aura_school_id,caster_level,manifester_level,aura_strength,activation,activation_text,slot,
+   maximum_charges,recharge_text,enhancement_bonus,craft_cost_copper,craft_xp_cost,crafting_text,crafting_prerequisites)
+SELECT d.item_id,NULL,d.caster_level,NULL,NULL,d.activation,d.activation_text,'slotless',
+       NULL,NULL,d.enhancement_bonus,d.craft_cost_copper,d.craft_xp_cost,d.crafting_text,NULL
+FROM desired d;

@@ -19,6 +19,7 @@ on:
       - "tests/e2e/character-creator.e2e.mjs"
       - "tests/e2e/character-creator-ui.e2e.mjs"
       - "tests/e2e/character-creator-guardrails.e2e.mjs"
+      - "tests/e2e/character-creator-supplement-classes.e2e.mjs"
   workflow_dispatch:
 
 permissions:

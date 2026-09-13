@@ -95,6 +95,14 @@ export function DiceTray() {
   }, []);
 
   useEffect(() => {
+    function openDiceTray() {
+      setOpen(true);
+    }
+    window.addEventListener("endless-codex:open-dice", openDiceTray);
+    return () => window.removeEventListener("endless-codex:open-dice", openDiceTray);
+  }, []);
+
+  useEffect(() => {
     if (open) requestAnimationFrame(() => expressionInput.current?.focus());
   }, [open]);
 
@@ -146,7 +154,7 @@ export function DiceTray() {
           role="dialog"
           aria-modal="false"
           aria-labelledby="dice-tray-title"
-          className="fixed bottom-4 left-4 z-[70] flex max-h-[min(760px,calc(100vh-2rem))] w-[min(430px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-gold/35 bg-background/98 text-foreground shadow-2xl backdrop-blur-xl"
+          className="fixed bottom-4 left-4 z-[70] flex max-h-[min(760px,calc(100vh-2rem))] w-[min(430px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-gold/35 bg-background/95 text-foreground shadow-2xl backdrop-blur-xl"
         >
           <header className="flex items-center justify-between border-b border-border px-4 py-3">
             <div className="flex items-center gap-3">

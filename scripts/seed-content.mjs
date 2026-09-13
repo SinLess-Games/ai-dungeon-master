@@ -219,18 +219,26 @@ function sqlLiteral(value) {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
+export function normalizeD1SeedSql(contents) {
+  // Cloudflare D1 rejects CREATE TEMP/TEMPORARY TABLE through the execute API.
+  // Seed staging tables are transaction-scoped in practice because their seed
+  // files drop them before completion, so execute them as regular tables.
+  return contents.replace(/\bCREATE\s+(?:TEMP|TEMPORARY)\s+TABLE\b/giu, "CREATE TABLE");
+}
+
 export function buildSeedBatch(contents, path, contentHash) {
+  const executableContents = normalizeD1SeedSql(contents);
   // Find the last SQL token, ignoring comments and treating quoted text as one
   // token. Adding an extra ';' after an existing terminator creates an empty
   // statement that remote D1 imports reject (local D1 silently ignores it).
   let lastToken;
   const tokens =
     /--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:""|[^"])*"|`(?:``|[^`])*`|\[[^\]]*\]|\S/g;
-  for (const [token] of contents.matchAll(tokens)) {
+  for (const [token] of executableContents.matchAll(tokens)) {
     if (!token.startsWith("--") && !token.startsWith("/*")) lastToken = token;
   }
   const terminator = lastToken && lastToken !== ";" ? ";\n" : "";
-  return `${contents}\n${terminator}UPDATE ${HISTORY_TABLE} SET status = 'applied', completed_at = CURRENT_TIMESTAMP WHERE path = ${sqlLiteral(path)} AND content_hash = ${sqlLiteral(contentHash)};\n`;
+  return `${executableContents}\n${terminator}UPDATE ${HISTORY_TABLE} SET status = 'applied', completed_at = CURRENT_TIMESTAMP WHERE path = ${sqlLiteral(path)} AND content_hash = ${sqlLiteral(contentHash)};\n`;
 }
 
 export async function main({

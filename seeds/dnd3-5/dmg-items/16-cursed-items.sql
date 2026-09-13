@@ -126,6 +126,7 @@ WITH desired(slug,name,page,kind,summary,tags,mechanics) AS (VALUES
  'Complete percentile mapping for the DMG''s specific cursed-item catalog.',
  '["magic-items","cursed-items","specific-items","random-generation","table-7-31"]',
  json_object('results',json((SELECT json_group_array(json_array(min_roll,max_roll,slug,price_copper)) FROM _dmg_cursed_items))))
+)
 INSERT INTO dnd35_rules
  (id,source_id,source_page,slug,name,description,rules_text,is_homebrew,owner_user_id,is_enabled,
   category,kind,is_variant,default_enabled,parent_slug,supersedes_slug,tags,mechanics)

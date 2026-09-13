@@ -85,7 +85,28 @@ function inspectJsonLiterals(path: string): string[] {
   return issues;
 }
 
+function inspectD1Compatibility(path: string): string[] {
+  const sql = readFileSync(path, "utf8");
+  const issues: string[] = [];
+  const pattern = /\bCREATE\s+(?:TEMP|TEMPORARY)\s+TABLE\b/giu;
+
+  for (const match of sql.matchAll(pattern)) {
+    const before = sql.slice(0, match.index);
+    const line = before.split("\n").length;
+    issues.push(
+      `${relative(process.cwd(), path)}:${line}: D1 does not authorize CREATE TEMP TABLE in seed batches; use a regular staging table and drop it before the seed completes`,
+    );
+  }
+
+  return issues;
+}
+
 it("keeps every JSON-shaped SQL seed literal valid", () => {
   const issues = listSqlFiles(join(process.cwd(), "seeds")).flatMap(inspectJsonLiterals);
+  expect(issues, issues.join("\n")).toEqual([]);
+});
+
+it("keeps SQL seed batches compatible with D1 table authorization", () => {
+  const issues = listSqlFiles(join(process.cwd(), "seeds")).flatMap(inspectD1Compatibility);
   expect(issues, issues.join("\n")).toEqual([]);
 });

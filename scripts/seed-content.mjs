@@ -1,79 +1,48 @@
 #!/usr/bin/env node
 
-import { readdir } from "node:fs/promises";
-import { resolve, relative } from "node:path";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { dirname, resolve, relative } from "node:path";
+import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import process from "node:process";
+import { createRequire } from "node:module";
+import { createInterface } from "node:readline/promises";
+import { pathToFileURL } from "node:url";
 
 const DATABASE_BINDING = "DB";
-const SEEDS_ROOT = resolve(process.cwd(), "seeds");
-
-// Keep dependencies deterministic. Entries that do not exist yet are simply skipped.
-// Revised 3.5 sources intentionally run before older-edition sources where shared slugs
-// should resolve to the revised canonical row instead of creating duplicates.
-const preferredSeedOrder = [
-  "phb-classes",
-  "phb-races",
-  "dmg-races",
-  "phb-skills",
-  "phb-feats",
-  "phb-divine",
-  "phb-creatures",
-  "srd-monster-races",
-  "monster-manual-races",
-  "monster-manual-3-races",
-  "monster-manual-4-races",
-  "monster-manual-5-races",
-  "phb-spells",
-  "phb-rules",
-  "dmg-rules",
-  "phb2-classes",
-  "phb2-feats",
-  "phb2-spells",
-  "phb2-rules",
-  "dmg2-rules",
-  "spell-compendium-spells",
-  "deities-and-demigods-divine",
-  "deities-and-demigods-spells",
-  "deities-and-demigods-feats",
-  "deities-and-demigods-classes",
-  "deities-and-demigods-items",
-  "deities-and-demigods-monsters",
-  "deities-and-demigods-deities",
-  "epic-level-handbook-rules",
-  "epic-level-handbook-feats",
-  "epic-level-handbook-classes",
-  "epic-level-handbook-spells",
-  "epic-level-handbook-items",
-  "epic-level-handbook-monsters",
-  "heroes-of-horror-classes",
-  "heroes-of-horror-feats",
-  "heroes-of-horror-spells",
-  "heroes-of-horror-rules",
-  "heroes-of-horror-items",
-  "heroes-of-battle-classes",
-  "heroes-of-battle-feats",
-  "heroes-of-battle-spells",
-  "heroes-of-battle-rules",
-  "endless-codex-rules",
-  "expanded-psionics-handbook-classes",
-  "expanded-psionics-handbook-feats",
-  "expanded-psionics-handbook-powers",
-  "expanded-psionics-handbook-rules",
-  "expanded-psionics-handbook-races",
-  "psionics-handbook-classes",
-  "psionics-handbook-feats",
-  "psionics-handbook-powers",
-  "psionics-handbook-rules",
-  "playable-race-catalog",
-];
+const WRANGLER = resolve(
+  dirname(createRequire(import.meta.url).resolve("wrangler/package.json")),
+  "bin/wrangler.js",
+);
+// Operator metadata, owned by this runner (like Wrangler's d1_migrations table).
+const HISTORY_TABLE = "codex_seed_history";
 
 function parseArgs(argv) {
   let remote = false;
+  let yes = false;
+  let markApplied = false;
+  let migrateLocal = false;
   const seeds = [];
+  const systems = [];
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+
+    if (arg === "--yes" || arg === "-y") {
+      yes = true;
+      continue;
+    }
+
+    if (arg === "--mark-applied") {
+      markApplied = true;
+      continue;
+    }
+
+    if (arg === "--migrate-local") {
+      migrateLocal = true;
+      continue;
+    }
 
     if (arg === "--remote") {
       remote = true;
@@ -85,37 +54,42 @@ function parseArgs(argv) {
       continue;
     }
 
-    if (arg === "--seed") {
+    if (arg === "--seed" || arg === "--system") {
       const seed = argv[index + 1];
       if (!seed || seed.startsWith("--")) {
-        throw new Error("--seed requires a seed directory name, for example --seed phb-classes");
+        throw new Error(`${arg} requires a directory name`);
       }
-      seeds.push(seed);
+      (arg === "--system" ? systems : seeds).push(seed);
       index += 1;
       continue;
     }
 
-    if (arg.startsWith("--seed=")) {
-      const seed = arg.slice("--seed=".length).trim();
+    if (arg.startsWith("--seed=") || arg.startsWith("--system=")) {
+      const [flag, ...parts] = arg.split("=");
+      const seed = parts.join("=").trim();
       if (!seed) {
-        throw new Error("--seed requires a non-empty seed directory name");
+        throw new Error(`${flag} requires a non-empty directory name`);
       }
-      seeds.push(seed);
+      (flag === "--system" ? systems : seeds).push(seed);
       continue;
     }
 
     throw new Error(`Unknown argument: ${arg}`);
   }
 
-  return { remote, seeds };
+  if (remote && migrateLocal) {
+    throw new Error("--migrate-local cannot be combined with --remote");
+  }
+
+  return { remote, seeds, systems, yes, markApplied, migrateLocal };
 }
 
-async function listSeedDirectories() {
-  const entries = await readdir(SEEDS_ROOT, { withFileTypes: true });
+async function listSeedDirectories(seedsRoot) {
+  const entries = await readdir(seedsRoot, { withFileTypes: true });
   return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
 }
 
-function orderSeeds(seedNames) {
+function orderSeeds(seedNames, preferredSeedOrder) {
   const preferredIndex = new Map(preferredSeedOrder.map((name, index) => [name, index]));
 
   return [...seedNames].sort((a, b) => {
@@ -127,6 +101,27 @@ function orderSeeds(seedNames) {
     if (bIndex !== undefined) return 1;
     return a.localeCompare(b);
   });
+}
+
+async function readSeedOrder(systemRoot) {
+  let source;
+  try {
+    source = await readFile(resolve(systemRoot, "seed-order.json"), "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  }
+  const order = JSON.parse(source);
+  if (
+    !Array.isArray(order) ||
+    order.some((name) => typeof name !== "string" || !name || /[\\/]/.test(name)) ||
+    new Set(order).size !== order.length
+  ) {
+    throw new Error(
+      `${systemRoot}/seed-order.json must contain an array of unique seed directory names`,
+    );
+  }
+  return order;
 }
 
 async function listSqlFiles(directory) {
@@ -149,20 +144,18 @@ async function listSqlFiles(directory) {
   return files;
 }
 
-function executeSqlFile(file, remote) {
-  const executable = process.platform === "win32" ? "npx.cmd" : "npx";
-  const mode = remote ? "--remote" : "--local";
-  const displayPath = relative(process.cwd(), file);
-
-  console.log(`\n→ ${displayPath}`);
-
+export function executeWrangler(args, cwd) {
+  const json = args.includes("--json");
   const result = spawnSync(
-    executable,
-    ["--no-install", "wrangler", "d1", "execute", DATABASE_BINDING, mode, "--file", file],
+    process.execPath,
+    [WRANGLER, ...args, "--config", resolve(cwd, "wrangler.jsonc")],
     {
-      cwd: process.cwd(),
-      env: process.env,
-      stdio: "inherit",
+      cwd,
+      env: { ...process.env, CI: "true" },
+      // The runner owns confirmation; children cannot ask additional questions.
+      stdio: ["ignore", json ? "pipe" : "inherit", "inherit"],
+      encoding: "utf8",
+      maxBuffer: 16 * 1024 * 1024,
     },
   );
 
@@ -171,53 +164,275 @@ function executeSqlFile(file, remote) {
   }
 
   if (result.status !== 0) {
-    throw new Error(`${displayPath} failed with exit code ${result.status ?? "unknown"}`);
-  }
-}
-
-async function main() {
-  const { remote, seeds: requestedSeeds } = parseArgs(process.argv.slice(2));
-  const availableSeeds = await listSeedDirectories();
-
-  const missingSeeds = requestedSeeds.filter((seed) => !availableSeeds.includes(seed));
-  if (missingSeeds.length > 0) {
     throw new Error(
-      `Unknown seed director${missingSeeds.length === 1 ? "y" : "ies"}: ${missingSeeds.join(", ")}. ` +
-        `Available seeds: ${availableSeeds.sort().join(", ")}`,
+      `Wrangler failed with exit code ${result.status ?? result.signal ?? "unknown"}`,
     );
   }
 
-  const selectedSeeds = orderSeeds(
-    requestedSeeds.length > 0 ? [...new Set(requestedSeeds)] : availableSeeds,
+  if (!json) return [];
+  const responses = JSON.parse(result.stdout);
+  if (!Array.isArray(responses) || responses.some((response) => response.success !== true)) {
+    throw new Error("Wrangler did not confirm successful SQL execution");
+  }
+  return responses.flatMap((response) => response.results ?? []);
+}
+
+async function confirmOnce(question) {
+  const prompt = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return /^(y|yes)$/i.test((await prompt.question(`${question} [y/N] `)).trim());
+  } finally {
+    prompt.close();
+  }
+}
+
+function sqlLiteral(value) {
+  return `'${value.replaceAll("'", "''")}'`;
+}
+
+export async function main({
+  argv = process.argv.slice(2),
+  cwd = process.cwd(),
+  execute = executeWrangler,
+  confirm = confirmOnce,
+  log = console.log,
+} = {}) {
+  const {
+    remote,
+    seeds: requestedSeeds,
+    systems: requestedSystems,
+    yes,
+    markApplied,
+    migrateLocal,
+  } = parseArgs(argv);
+  const seedsRoot = resolve(cwd, "seeds");
+  const availableSystems = await listSeedDirectories(seedsRoot);
+  const missingSystems = requestedSystems.filter((system) => !availableSystems.includes(system));
+  if (missingSystems.length > 0) {
+    throw new Error(
+      `Unknown seed system: ${missingSystems.join(", ")}. Available systems: ${availableSystems.sort().join(", ")}`,
+    );
+  }
+  const selectedSystems = [
+    ...new Set(requestedSystems.length ? requestedSystems : availableSystems),
+  ].sort();
+  const availableSeeds = [];
+  for (const system of selectedSystems) {
+    const systemRoot = resolve(seedsRoot, system);
+    const groups = await listSeedDirectories(systemRoot);
+    const order = await readSeedOrder(systemRoot);
+    availableSeeds.push(...orderSeeds(groups, order).map((group) => `${system}/${group}`));
+  }
+
+  const selectedNames = new Set();
+  for (const seed of requestedSeeds) {
+    const matches = availableSeeds.filter((name) => name === seed || name.split("/")[1] === seed);
+    if (matches.length === 0) {
+      throw new Error(
+        `Unknown seed directory: ${seed}. Available seeds: ${availableSeeds.join(", ")}`,
+      );
+    }
+    if (matches.length > 1) {
+      throw new Error(
+        `Ambiguous seed directory: ${seed}. Use --system or a qualified --seed: ${matches.join(", ")}`,
+      );
+    }
+    selectedNames.add(matches[0]);
+  }
+
+  const selectedSeeds = availableSeeds.filter(
+    (seed) => requestedSeeds.length === 0 || selectedNames.has(seed),
   );
   const target = remote ? "REMOTE Cloudflare D1" : "LOCAL D1";
-
-  console.log(`Seeding ${target} through binding ${DATABASE_BINDING}.`);
-  console.log(`Seeds: ${selectedSeeds.join(" → ")}`);
-
-  let fileCount = 0;
-
+  const files = [];
   for (const seed of selectedSeeds) {
-    const seedDirectory = resolve(SEEDS_ROOT, seed);
-    const sqlFiles = await listSqlFiles(seedDirectory);
+    files.push(...(await listSqlFiles(resolve(seedsRoot, seed))));
+  }
+  if (files.length === 0) {
+    log("No SQL seed files found.");
+    return;
+  }
 
-    if (sqlFiles.length === 0) {
-      console.log(`\nSkipping ${seed}: no .sql files found.`);
-      continue;
-    }
+  log(`Target: ${target} through binding ${DATABASE_BINDING}.`);
+  log(`Seeds: ${selectedSeeds.join(" → ")}`);
+  const action = markApplied
+    ? "Record the selected files as already applied without executing their SQL?"
+    : `${migrateLocal ? "Apply pending local migrations and seed" : "Seed"} ${target}, applying new or changed files?`;
+  if (!yes && !(await confirm(action))) {
+    log("Seed cancelled.");
+    return;
+  }
 
-    console.log(`\n=== ${seed} (${sqlFiles.length} file${sqlFiles.length === 1 ? "" : "s"}) ===`);
+  if (migrateLocal && !markApplied) {
+    execute(["d1", "migrations", "apply", DATABASE_BINDING, "--local"], cwd);
+  }
 
-    for (const file of sqlFiles) {
-      executeSqlFile(file, remote);
-      fileCount += 1;
+  const sql = (command) =>
+    execute(
+      [
+        "d1",
+        "execute",
+        DATABASE_BINDING,
+        remote ? "--remote" : "--local",
+        "--yes",
+        "--json",
+        "--command",
+        command,
+      ],
+      cwd,
+    );
+  sql(`CREATE TABLE IF NOT EXISTS ${HISTORY_TABLE} (
+    path TEXT PRIMARY KEY NOT NULL,
+    content_hash TEXT,
+    status TEXT NOT NULL CHECK (status IN ('started', 'applied', 'adopted')),
+    started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    completed_at TEXT
+  )`);
+  const hasContentHash = () =>
+    sql(`PRAGMA table_info(${HISTORY_TABLE})`).some((column) => column.name === "content_hash");
+  if (!hasContentHash()) {
+    try {
+      sql(`ALTER TABLE ${HISTORY_TABLE} ADD COLUMN content_hash TEXT`);
+    } catch (error) {
+      // Another runner may have upgraded the same database concurrently.
+      if (!hasContentHash()) throw error;
     }
   }
 
-  console.log(`\n✓ Seeded ${target}: ${fileCount} SQL file${fileCount === 1 ? "" : "s"} applied.`);
+  // Before system folders existed, all history belonged to D&D 3.5. Rename only
+  // selected D&D groups, preserving hashes/status/timestamps. Never move a live
+  // claim: an older runner might still be completing it using its original path.
+  const legacyGroups = selectedSeeds
+    .filter((seed) => seed.startsWith("dnd3-5/"))
+    .map((seed) => sqlLiteral(seed.slice("dnd3-5/".length)));
+  if (legacyGroups.length > 0) {
+    const legacyMatch = `substr(old.path, 1, instr(old.path, '/') - 1) IN (${legacyGroups.join(", ")})`;
+    const conflicts = sql(`SELECT old.path FROM ${HISTORY_TABLE} old
+      JOIN ${HISTORY_TABLE} current ON current.path = 'dnd3-5/' || old.path
+      WHERE ${legacyMatch}`);
+    if (conflicts.length > 0) {
+      throw new Error(
+        `Conflicting legacy and system seed history: ${conflicts.map((row) => row.path).join(", ")}. Reconcile these records before seeding.`,
+      );
+    }
+    sql(`UPDATE ${HISTORY_TABLE} AS old SET path = 'dnd3-5/' || path
+      WHERE ${legacyMatch} AND status != 'started'`);
+  }
+  const history = new Map(
+    sql(`SELECT path, status, content_hash FROM ${HISTORY_TABLE}`).map((row) => [row.path, row]),
+  );
+  const filePath = (file) => relative(seedsRoot, file).replaceAll("\\", "/");
+  const unfinished = files.filter((file) => {
+    const path = filePath(file);
+    return (
+      history.get(path)?.status === "started" ||
+      (path.startsWith("dnd3-5/") &&
+        history.get(path.slice("dnd3-5/".length))?.status === "started")
+    );
+  });
+  if (unfinished.length > 0) {
+    throw new Error(
+      `Seeds have an unfinished attempt and will not be rerun: ${unfinished.map(filePath).join(", ")}. ` +
+        "Inspect their database changes and codex_seed_history before proceeding; see docs/content-seeding.md.",
+    );
+  }
+
+  let fileCount = 0;
+  let skippedCount = 0;
+  for (const file of files) {
+    const path = filePath(file);
+    // Hash the same snapshot that is executed. Normalize line endings so changing
+    // operating systems does not replay otherwise unchanged SQL.
+    const contents = (await readFile(file, "utf8")).replaceAll("\r\n", "\n");
+    const contentHash = createHash("sha256").update(contents).digest("hex");
+    const previous = history.get(path);
+
+    if (previous && previous.content_hash === null) {
+      // Older history recorded only paths. Preserve completed seeds and establish
+      // a baseline without replaying SQL whose original contents were not saved.
+      const baselined = sql(`UPDATE ${HISTORY_TABLE} SET content_hash = ${sqlLiteral(contentHash)}
+        WHERE path = ${sqlLiteral(path)} AND content_hash IS NULL AND status != 'started'
+        RETURNING path`);
+      if (baselined.length !== 1) {
+        throw new Error(`${path} history changed in another seed run. Run the command again.`);
+      }
+      log(`Skipping ${path}: recorded current checksum as the baseline for existing history.`);
+      skippedCount += 1;
+      continue;
+    }
+
+    if (previous?.content_hash === contentHash) {
+      log(`Skipping ${path}: unchanged.`);
+      skippedCount += 1;
+      continue;
+    }
+
+    // Claim before executing. A crash or uncertain remote response must never
+    // cause a second attempt. Compare the previous hash as well as status so
+    // concurrent runs cannot both claim a change, even with different snapshots.
+    const claimed = sql(`INSERT INTO ${HISTORY_TABLE} (path, content_hash, status, completed_at)
+      VALUES (${sqlLiteral(path)}, ${sqlLiteral(contentHash)}, '${markApplied ? "adopted" : "started"}', ${markApplied ? "CURRENT_TIMESTAMP" : "NULL"})
+      ON CONFLICT(path) ${
+        previous
+          ? `DO UPDATE SET content_hash = excluded.content_hash, status = excluded.status, started_at = CURRENT_TIMESTAMP, completed_at = excluded.completed_at
+        WHERE ${HISTORY_TABLE}.status != 'started' AND ${HISTORY_TABLE}.content_hash = ${sqlLiteral(previous.content_hash)}`
+          : "DO NOTHING"
+      }
+      RETURNING path`);
+    if (claimed.length !== 1) {
+      throw new Error(`${path} was claimed by another seed run. Stopping without executing it.`);
+    }
+    if (!markApplied) {
+      log(`\n→ seeds/${path}${previous ? " (updated)" : ""}`);
+      let temporaryDirectory;
+      try {
+        temporaryDirectory = await mkdtemp(resolve(tmpdir(), "codex-seed-"));
+        const batchFile = resolve(temporaryDirectory, "seed.sql");
+        // Wrangler executes the file in a D1 transaction. Commit completion with
+        // the content so a crash/lost response after commit cannot strand history.
+        await writeFile(
+          batchFile,
+          `${contents}\n;\nUPDATE ${HISTORY_TABLE} SET status = 'applied', completed_at = CURRENT_TIMESTAMP WHERE path = ${sqlLiteral(path)} AND content_hash = ${sqlLiteral(contentHash)};\n`,
+        );
+        execute(
+          [
+            "d1",
+            "execute",
+            DATABASE_BINDING,
+            remote ? "--remote" : "--local",
+            "--yes",
+            "--json",
+            "--file",
+            batchFile,
+          ],
+          cwd,
+        );
+      } catch (error) {
+        throw new Error(
+          `${path}: ${error instanceof Error ? error.message : String(error)}. The attempt remains recorded and will not be retried automatically.`,
+        );
+      } finally {
+        if (temporaryDirectory) {
+          await rm(temporaryDirectory, { recursive: true, force: true });
+        }
+      }
+    }
+    history.set(path, {
+      path,
+      content_hash: contentHash,
+      status: markApplied ? "adopted" : "applied",
+    });
+    fileCount += 1;
+  }
+
+  log(
+    `\n✓ ${target}: ${fileCount} SQL file${fileCount === 1 ? "" : "s"} ${markApplied ? "recorded without execution" : "applied"}, ${skippedCount} skipped.`,
+  );
 }
 
-main().catch((error) => {
-  console.error(`\nSeed failed: ${error instanceof Error ? error.message : String(error)}`);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  main().catch((error) => {
+    console.error(`\nSeed failed: ${error instanceof Error ? error.message : String(error)}`);
+    process.exitCode = 1;
+  });
+}

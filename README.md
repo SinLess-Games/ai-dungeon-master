@@ -1898,6 +1898,9 @@ Better Auth provides same-origin email/username login, signup, cookie sessions, 
 
 considerations are in [the D&D database handoff](docs/dnd35-database-schema.md).
 
+For content seed commands, persistent execution history, and adopting previously
+seeded databases, see [content seeding](docs/content-seeding.md).
+
 ### Build, preview and deploy
 
 \`\`\`bash

@@ -4,10 +4,10 @@ import { DatabaseSync } from "node:sqlite";
 import { expect, it } from "vitest";
 
 const RULE_SEED_DIRS = [
-  "seeds/phb-rules",
-  "seeds/phb2-rules",
-  "seeds/expanded-psionics-handbook-rules",
-  "seeds/psionics-handbook-rules",
+  "seeds/dnd3-5/phb-rules",
+  "seeds/dnd3-5/phb2-rules",
+  "seeds/dnd3-5/expanded-psionics-handbook-rules",
+  "seeds/dnd3-5/psionics-handbook-rules",
 ] as const;
 
 function listSqlFiles(path: string): string[] {
@@ -36,8 +36,7 @@ function scalar(db: DatabaseSync, sql: string): number {
 
 function mechanics(db: DatabaseSync, slug: string): Record<string, unknown> {
   const row = db.prepare("SELECT mechanics FROM dnd35_rules WHERE slug=?").get(slug) as
-    | { mechanics: string }
-    | undefined;
+    { mechanics: string } | undefined;
   return JSON.parse(row?.mechanics ?? "{}");
 }
 
@@ -51,10 +50,18 @@ it("seeds PHB, PHB II, XPH, and legacy Psionics Handbook rules idempotently", ()
 
     seedRules(db);
 
-    expect(scalar(db, "SELECT count(*) AS n FROM dnd35_rules WHERE source_id='phb-3.5'")).toBeGreaterThanOrEqual(40);
-    expect(scalar(db, "SELECT count(*) AS n FROM dnd35_rules WHERE source_id='phb2-3.5'")).toBeGreaterThanOrEqual(20);
-    expect(scalar(db, "SELECT count(*) AS n FROM dnd35_rules WHERE source_id='xph-3.5'")).toBeGreaterThanOrEqual(30);
-    expect(scalar(db, "SELECT count(*) AS n FROM dnd35_rules WHERE source_id='ph3e-3.0'")).toBeGreaterThanOrEqual(20);
+    expect(
+      scalar(db, "SELECT count(*) AS n FROM dnd35_rules WHERE source_id='phb-3.5'"),
+    ).toBeGreaterThanOrEqual(40);
+    expect(
+      scalar(db, "SELECT count(*) AS n FROM dnd35_rules WHERE source_id='phb2-3.5'"),
+    ).toBeGreaterThanOrEqual(20);
+    expect(
+      scalar(db, "SELECT count(*) AS n FROM dnd35_rules WHERE source_id='xph-3.5'"),
+    ).toBeGreaterThanOrEqual(30);
+    expect(
+      scalar(db, "SELECT count(*) AS n FROM dnd35_rules WHERE source_id='ph3e-3.0'"),
+    ).toBeGreaterThanOrEqual(20);
 
     const firstCount = scalar(db, "SELECT count(*) AS n FROM dnd35_rules");
     seedRules(db);

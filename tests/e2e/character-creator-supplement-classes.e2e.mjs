@@ -20,16 +20,16 @@ const origin = "http://localhost:5189";
 const secret = randomBytes(48).toString("hex");
 const password = `Supplement-${randomBytes(18).toString("hex")}!`;
 const seedPaths = [
-  "seeds/phb-classes/00-classes.sql",
-  "seeds/phb-classes/05-starting-wealth.sql",
-  "seeds/phb-races",
-  "seeds/phb-skills",
-  "seeds/heroes-of-horror-classes/00-classes.sql",
-  "seeds/heroes-of-horror-classes/05-starting-wealth.sql",
-  "seeds/heroes-of-horror-classes/06-base-prerequisites.sql",
-  "seeds/heroes-of-horror-classes/07-skills.sql",
-  "seeds/heroes-of-battle-classes/00-classes.sql",
-  "seeds/heroes-of-battle-classes/07-skills.sql",
+  "seeds/dnd3-5/phb-classes/00-classes.sql",
+  "seeds/dnd3-5/phb-classes/05-starting-wealth.sql",
+  "seeds/dnd3-5/phb-races",
+  "seeds/dnd3-5/phb-skills",
+  "seeds/dnd3-5/heroes-of-horror-classes/00-classes.sql",
+  "seeds/dnd3-5/heroes-of-horror-classes/05-starting-wealth.sql",
+  "seeds/dnd3-5/heroes-of-horror-classes/06-base-prerequisites.sql",
+  "seeds/dnd3-5/heroes-of-horror-classes/07-skills.sql",
+  "seeds/dnd3-5/heroes-of-battle-classes/00-classes.sql",
+  "seeds/dnd3-5/heroes-of-battle-classes/07-skills.sql",
 ];
 let proxy;
 let server;

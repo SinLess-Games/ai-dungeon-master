@@ -98,7 +98,7 @@ async function applyMigrations(db) {
 
 async function applySeeds(db) {
   for (const seedDirectory of seedDirectories) {
-    for (const file of await sqlFiles(join("seeds", seedDirectory))) {
+    for (const file of await sqlFiles(join("seeds", "dnd3-5", seedDirectory))) {
       for (const statement of splitSqlStatements(stripLineComments(await readFile(file, "utf8")))) {
         await db.prepare(statement).run();
       }

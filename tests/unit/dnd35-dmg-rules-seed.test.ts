@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { expect, it } from "vitest";
 
-const RULE_SEED_DIRS = ["seeds/dmg-rules", "seeds/dmg2-rules"] as const;
+const RULE_SEED_DIRS = ["seeds/dnd3-5/dmg-rules", "seeds/dnd3-5/dmg2-rules"] as const;
 
 function listSqlFiles(path: string): string[] {
   return readdirSync(path)
@@ -31,8 +31,7 @@ function scalar(db: DatabaseSync, sql: string): number {
 
 function mechanics(db: DatabaseSync, slug: string): Record<string, unknown> {
   const row = db.prepare("SELECT mechanics FROM dnd35_rules WHERE slug=?").get(slug) as
-    | { mechanics: string }
-    | undefined;
+    { mechanics: string } | undefined;
   return JSON.parse(row?.mechanics ?? "{}");
 }
 
@@ -68,10 +67,7 @@ it("seeds DMG and DMG II rules idempotently without duplicate canonical slugs", 
     ).toEqual([]);
 
     expect(
-      scalar(
-        db,
-        "SELECT count(*) AS n FROM dnd35_rules WHERE is_variant=1 AND default_enabled<>0",
-      ),
+      scalar(db, "SELECT count(*) AS n FROM dnd35_rules WHERE is_variant=1 AND default_enabled<>0"),
     ).toBe(0);
 
     expect(

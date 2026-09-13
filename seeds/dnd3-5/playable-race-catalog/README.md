@@ -8,7 +8,7 @@ playable-race index as database seed rows.
 The by-book index contains **424 source-list entries across 59 books/magazines**.
 Equivalent entries are canonicalized by shared race slug before SQL generation, leaving
 **354 unique race options**. The Player's Handbook core seven are not re-seeded here
-because `seeds/phb-races/` already owns those complete rows.
+because `seeds/dnd3-5/phb-races/` already owns those complete rows.
 
 The generated SQL never creates a second canonical shared race when one already exists:
 

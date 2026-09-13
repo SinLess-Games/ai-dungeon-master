@@ -4,9 +4,9 @@ import { DatabaseSync } from "node:sqlite";
 import { expect, it } from "vitest";
 
 const XPH_SEED_DIRS = [
-  "seeds/expanded-psionics-handbook-classes",
-  "seeds/expanded-psionics-handbook-feats",
-  "seeds/expanded-psionics-handbook-powers",
+  "seeds/dnd3-5/expanded-psionics-handbook-classes",
+  "seeds/dnd3-5/expanded-psionics-handbook-feats",
+  "seeds/dnd3-5/expanded-psionics-handbook-powers",
 ] as const;
 
 function listSqlFiles(path: string): string[] {

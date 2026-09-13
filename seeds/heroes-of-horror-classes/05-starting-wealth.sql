@@ -1,4 +1,9 @@
--- Heroes of Horror starting gold for the two base classes.
+-- Starting-wealth defaults for the two Heroes of Horror base classes.
+-- Heroes of Horror pp. 82-88 presents Archivist and Dread Necromancer but does not
+-- print a starting-gold formula for either class. Endless Codex supplies deterministic
+-- PHB-style defaults so character creation can complete without inventing money at runtime:
+--   Archivist:         5d4 x 10 gp (cleric-equivalent; average 125 gp)
+--   Dread Necromancer: 3d4 x 10 gp (sorcerer/wizard-equivalent; average 75 gp)
 -- Prestige classes intentionally do not receive a starting-wealth formula because
 -- they cannot be selected as a character's 1st-level class.
 WITH desired(slug,dice_count,die_sides,multiplier_gp) AS (VALUES

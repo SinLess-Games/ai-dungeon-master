@@ -431,9 +431,22 @@ export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
         .orderBy(asc(languages.name))
         .all(),
     ]);
-    const bonusOptions = access.filter((entry) => entry.kind === "bonus" && !entry.isSecret);
+    const automatic = access.filter((entry) => entry.kind === "automatic");
+    const automaticIds = new Set(automatic.map((entry) => entry.languageId));
+    const explicitBonusOptions = access.filter((entry) => entry.kind === "bonus" && !entry.isSecret);
+    const bonusOptions = explicitBonusOptions.length > 0
+      ? explicitBonusOptions
+      : allLanguages
+          .filter((language) => !language.isSecret && !automaticIds.has(language.id))
+          .map((language) => ({
+            languageId: language.id,
+            kind: "bonus" as const,
+            name: language.name,
+            slug: language.slug,
+            isSecret: language.isSecret,
+          }));
     return c.json({
-      automatic: access.filter((entry) => entry.kind === "automatic"),
+      automatic,
       bonusOptions,
       allOptions: allLanguages,
       bonusChoicesRequired: Math.min(firstLevelBonusLanguageCount(effectiveIntelligence), bonusOptions.length),
@@ -451,8 +464,13 @@ export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
       const row = await requireCharacterCreatorEditor({ db, characterId: c.req.param("characterId"), userId: session.user.id });
       const firstClasses = await requireFirstCharacterClasses(db, row.character.id);
       const { race, effectiveIntelligence } = await requireRaceAndIntelligence(db, row.character.id);
-      const [access, speakLanguageRows, druidic] = await Promise.all([
+      const [access, allLanguages, speakLanguageRows, druidic] = await Promise.all([
         db.select({ languageId: raceLanguages.languageId, kind: raceLanguages.kind }).from(raceLanguages).where(eq(raceLanguages.raceId, race.id)).all(),
+        db
+          .select({ id: languages.id, isSecret: languages.isSecret })
+          .from(languages)
+          .where(and(eq(languages.isEnabled, true), or(isNull(languages.ownerUserId), eq(languages.ownerUserId, session.user.id))))
+          .all(),
         db
           .select({ languageId: characterSkills.specialization })
           .from(characterSkills)
@@ -463,13 +481,21 @@ export const characterSkillLanguageRoutes = new Hono<CharacterCreationEnv>()
       ]);
 
       const automatic = access.filter((entry) => entry.kind === "automatic").map((entry) => entry.languageId);
-      const bonusAllowed = new Set(access.filter((entry) => entry.kind === "bonus").map((entry) => entry.languageId));
+      const automaticIds = new Set(automatic);
+      const explicitBonusAllowed = new Set(access.filter((entry) => entry.kind === "bonus").map((entry) => entry.languageId));
+      const bonusAllowed = explicitBonusAllowed.size > 0
+        ? explicitBonusAllowed
+        : new Set(
+            allLanguages
+              .filter((language) => !language.isSecret && !automaticIds.has(language.id))
+              .map((language) => language.id),
+          );
       const uniqueBonus = new Set(input.bonusLanguageIds);
       const required = Math.min(firstLevelBonusLanguageCount(effectiveIntelligence), bonusAllowed.size);
       if (uniqueBonus.size !== input.bonusLanguageIds.length) throw new ValidationError("Bonus language choices must be unique.");
       if (uniqueBonus.size !== required) throw new ValidationError(`Choose exactly ${required} bonus language${required === 1 ? "" : "s"}.`);
       for (const languageId of uniqueBonus) {
-        if (!bonusAllowed.has(languageId)) throw new ValidationError(`Language is not an available racial bonus language: ${languageId}.`);
+        if (!bonusAllowed.has(languageId)) throw new ValidationError(`Language is not an available bonus language: ${languageId}.`);
       }
 
       const selected = new Set<string>([

@@ -7,8 +7,6 @@ on:
       - "drizzle/**"
       - "package.json"
       - "package-lock.json"
-      - "scripts/seed-content.mjs"
-      - "seeds/**"
       - "src/components/layout/site-header.tsx"
       - "src/components/layout/site-header.css"
       - "src/infrastructure/database/**"
@@ -48,7 +46,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Local D1 migrate and seed bootstrap
+      # Seed correctness is validated independently by Seed CI. The creator suite
+      # still needs a populated local D1 database as its test fixture.
+      - name: Prepare local D1 test database
         shell: bash
         run: |
           set -o pipefail

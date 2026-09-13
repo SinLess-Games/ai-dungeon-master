@@ -211,7 +211,7 @@ export async function filterQualifiedFeatOptions<T extends FeatEligibilityOption
       const featId = parameters["featId"];
       const requiredChoice = parameters["choice"];
       if (typeof featId !== "string") return false;
-      return selectedFeatFacts.some((fact) => feat.featId === featId && (typeof requiredChoice !== "string" || feat.choice === requiredChoice));
+      return selectedFeatFacts.some((fact) => fact.featId === featId && (typeof requiredChoice !== "string" || fact.choice === requiredChoice));
     }
     if (extensionRule.key === "dnd35.prerequisite.selected-weapon-feat") {
       const required = parameters["featId"];

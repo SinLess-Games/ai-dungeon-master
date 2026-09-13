@@ -23,7 +23,7 @@ import "./site-header.css";
 const playItems = [
   { label: "Campaigns", icon: Swords },
   { label: "Characters", icon: Users, to: "/characters" as const },
-  { label: "Dice", icon: Dices },
+  { label: "Dice", icon: Dices, action: "dice" as const },
   { label: "Wiki", icon: BookOpen },
 ] as const;
 
@@ -176,6 +176,23 @@ export function SiteHeader() {
                         </Link>
                       );
                     }
+                    if ("action" in item && item.action === "dice") {
+                      return (
+                        <button
+                          key={item.label}
+                          type="button"
+                          title="Open dice tray"
+                          onClick={() => {
+                            playDropdown.current?.removeAttribute("open");
+                            window.dispatchEvent(new Event("endless-codex:open-dice"));
+                          }}
+                        >
+                          <Icon aria-hidden="true" />
+                          <span>{item.label}</span>
+                          <small>Open</small>
+                        </button>
+                      );
+                    }
                     return (
                       <button
                         key={item.label}
@@ -277,9 +294,7 @@ export function SiteHeader() {
                       <span>{page.description}</span>
                     </Link>
                   ))}
-                  {pages.length === 0 && (
-                    <p>No pages found. Campaigns, Dice, and Wiki are coming soon.</p>
-                  )}
+                  {pages.length === 0 && <p>No pages found. Campaigns and Wiki are coming soon.</p>}
                 </div>
               </>
             ) : (

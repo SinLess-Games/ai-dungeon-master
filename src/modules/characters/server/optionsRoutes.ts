@@ -216,7 +216,12 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>()
       list.push({ id: row.id, slug: row.slug, name: row.name });
       skillsByClass.set(row.classId, list);
     }
-    const wealthByClass = new Map(wealthRows.map((row) => [row.classId, row]));
+    const wealthByClass = new Map(
+      wealthRows.map(({ classId, diceCount, dieSides, multiplierGp }) => [
+        classId,
+        { diceCount, dieSides, multiplierGp },
+      ]),
+    );
     const prerequisitesByClass = new Map(prerequisiteRows.map((row) => [row.classId, row]));
     const maximumLevelAdjustment = Math.max(
       0,

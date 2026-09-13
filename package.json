@@ -19,6 +19,8 @@
     "check": "npm run typecheck && npm run lint && npm run test:unit",
     "test": "vitest run --coverage",
     "test:unit": "vitest run",
+    "test:unit:ci": "vitest run --exclude \"tests/unit/*seed*.test.ts\"",
+    "test:unit:seeds": "vitest run seed",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
@@ -107,7 +109,7 @@
     "prettier": "^3.7.3",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
-    "vite": "^8.1.5",
+    "vite": "^4.1.11",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.1.11",
     "wrangler": "^4.129.0"

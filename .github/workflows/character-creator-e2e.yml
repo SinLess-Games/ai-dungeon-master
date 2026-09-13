@@ -52,7 +52,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          npm run db:seed:local 2>&1 | tee character-creator-e2e.log
+          npm run db:seed:local -- --yes 2>&1 | tee character-creator-e2e.log
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium

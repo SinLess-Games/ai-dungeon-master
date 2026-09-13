@@ -31,6 +31,33 @@ export interface DiceRollResult {
   total: number;
 }
 
+export interface DiceFormulaTerm {
+  sign: 1 | -1;
+  expression: DiceExpression;
+}
+
+export interface DiceFormula {
+  terms: readonly DiceFormulaTerm[];
+  modifier: number;
+  notation: string;
+}
+
+export interface DiceFormulaTermResult {
+  sign: 1 | -1;
+  expression: DiceExpression;
+  rolls: readonly number[];
+  subtotal: number;
+  signedSubtotal: number;
+}
+
+export interface DiceFormulaRollResult {
+  formula: DiceFormula;
+  terms: readonly DiceFormulaTermResult[];
+  subtotal: number;
+  modifier: number;
+  total: number;
+}
+
 export interface RollDiceOptions {
   random?: RandomSource;
   limits?: Partial<DiceLimits>;
@@ -80,11 +107,9 @@ function validateExpression(expression: DiceExpression, limits: DiceLimits): voi
 }
 
 /**
- * Parse standard tabletop notation such as d20, 2d6+3, 4d8 - 2, or d%.
+ * Parse one standard tabletop dice group such as d20, 2d6+3, 4d8 - 2, or d%.
  *
- * This deliberately supports one dice group plus one flat modifier. More
- * complicated expression trees can be layered on top without changing the
- * primitive roll contract.
+ * Use parseDiceFormula when an expression contains multiple dice groups.
  */
 export function parseDiceExpression(
   notation: string,
@@ -116,6 +141,97 @@ export function parseDiceExpression(
 
   validateExpression(expression, resolveLimits(limitsOverride));
   return expression;
+}
+
+function normalizeFormula(terms: readonly DiceFormulaTerm[], modifier: number): string {
+  const dice = terms
+    .map((term, index) => {
+      const notation = normalizeNotation(term.expression.count, term.expression.sides, 0);
+      if (index === 0) return term.sign < 0 ? `-${notation}` : notation;
+      return `${term.sign < 0 ? "-" : "+"}${notation}`;
+    })
+    .join("");
+  const flat = modifier === 0 ? "" : modifier > 0 ? `+${modifier}` : `${modifier}`;
+  return `${dice}${flat}`;
+}
+
+/**
+ * Parse tabletop arithmetic with multiple dice groups and a flat modifier.
+ *
+ * Examples: 2d6 + 1d4 + 3, d20 + d6 - 2, 4d8 - 1d8, d%.
+ * The total number of dice across all groups is constrained by maxDice.
+ */
+export function parseDiceFormula(
+  notation: string,
+  limitsOverride?: Partial<DiceLimits>,
+): DiceFormula {
+  const compact = notation.replace(/\s+/g, "");
+  const limits = resolveLimits(limitsOverride);
+
+  if (!compact) throw new SyntaxError("Dice notation cannot be empty.");
+
+  const pieces = compact.match(/[+-]?[^+-]+/g);
+  if (!pieces || pieces.join("") !== compact) {
+    throw new SyntaxError(`Invalid dice notation: ${notation}`);
+  }
+
+  const terms: DiceFormulaTerm[] = [];
+  let modifier = 0;
+  let totalDice = 0;
+
+  for (const piece of pieces) {
+    const sign: 1 | -1 = piece.startsWith("-") ? -1 : 1;
+    const body = piece.startsWith("+") || piece.startsWith("-") ? piece.slice(1) : piece;
+
+    if (!body) throw new SyntaxError(`Invalid dice notation: ${notation}`);
+
+    if (/^\d*d(?:\d+|%)$/i.test(body)) {
+      const expression = parseDiceExpression(body, limits);
+      totalDice += expression.count;
+      if (totalDice > limits.maxDice) {
+        throw new RangeError(`Total dice count cannot exceed ${limits.maxDice}.`);
+      }
+      terms.push({
+        sign,
+        expression: {
+          ...expression,
+          modifier: 0,
+          notation: normalizeNotation(expression.count, expression.sides, 0),
+        },
+      });
+      continue;
+    }
+
+    if (/^\d+$/.test(body)) {
+      const value = Number(body);
+      if (!Number.isSafeInteger(value)) {
+        throw new RangeError("Dice modifier must be a safe integer.");
+      }
+      modifier += sign * value;
+      if (!Number.isSafeInteger(modifier)) {
+        throw new RangeError("Dice modifier must be a safe integer.");
+      }
+      continue;
+    }
+
+    throw new SyntaxError(`Invalid dice notation: ${notation}`);
+  }
+
+  if (terms.length === 0) {
+    throw new SyntaxError("A dice formula must include at least one dice term.");
+  }
+
+  if (Math.abs(modifier) > limits.maxAbsoluteModifier) {
+    throw new RangeError(
+      `Absolute dice modifier cannot exceed ${limits.maxAbsoluteModifier}.`,
+    );
+  }
+
+  return {
+    terms,
+    modifier,
+    notation: normalizeFormula(terms, modifier),
+  };
 }
 
 export function rollDie(
@@ -159,5 +275,55 @@ export function rollDice(
     subtotal,
     modifier: expression.modifier,
     total: subtotal + expression.modifier,
+  };
+}
+
+export function rollDiceFormula(
+  input: string | DiceFormula,
+  options: RollDiceOptions = {},
+): DiceFormulaRollResult {
+  const limits = resolveLimits(options.limits);
+  const formula = typeof input === "string" ? parseDiceFormula(input, limits) : input;
+  const random = options.random ?? mathRandomSource;
+
+  let totalDice = 0;
+  for (const term of formula.terms) {
+    validateExpression(term.expression, limits);
+    totalDice += term.expression.count;
+  }
+  if (totalDice > limits.maxDice) {
+    throw new RangeError(`Total dice count cannot exceed ${limits.maxDice}.`);
+  }
+  if (!Number.isSafeInteger(formula.modifier)) {
+    throw new RangeError("Dice modifier must be a safe integer.");
+  }
+  if (Math.abs(formula.modifier) > limits.maxAbsoluteModifier) {
+    throw new RangeError(
+      `Absolute dice modifier cannot exceed ${limits.maxAbsoluteModifier}.`,
+    );
+  }
+
+  const terms = formula.terms.map((term): DiceFormulaTermResult => {
+    const result = rollDice(term.expression, { random, limits });
+    return {
+      sign: term.sign,
+      expression: result.expression,
+      rolls: result.rolls,
+      subtotal: result.subtotal,
+      signedSubtotal: result.subtotal * term.sign,
+    };
+  });
+  const subtotal = terms.reduce((sum, term) => sum + term.signedSubtotal, 0);
+
+  return {
+    formula: {
+      terms: formula.terms,
+      modifier: formula.modifier,
+      notation: normalizeFormula(formula.terms, formula.modifier),
+    },
+    terms,
+    subtotal,
+    modifier: formula.modifier,
+    total: subtotal + formula.modifier,
   };
 }

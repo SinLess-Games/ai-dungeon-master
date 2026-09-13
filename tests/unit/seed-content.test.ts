@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { executeWrangler, main } from "../../scripts/seed-content.mjs";
+import { buildSeedBatch, executeWrangler, main } from "../../scripts/seed-content.mjs";
 
 vi.mock("node:child_process", () => ({ spawnSync: vi.fn() }));
 
@@ -64,6 +64,21 @@ afterEach(() => {
 });
 
 describe("content seeding", () => {
+  it("does not add empty statements to remote import batches", async () => {
+    seed("phb-classes/00-first.sql", "INSERT INTO events VALUES ('remote');\n-- trailing comment");
+    await run(["--remote", "--yes", "--seed=phb-classes"], (args) => {
+      if (args.includes("--file")) {
+        const batch = readFileSync(args[args.indexOf("--file") + 1]!, "utf8");
+        if (/;\s*;/.test(batch.replace(/--[^\n]*/g, ""))) {
+          throw new Error("SQL code did not contain a statement.");
+        }
+      }
+      return execute(args);
+    });
+    expect(database.prepare("SELECT name FROM events").all()).toEqual([{ name: "remote" }]);
+    expect(database.prepare("SELECT status FROM codex_seed_history").get()?.status).toBe("applied");
+  });
+
   it("migrates checksummed D&D history after the directory move without replaying SQL", async () => {
     await run(["--yes", "--seed=phb-classes"]);
     const previous = database.prepare("SELECT * FROM codex_seed_history").get()!;
@@ -354,6 +369,52 @@ describe("content seeding", () => {
 });
 
 describe("Wrangler transport", () => {
+  it("reads remote JSON after upload progress and terminal formatting", () => {
+    vi.mocked(spawnSync).mockReturnValue({
+      pid: 1,
+      output: [],
+      stdout:
+        '\u001b[32m├ Checking if file needs uploading\u001b[0m\n│\n└ Uploading complete\n[\n  {"success":true,"results":[{"Total queries executed":2}]}\n]\n',
+      stderr: "",
+      status: 0,
+      signal: null,
+    });
+    expect(executeWrangler(["--remote", "--json"], cwd)).toEqual([{ "Total queries executed": 2 }]);
+  });
+
+  it("does not accept progress output without a complete JSON result", () => {
+    vi.mocked(spawnSync).mockReturnValue({
+      pid: 1,
+      output: [],
+      stdout: '├ Upload complete\n[{"success":true',
+      stderr: "",
+      status: 0,
+      signal: null,
+    });
+    expect(() => executeWrangler(["--remote", "--json"], cwd)).toThrow("valid JSON result");
+  });
+
+  it("surfaces structured remote errors from stdout instead of only an exit code", () => {
+    vi.mocked(spawnSync).mockReturnValue({
+      pid: 1,
+      output: [],
+      stdout:
+        "├ Checking if file needs uploading\n" +
+        JSON.stringify({
+          error: {
+            text: "SQL code did not contain a statement.",
+            notes: [{ text: "Import rolled back." }],
+          },
+        }),
+      stderr: "",
+      status: 1,
+      signal: null,
+    });
+    expect(() => executeWrangler(["--remote", "--json"], cwd)).toThrow(
+      "SQL code did not contain a statement. Import rolled back.",
+    );
+  });
+
   it("closes child stdin, uses CI and pins the source config", () => {
     vi.mocked(spawnSync).mockReturnValue({
       pid: 1,
@@ -386,5 +447,24 @@ describe("Wrangler transport", () => {
       signal: null,
     });
     expect(() => executeWrangler(["--json"], cwd)).toThrow("did not confirm");
+  });
+});
+
+describe("seed batch terminators", () => {
+  it.each([
+    ["SELECT 1;", false],
+    ["SELECT 1;\n-- trailing comment", false],
+    ["SELECT 1; /* comment with ; */", false],
+    ["-- comments only;\n/* ; */", false],
+    ["", false],
+    ["SELECT 1", true],
+    ["SELECT ';' -- no terminator;", true],
+    ["SELECT 'escaped'';quote'", true],
+    ['SELECT ";"', true],
+    ["SELECT `;`", true],
+    ["SELECT [;]", true],
+  ])("correctly terminates %j before recording completion", (contents, needsTerminator) => {
+    const batch = buildSeedBatch(contents, "seed.sql", "hash");
+    expect(batch.startsWith(`${contents}\n${needsTerminator ? ";\n" : ""}UPDATE `)).toBe(true);
   });
 });

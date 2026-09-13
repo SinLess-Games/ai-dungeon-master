@@ -76,6 +76,13 @@ uses a temporary SQL file for this batch and removes it afterward; source seed
 files stay unchanged. Explicit historical records become `adopted`. Each path has
 one row representing its latest attempt, with its checksum, status and timestamps.
 
+The batch builder preserves existing SQL terminators and adds one only when
+needed. Remote D1 rejects empty statements created by duplicate semicolons even
+when local execution accepts them. Wrangler's structured error text is included
+in failures so remote import problems are visible in the terminal. The runner
+also accepts upload progress before Wrangler's final JSON result; that progress
+must not turn a successful remote import into a reported failure.
+
 A failed or interrupted attempt that did not commit stays `started`. If a network
 response is lost after commit, the next run sees `applied` and skips the file.
 Subsequent runs selecting a file still marked `started` stop

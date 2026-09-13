@@ -9,6 +9,7 @@ import process from "node:process";
 import { createRequire } from "node:module";
 import { createInterface } from "node:readline/promises";
 import { pathToFileURL } from "node:url";
+import { stripVTControlCharacters } from "node:util";
 
 const DATABASE_BINDING = "DB";
 const WRANGLER = resolve(
@@ -144,6 +145,21 @@ async function listSqlFiles(directory) {
   return files;
 }
 
+function parseWranglerOutput(stdout) {
+  // Remote imports can write spinner/progress lines even with --json and CI.
+  // Parse the final JSON document, without treating arbitrary log text as data.
+  const output = stripVTControlCharacters(stdout).trim();
+  const starts = [0, ...Array.from(output.matchAll(/^[ \t]*[[{]/gm), (match) => match.index)];
+  for (const start of new Set(starts)) {
+    try {
+      return JSON.parse(output.slice(start));
+    } catch {
+      // Try the next line beginning a JSON object or array.
+    }
+  }
+  throw new Error("Wrangler did not return a valid JSON result");
+}
+
 export function executeWrangler(args, cwd) {
   const json = args.includes("--json");
   const result = spawnSync(
@@ -164,13 +180,26 @@ export function executeWrangler(args, cwd) {
   }
 
   if (result.status !== 0) {
+    let detail = "";
+    if (json && result.stdout) {
+      try {
+        // Wrangler writes structured failures to stdout in JSON mode, which is
+        // otherwise captured and hidden by this wrapper. Report error fields only.
+        const failure = parseWranglerOutput(result.stdout).error;
+        detail = [failure?.text, ...(failure?.notes ?? []).map((note) => note.text)]
+          .filter((value) => typeof value === "string")
+          .join(" ");
+      } catch {
+        // Non-JSON diagnostics still appear on inherited stderr.
+      }
+    }
     throw new Error(
-      `Wrangler failed with exit code ${result.status ?? result.signal ?? "unknown"}`,
+      `Wrangler failed with exit code ${result.status ?? result.signal ?? "unknown"}${detail ? `: ${detail}` : ""}`,
     );
   }
 
   if (!json) return [];
-  const responses = JSON.parse(result.stdout);
+  const responses = parseWranglerOutput(result.stdout);
   if (!Array.isArray(responses) || responses.some((response) => response.success !== true)) {
     throw new Error("Wrangler did not confirm successful SQL execution");
   }
@@ -188,6 +217,20 @@ async function confirmOnce(question) {
 
 function sqlLiteral(value) {
   return `'${value.replaceAll("'", "''")}'`;
+}
+
+export function buildSeedBatch(contents, path, contentHash) {
+  // Find the last SQL token, ignoring comments and treating quoted text as one
+  // token. Adding an extra ';' after an existing terminator creates an empty
+  // statement that remote D1 imports reject (local D1 silently ignores it).
+  let lastToken;
+  const tokens =
+    /--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:""|[^"])*"|`(?:``|[^`])*`|\[[^\]]*\]|\S/g;
+  for (const [token] of contents.matchAll(tokens)) {
+    if (!token.startsWith("--") && !token.startsWith("/*")) lastToken = token;
+  }
+  const terminator = lastToken && lastToken !== ";" ? ";\n" : "";
+  return `${contents}\n${terminator}UPDATE ${HISTORY_TABLE} SET status = 'applied', completed_at = CURRENT_TIMESTAMP WHERE path = ${sqlLiteral(path)} AND content_hash = ${sqlLiteral(contentHash)};\n`;
 }
 
 export async function main({
@@ -390,10 +433,7 @@ export async function main({
         const batchFile = resolve(temporaryDirectory, "seed.sql");
         // Wrangler executes the file in a D1 transaction. Commit completion with
         // the content so a crash/lost response after commit cannot strand history.
-        await writeFile(
-          batchFile,
-          `${contents}\n;\nUPDATE ${HISTORY_TABLE} SET status = 'applied', completed_at = CURRENT_TIMESTAMP WHERE path = ${sqlLiteral(path)} AND content_hash = ${sqlLiteral(contentHash)};\n`,
-        );
+        await writeFile(batchFile, buildSeedBatch(contents, path, contentHash));
         execute(
           [
             "d1",

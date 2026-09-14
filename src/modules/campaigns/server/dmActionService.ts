@@ -181,7 +181,7 @@ export async function loadDmCharacterContext(
        WHERE a.campaign_id = ?
          AND a.character_id = ?
          AND a.kind = 'character'
-         AND a.status IN ('active', 'defeated')
+         AND a.status = 'active'
        LIMIT 1`,
     )
     .bind(campaignId, characterId)
@@ -234,11 +234,12 @@ export async function loadDmCharacterContext(
       ability: skill.ability,
       specialization: "",
       ranks: 0,
-      trainedOnly: Boolean(skill.trainedOnly),
+      trainedOnly: false,
     });
   }
   for (const skill of trainedResult.results) {
     if (skill.slug === "speak-language") continue;
+    if (Boolean(skill.trainedOnly) && skill.ranks <= 0) continue;
     const specialization = skill.specialization ?? "";
     skills.set(`${skill.id}\u0000${specialization.toLocaleLowerCase()}`, {
       id: skill.id,

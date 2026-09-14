@@ -38,8 +38,8 @@ interface CampaignBindings extends AuthEnv {
 type CampaignEnv = { Bindings: CampaignBindings };
 
 const campaignSettingsSchema = z.record(z.string(), z.unknown()).superRefine((settings, ctx) => {
-  const creatorV1 = settings.creatorVersion === 1;
-  const genres = settings.genres;
+  const creatorV1 = settings["creatorVersion"] === 1;
+  const genres = settings["genres"];
 
   if (genres !== undefined || creatorV1) {
     if (!Array.isArray(genres)) {
@@ -86,7 +86,7 @@ const campaignSettingsSchema = z.record(z.string(), z.unknown()).superRefine((se
     }
   }
 
-  const shortDescription = settings.shortDescription;
+  const shortDescription = settings["shortDescription"];
   if (
     shortDescription !== undefined &&
     (typeof shortDescription !== "string" || shortDescription.trim().length > 200)
@@ -98,17 +98,17 @@ const campaignSettingsSchema = z.record(z.string(), z.unknown()).superRefine((se
     });
   }
 
-  const pace = settings.pace;
+  const pace = settings["pace"];
   if ((pace !== undefined || creatorV1) && (typeof pace !== "string" || !campaignPaceIds.has(pace))) {
     ctx.addIssue({ code: "custom", path: ["pace"], message: "Choose a supported campaign pace." });
   }
 
-  const scale = settings.scale;
+  const scale = settings["scale"];
   if ((scale !== undefined || creatorV1) && (typeof scale !== "string" || !campaignScaleIds.has(scale))) {
     ctx.addIssue({ code: "custom", path: ["scale"], message: "Choose a supported campaign scale." });
   }
 
-  const structure = settings.structure;
+  const structure = settings["structure"];
   if (
     (structure !== undefined || creatorV1) &&
     (typeof structure !== "string" || !campaignStructureIds.has(structure))

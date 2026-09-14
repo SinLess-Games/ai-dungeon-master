@@ -1,6 +1,13 @@
 import { detailedMetrics } from "./metrics";
-import { bugReports } from "@/infrastructure/database/schema/feedback/bugReport";
-import { featureRequests } from "@/infrastructure/database/schema/feedback/featureRequest";
+import {
+  bugReports,
+  bugReportStatuses,
+} from "@/infrastructure/database/schema/feedback/bugReport";
+import {
+  featureRequests,
+  featureRequestStatuses,
+} from "@/infrastructure/database/schema/feedback/featureRequest";
+import { githubFeedbackLinks } from "@/infrastructure/database/schema/feedback/githubFeedbackLink";
 import { Hono } from "hono";
 import { and, count, desc, eq, gt, gte, lte, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -9,7 +16,9 @@ import { campaigns } from "@/infrastructure/database/schema/campaign";
 import { users, sessions } from "@/infrastructure/database/schema/auth";
 import { createAuth, type AuthEnv } from "@/modules/auth/server/auth";
 import { requireAdmin } from "@/modules/auth/server/requireAuth";
-import { BadRequestError } from "@/server/middleware/errors";
+import { enqueueFeedbackSync } from "@/modules/feedback/github/sync";
+import type { GitHubFeedbackEnv } from "@/modules/feedback/github/types";
+import { BadRequestError, NotFoundError } from "@/server/middleware/errors";
 
 const listQuery = z.object({
   search: z.string().trim().max(100).default(""),
@@ -17,10 +26,34 @@ const listQuery = z.object({
   status: z.enum(["all", "active", "suspended"]).default("all"),
   page: z.coerce.number().int().min(0).max(100000).default(0),
 });
+const bugStatusSchema = z.enum(bugReportStatuses);
+const featureStatusSchema = z.enum(featureRequestStatuses);
+const feedbackTypeSchema = z.enum(["bug", "feature"]);
 const isSuspended = (now: Date) =>
   sql<boolean>`coalesce(${users.banned}, 0) = 1 AND (${users.banExpires} IS NULL OR ${users.banExpires} > ${now.getTime()})`;
 
-export const adminRoutes = new Hono<{ Bindings: AuthEnv }>()
+type AdminBindings = AuthEnv & GitHubFeedbackEnv;
+
+async function feedbackExists(
+  database: ReturnType<typeof createDatabase>,
+  type: "bug" | "feature",
+  id: string,
+): Promise<boolean> {
+  if (type === "bug") {
+    return Boolean(
+      await database.select({ id: bugReports.id }).from(bugReports).where(eq(bugReports.id, id)).get(),
+    );
+  }
+  return Boolean(
+    await database
+      .select({ id: featureRequests.id })
+      .from(featureRequests)
+      .where(eq(featureRequests.id, id))
+      .get(),
+  );
+}
+
+export const adminRoutes = new Hono<{ Bindings: AdminBindings }>()
   .use("/api/admin/*", async (c, next) => {
     c.header("Cache-Control", "no-store");
     await requireAdmin(createAuth(c.env), c.req.raw.headers);
@@ -73,7 +106,7 @@ export const adminRoutes = new Hono<{ Bindings: AuthEnv }>()
   .get("/api/admin/feedback", async (c) => {
     const parsed = z
       .object({
-        type: z.enum(["bug", "feature"]).default("bug"),
+        type: feedbackTypeSchema.default("bug"),
         page: z.coerce.number().int().min(0).max(100000).default(0),
       })
       .safeParse(c.req.query());
@@ -92,9 +125,21 @@ export const adminRoutes = new Hono<{ Bindings: AuthEnv }>()
               status: bugReports.status,
               createdAt: bugReports.createdAt,
               reporter: users.email,
+              githubIssueNumber: githubFeedbackLinks.githubIssueNumber,
+              githubIssueUrl: githubFeedbackLinks.githubIssueUrl,
+              githubSyncStatus: githubFeedbackLinks.syncStatus,
+              githubLastError: githubFeedbackLinks.lastError,
+              githubLastSyncedAt: githubFeedbackLinks.lastSyncedAt,
             })
             .from(bugReports)
             .leftJoin(users, eq(users.id, bugReports.reporterUserId))
+            .leftJoin(
+              githubFeedbackLinks,
+              and(
+                eq(githubFeedbackLinks.feedbackType, "bug"),
+                eq(githubFeedbackLinks.feedbackId, bugReports.id),
+              ),
+            )
             .orderBy(desc(bugReports.createdAt), bugReports.id)
             .limit(20)
             .offset(page * 20)
@@ -108,9 +153,21 @@ export const adminRoutes = new Hono<{ Bindings: AuthEnv }>()
               status: featureRequests.status,
               createdAt: featureRequests.createdAt,
               reporter: users.email,
+              githubIssueNumber: githubFeedbackLinks.githubIssueNumber,
+              githubIssueUrl: githubFeedbackLinks.githubIssueUrl,
+              githubSyncStatus: githubFeedbackLinks.syncStatus,
+              githubLastError: githubFeedbackLinks.lastError,
+              githubLastSyncedAt: githubFeedbackLinks.lastSyncedAt,
             })
             .from(featureRequests)
             .leftJoin(users, eq(users.id, featureRequests.requesterUserId))
+            .leftJoin(
+              githubFeedbackLinks,
+              and(
+                eq(githubFeedbackLinks.feedbackType, "feature"),
+                eq(githubFeedbackLinks.feedbackId, featureRequests.id),
+              ),
+            )
             .orderBy(desc(featureRequests.createdAt), featureRequests.id)
             .limit(20)
             .offset(page * 20)
@@ -118,6 +175,77 @@ export const adminRoutes = new Hono<{ Bindings: AuthEnv }>()
       db.select({ value: count() }).from(table).get(),
     ]);
     return c.json({ items, total: total?.value ?? 0, page, pageSize: 20 });
+  })
+  .patch("/api/admin/feedback/:type/:id", async (c) => {
+    const typeResult = feedbackTypeSchema.safeParse(c.req.param("type"));
+    if (!typeResult.success) throw new BadRequestError("Invalid feedback type.");
+    const type = typeResult.data;
+    const id = c.req.param("id");
+    const body = (await c.req.json().catch(() => null)) as { status?: unknown } | null;
+    const statusResult =
+      type === "bug"
+        ? bugStatusSchema.safeParse(body?.status)
+        : featureStatusSchema.safeParse(body?.status);
+    if (!statusResult.success) throw new BadRequestError("Invalid feedback status.");
+
+    const db = createDatabase(c.env.DB!);
+    if (!(await feedbackExists(db, type, id))) throw new NotFoundError("Feedback was not found.");
+    const now = new Date();
+    if (type === "bug") {
+      const status = bugStatusSchema.parse(statusResult.data);
+      await db
+        .update(bugReports)
+        .set({
+          status,
+          updatedAt: now,
+          ...(status === "resolved" || status === "closed" ? { resolvedAt: now } : {}),
+        })
+        .where(eq(bugReports.id, id))
+        .run();
+    } else {
+      const status = featureStatusSchema.parse(statusResult.data);
+      await db
+        .update(featureRequests)
+        .set({
+          status,
+          updatedAt: now,
+          ...(status === "completed" ? { completedAt: now } : {}),
+        })
+        .where(eq(featureRequests.id, id))
+        .run();
+    }
+
+    let githubSyncQueued = false;
+    try {
+      githubSyncQueued = await enqueueFeedbackSync(c.env.GITHUB_SYNC_QUEUE, {
+        feedbackType: type,
+        feedbackId: id,
+        reason: "status_changed",
+      });
+    } catch (error) {
+      console.error("Unable to queue feedback status sync", { type, id, error });
+    }
+    return c.json({ id, type, status: statusResult.data, githubSyncQueued });
+  })
+  .post("/api/admin/feedback/:type/:id/sync", async (c) => {
+    const typeResult = feedbackTypeSchema.safeParse(c.req.param("type"));
+    if (!typeResult.success) throw new BadRequestError("Invalid feedback type.");
+    const type = typeResult.data;
+    const id = c.req.param("id");
+    const db = createDatabase(c.env.DB!);
+    if (!(await feedbackExists(db, type, id))) throw new NotFoundError("Feedback was not found.");
+
+    let queued = false;
+    try {
+      queued = await enqueueFeedbackSync(c.env.GITHUB_SYNC_QUEUE, {
+        feedbackType: type,
+        feedbackId: id,
+        reason: "status_changed",
+      });
+    } catch (error) {
+      console.error("Unable to manually queue GitHub feedback sync", { type, id, error });
+    }
+    return c.json({ id, type, queued }, queued ? 202 : 503);
   })
   .get("/api/admin/users", async (c) => {
     const parsed = listQuery.safeParse(c.req.query());

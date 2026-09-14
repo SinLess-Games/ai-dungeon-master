@@ -15,6 +15,7 @@ export type CampaignDmActionArguments =
   | {
       type: "check.skill";
       skillId: string;
+      skillName?: string;
       specialization?: string;
       dc: number;
       reason: string;

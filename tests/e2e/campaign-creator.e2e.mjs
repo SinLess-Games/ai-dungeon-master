@@ -116,6 +116,8 @@ try {
   await page.locator(".auth-user-menu summary").waitFor();
 
   await page.goto(`${origin}/campaigns/new`);
+  await page.getByRole("heading", { name: "Your Campaigns" }).waitFor();
+  await page.getByRole("button", { name: "Create campaign", exact: true }).first().click();
   await page.getByLabel("Campaign name").fill("Ashes of the North");
   await page.getByLabel("Short description").fill(
     "A frozen kingdom fractures while old powers wake beneath the ice.",
@@ -182,6 +184,22 @@ try {
   assert.equal(settings.ruleset.epicLevels, true);
   console.log("✓ campaign E2E: complete seven-stage creator persists its settings");
 
+  await page.getByRole("button", { name: /Back to campaigns/ }).click();
+  await page.getByRole("heading", { name: "Your Campaigns" }).waitFor();
+  await page.getByRole("heading", { name: "Ashes of the North" }).waitFor();
+  await page.getByRole("button", { name: /Continue setup/ }).click();
+  await page.getByRole("heading", { name: "Ashes of the North" }).waitFor();
+  await page.getByLabel("Short description").fill("The north is breaking, and the old powers are awake.");
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await page.getByText("Campaign setup updated.").waitFor();
+  const resumed = await api(page, "GET", `/api/campaigns/${campaign.id}`);
+  assert.equal(
+    resumed.campaign.settings.shortDescription,
+    "The north is breaking, and the old powers are awake.",
+  );
+  assert.equal(resumed.campaign.settings.creatorVersion, 2);
+  console.log("✓ campaign E2E: campaign library resumes and updates the same saved draft");
+
   const tooManyGenres = [
     "grimdark",
     "exploration",
@@ -199,7 +217,11 @@ try {
       timeMode: "paused",
       visibility: "private",
       maxPlayers: 1,
-      settings: { ...settings, genres: tooManyGenres, ruleset: { ...settings.ruleset, campaignStyleIds: tooManyGenres } },
+      settings: {
+        ...settings,
+        genres: tooManyGenres,
+        ruleset: { ...settings.ruleset, campaignStyleIds: tooManyGenres },
+      },
     },
   });
   assert.equal(invalid.status(), 400);
@@ -207,7 +229,7 @@ try {
   console.log("✓ campaign E2E: server rejects more than five campaign styles");
 
   assert.deepEqual(pageErrors, []);
-  console.log("\n✓ Campaign creator end-to-end verification passed.");
+  console.log("\n✓ Campaign creator MVP end-to-end verification passed.");
 } finally {
   if (browser) await browser.close();
   if (server) await server.close();

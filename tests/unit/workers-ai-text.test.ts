@@ -4,9 +4,11 @@ import {
   type WorkersAIBinding,
 } from "../../src/infrastructure/ai/openaiCompatible";
 
+type WorkersAIRequest = Parameters<WorkersAIBinding["run"]>[1];
+
 describe("Workers AI text generation", () => {
   it("disables Gemma 4 thinking so synchronous calls return user-visible content", async () => {
-    const run = vi.fn(async () => ({
+    const run = vi.fn(async (_model: string, _input: WorkersAIRequest) => ({
       id: "completion-1",
       object: "chat.completion",
       choices: [
@@ -43,7 +45,7 @@ describe("Workers AI text generation", () => {
   });
 
   it("does not send Gemma-specific chat-template settings to other Workers AI models", async () => {
-    const run = vi.fn(async () => ({ response: "Ready." }));
+    const run = vi.fn(async (_model: string, _input: WorkersAIRequest) => ({ response: "Ready." }));
     const binding: WorkersAIBinding = { run };
 
     await generateOpenAICompatibleText(

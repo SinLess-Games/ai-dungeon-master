@@ -7,6 +7,8 @@ import {
   Heart,
   Map,
   MessageSquare,
+  PauseCircle,
+  PlayCircle,
   Radio,
   RefreshCw,
   Send,
@@ -18,7 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { authClient } from "@/modules/auth/client/authClient";
-import { getCampaign } from "../client/campaignCreatorApi";
+import { getCampaign, pauseCampaign, resumeCampaign } from "../client/campaignCreatorApi";
 import {
   endCampaignTurn,
   getCampaignGameState,
@@ -31,6 +33,7 @@ import {
   type CampaignPlayMessage,
   type CampaignPlayMessageChannel,
 } from "../client/campaignPlayApi";
+import { CampaignCastingPanel } from "./CampaignCastingPanel";
 import { CampaignResolutionPanel } from "./CampaignResolutionPanel";
 
 type PlayChannel = "campaign" | "ooc" | "character";
@@ -220,14 +223,41 @@ export function CampaignPlayScreen({
     onError: (error) => toast.error(errorMessage(error)),
   });
 
+  const lifecycle = useMutation({
+    mutationFn: async () => {
+      const status = detail.data?.campaign.status;
+      if (status === "active") return pauseCampaign(campaignId);
+      if (status === "paused") return resumeCampaign(campaignId);
+      throw new Error("This campaign cannot be paused or resumed from its current state.");
+    },
+    onSuccess: async (result) => {
+      toast.success(result.status === "paused" ? "Campaign paused." : "Campaign resumed.");
+      await Promise.all([
+        detail.refetch(),
+        game.refetch(),
+        queryClient.invalidateQueries({ queryKey: ["campaigns"] }),
+      ]);
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  });
+
+  const campaignStatus = detail.data?.campaign.status;
   const canEndTurn = Boolean(
-    detail.data?.campaign.status === "active" &&
+    campaignStatus === "active" &&
       currentUserId &&
       currentTurnActor &&
       currentTurnActor.controllerUserId === currentUserId,
   );
   const canControlSelectedActor = Boolean(
-    currentUserId && selectedActor && selectedActor.controllerUserId === currentUserId,
+    campaignStatus === "active" &&
+      currentUserId &&
+      selectedActor &&
+      selectedActor.controllerUserId === currentUserId,
+  );
+  const canManageLifecycle = Boolean(
+    currentUserId &&
+      detail.data?.campaign.ownerUserId === currentUserId &&
+      (campaignStatus === "active" || campaignStatus === "paused"),
   );
 
   function submit(event: FormEvent) {
@@ -238,6 +268,7 @@ export function CampaignPlayScreen({
 
   async function refreshTable() {
     await Promise.all([
+      detail.refetch(),
       game.refetch(),
       channel === "character" ? Promise.resolve() : messages.refetch(),
     ]);
@@ -304,9 +335,42 @@ export function CampaignPlayScreen({
           </div>
 
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            {canManageLifecycle ? (
+              <button
+                type="button"
+                disabled={lifecycle.isPending}
+                onClick={() => lifecycle.mutate()}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 font-semibold transition hover:border-gold/40 hover:text-gold disabled:opacity-50"
+              >
+                {campaign.status === "paused" ? (
+                  <PlayCircle className="h-3.5 w-3.5" />
+                ) : (
+                  <PauseCircle className="h-3.5 w-3.5" />
+                )}
+                {lifecycle.isPending
+                  ? "Updating…"
+                  : campaign.status === "paused"
+                    ? "Resume"
+                    : "Pause"}
+              </button>
+            ) : null}
             <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1.5">
-              <Radio className={`h-3.5 w-3.5 ${game.isError ? "text-amber-500" : "text-emerald-500"}`} />
-              {game.isError ? "Chat live · game state unavailable" : game.isFetching ? "Syncing" : "Live table"}
+              <Radio
+                className={`h-3.5 w-3.5 ${
+                  campaign.status === "paused"
+                    ? "text-amber-500"
+                    : game.isError
+                      ? "text-amber-500"
+                      : "text-emerald-500"
+                }`}
+              />
+              {campaign.status === "paused"
+                ? "Paused · history live"
+                : game.isError
+                  ? "Chat live · game state unavailable"
+                  : game.isFetching
+                    ? "Syncing"
+                    : "Live table"}
             </span>
             <button
               type="button"
@@ -318,6 +382,12 @@ export function CampaignPlayScreen({
             </button>
           </div>
         </header>
+
+        {campaign.status === "paused" ? (
+          <div className="border-b border-amber-500/20 bg-amber-500/5 px-4 py-2 text-center text-xs text-amber-700 dark:text-amber-300">
+            Campaign play is paused. Chat, OOC DM, character state, and history remain available; rules-engine actions are read-only until play resumes.
+          </div>
+        ) : null}
 
         <div className="grid min-h-[720px] lg:grid-cols-[220px_minmax(0,1fr)_300px]">
           <aside className="border-b border-border bg-background/35 p-3 lg:border-b-0 lg:border-r">
@@ -426,6 +496,7 @@ export function CampaignPlayScreen({
                 name={selectedCharacter?.name ?? "No character selected"}
                 status={selectedCharacter?.status ?? "unavailable"}
                 actor={selectedActor}
+                actors={game.data?.actors ?? []}
                 conditions={conditions}
                 initiative={initiative}
                 canControl={canControlSelectedActor}
@@ -500,7 +571,7 @@ export function CampaignPlayScreen({
                 <Sparkles className="h-4 w-4" /> Campaign play MVP
               </div>
               <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                Campaign and private OOC chat are persistent. AI and hybrid tables receive stored DM replies backed by current campaign context. Skill checks, saves, and encounter turns use the authoritative command pipeline; free text never edits rules state directly.
+                Persistent campaign/OOC chat, AI DM replies, pause/resume, combat, checks, saves, spells, powers, encounter turns, and runtime character state now share the authoritative campaign table.
               </p>
             </div>
           </aside>
@@ -620,6 +691,7 @@ function CharacterChannel({
   name,
   status,
   actor,
+  actors,
   conditions,
   initiative,
   canControl,
@@ -629,6 +701,7 @@ function CharacterChannel({
   name: string;
   status: string;
   actor: CampaignGameActor | null;
+  actors: CampaignGameActor[];
   conditions: Array<{ id: string; conditionId: string; remainingRounds: number | null }>;
   initiative: CampaignEncounterParticipant | null;
   canControl: boolean;
@@ -696,10 +769,18 @@ function CharacterChannel({
         onResolved={onResolved}
       />
 
+      <CampaignCastingPanel
+        campaignId={campaignId}
+        actor={actor}
+        actors={actors}
+        enabled={canControl}
+        onResolved={onResolved}
+      />
+
       <div className="mt-5 rounded-xl border border-border bg-card/60 p-5">
         <h3 className="font-display text-xl">Live character snapshot</h3>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          This channel reflects authoritative runtime state. Skill checks and saves above write through the rules engine; inventory, spells, full sheet actions, and tactical controls can layer onto the same surface without duplicating campaign state.
+          This channel reflects authoritative runtime state. Checks, attacks, spell slots, power points, and resolved casting above write through the rules engine; inventory management and the full sheet can expand this same surface later without duplicating campaign state.
         </p>
       </div>
     </div>

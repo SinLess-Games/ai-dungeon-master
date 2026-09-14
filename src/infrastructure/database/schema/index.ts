@@ -3,6 +3,7 @@ export * from "./world";
 export * from "./campaign";
 export * from "./campaignMembership";
 export * from "./campaignPlayMessage";
+export * from "./campaignDmAction";
 export * from "./character";
 export * from "./gameActor";
 export * from "./runtimeDnd35MonsterInstance";

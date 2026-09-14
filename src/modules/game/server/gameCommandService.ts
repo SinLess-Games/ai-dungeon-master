@@ -35,6 +35,8 @@ export type GameCommand =
       skillId: string;
       specialization?: string;
       dc: number;
+      /** Optional player-supplied natural d20 result. */
+      roll?: number;
     }
   | {
       type: "check.save";
@@ -42,6 +44,8 @@ export type GameCommand =
       save: "fort" | "ref" | "will";
       dc: number;
       sourceId?: string;
+      /** Optional player-supplied natural d20 result. */
+      roll?: number;
     }
   | {
       type: "spell.cast.prepared";
@@ -159,6 +163,7 @@ export async function executeGameCommand(
           ...(command.specialization === undefined
             ? {}
             : { specialization: command.specialization }),
+          ...(command.roll === undefined ? {} : { roll: command.roll }),
         }),
       };
     case "check.save":
@@ -170,6 +175,7 @@ export async function executeGameCommand(
           save: command.save,
           dc: command.dc,
           ...(command.sourceId === undefined ? {} : { sourceId: command.sourceId }),
+          ...(command.roll === undefined ? {} : { roll: command.roll }),
         }),
       };
     case "spell.cast.prepared":

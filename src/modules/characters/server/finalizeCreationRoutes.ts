@@ -18,6 +18,7 @@ import { requireUser } from "@/modules/auth/server/requireAuth";
 import { reconcileCampaignReadiness } from "@/modules/campaigns/domain/lifecycle";
 import { abilityModifier } from "@/rulesets/dnd35";
 import { ValidationError } from "@/server/middleware/errors";
+import { maximumHitPointsFromClassTracks } from "../domain/hitPoints";
 import {
   monsterEffectiveCharacterLevel,
   racialHitPoints,
@@ -61,20 +62,6 @@ export function missingCreationSteps(
   return REQUIRED_CREATION_STEPS
     .filter(({ field }) => progress?.[field] !== true)
     .map(({ label }) => label);
-}
-
-export function maximumHitPointsFromClassTracks(
-  classRows: Array<{ characterLevel: number; hitPointsGained: number }>,
-  constitutionModifier: number,
-): number {
-  const bestByLevel = new Map<number, number>();
-  for (const row of classRows) {
-    bestByLevel.set(row.characterLevel, Math.max(bestByLevel.get(row.characterLevel) ?? 0, row.hitPointsGained));
-  }
-  return [...bestByLevel.values()].reduce(
-    (total, hitPointsGained) => total + Math.max(1, hitPointsGained + constitutionModifier),
-    0,
-  );
 }
 
 function classLevelCount(classRows: Array<{ characterLevel: number }>): number {

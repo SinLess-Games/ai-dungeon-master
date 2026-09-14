@@ -242,22 +242,20 @@ export function CampaignPlayScreen({
   });
 
   const campaignStatus = detail.data?.campaign.status;
+  const hasGameMasterControl = detail.data?.role === "owner" || detail.data?.role === "gm";
   const canEndTurn = Boolean(
     campaignStatus === "active" &&
-      currentUserId &&
       currentTurnActor &&
-      currentTurnActor.controllerUserId === currentUserId,
+      (hasGameMasterControl ||
+        (currentUserId && currentTurnActor.controllerUserId === currentUserId)),
   );
   const canControlSelectedActor = Boolean(
     campaignStatus === "active" &&
-      currentUserId &&
       selectedActor &&
-      selectedActor.controllerUserId === currentUserId,
+      (hasGameMasterControl || (currentUserId && selectedActor.controllerUserId === currentUserId)),
   );
   const canManageLifecycle = Boolean(
-    currentUserId &&
-      detail.data?.campaign.ownerUserId === currentUserId &&
-      (campaignStatus === "active" || campaignStatus === "paused"),
+    hasGameMasterControl && (campaignStatus === "active" || campaignStatus === "paused"),
   );
 
   function submit(event: FormEvent) {
@@ -553,7 +551,7 @@ export function CampaignPlayScreen({
                         onClick={() => endTurn.mutate()}
                         className="w-full rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold transition hover:bg-gold/15 disabled:opacity-50"
                       >
-                        {endTurn.isPending ? "Ending turn…" : "End my turn"}
+                        {endTurn.isPending ? "Ending turn…" : "End turn"}
                       </button>
                     ) : null}
                   </div>

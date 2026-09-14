@@ -41,6 +41,12 @@ function concatBytes(...chunks: Uint8Array[]): Uint8Array {
   return result;
 }
 
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
 function derLength(length: number): Uint8Array {
   if (length < 0x80) return new Uint8Array([length]);
   const bytes: number[] = [];
@@ -112,7 +118,7 @@ async function createAppJwt(env: GitHubFeedbackEnv): Promise<string> {
 
   const key = await crypto.subtle.importKey(
     "pkcs8",
-    privateKeyToPkcs8(privateKey),
+    toArrayBuffer(privateKeyToPkcs8(privateKey)),
     { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
     false,
     ["sign"],
@@ -130,7 +136,7 @@ async function createAppJwt(env: GitHubFeedbackEnv): Promise<string> {
   const signature = await crypto.subtle.sign(
     "RSASSA-PKCS1-v1_5",
     key,
-    encoder.encode(unsigned),
+    toArrayBuffer(encoder.encode(unsigned)),
   );
   return `${unsigned}.${base64Url(new Uint8Array(signature))}`;
 }
@@ -298,10 +304,15 @@ export async function verifyGitHubWebhookSignature(
   if (!signature) return false;
   const key = await crypto.subtle.importKey(
     "raw",
-    encoder.encode(secret),
+    toArrayBuffer(encoder.encode(secret)),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["verify"],
   );
-  return crypto.subtle.verify("HMAC", key, signature, encoder.encode(rawBody));
+  return crypto.subtle.verify(
+    "HMAC",
+    key,
+    toArrayBuffer(signature),
+    toArrayBuffer(encoder.encode(rawBody)),
+  );
 }

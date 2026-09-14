@@ -25,6 +25,7 @@
   "vars": {
     "GITHUB_REPOSITORY": "SinLess-Games/ai-dungeon-master",
     "GITHUB_APP_ID": "4943196",
+    "GITHUB_INSTALLATION_ID": "161683158",
 
     "DEVBLOG_AI_ENABLED": "true",
     "DEVBLOG_AI_AUTO_PUBLISH": "false",
@@ -53,33 +54,33 @@
   },
 
   "queues": {
-  "producers": [
-    {
-      "binding": "BACKGROUND_QUEUE",
-      "queue": "endless-codex-background"
-    },
-    {
-      "binding": "GITHUB_SYNC_QUEUE",
-      "queue": "endless-codex-github-sync"
-    }
-  ],
-  "consumers": [
-    {
-      "queue": "endless-codex-background",
-      "max_batch_size": 10,
-      "max_batch_timeout": 5,
-      "max_retries": 5,
-      "dead_letter_queue": "endless-codex-background-dlq"
-    },
-    {
-      "queue": "endless-codex-github-sync",
-      "max_batch_size": 10,
-      "max_batch_timeout": 5,
-      "max_retries": 5,
-      "dead_letter_queue": "endless-codex-github-sync-dlq"
-    }
-  ]
-},
+    "producers": [
+      {
+        "binding": "BACKGROUND_QUEUE",
+        "queue": "endless-codex-background"
+      },
+      {
+        "binding": "GITHUB_SYNC_QUEUE",
+        "queue": "endless-codex-github-sync"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "endless-codex-background",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "endless-codex-background-dlq"
+      },
+      {
+        "queue": "endless-codex-github-sync",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "endless-codex-github-sync-dlq"
+      }
+    ]
+  },
 
   "kv_namespaces": [
     {

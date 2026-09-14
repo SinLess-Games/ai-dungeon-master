@@ -1,0 +1,53 @@
+name: Feature request
+description: Suggest an improvement for The Endless Codex
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping shape The Endless Codex. Issues created with this form are synchronized into the admin Feedback inbox.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What problem or limitation are you running into?
+      placeholder: Explain the player or administrator need.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What would you like The Endless Codex to do?
+      placeholder: Describe the behavior or experience you want.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Product area
+      options:
+        - Gameplay
+        - AI
+        - Rules
+        - Maps
+        - Multiplayer
+        - Characters
+        - Worlds
+        - Campaigns
+        - Content
+        - UI
+        - Mobile
+        - Desktop
+        - Billing
+        - Account
+        - Performance
+        - Accessibility
+        - Other
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add examples, mockups, or other useful context. Do not include secrets or private account data.

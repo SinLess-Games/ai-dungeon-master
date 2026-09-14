@@ -10,14 +10,22 @@ import {
   isWeeklyDevBlogEnabled,
 } from "@/modules/devblog/ai/automation";
 import type { DevBlogAIEnv } from "@/modules/devblog/ai/types";
+import { processGitHubSyncBatch } from "@/modules/feedback/github/sync";
+import type {
+  GitHubFeedbackEnv,
+  GitHubSyncJob,
+} from "@/modules/feedback/github/types";
 import { CampaignRoom } from "@/modules/game/live/CampaignRoom";
 import { app } from "@/server/app";
 
-interface WorkerEnv extends AuthEnv, DevBlogAIEnv {
+type WorkerQueueJob = BackgroundJob | GitHubSyncJob;
+
+interface WorkerEnv extends AuthEnv, DevBlogAIEnv, GitHubFeedbackEnv {
   DB?: D1Database;
   R2_BUCKET?: R2Bucket;
   CAMPAIGN_ROOM?: DurableObjectNamespace<CampaignRoom>;
   BACKGROUND_QUEUE?: Queue<BackgroundJob>;
+  GITHUB_SYNC_QUEUE?: Queue<GitHubSyncJob>;
   RUNTIME_CACHE?: KVNamespace;
   APP_VERSION?: string;
   BUILD_ID?: string;
@@ -31,8 +39,9 @@ export { CampaignRoom };
  * Cloudflare Worker entrypoint.
  *
  * HTTP traffic is handled by the single Hono application. Scheduled work runs
- * the weekly devblog writer, while Queue deliveries handle asynchronous game
- * post-processing. CampaignRoom is exported as the campaign-scoped Durable
+ * the weekly devblog writer. Queue deliveries are split by queue name so game
+ * post-processing and GitHub feedback synchronization fail and retry
+ * independently. CampaignRoom is exported as the campaign-scoped Durable
  * Object used for hibernating WebSocket coordination.
  */
 export default {
@@ -64,6 +73,10 @@ export default {
   },
 
   queue(batch, env, ctx) {
-    ctx.waitUntil(processBackgroundJobBatch(batch, env));
+    if (batch.queue === "endless-codex-github-sync") {
+      ctx.waitUntil(processGitHubSyncBatch(batch as MessageBatch<GitHubSyncJob>, env));
+      return;
+    }
+    ctx.waitUntil(processBackgroundJobBatch(batch as MessageBatch<BackgroundJob>, env));
   },
-} satisfies ExportedHandler<WorkerEnv, BackgroundJob>;
+} satisfies ExportedHandler<WorkerEnv, WorkerQueueJob>;

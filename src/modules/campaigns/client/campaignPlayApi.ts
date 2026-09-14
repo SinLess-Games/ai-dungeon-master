@@ -86,6 +86,7 @@ export interface CampaignGameState {
 export type CampaignPlayMessageChannel = "campaign" | "ooc_dm";
 export type CampaignPlayMessageAuthorKind = "player" | "dm" | "system";
 export type CampaignSaveKind = "fort" | "ref" | "will";
+export type CampaignAttackKind = "melee" | "ranged";
 
 export interface CampaignPlayMessage {
   id: string;
@@ -110,10 +111,20 @@ export interface CampaignPlaySkillOption {
   trainedOnly: boolean;
 }
 
+export interface CampaignPlayWeaponOption {
+  inventoryId: string;
+  itemId: string;
+  name: string;
+  attackKind: "melee" | "ranged" | "both";
+  handedness: "light" | "one_handed" | "two_handed" | "ranged";
+  quantity: number;
+}
+
 export interface CampaignPlayCheckOptions {
   character: { id: string; name: string };
   skills: CampaignPlaySkillOption[];
   saves: CampaignSaveKind[];
+  weapons: CampaignPlayWeaponOption[];
 }
 
 export interface SendCampaignPlayMessageResult {
@@ -198,6 +209,25 @@ export function performCampaignSave(
       actorId,
       save,
       dc,
+    }),
+  });
+}
+
+export function performCampaignAttack(
+  campaignId: string,
+  attackerId: string,
+  targetId: string,
+  kind: CampaignAttackKind,
+  weaponInventoryId?: string,
+): Promise<unknown> {
+  return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/game/commands`, {
+    method: "POST",
+    body: JSON.stringify({
+      type: "combat.attack",
+      attackerId,
+      targetId,
+      kind,
+      ...(weaponInventoryId ? { weaponInventoryId } : {}),
     }),
   });
 }

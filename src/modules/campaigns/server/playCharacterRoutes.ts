@@ -7,8 +7,11 @@ import {
   campaignMemberships,
   campaigns,
   characters,
+  characterInventory,
   characterSkills,
+  items,
   skills,
+  weapons,
 } from "@/infrastructure/database/schema";
 import { createAuth, type AuthEnv } from "@/modules/auth/server/auth";
 import { requireUser } from "@/modules/auth/server/requireAuth";
@@ -78,7 +81,7 @@ export const campaignPlayCharacterRoutes = new Hono<Env>().get(
       .get();
     if (!character) throw new NotFoundError("Character not found in this campaign.");
 
-    const [trained, untrained] = await Promise.all([
+    const [trained, untrained, carriedWeapons] = await Promise.all([
       db
         .select({
           id: skills.id,
@@ -119,6 +122,26 @@ export const campaignPlayCharacterRoutes = new Hono<Env>().get(
         )
         .orderBy(asc(skills.name))
         .all(),
+      db
+        .select({
+          inventoryId: characterInventory.id,
+          itemId: items.id,
+          name: items.name,
+          attackKind: weapons.attackKind,
+          handedness: weapons.handedness,
+          quantity: characterInventory.quantity,
+        })
+        .from(characterInventory)
+        .innerJoin(items, eq(characterInventory.itemId, items.id))
+        .innerJoin(weapons, eq(items.id, weapons.itemId))
+        .where(
+          and(
+            eq(characterInventory.characterId, characterId),
+            eq(characterInventory.location, "carried"),
+          ),
+        )
+        .orderBy(asc(items.name))
+        .all(),
     ]);
 
     const options = new Map<string, {
@@ -154,6 +177,7 @@ export const campaignPlayCharacterRoutes = new Hono<Env>().get(
         `${a.name}\u0000${a.specialization}`.localeCompare(`${b.name}\u0000${b.specialization}`),
       ),
       saves: ["fort", "ref", "will"] as const,
+      weapons: carriedWeapons,
     });
   },
 );

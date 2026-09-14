@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CampaignCreator } from "@/modules/campaigns/ui/CampaignCreator";
+import { CampaignsHub } from "@/modules/campaigns/ui/CampaignsHub";
 
 export const Route = createFileRoute("/campaigns/new")({
-  component: CampaignCreator,
+  component: CampaignsHub,
 });

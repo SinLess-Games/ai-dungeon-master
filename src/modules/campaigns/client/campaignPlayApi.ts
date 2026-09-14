@@ -85,6 +85,7 @@ export interface CampaignGameState {
 
 export type CampaignPlayMessageChannel = "campaign" | "ooc_dm";
 export type CampaignPlayMessageAuthorKind = "player" | "dm" | "system";
+export type CampaignSaveKind = "fort" | "ref" | "will";
 
 export interface CampaignPlayMessage {
   id: string;
@@ -97,6 +98,22 @@ export interface CampaignPlayMessage {
   characterName: string | null;
   content: string;
   createdAt: number;
+}
+
+export interface CampaignPlaySkillOption {
+  id: string;
+  slug: string;
+  name: string;
+  ability: string | null;
+  specialization: string;
+  ranks: number;
+  trainedOnly: boolean;
+}
+
+export interface CampaignPlayCheckOptions {
+  character: { id: string; name: string };
+  skills: CampaignPlaySkillOption[];
+  saves: CampaignSaveKind[];
 }
 
 export interface SendCampaignPlayMessageResult {
@@ -138,6 +155,51 @@ export function sendCampaignPlayMessage(
       body: JSON.stringify(input),
     },
   );
+}
+
+export function getCampaignPlayCheckOptions(
+  campaignId: string,
+  characterId: string,
+): Promise<CampaignPlayCheckOptions> {
+  return requestJson<CampaignPlayCheckOptions>(
+    `/api/campaigns/${encodeURIComponent(campaignId)}/play/characters/${encodeURIComponent(characterId)}/checks`,
+  );
+}
+
+export function performCampaignSkillCheck(
+  campaignId: string,
+  actorId: string,
+  skillId: string,
+  dc: number,
+  specialization?: string,
+): Promise<unknown> {
+  return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/game/commands`, {
+    method: "POST",
+    body: JSON.stringify({
+      type: "check.skill",
+      actorId,
+      skillId,
+      dc,
+      ...(specialization ? { specialization } : {}),
+    }),
+  });
+}
+
+export function performCampaignSave(
+  campaignId: string,
+  actorId: string,
+  save: CampaignSaveKind,
+  dc: number,
+): Promise<unknown> {
+  return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/game/commands`, {
+    method: "POST",
+    body: JSON.stringify({
+      type: "check.save",
+      actorId,
+      save,
+      dc,
+    }),
+  });
 }
 
 export function endCampaignTurn(

@@ -16,6 +16,7 @@ import type {
 export type CampaignVisibility = "private" | "invite_only" | "unlisted" | "public";
 export type CampaignPlayMode = "solo" | "multiplayer";
 export type CampaignGameMasterMode = "ai" | "human" | "hybrid";
+export type CampaignAccessRole = "owner" | "gm" | "player" | "observer";
 
 export interface CampaignCreatorSettings {
   creatorVersion: 2;
@@ -127,6 +128,7 @@ export interface CampaignDetailResponse {
     rulesetVersion: string;
     worldId: string | null;
   };
+  role: CampaignAccessRole;
   characters: Array<{
     id: string;
     name: string;

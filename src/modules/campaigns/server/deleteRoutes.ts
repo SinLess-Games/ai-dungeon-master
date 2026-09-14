@@ -46,7 +46,7 @@ export const campaignDeleteRoutes = new Hono<Env>().delete(
     if (campaign.ownerUserId !== session.user.id) {
       throw new ForbiddenError("Only the campaign owner can delete this campaign.");
     }
-    if (confirmationName.trim() !== campaign.name) {
+    if (confirmationName !== campaign.name) {
       throw new ValidationError("Enter the campaign name exactly to confirm deletion.");
     }
 

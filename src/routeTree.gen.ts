@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './app/routes/__root'
 import { Route as IndexRouteImport } from './app/routes/index'
 import { Route as DiceRouteImport } from './app/routes/dice'
 import { Route as StatusRouteImport } from './app/routes/status'
+import { Route as CampaignsNewRouteImport } from './app/routes/campaigns/new'
 import { Route as CharactersIndexRouteImport } from './app/routes/characters/index'
 import { Route as CharactersNewRouteImport } from './app/routes/characters/new'
 import { Route as DevblogIndexRouteImport } from './app/routes/devblog/index'
@@ -33,6 +34,11 @@ const DiceRoute = DiceRouteImport.update({
 const StatusRoute = StatusRouteImport.update({
   id: '/status',
   path: '/status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CampaignsNewRoute = CampaignsNewRouteImport.update({
+  id: '/campaigns/new',
+  path: '/campaigns/new',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CharactersIndexRoute = CharactersIndexRouteImport.update({
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dice': typeof DiceRoute
   '/status': typeof StatusRoute
+  '/campaigns/new': typeof CampaignsNewRoute
   '/characters/new': typeof CharactersNewRoute
   '/devblog/$slug': typeof DevblogSlugRoute
   '/devblog/admin': typeof DevblogAdminRoute
@@ -87,6 +94,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dice': typeof DiceRoute
   '/status': typeof StatusRoute
+  '/campaigns/new': typeof CampaignsNewRoute
   '/characters/new': typeof CharactersNewRoute
   '/devblog/$slug': typeof DevblogSlugRoute
   '/devblog/admin': typeof DevblogAdminRoute
@@ -100,6 +108,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/dice': typeof DiceRoute
   '/status': typeof StatusRoute
+  '/campaigns/new': typeof CampaignsNewRoute
   '/characters/new': typeof CharactersNewRoute
   '/devblog/$slug': typeof DevblogSlugRoute
   '/devblog/admin': typeof DevblogAdminRoute
@@ -114,6 +123,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dice'
     | '/status'
+    | '/campaigns/new'
     | '/characters/new'
     | '/devblog/$slug'
     | '/devblog/admin'
@@ -126,6 +136,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dice'
     | '/status'
+    | '/campaigns/new'
     | '/characters/new'
     | '/devblog/$slug'
     | '/devblog/admin'
@@ -138,6 +149,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dice'
     | '/status'
+    | '/campaigns/new'
     | '/characters/new'
     | '/devblog/$slug'
     | '/devblog/admin'
@@ -151,6 +163,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DiceRoute: typeof DiceRoute
   StatusRoute: typeof StatusRoute
+  CampaignsNewRoute: typeof CampaignsNewRoute
   CharactersNewRoute: typeof CharactersNewRoute
   DevblogSlugRoute: typeof DevblogSlugRoute
   DevblogAdminRoute: typeof DevblogAdminRoute
@@ -181,6 +194,13 @@ declare module '@tanstack/react-router' {
       path: '/status'
       fullPath: '/status'
       preLoaderRoute: typeof StatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/campaigns/new': {
+      id: '/campaigns/new'
+      path: '/campaigns/new'
+      fullPath: '/campaigns/new'
+      preLoaderRoute: typeof CampaignsNewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/characters/': {
@@ -239,6 +259,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DiceRoute: DiceRoute,
   StatusRoute: StatusRoute,
+  CampaignsNewRoute: CampaignsNewRoute,
   CharactersNewRoute: CharactersNewRoute,
   DevblogSlugRoute: DevblogSlugRoute,
   DevblogAdminRoute: DevblogAdminRoute,

@@ -63,18 +63,21 @@ export async function updateFeedbackStatus(
   id: string,
   status: string,
 ) {
-  return checked(
-    await api.api.admin.feedback[":type"][":id"].$patch({
-      param: { type, id },
-      json: { status },
+  return checked<{ id: string; type: "bug" | "feature"; status: string; githubSyncQueued: boolean }>(
+    await fetch(`/api/admin/feedback/${encodeURIComponent(type)}/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
     }),
   );
 }
 
 export async function retryFeedbackGitHubSync(type: "bug" | "feature", id: string) {
-  return checked(
-    await api.api.admin.feedback[":type"][":id"].sync.$post({
-      param: { type, id },
+  return checked<{ id: string; type: "bug" | "feature"; queued: boolean }>(
+    await fetch(`/api/admin/feedback/${encodeURIComponent(type)}/${encodeURIComponent(id)}/sync`, {
+      method: "POST",
+      credentials: "same-origin",
     }),
   );
 }

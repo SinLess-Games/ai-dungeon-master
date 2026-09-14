@@ -672,7 +672,7 @@ function MessageCard({ message }: { message: CampaignPlayMessage }) {
   );
 }
 
-function EventCard({ event, actorName }: { event: CampaignGameEvent; actorName?: string }) {
+function EventCard({ event, actorName }: { event: CampaignGameEvent; actorName?: string | undefined }) {
   return (
     <article className="rounded-xl border border-dashed border-border bg-background/30 p-3.5">
       <div className="flex items-center justify-between gap-3">

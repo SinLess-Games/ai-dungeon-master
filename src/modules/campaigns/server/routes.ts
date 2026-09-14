@@ -20,6 +20,13 @@ import {
   ServiceUnavailableError,
   ValidationError,
 } from "@/server/middleware/errors";
+import {
+  CAMPAIGN_STYLE_LIMIT,
+  campaignPaceIds,
+  campaignScaleIds,
+  campaignStructureIds,
+  campaignStyleIds,
+} from "../domain/creatorOptions";
 import { BootstrapWorldGenerator } from "./bootstrapWorldGenerator";
 import { D1CampaignStartRepository } from "./d1StartRepository";
 import { startCampaign } from "./startCampaign";
@@ -29,6 +36,90 @@ interface CampaignBindings extends AuthEnv {
 }
 
 type CampaignEnv = { Bindings: CampaignBindings };
+
+const campaignSettingsSchema = z.record(z.string(), z.unknown()).superRefine((settings, ctx) => {
+  const creatorV1 = settings.creatorVersion === 1;
+  const genres = settings.genres;
+
+  if (genres !== undefined || creatorV1) {
+    if (!Array.isArray(genres)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["genres"],
+        message: "Campaign genres must be an array.",
+      });
+    } else {
+      if (creatorV1 && genres.length < 1) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["genres"],
+          message: "Choose at least one campaign style or genre.",
+        });
+      }
+      if (genres.length > CAMPAIGN_STYLE_LIMIT) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["genres"],
+          message: `Choose no more than ${CAMPAIGN_STYLE_LIMIT} campaign styles or genres.`,
+        });
+      }
+      const seen = new Set<string>();
+      for (const genre of genres) {
+        if (typeof genre !== "string" || !campaignStyleIds.has(genre)) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["genres"],
+            message: "Campaign genres include an unsupported value.",
+          });
+          break;
+        }
+        if (seen.has(genre)) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["genres"],
+            message: "Campaign genres cannot contain duplicates.",
+          });
+          break;
+        }
+        seen.add(genre);
+      }
+    }
+  }
+
+  const shortDescription = settings.shortDescription;
+  if (
+    shortDescription !== undefined &&
+    (typeof shortDescription !== "string" || shortDescription.trim().length > 200)
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["shortDescription"],
+      message: "Campaign short description must be 200 characters or fewer.",
+    });
+  }
+
+  const pace = settings.pace;
+  if ((pace !== undefined || creatorV1) && (typeof pace !== "string" || !campaignPaceIds.has(pace))) {
+    ctx.addIssue({ code: "custom", path: ["pace"], message: "Choose a supported campaign pace." });
+  }
+
+  const scale = settings.scale;
+  if ((scale !== undefined || creatorV1) && (typeof scale !== "string" || !campaignScaleIds.has(scale))) {
+    ctx.addIssue({ code: "custom", path: ["scale"], message: "Choose a supported campaign scale." });
+  }
+
+  const structure = settings.structure;
+  if (
+    (structure !== undefined || creatorV1) &&
+    (typeof structure !== "string" || !campaignStructureIds.has(structure))
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["structure"],
+      message: "Choose a supported campaign structure.",
+    });
+  }
+});
 
 const createCampaignSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -46,7 +137,7 @@ const createCampaignSchema = z.object({
   visibility: z.enum(["private", "invite_only", "unlisted", "public"]).default("private"),
   maxPlayers: z.number().int().positive().nullable().optional(),
   generationSeed: z.string().trim().min(1).max(256).optional(),
-  settings: z.record(z.string(), z.unknown()).optional(),
+  settings: campaignSettingsSchema.optional(),
 });
 
 const updateCampaignSchema = z
@@ -60,7 +151,7 @@ const updateCampaignSchema = z
     visibility: z.enum(["private", "invite_only", "unlisted", "public"]).optional(),
     maxPlayers: z.number().int().positive().nullable().optional(),
     generationSeed: z.string().trim().min(1).max(256).optional(),
-    settings: z.record(z.string(), z.unknown()).optional(),
+    settings: campaignSettingsSchema.optional(),
   })
   .refine((value) => Object.keys(value).length > 0, "At least one campaign field is required.");
 
@@ -110,7 +201,9 @@ async function requireCampaignAccess(input: {
   return campaign;
 }
 
-function throwStartFailure(errors: readonly { code: string; message: string; path?: string; details?: unknown }[]): never {
+function throwStartFailure(
+  errors: readonly { code: string; message: string; path?: string; details?: unknown }[],
+): never {
   const first = errors[0];
   const details = {
     issues: errors.map((error) => ({

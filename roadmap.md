@@ -26,7 +26,8 @@ feature. This audit does not certify production deployment or live provider setu
 - [ ] Streaming AI DM with state tools, player rolls, grants, alignment tracking
   - [x] [Persistent campaign/private DM conversations](src/modules/campaigns/server/playMessageRoutes.ts) and generated AI replies.
   - [x] [Validated game commands](src/modules/game/server/gameCommandRoutes.ts) for encounters, attacks, checks, casting, and psionics, with player controls in campaign play.
-  - [ ] Token streaming, an integrated model tool-calling loop, item/XP grant workflows, and ongoing alignment tracking. Current narration and deterministic commands are separate paths.
+  - [x] First structured AI DM tool loop for skill checks and saving throws: the model plans a validated request, the player supplies the natural d20, the deterministic game-command boundary resolves and persists the authoritative event, and the DM narrates the recorded result.
+  - [ ] Token streaming; expand model tools to attacks, casting, conditions and other validated state changes; item/XP grant workflows; and ongoing alignment tracking.
 - [ ] Standalone world builder + world map — [campaign start](src/modules/campaigns/server/bootstrapWorldGenerator.ts) creates a minimal persistent world root and generation metadata; standalone editing and map generation/display are absent.
 
 ## Phase 2 — Reference, loot, export

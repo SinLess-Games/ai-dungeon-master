@@ -139,3 +139,18 @@ export function sendCampaignPlayMessage(
     },
   );
 }
+
+export function endCampaignTurn(
+  campaignId: string,
+  encounterId: string,
+  actorId: string,
+): Promise<unknown> {
+  return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/game/commands`, {
+    method: "POST",
+    body: JSON.stringify({
+      type: "encounter.end_turn",
+      encounterId,
+      actorId,
+    }),
+  });
+}

@@ -8,7 +8,13 @@ import { users } from "./auth";
 export const campaignDmActionKinds = ["check.skill", "check.save"] as const;
 export type CampaignDmActionKind = (typeof campaignDmActionKinds)[number];
 
-export const campaignDmActionStatuses = ["pending", "resolved", "failed", "cancelled"] as const;
+export const campaignDmActionStatuses = [
+  "pending",
+  "resolving",
+  "resolved",
+  "failed",
+  "cancelled",
+] as const;
 export type CampaignDmActionStatus = (typeof campaignDmActionStatuses)[number];
 
 export type CampaignDmActionArguments =
@@ -85,7 +91,7 @@ export const campaignDmActions = sqliteTable(
     ),
     check(
       "campaign_dm_actions_status_valid",
-      sql`${table.status} IN ('pending', 'resolved', 'failed', 'cancelled')`,
+      sql`${table.status} IN ('pending', 'resolving', 'resolved', 'failed', 'cancelled')`,
     ),
     check("campaign_dm_actions_arguments_json_valid", sql`json_valid(${table.arguments})`),
     check(

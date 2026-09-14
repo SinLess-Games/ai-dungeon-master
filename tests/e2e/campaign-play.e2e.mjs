@@ -222,7 +222,6 @@ try {
 
   await page.goto(`${origin}/campaigns/new`);
   await page.getByRole("heading", { name: "Your Campaigns" }).waitFor();
-  const card = page.getByRole("heading", { name: "The Black Glass Road" }).locator("..", { hasText: "The Black Glass Road" });
   await page.getByRole("heading", { name: "The Black Glass Road" }).waitFor();
   await page.getByRole("button", { name: "Enter", exact: true }).click();
   await page.getByRole("heading", { name: "The Table", exact: true }).waitFor();
@@ -244,7 +243,7 @@ try {
     .getByText("The rule is clear: resolve uncertain outcomes through the rules engine.", { exact: true })
     .waitFor();
   assert.equal(ai.requests.length, 2);
-  await page.getByRole("button", { name: /Campaign.*In-character table/ }).click();
+  await page.getByRole("button", { name: /^Campaign/ }).click();
   assert.equal(
     await page.getByText("OOC: should an uncertain action change HP before a rules check?", { exact: true }).count(),
     0,

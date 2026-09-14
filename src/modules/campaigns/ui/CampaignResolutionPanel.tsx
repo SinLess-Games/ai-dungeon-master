@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Dices, ShieldCheck, Swords } from "lucide-react";
 import { toast } from "sonner";
 import {
+  getCampaignGameState,
   getCampaignPlayCheckOptions,
   performCampaignAttack,
   performCampaignSave,
@@ -32,13 +33,11 @@ interface AttackChoice {
 export function CampaignResolutionPanel({
   campaignId,
   actor,
-  targets,
   enabled,
   onResolved,
 }: {
   campaignId: string;
   actor: CampaignGameActor | null;
-  targets: CampaignGameActor[];
   enabled: boolean;
   onResolved: () => Promise<unknown> | unknown;
 }) {
@@ -54,10 +53,15 @@ export function CampaignResolutionPanel({
     queryFn: () => getCampaignPlayCheckOptions(campaignId, characterId!),
     enabled: Boolean(characterId),
   });
+  const game = useQuery({
+    queryKey: ["campaigns", "play", campaignId, "state"],
+    queryFn: () => getCampaignGameState(campaignId),
+    enabled: Boolean(actor),
+  });
 
   const legalTargets = useMemo(
-    () => targets.filter((target) => target.id !== actor?.id && target.status === "active"),
-    [actor?.id, targets],
+    () => (game.data?.actors ?? []).filter((target) => target.id !== actor?.id && target.status === "active"),
+    [actor?.id, game.data?.actors],
   );
 
   const attackChoices = useMemo<AttackChoice[]>(() => {

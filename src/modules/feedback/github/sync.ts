@@ -468,11 +468,11 @@ async function importGitHubIssue(
   const db = createDatabase(requireDatabase(env));
   const id = crypto.randomUUID();
   const body = issue.body?.trim() || `Imported from GitHub issue #${issue.number}.`;
-  const description =
+  const extractedDescription =
     extractSection(body, "Description") ??
     extractSection(body, "Problem to solve") ??
-    stripFeedbackMarker(body) ||
-    `Imported from GitHub issue #${issue.number}.`;
+    stripFeedbackMarker(body);
+  const description = extractedDescription || `Imported from GitHub issue #${issue.number}.`;
   if (feedbackType === "bug") {
     await db.insert(bugReports).values({
       id,

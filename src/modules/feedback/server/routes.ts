@@ -5,10 +5,14 @@ import { bugReports } from "@/infrastructure/database/schema/feedback/bugReport"
 import { featureRequests } from "@/infrastructure/database/schema/feedback/featureRequest";
 import { createAuth, type AuthEnv } from "@/modules/auth/server/auth";
 import { requireUser } from "@/modules/auth/server/requireAuth";
+import { enqueueFeedbackSync } from "../github/sync";
+import type { GitHubFeedbackEnv } from "../github/types";
 import { feedbackSchema } from "../domain/validation";
 import { BadRequestError, ForbiddenError } from "@/server/middleware/errors";
 
-export const feedbackRoutes = new Hono<{ Bindings: AuthEnv }>().post(
+type FeedbackBindings = AuthEnv & GitHubFeedbackEnv;
+
+export const feedbackRoutes = new Hono<{ Bindings: FeedbackBindings }>().post(
   "/api/feedback",
   bodyLimit({ maxSize: 40000 }),
   async (c) => {
@@ -39,7 +43,21 @@ export const feedbackRoutes = new Hono<{ Bindings: AuthEnv }>().post(
         platform: "web",
       });
     }
+
+    let githubSyncQueued = false;
+    try {
+      githubSyncQueued = await enqueueFeedbackSync(c.env.GITHUB_SYNC_QUEUE, {
+        feedbackType: type,
+        feedbackId: id,
+        reason: "created",
+      });
+    } catch (error) {
+      // Feedback is the primary record. A temporary GitHub/Queue failure must
+      // not discard a player's submission; admins can retry from the inbox.
+      console.error("Unable to queue GitHub feedback sync", { id, type, error });
+    }
+
     c.header("Cache-Control", "no-store");
-    return c.json({ id, type }, 201);
+    return c.json({ id, type, githubSyncQueued }, 201);
   },
 );

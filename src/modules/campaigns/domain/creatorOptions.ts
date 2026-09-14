@@ -70,7 +70,68 @@ export const campaignStructureOptions = [
 
 export type CampaignStructure = (typeof campaignStructureOptions)[number]["id"];
 
+export const worldTemplateOptions = [
+  { id: "balanced-realms", name: "Balanced Realms", description: "A broad mix of settlements, wilderness, ruins, factions, and roads." },
+  { id: "dangerous-frontier", name: "Dangerous Frontier", description: "Sparse civilization surrounded by wilderness, ruins, and unexplored territory." },
+  { id: "fractured-kingdoms", name: "Fractured Kingdoms", description: "Rival realms, disputed borders, politics, warfare, and shifting alliances." },
+  { id: "ancient-ruins", name: "Age of Ruins", description: "A world layered over fallen civilizations, forgotten roads, and buried powers." },
+  { id: "wild-magic", name: "Wild Magic", description: "Unstable magical regions and supernatural events shape travel and settlement life." },
+  { id: "isles-and-seas", name: "Isles & Seas", description: "Coasts, archipelagos, trade routes, naval travel, and isolated cultures." },
+] as const;
+
+export type WorldTemplateId = (typeof worldTemplateOptions)[number]["id"];
+export type WorldCreationMode = "generated" | "seeded";
+
+export const levelingModeOptions = [
+  { id: "experience", name: "Experience Points", description: "Use D&D 3.5 XP progression and level thresholds." },
+  { id: "milestone", name: "Milestone", description: "The campaign advances characters at major story milestones." },
+] as const;
+export type LevelingMode = (typeof levelingModeOptions)[number]["id"];
+
+export const characterProgressionOptions = [
+  { id: "standard", name: "Standard", description: "Normal D&D 3.5 class progression." },
+  { id: "gestalt", name: "Gestalt", description: "Characters advance in two classes at each character level." },
+  { id: "player-choice", name: "Player Choice", description: "Allow each player to choose standard or gestalt creation." },
+] as const;
+export type CharacterProgressionPolicy = (typeof characterProgressionOptions)[number]["id"];
+
+export const campaignDifficultyOptions = [
+  { id: "forgiving", name: "Forgiving", description: "Lower pressure and more recovery opportunities." },
+  { id: "balanced", name: "Balanced", description: "Fair consequences with dangerous encounters when earned." },
+  { id: "challenging", name: "Challenging", description: "Resources matter and poor choices can become costly." },
+  { id: "brutal", name: "Brutal", description: "Lethal stakes, scarce safety, and enemies that exploit mistakes." },
+] as const;
+export type CampaignDifficulty = (typeof campaignDifficultyOptions)[number]["id"];
+
+export const rulesStrictnessOptions = [
+  { id: "strict", name: "Rules Strict", description: "Prefer rules-as-written and deterministic adjudication." },
+  { id: "balanced", name: "Balanced", description: "Keep the rules authoritative while allowing sensible rulings." },
+  { id: "cinematic", name: "Cinematic", description: "Favor dramatic rulings when the rules leave room for interpretation." },
+] as const;
+export type RulesStrictness = (typeof rulesStrictnessOptions)[number]["id"];
+
+export const dmCreativityOptions = [
+  { id: "conservative", name: "Conservative", description: "Stay close to established lore, locations, and campaign facts." },
+  { id: "adaptive", name: "Adaptive", description: "Add new details when needed while protecting continuity." },
+  { id: "inventive", name: "Inventive", description: "Create more unexpected NPCs, hooks, complications, and discoveries." },
+] as const;
+export type DmCreativity = (typeof dmCreativityOptions)[number]["id"];
+
+export const contentPolicyOptions = [
+  { id: "core", name: "Core Only", description: "Use the core D&D 3.5 rules and content set." },
+  { id: "official", name: "Official 3.5", description: "Allow enabled official D&D 3.5 supplements in addition to core." },
+  { id: "custom", name: "Custom", description: "Allow official content plus enabled homebrew or custom sources." },
+] as const;
+export type ContentPolicy = (typeof contentPolicyOptions)[number]["id"];
+
 export const campaignStyleIds = new Set<string>(campaignStyleOptions.map((option) => option.id));
 export const campaignPaceIds = new Set<string>(campaignPaceOptions.map((option) => option.id));
 export const campaignScaleIds = new Set<string>(campaignScaleOptions.map((option) => option.id));
 export const campaignStructureIds = new Set<string>(campaignStructureOptions.map((option) => option.id));
+export const worldTemplateIds = new Set<string>(worldTemplateOptions.map((option) => option.id));
+export const levelingModeIds = new Set<string>(levelingModeOptions.map((option) => option.id));
+export const characterProgressionIds = new Set<string>(characterProgressionOptions.map((option) => option.id));
+export const campaignDifficultyIds = new Set<string>(campaignDifficultyOptions.map((option) => option.id));
+export const rulesStrictnessIds = new Set<string>(rulesStrictnessOptions.map((option) => option.id));
+export const dmCreativityIds = new Set<string>(dmCreativityOptions.map((option) => option.id));
+export const contentPolicyIds = new Set<string>(contentPolicyOptions.map((option) => option.id));

@@ -25,6 +25,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:e2e:campaign": "node tests/e2e/campaign-creator.e2e.mjs",
+    "test:e2e:campaign-play": "node tests/e2e/campaign-play.e2e.mjs",
     "test:e2e:creator": "node tests/e2e/character-creator.e2e.mjs && node tests/e2e/character-creator-ui.e2e.mjs && node tests/e2e/character-creator-guardrails.e2e.mjs && node tests/e2e/character-creator-supplement-classes.e2e.mjs",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",

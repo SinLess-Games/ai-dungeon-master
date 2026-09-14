@@ -83,8 +83,59 @@ export interface CampaignGameState {
   events: CampaignGameEvent[];
 }
 
+export type CampaignPlayMessageChannel = "campaign" | "ooc_dm";
+export type CampaignPlayMessageAuthorKind = "player" | "dm" | "system";
+
+export interface CampaignPlayMessage {
+  id: string;
+  campaignId: string;
+  channel: CampaignPlayMessageChannel;
+  authorKind: CampaignPlayMessageAuthorKind;
+  authorUserId: string | null;
+  authorName: string;
+  characterId: string | null;
+  characterName: string | null;
+  content: string;
+  createdAt: number;
+}
+
+export interface SendCampaignPlayMessageResult {
+  message: CampaignPlayMessage;
+  dmMessage: CampaignPlayMessage | null;
+  aiError: string | null;
+  awaitingHumanDm: boolean;
+}
+
 export function getCampaignGameState(campaignId: string): Promise<CampaignGameState> {
   return requestJson<CampaignGameState>(
     `/api/campaigns/${encodeURIComponent(campaignId)}/game/state?eventLimit=100`,
+  );
+}
+
+export async function listCampaignPlayMessages(
+  campaignId: string,
+  channel: CampaignPlayMessageChannel,
+  limit = 60,
+): Promise<CampaignPlayMessage[]> {
+  const response = await requestJson<{ items: CampaignPlayMessage[] }>(
+    `/api/campaigns/${encodeURIComponent(campaignId)}/play/messages?channel=${encodeURIComponent(channel)}&limit=${limit}`,
+  );
+  return response.items;
+}
+
+export function sendCampaignPlayMessage(
+  campaignId: string,
+  input: {
+    channel: CampaignPlayMessageChannel;
+    content: string;
+    characterId?: string | null;
+  },
+): Promise<SendCampaignPlayMessageResult> {
+  return requestJson<SendCampaignPlayMessageResult>(
+    `/api/campaigns/${encodeURIComponent(campaignId)}/play/messages`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
   );
 }

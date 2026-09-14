@@ -103,6 +103,22 @@ export interface CampaignPlayMessage {
   createdAt: number;
 }
 
+export interface CampaignDmAction {
+  id: string;
+  campaignId: string;
+  characterId: string;
+  actorId: string;
+  kind: "check.skill" | "check.save";
+  status: "pending" | "resolving" | "resolved" | "failed" | "cancelled";
+  dc: number;
+  reason: string;
+  skill: { id: string; name: string; specialization: string } | null;
+  save: CampaignSaveKind | null;
+  error: string | null;
+  createdAt: number;
+  resolvedAt: number | null;
+}
+
 export interface CampaignPlaySkillOption {
   id: string;
   slug: string;
@@ -214,8 +230,15 @@ export interface CampaignCastingState {
 export interface SendCampaignPlayMessageResult {
   message: CampaignPlayMessage;
   dmMessage: CampaignPlayMessage | null;
+  pendingAction: CampaignDmAction | null;
   aiError: string | null;
   awaitingHumanDm: boolean;
+}
+
+export interface ResolveCampaignDmActionResult {
+  action: CampaignDmAction;
+  result: { type: "check.skill" | "check.save"; value: unknown };
+  dmMessage: CampaignPlayMessage;
 }
 
 export function getCampaignGameState(campaignId: string): Promise<CampaignGameState> {
@@ -248,6 +271,29 @@ export function sendCampaignPlayMessage(
     {
       method: "POST",
       body: JSON.stringify(input),
+    },
+  );
+}
+
+export async function getPendingCampaignDmAction(
+  campaignId: string,
+): Promise<CampaignDmAction | null> {
+  const response = await requestJson<{ action: CampaignDmAction | null }>(
+    `/api/campaigns/${encodeURIComponent(campaignId)}/play/dm-actions/pending`,
+  );
+  return response.action;
+}
+
+export function resolveCampaignDmAction(
+  campaignId: string,
+  actionId: string,
+  roll: number,
+): Promise<ResolveCampaignDmActionResult> {
+  return requestJson<ResolveCampaignDmActionResult>(
+    `/api/campaigns/${encodeURIComponent(campaignId)}/play/dm-actions/${encodeURIComponent(actionId)}/resolve`,
+    {
+      method: "POST",
+      body: JSON.stringify({ roll }),
     },
   );
 }
@@ -332,6 +378,7 @@ export function performCampaignSkillCheck(
   skillId: string,
   dc: number,
   specialization?: string,
+  roll?: number,
 ): Promise<unknown> {
   return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/game/commands`, {
     method: "POST",
@@ -341,6 +388,7 @@ export function performCampaignSkillCheck(
       skillId,
       dc,
       ...(specialization ? { specialization } : {}),
+      ...(roll === undefined ? {} : { roll }),
     }),
   });
 }
@@ -350,6 +398,7 @@ export function performCampaignSave(
   actorId: string,
   save: CampaignSaveKind,
   dc: number,
+  roll?: number,
 ): Promise<unknown> {
   return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/game/commands`, {
     method: "POST",
@@ -358,6 +407,7 @@ export function performCampaignSave(
       actorId,
       save,
       dc,
+      ...(roll === undefined ? {} : { roll }),
     }),
   });
 }

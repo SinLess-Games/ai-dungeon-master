@@ -87,6 +87,8 @@ export type CampaignPlayMessageChannel = "campaign" | "ooc_dm";
 export type CampaignPlayMessageAuthorKind = "player" | "dm" | "system";
 export type CampaignSaveKind = "fort" | "ref" | "will";
 export type CampaignAttackKind = "melee" | "ranged";
+export type CampaignCastingMode = "prepared" | "spontaneous" | "psionic" | "other";
+export type CampaignCastingTradition = "arcane" | "divine" | "psionic" | "other";
 
 export interface CampaignPlayMessage {
   id: string;
@@ -125,6 +127,88 @@ export interface CampaignPlayCheckOptions {
   skills: CampaignPlaySkillOption[];
   saves: CampaignSaveKind[];
   weapons: CampaignPlayWeaponOption[];
+}
+
+export interface CampaignPreparedSpellOption {
+  preparationId: string;
+  spellId: string;
+  name: string;
+  slotLevel: number;
+  preparedCount: number;
+  expendedCount: number;
+  remaining: number;
+  actionType: string | null;
+  rangeText: string;
+  targetText: string | null;
+}
+
+export interface CampaignSpontaneousSpellOption {
+  spellId: string;
+  name: string;
+  spellLevel: number;
+  actionType: string | null;
+  rangeText: string;
+  targetText: string | null;
+}
+
+export interface CampaignPowerOption {
+  powerId: string;
+  name: string;
+  powerLevel: number;
+  powerPoints: number;
+  actionType: string | null;
+  rangeText: string;
+  targetText: string | null;
+  augmentationText: string | null;
+}
+
+export interface CampaignCastingCatalogTrack {
+  id: string;
+  mode: CampaignCastingMode;
+  tradition: CampaignCastingTradition;
+  trackKey: string;
+  prepared: CampaignPreparedSpellOption[];
+  spontaneous: CampaignSpontaneousSpellOption[];
+  powers: CampaignPowerOption[];
+}
+
+export interface CampaignCastingCatalog {
+  character: { id: string; name: string };
+  tracks: CampaignCastingCatalogTrack[];
+}
+
+export interface CampaignCastingStateTrack {
+  id: string;
+  mode: CampaignCastingMode;
+  tradition: CampaignCastingTradition;
+  castingAbility: "str" | "dex" | "con" | "int" | "wis" | "cha";
+  effectiveProgressionLevel: number;
+  casterOrManifesterLevel: number;
+  prepared?: Array<{
+    id: string;
+    spellId: string;
+    slotLevel: number;
+    preparedCount: number;
+    expendedCount: number;
+    remaining: number;
+  }>;
+  spontaneous?: Array<{
+    spellLevel: number;
+    maximum: number;
+    expended: number;
+    remaining: number;
+  }>;
+}
+
+export interface CampaignCastingState {
+  characterId: string;
+  tracks: CampaignCastingStateTrack[];
+  psionics: {
+    maximumPowerPoints: number;
+    powerPointsSpent: number;
+    currentPowerPoints: number;
+    focused: boolean;
+  };
 }
 
 export interface SendCampaignPlayMessageResult {
@@ -175,6 +259,71 @@ export function getCampaignPlayCheckOptions(
   return requestJson<CampaignPlayCheckOptions>(
     `/api/campaigns/${encodeURIComponent(campaignId)}/play/characters/${encodeURIComponent(characterId)}/checks`,
   );
+}
+
+export function getCampaignCastingCatalog(
+  campaignId: string,
+  characterId: string,
+): Promise<CampaignCastingCatalog> {
+  return requestJson<CampaignCastingCatalog>(
+    `/api/campaigns/${encodeURIComponent(campaignId)}/play/characters/${encodeURIComponent(characterId)}/casting`,
+  );
+}
+
+export function getCampaignCastingState(
+  campaignId: string,
+  characterId: string,
+): Promise<CampaignCastingState> {
+  return requestJson<CampaignCastingState>(
+    `/api/campaigns/${encodeURIComponent(campaignId)}/game/casting/${encodeURIComponent(characterId)}`,
+  );
+}
+
+export function castPreparedCampaignSpell(
+  campaignId: string,
+  input: {
+    actorId: string;
+    castingTrackId: string;
+    spellId: string;
+    preparationId: string;
+    targetIds?: string[];
+  },
+): Promise<unknown> {
+  return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/game/resolved-casting/spells`, {
+    method: "POST",
+    body: JSON.stringify({ mode: "prepared", ...input }),
+  });
+}
+
+export function castSpontaneousCampaignSpell(
+  campaignId: string,
+  input: {
+    actorId: string;
+    castingTrackId: string;
+    spellId: string;
+    slotLevel?: number;
+    targetIds?: string[];
+  },
+): Promise<unknown> {
+  return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/game/resolved-casting/spells`, {
+    method: "POST",
+    body: JSON.stringify({ mode: "spontaneous", ...input }),
+  });
+}
+
+export function manifestCampaignPower(
+  campaignId: string,
+  input: {
+    actorId: string;
+    castingTrackId: string;
+    powerId: string;
+    targetIds?: string[];
+  },
+): Promise<unknown> {
+  return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/game/resolved-casting/powers`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 export function performCampaignSkillCheck(

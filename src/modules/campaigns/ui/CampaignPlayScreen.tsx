@@ -17,8 +17,10 @@ import {
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
+import { authClient } from "@/modules/auth/client/authClient";
 import { getCampaign } from "../client/campaignCreatorApi";
 import {
+  endCampaignTurn,
   getCampaignGameState,
   listCampaignPlayMessages,
   sendCampaignPlayMessage,
@@ -77,6 +79,8 @@ export function CampaignPlayScreen({
   onBack: () => void;
 }) {
   const queryClient = useQueryClient();
+  const session = authClient.useSession();
+  const currentUserId = session.data?.user.id ?? null;
   const [channel, setChannel] = useState<PlayChannel>("campaign");
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const [composer, setComposer] = useState("");
@@ -106,16 +110,45 @@ export function CampaignPlayScreen({
     refetchInterval: 4_000,
   });
 
+  const controlledCharacterIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (!currentUserId) return ids;
+    for (const character of detail.data?.characters ?? []) {
+      if (character.ownerUserId === currentUserId) ids.add(character.id);
+    }
+    for (const actor of game.data?.actors ?? []) {
+      if (actor.controllerUserId === currentUserId && actor.characterId) ids.add(actor.characterId);
+    }
+    return ids;
+  }, [currentUserId, detail.data?.characters, game.data?.actors]);
+
   const selectedCharacter = useMemo(() => {
     const characters = detail.data?.characters ?? [];
     if (characters.length === 0) return null;
-    return characters.find((entry) => entry.id === selectedCharacterId) ?? characters[0] ?? null;
-  }, [detail.data?.characters, selectedCharacterId]);
+    return (
+      characters.find((entry) => entry.id === selectedCharacterId) ??
+      characters.find((entry) => controlledCharacterIds.has(entry.id)) ??
+      characters[0] ??
+      null
+    );
+  }, [controlledCharacterIds, detail.data?.characters, selectedCharacterId]);
+
+  const speakingCharacter = useMemo(() => {
+    const characters = detail.data?.characters ?? [];
+    if (selectedCharacter && controlledCharacterIds.has(selectedCharacter.id)) return selectedCharacter;
+    return characters.find((entry) => controlledCharacterIds.has(entry.id)) ?? null;
+  }, [controlledCharacterIds, detail.data?.characters, selectedCharacter]);
 
   const selectedActor = useMemo(() => {
     if (!selectedCharacter) return null;
     return game.data?.actors.find((actor) => actor.characterId === selectedCharacter.id) ?? null;
   }, [game.data?.actors, selectedCharacter]);
+
+  const currentTurnActor = useMemo(() => {
+    const actorId = game.data?.encounter?.currentActorId;
+    if (!actorId) return null;
+    return game.data?.actors.find((actor) => actor.id === actorId) ?? null;
+  }, [game.data?.actors, game.data?.encounter?.currentActorId]);
 
   const conditions = useMemo(
     () =>
@@ -157,8 +190,8 @@ export function CampaignPlayScreen({
       sendCampaignPlayMessage(campaignId, {
         channel: apiChannel(channel),
         content: composer.trim(),
-        ...(channel === "campaign" && selectedCharacter
-          ? { characterId: selectedCharacter.id }
+        ...(channel === "campaign" && speakingCharacter
+          ? { characterId: speakingCharacter.id }
           : {}),
       }),
     onSuccess: async (result) => {
@@ -171,6 +204,27 @@ export function CampaignPlayScreen({
     },
     onError: (error) => toast.error(errorMessage(error)),
   });
+
+  const endTurn = useMutation({
+    mutationFn: () => {
+      if (!game.data?.encounter || !currentTurnActor) {
+        throw new Error("There is no current encounter turn to end.");
+      }
+      return endCampaignTurn(campaignId, game.data.encounter.id, currentTurnActor.id);
+    },
+    onSuccess: async () => {
+      toast.success("Turn ended.");
+      await game.refetch();
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  });
+
+  const canEndTurn = Boolean(
+    detail.data?.campaign.status === "active" &&
+      currentUserId &&
+      currentTurnActor &&
+      currentTurnActor.controllerUserId === currentUserId,
+  );
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -304,6 +358,7 @@ export function CampaignPlayScreen({
                   detail.data.characters.map((character) => {
                     const actor = game.data?.actors.find((entry) => entry.characterId === character.id) ?? null;
                     const selected = selectedCharacter?.id === character.id;
+                    const controlled = controlledCharacterIds.has(character.id);
                     return (
                       <button
                         key={character.id}
@@ -315,7 +370,14 @@ export function CampaignPlayScreen({
                             : "border-transparent hover:border-border hover:bg-muted/30"
                         }`}
                       >
-                        <span className="block truncate text-sm font-semibold">{character.name}</span>
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="truncate text-sm font-semibold">{character.name}</span>
+                          {controlled ? (
+                            <span className="shrink-0 rounded-full border border-gold/25 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-gold">
+                              You
+                            </span>
+                          ) : null}
+                        </span>
                         <span className="mt-0.5 block truncate text-xs text-muted-foreground">{actorHealthLabel(actor)}</span>
                       </button>
                     );
@@ -337,6 +399,7 @@ export function CampaignPlayScreen({
                 actors={game.data?.actors ?? []}
                 encounter={game.data?.encounter ?? null}
                 loading={messages.isLoading}
+                error={messages.error ? errorMessage(messages.error) : null}
               />
             ) : null}
 
@@ -349,6 +412,7 @@ export function CampaignPlayScreen({
                 actors={[]}
                 encounter={null}
                 loading={messages.isLoading}
+                error={messages.error ? errorMessage(messages.error) : null}
               />
             ) : null}
 
@@ -375,9 +439,9 @@ export function CampaignPlayScreen({
                 }
                 note={
                   channel === "campaign"
-                    ? selectedCharacter
-                      ? `Speaking as ${selectedCharacter.name}. Mechanical outcomes remain authoritative through the rules engine.`
-                      : "Send an in-character action or dialogue to the table."
+                    ? speakingCharacter
+                      ? `Speaking as ${speakingCharacter.name}. Mechanical outcomes remain authoritative through the rules engine.`
+                      : "No controlled character selected; this message will be sent as you rather than as another player's character."
                     : "Only you and the Dungeon Master can hydrate this conversation."
                 }
               />
@@ -395,7 +459,24 @@ export function CampaignPlayScreen({
               </SideCard>
               <SideCard icon={<Swords className="h-4 w-4" />} title="Encounter">
                 {game.data?.encounter ? (
-                  <p>Round {game.data.encounter.roundNumber} · {game.data.encounter.participants.length} participants</p>
+                  <div className="space-y-2">
+                    <p>
+                      Round {game.data.encounter.roundNumber} · {game.data.encounter.participants.length} participants
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Current turn: {currentTurnActor?.name ?? "Unknown actor"}
+                    </p>
+                    {canEndTurn ? (
+                      <button
+                        type="button"
+                        disabled={endTurn.isPending}
+                        onClick={() => endTurn.mutate()}
+                        className="w-full rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-xs font-semibold text-gold transition hover:bg-gold/15 disabled:opacity-50"
+                      >
+                        {endTurn.isPending ? "Ending turn…" : "End my turn"}
+                      </button>
+                    ) : null}
+                  </div>
                 ) : (
                   <p>No active encounter</p>
                 )}
@@ -410,7 +491,7 @@ export function CampaignPlayScreen({
                 <Sparkles className="h-4 w-4" /> Campaign play MVP
               </div>
               <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                Campaign and private OOC chat are persistent. AI and hybrid tables receive stored DM replies backed by current campaign context; rules state still changes only through authoritative game commands.
+                Campaign and private OOC chat are persistent. AI and hybrid tables receive stored DM replies backed by current campaign context. Encounter turns use the authoritative command pipeline; free text never edits rules state directly.
               </p>
             </div>
           </aside>
@@ -428,6 +509,7 @@ function ConversationChannel({
   actors,
   encounter,
   loading,
+  error,
 }: {
   title: string;
   eyebrow: string;
@@ -436,6 +518,7 @@ function ConversationChannel({
   actors: CampaignGameActor[];
   encounter: CampaignEncounter | null;
   loading: boolean;
+  error: string | null;
 }) {
   const names = useMemo(() => new Map(actors.map((actor) => [actor.id, actor.name])), [actors]);
   return (
@@ -456,7 +539,11 @@ function ConversationChannel({
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto p-5">
-        {loading ? (
+        {error ? (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            {error}
+          </div>
+        ) : loading ? (
           <p className="py-10 text-center text-sm text-muted-foreground">Loading conversation…</p>
         ) : timeline.length ? (
           timeline.map((entry) =>

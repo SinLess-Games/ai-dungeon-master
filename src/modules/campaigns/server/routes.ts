@@ -20,6 +20,20 @@ import {
   ServiceUnavailableError,
   ValidationError,
 } from "@/server/middleware/errors";
+import {
+  CAMPAIGN_STYLE_LIMIT,
+  campaignDifficultyIds,
+  campaignPaceIds,
+  campaignScaleIds,
+  campaignStructureIds,
+  campaignStyleIds,
+  characterProgressionIds,
+  contentPolicyIds,
+  dmCreativityIds,
+  levelingModeIds,
+  rulesStrictnessIds,
+  worldTemplateIds,
+} from "../domain/creatorOptions";
 import { BootstrapWorldGenerator } from "./bootstrapWorldGenerator";
 import { D1CampaignStartRepository } from "./d1StartRepository";
 import { startCampaign } from "./startCampaign";
@@ -29,6 +43,285 @@ interface CampaignBindings extends AuthEnv {
 }
 
 type CampaignEnv = { Bindings: CampaignBindings };
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function addSettingsIssue(
+  ctx: z.RefinementCtx,
+  path: Array<string | number>,
+  message: string,
+): void {
+  ctx.addIssue({ code: "custom", path, message });
+}
+
+function validateGenreArray(
+  value: unknown,
+  ctx: z.RefinementCtx,
+  path: Array<string | number>,
+  required: boolean,
+): string[] | null {
+  if (!Array.isArray(value)) {
+    if (value !== undefined || required) addSettingsIssue(ctx, path, "Campaign genres must be an array.");
+    return null;
+  }
+  if (required && value.length < 1) {
+    addSettingsIssue(ctx, path, "Choose at least one campaign style or genre.");
+  }
+  if (value.length > CAMPAIGN_STYLE_LIMIT) {
+    addSettingsIssue(
+      ctx,
+      path,
+      `Choose no more than ${CAMPAIGN_STYLE_LIMIT} campaign styles or genres.`,
+    );
+  }
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const genre of value) {
+    if (typeof genre !== "string" || !campaignStyleIds.has(genre)) {
+      addSettingsIssue(ctx, path, "Campaign genres include an unsupported value.");
+      return null;
+    }
+    if (seen.has(genre)) {
+      addSettingsIssue(ctx, path, "Campaign genres cannot contain duplicates.");
+      return null;
+    }
+    seen.add(genre);
+    result.push(genre);
+  }
+  return result;
+}
+
+const campaignSettingsSchema = z.record(z.string(), z.unknown()).superRefine((settings, ctx) => {
+  const creatorVersion = settings["creatorVersion"];
+  const creatorV1 = creatorVersion === 1;
+  const creatorV2 = creatorVersion === 2;
+  const creatorSettings = creatorV1 || creatorV2;
+
+  if (creatorVersion !== undefined && !creatorSettings) {
+    addSettingsIssue(ctx, ["creatorVersion"], "Unsupported campaign creator settings version.");
+  }
+
+  const genres = validateGenreArray(settings["genres"], ctx, ["genres"], creatorSettings);
+
+  const shortDescription = settings["shortDescription"];
+  if (
+    shortDescription !== undefined &&
+    (typeof shortDescription !== "string" || shortDescription.trim().length > 200)
+  ) {
+    addSettingsIssue(
+      ctx,
+      ["shortDescription"],
+      "Campaign short description must be 200 characters or fewer.",
+    );
+  }
+  if (creatorSettings && (typeof shortDescription !== "string" || !shortDescription.trim())) {
+    addSettingsIssue(ctx, ["shortDescription"], "Campaign short description is required.");
+  }
+
+  const pace = settings["pace"];
+  if (
+    (pace !== undefined || creatorSettings) &&
+    (typeof pace !== "string" || !campaignPaceIds.has(pace))
+  ) {
+    addSettingsIssue(ctx, ["pace"], "Choose a supported campaign pace.");
+  }
+
+  const scale = settings["scale"];
+  if (
+    (scale !== undefined || creatorSettings) &&
+    (typeof scale !== "string" || !campaignScaleIds.has(scale))
+  ) {
+    addSettingsIssue(ctx, ["scale"], "Choose a supported campaign scale.");
+  }
+
+  const structure = settings["structure"];
+  if (
+    (structure !== undefined || creatorSettings) &&
+    (typeof structure !== "string" || !campaignStructureIds.has(structure))
+  ) {
+    addSettingsIssue(ctx, ["structure"], "Choose a supported campaign structure.");
+  }
+
+  if (!creatorV2) return;
+
+  const world = asRecord(settings["world"]);
+  if (!world) {
+    addSettingsIssue(ctx, ["world"], "Campaign world settings are required.");
+  } else {
+    if (world["mode"] !== "generated" && world["mode"] !== "seeded") {
+      addSettingsIssue(ctx, ["world", "mode"], "Choose a supported world creation mode.");
+    }
+    if (typeof world["templateId"] !== "string" || !worldTemplateIds.has(world["templateId"])) {
+      addSettingsIssue(ctx, ["world", "templateId"], "Choose a supported world template.");
+    }
+    for (const key of ["multiPlanar", "persistentWorld"] as const) {
+      if (typeof world[key] !== "boolean") {
+        addSettingsIssue(ctx, ["world", key], `${key} must be a boolean.`);
+      }
+    }
+  }
+
+  const rules = asRecord(settings["rules"]);
+  if (!rules) {
+    addSettingsIssue(ctx, ["rules"], "Campaign rules settings are required.");
+  } else {
+    if (
+      typeof rules["levelingMode"] !== "string" ||
+      !levelingModeIds.has(rules["levelingMode"])
+    ) {
+      addSettingsIssue(ctx, ["rules", "levelingMode"], "Choose a supported leveling mode.");
+    }
+    if (
+      typeof rules["characterProgression"] !== "string" ||
+      !characterProgressionIds.has(rules["characterProgression"])
+    ) {
+      addSettingsIssue(
+        ctx,
+        ["rules", "characterProgression"],
+        "Choose a supported character progression policy.",
+      );
+    }
+    if (typeof rules["epicLevels"] !== "boolean") {
+      addSettingsIssue(ctx, ["rules", "epicLevels"], "epicLevels must be a boolean.");
+    }
+  }
+
+  const players = asRecord(settings["players"]);
+  if (!players) {
+    addSettingsIssue(ctx, ["players"], "Campaign player settings are required.");
+  } else {
+    const maxPlayers = players["maxPlayers"];
+    if (
+      typeof maxPlayers !== "number" ||
+      !Number.isInteger(maxPlayers) ||
+      maxPlayers < 1 ||
+      maxPlayers > 12
+    ) {
+      addSettingsIssue(ctx, ["players", "maxPlayers"], "Maximum players must be from 1 to 12.");
+    }
+    for (const key of ["requireApproval", "allowSpectators", "allowPvp"] as const) {
+      if (typeof players[key] !== "boolean") {
+        addSettingsIssue(ctx, ["players", key], `${key} must be a boolean.`);
+      }
+    }
+  }
+
+  const dm = asRecord(settings["dm"]);
+  if (!dm) {
+    addSettingsIssue(ctx, ["dm"], "Dungeon Master settings are required.");
+  } else {
+    if (typeof dm["difficulty"] !== "string" || !campaignDifficultyIds.has(dm["difficulty"])) {
+      addSettingsIssue(ctx, ["dm", "difficulty"], "Choose a supported campaign difficulty.");
+    }
+    if (
+      typeof dm["rulesStrictness"] !== "string" ||
+      !rulesStrictnessIds.has(dm["rulesStrictness"])
+    ) {
+      addSettingsIssue(ctx, ["dm", "rulesStrictness"], "Choose a supported rules strictness.");
+    }
+    if (typeof dm["creativity"] !== "string" || !dmCreativityIds.has(dm["creativity"])) {
+      addSettingsIssue(ctx, ["dm", "creativity"], "Choose a supported DM creativity level.");
+    }
+    for (const key of ["rollNpcDice", "showDmRolls", "persistentNpcs", "idlePlus"] as const) {
+      if (typeof dm[key] !== "boolean") {
+        addSettingsIssue(ctx, ["dm", key], `${key} must be a boolean.`);
+      }
+    }
+  }
+
+  const content = asRecord(settings["content"]);
+  if (!content) {
+    addSettingsIssue(ctx, ["content"], "Campaign content settings are required.");
+  } else {
+    if (typeof content["policy"] !== "string" || !contentPolicyIds.has(content["policy"])) {
+      addSettingsIssue(ctx, ["content", "policy"], "Choose a supported content policy.");
+    }
+    for (const key of ["allowHomebrew", "allowThirdParty"] as const) {
+      if (typeof content[key] !== "boolean") {
+        addSettingsIssue(ctx, ["content", key], `${key} must be a boolean.`);
+      }
+    }
+    if (
+      typeof content["houseRules"] !== "string" ||
+      content["houseRules"].trim().length > 5000
+    ) {
+      addSettingsIssue(ctx, ["content", "houseRules"], "House rules must be 5000 characters or fewer.");
+    }
+  }
+
+  const ruleset = asRecord(settings["ruleset"]);
+  if (!ruleset) {
+    addSettingsIssue(ctx, ["ruleset"], "Ruleset generation settings are required.");
+    return;
+  }
+  if (ruleset["id"] !== "dnd35" || ruleset["version"] !== "3.5") {
+    addSettingsIssue(ctx, ["ruleset"], "Campaign creator currently supports D&D 3.5 only.");
+  }
+  if (
+    typeof ruleset["worldTemplateId"] !== "string" ||
+    !worldTemplateIds.has(ruleset["worldTemplateId"])
+  ) {
+    addSettingsIssue(ctx, ["ruleset", "worldTemplateId"], "Choose a supported world template.");
+  }
+  const rulesetGenres = validateGenreArray(
+    ruleset["campaignStyleIds"],
+    ctx,
+    ["ruleset", "campaignStyleIds"],
+    true,
+  );
+  if (genres && rulesetGenres && JSON.stringify(genres) !== JSON.stringify(rulesetGenres)) {
+    addSettingsIssue(
+      ctx,
+      ["ruleset", "campaignStyleIds"],
+      "Ruleset campaign styles must match the selected campaign genres.",
+    );
+  }
+  if (ruleset["pace"] !== pace) {
+    addSettingsIssue(ctx, ["ruleset", "pace"], "Ruleset pace must match campaign pace.");
+  }
+  if (world && ruleset["worldTemplateId"] !== world["templateId"]) {
+    addSettingsIssue(
+      ctx,
+      ["ruleset", "worldTemplateId"],
+      "Ruleset world template must match the selected world template.",
+    );
+  }
+  if (world && ruleset["multiPlanar"] !== world["multiPlanar"]) {
+    addSettingsIssue(
+      ctx,
+      ["ruleset", "multiPlanar"],
+      "Ruleset planar setting must match the selected world setting.",
+    );
+  }
+  if (rules && ruleset["epicLevels"] !== rules["epicLevels"]) {
+    addSettingsIssue(
+      ctx,
+      ["ruleset", "epicLevels"],
+      "Ruleset epic-level setting must match campaign rules.",
+    );
+  }
+  if (rules && ruleset["levelingMode"] !== rules["levelingMode"]) {
+    addSettingsIssue(
+      ctx,
+      ["ruleset", "levelingMode"],
+      "Ruleset leveling mode must match campaign rules.",
+    );
+  }
+  if (rules && ruleset["characterProgression"] !== rules["characterProgression"]) {
+    addSettingsIssue(
+      ctx,
+      ["ruleset", "characterProgression"],
+      "Ruleset character progression must match campaign rules.",
+    );
+  }
+  if (scale === "epic" && rules?.["epicLevels"] !== true) {
+    addSettingsIssue(ctx, ["rules", "epicLevels"], "Epic campaigns must enable epic levels.");
+  }
+});
 
 const createCampaignSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -44,9 +337,9 @@ const createCampaignSchema = z.object({
   gameMasterMode: z.enum(["ai", "human", "hybrid"]).default("ai"),
   timeMode: z.enum(["paused", "session", "living", "custom"]).default("paused"),
   visibility: z.enum(["private", "invite_only", "unlisted", "public"]).default("private"),
-  maxPlayers: z.number().int().positive().nullable().optional(),
+  maxPlayers: z.number().int().min(1).max(12).nullable().optional(),
   generationSeed: z.string().trim().min(1).max(256).optional(),
-  settings: z.record(z.string(), z.unknown()).optional(),
+  settings: campaignSettingsSchema.optional(),
 });
 
 const updateCampaignSchema = z
@@ -58,9 +351,9 @@ const updateCampaignSchema = z
     gameMasterMode: z.enum(["ai", "human", "hybrid"]).optional(),
     timeMode: z.enum(["paused", "session", "living", "custom"]).optional(),
     visibility: z.enum(["private", "invite_only", "unlisted", "public"]).optional(),
-    maxPlayers: z.number().int().positive().nullable().optional(),
+    maxPlayers: z.number().int().min(1).max(12).nullable().optional(),
     generationSeed: z.string().trim().min(1).max(256).optional(),
-    settings: z.record(z.string(), z.unknown()).optional(),
+    settings: campaignSettingsSchema.optional(),
   })
   .refine((value) => Object.keys(value).length > 0, "At least one campaign field is required.");
 
@@ -110,7 +403,9 @@ async function requireCampaignAccess(input: {
   return campaign;
 }
 
-function throwStartFailure(errors: readonly { code: string; message: string; path?: string; details?: unknown }[]): never {
+function throwStartFailure(
+  errors: readonly { code: string; message: string; path?: string; details?: unknown }[],
+): never {
   const first = errors[0];
   const details = {
     issues: errors.map((error) => ({

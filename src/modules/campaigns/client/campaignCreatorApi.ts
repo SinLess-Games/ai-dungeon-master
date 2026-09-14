@@ -93,6 +93,7 @@ export interface UpdateCampaignInput {
 
 export interface CreatedCampaign {
   id: string;
+  ownerUserId: string;
   name: string;
   slug: string;
   description: string | null;
@@ -200,6 +201,22 @@ export function startCampaign(campaignId: string): Promise<{
   status: string;
 }> {
   return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/start`, {
+    method: "POST",
+  });
+}
+
+export function pauseCampaign(
+  campaignId: string,
+): Promise<{ campaignId: string; status: "paused" }> {
+  return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/play/pause`, {
+    method: "POST",
+  });
+}
+
+export function resumeCampaign(
+  campaignId: string,
+): Promise<{ campaignId: string; status: "active" }> {
+  return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/play/resume`, {
     method: "POST",
   });
 }

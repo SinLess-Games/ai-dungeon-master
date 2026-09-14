@@ -4,7 +4,9 @@ import {
   completeCampaignStart,
   evaluateCampaignReadiness,
   failCampaignStart,
+  pauseCampaignPlay,
   reconcileCampaignReadiness,
+  resumeCampaignPlay,
   type CampaignCharacterSnapshot,
   type CampaignLifecycleSnapshot,
 } from "@/modules/campaigns/domain/lifecycle";
@@ -158,6 +160,54 @@ describe("campaign-first lifecycle", () => {
         startedAt: 200,
       }),
     });
+  });
+
+  it("pauses and resumes an initialized campaign without replacing its world", () => {
+    const active = campaign({
+      status: "active",
+      worldId: "world-1",
+      startRequestedAt: 100,
+      startedAt: 200,
+    });
+
+    const paused = pauseCampaignPlay(active);
+    expect(paused).toEqual({
+      ok: true,
+      value: campaign({
+        status: "paused",
+        worldId: "world-1",
+        startRequestedAt: 100,
+        startedAt: 200,
+      }),
+    });
+    if (!paused.ok) return;
+
+    const resumed = resumeCampaignPlay(paused.value);
+    expect(resumed).toEqual({ ok: true, value: active });
+  });
+
+  it("rejects pause and resume transitions that do not have runtime state", () => {
+    const wrongStatus = pauseCampaignPlay(campaign({ status: "ready" }));
+    expect(wrongStatus.ok).toBe(false);
+    if (!wrongStatus.ok) {
+      expect(wrongStatus.errors[0]?.code).toBe("CAMPAIGN_PAUSE_INVALID_STATUS");
+    }
+
+    const missingWorld = pauseCampaignPlay(
+      campaign({ status: "active", startedAt: 200 }),
+    );
+    expect(missingWorld.ok).toBe(false);
+    if (!missingWorld.ok) {
+      expect(missingWorld.errors[0]?.code).toBe("CAMPAIGN_PAUSE_RUNTIME_REQUIRED");
+    }
+
+    const missingStart = resumeCampaignPlay(
+      campaign({ status: "paused", worldId: "world-1" }),
+    );
+    expect(missingStart.ok).toBe(false);
+    if (!missingStart.ok) {
+      expect(missingStart.errors[0]?.code).toBe("CAMPAIGN_RESUME_RUNTIME_REQUIRED");
+    }
   });
 
   it("recovers a failed start to ready without retaining a failed world", () => {

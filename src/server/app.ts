@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 
+import type { OpenAICompatibleEnv } from "@/infrastructure/ai/openaiCompatible";
 import { errorHandler, notFoundHandler } from "@/server/middleware/errors";
 
 import { devblogRoutes } from "@/modules/devblog/server/routes";
@@ -13,6 +14,9 @@ import { feedbackRoutes } from "@/modules/feedback/server/routes";
 import { adminRoutes } from "@/modules/admin/server/routes";
 import { authRoutes, authHandler } from "@/modules/auth/server/routes";
 import type { AuthEnv } from "@/modules/auth/server/auth";
+import { campaignDeleteRoutes } from "@/modules/campaigns/server/deleteRoutes";
+import { campaignPlayCharacterRoutes } from "@/modules/campaigns/server/playCharacterRoutes";
+import { campaignPlayMessageRoutes } from "@/modules/campaigns/server/playMessageRoutes";
 import { campaignRoutes } from "@/modules/campaigns/server/routes";
 import { characterRoutes } from "@/modules/characters/server/routes";
 import { characterCreationRoutes } from "@/modules/characters/server/creationRoutes";
@@ -35,9 +39,11 @@ interface Bindings extends AuthEnv {
   CAMPAIGN_ROOM?: DurableObjectNamespace<CampaignRoom>;
   BACKGROUND_QUEUE?: Queue<unknown>;
   RUNTIME_CACHE?: KVNamespace;
+  AI?: OpenAICompatibleEnv["AI"];
   AI_API_KEY?: string;
   AI_BASE_URL?: string;
   AI_DEVBLOG_MODEL?: string;
+  AI_GAME_MODEL?: string;
   GITHUB_TOKEN?: string;
   GITHUB_REPOSITORY?: string;
   DEVBLOG_AI_ENABLED?: string;
@@ -196,6 +202,9 @@ const routes = app
   .route("/", devblogAdminRoutes)
   .route("/", devblogAIRoutes)
   .route("/", campaignRoutes)
+  .route("/", campaignDeleteRoutes)
+  .route("/", campaignPlayCharacterRoutes)
+  .route("/", campaignPlayMessageRoutes)
   .route("/", characterCreationRoutes)
   .route("/", characterRoutes)
   .route("/", actorRoutes)
@@ -216,6 +225,8 @@ const routes = app
         health: "/api/health",
         live: "/api/health/live",
         campaigns: "/api/campaigns",
+        campaignPlayMessages: "/api/campaigns/:campaignId/play/messages",
+        campaignPlayChecks: "/api/campaigns/:campaignId/play/characters/:characterId/checks",
         game: "/api/campaigns/:campaignId/game",
         gameState: "/api/campaigns/:campaignId/game/state",
         gameCommands: "/api/campaigns/:campaignId/game/commands",

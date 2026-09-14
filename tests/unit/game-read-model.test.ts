@@ -3,6 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { createDatabase } from "@/infrastructure/database/client";
+import { loadActiveGameContext } from "@/modules/game/server/d1Dnd35State";
 import { getCampaignGameReadModel } from "@/modules/game/server/gameReadModelService";
 import { createSqliteD1 } from "../helpers/sqliteD1";
 
@@ -104,5 +105,29 @@ describe("campaign game read model", () => {
       actorId: "npc-1",
       targetIds: ["npc-2"],
     });
+  });
+
+  it("hydrates a paused campaign without exposing it as an active mutation context", async () => {
+    sqlite = new DatabaseSync(":memory:");
+    sqlite.exec("PRAGMA foreign_keys = ON");
+    migrate(sqlite);
+    seed(sqlite);
+    sqlite.exec("UPDATE campaigns SET status = 'paused' WHERE id = 'campaign-1'");
+
+    const binding = createSqliteD1(sqlite);
+    const db = createDatabase(binding);
+    const model = await getCampaignGameReadModel(
+      { db, binding },
+      { campaignId: "campaign-1" },
+    );
+
+    expect(model.campaignId).toBe("campaign-1");
+    expect(model.worldId).toBe("world-1");
+    expect(model.sessionId).toBe("session-1");
+    expect(model.sequence).toBe(2);
+    expect(model.encounter?.currentActorId).toBe("npc-2");
+    expect(model.events.map((event) => event.id)).toEqual(["event-1", "event-2"]);
+
+    await expect(loadActiveGameContext(db, "campaign-1")).resolves.toBeNull();
   });
 });

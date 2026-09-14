@@ -223,7 +223,7 @@ async function castingCatalog(binding: D1Database, characterId: string) {
                 `SELECT known.power_id AS powerId,
                         power.name,
                         level.power_level AS powerLevel,
-                        power.power_points AS powerPoints,
+                        COALESCE(level.power_points, power.power_points) AS powerPoints,
                         power.action_type AS actionType,
                         power.range_text AS rangeText,
                         power.target_text AS targetText,

@@ -67,21 +67,23 @@ function eventStatement(
     WHERE ${guardSql}
   `;
   const unixSeconds = Math.floor(event.occurredAt.getTime() / 1000);
-  return db.prepare(sql).bind(
-    event.id,
-    event.campaignId,
-    event.sessionId,
-    event.campaignId,
-    event.eventType,
-    unixSeconds,
-    event.actorId ?? null,
-    event.sourceId ?? null,
-    JSON.stringify(event.targetIds ?? []),
-    JSON.stringify(event.payload ?? {}),
-    JSON.stringify(event.deltas ?? []),
-    unixSeconds,
-    ...guardBindings,
-  );
+  return db
+    .prepare(sql)
+    .bind(
+      event.id,
+      event.campaignId,
+      event.sessionId,
+      event.campaignId,
+      event.eventType,
+      unixSeconds,
+      event.actorId ?? null,
+      event.sourceId ?? null,
+      JSON.stringify(event.targetIds ?? []),
+      JSON.stringify(event.payload ?? {}),
+      JSON.stringify(event.deltas ?? []),
+      unixSeconds,
+      ...guardBindings,
+    );
 }
 
 function changes(result: D1Result<unknown> | undefined): number {

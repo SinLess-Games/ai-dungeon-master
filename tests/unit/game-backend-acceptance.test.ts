@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { createDatabase } from "@/infrastructure/database/client";
 import { performActorAttack } from "@/modules/game/server/actorCombatService";
+import { D1ActorHealthStore } from "@/modules/game/server/d1ActorHealthStore";
 import { startActorEncounter } from "@/modules/game/server/actorEncounterService";
 import { endEncounterTurn, finishEncounter } from "@/modules/game/server/encounterService";
 import { getCampaignGameReadModel } from "@/modules/game/server/gameReadModelService";
@@ -127,7 +128,7 @@ describe("backend gameplay acceptance", () => {
       { campaignId: "campaign-1", participantIds: ["monster-a", "monster-b"] },
     );
 
-    expect(encounter.eventId).toBeTruthy();
+    expect(encounter.eventId).toBe("encounter-2");
     expect(encounter.currentCharacterId).toBe("monster-a");
 
     const firstAttack = await performActorAttack(
@@ -151,14 +152,18 @@ describe("backend gameplay acceptance", () => {
     expect(firstAttack.attack.hit).toBe(true);
     expect(firstAttack.damage?.total).toBe(4);
     expect(
-      sqlite.prepare(
-        "SELECT current_hit_points FROM runtime_dnd35_monster_instances WHERE actor_id = 'monster-b'",
-      ).get(),
+      sqlite
+        .prepare(
+          "SELECT current_hit_points FROM runtime_dnd35_monster_instances WHERE actor_id = 'monster-b'",
+        )
+        .get(),
     ).toMatchObject({ current_hit_points: 8 });
     expect(
-      sqlite.prepare(
-        "SELECT standard_available FROM game_encounter_participants WHERE encounter_id = ? AND actor_id = 'monster-a'",
-      ).get(encounter.id),
+      sqlite
+        .prepare(
+          "SELECT standard_available FROM game_encounter_participants WHERE encounter_id = ? AND actor_id = 'monster-a'",
+        )
+        .get(encounter.id),
     ).toMatchObject({ standard_available: 0 });
 
     const turn = await endEncounterTurn(
@@ -171,6 +176,7 @@ describe("backend gameplay acceptance", () => {
       { campaignId: "campaign-1", encounterId: encounter.id, actorId: "monster-a" },
     );
     expect(turn.currentCharacterId).toBe("monster-b");
+    expect(turn.eventId).toBe("turn-event-1");
 
     const retaliation = await performActorAttack(
       {
@@ -191,7 +197,7 @@ describe("backend gameplay acceptance", () => {
     );
     expect(retaliation.damage?.total).toBe(2);
 
-    await finishEncounter(
+    const finished = await finishEncounter(
       {
         db,
         binding,
@@ -200,6 +206,9 @@ describe("backend gameplay acceptance", () => {
       },
       { campaignId: "campaign-1", encounterId: encounter.id, status: "completed" },
     );
+
+    expect(finished.eventId).toBe("finish-event-1");
+    expect(finished.sessionId).toBe("session-1");
 
     // Simulate a cold request/reconnect: create a fresh Drizzle client and
     // reconstruct state from D1 only. No Durable Object state is consulted.
@@ -229,5 +238,58 @@ describe("backend gameplay acceptance", () => {
       stable: true,
     });
     expect(sqlite.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+  });
+  it.each(["health", "action"])("does not partially commit when %s is stale", async (stale) => {
+    sqlite = new DatabaseSync(":memory:");
+    migrate(sqlite);
+    seedActiveMonsterEncounterWorld(sqlite);
+    const binding = createSqliteD1(sqlite);
+    const encounter = await startActorEncounter(
+      { db: createDatabase(binding), binding, createId: ids("guard"), rollInitiative: () => 10 },
+      { campaignId: "campaign-1", participantIds: ["monster-a", "monster-b"] },
+    );
+    const participant = encounter.participants[0]!;
+    const before = {
+      health: sqlite.prepare("SELECT * FROM runtime_dnd35_monster_instances").all(),
+      participants: sqlite.prepare("SELECT * FROM game_encounter_participants").all(),
+      events: sqlite.prepare("SELECT * FROM game_events").all(),
+    };
+    const committed = await new D1ActorHealthStore(binding).commit({
+      event: {
+        id: "rejected",
+        campaignId: "campaign-1",
+        sessionId: "session-1",
+        eventType: "combat.attack",
+        occurredAt: new Date(),
+      },
+      health: {
+        actorId: "monster-b",
+        kind: "monster",
+        expected: {
+          currentHitPoints: stale === "health" ? 11 : 12,
+          temporaryHitPoints: 0,
+          nonlethalDamage: 0,
+          stable: true,
+        },
+        next: { currentHitPoints: 8, temporaryHitPoints: 0, nonlethalDamage: 0, stable: true },
+      },
+      action: {
+        encounterId: encounter.id,
+        characterId: participant.characterId,
+        roundNumber: encounter.roundNumber,
+        activeTurnIndex: encounter.activeTurnIndex,
+        turnOrder: participant.turnOrder,
+        expected: { ...participant, standardAvailable: stale !== "action" },
+        next: { ...participant, standardAvailable: false },
+      },
+    });
+    expect(committed).toBe(false);
+    expect(sqlite.prepare("SELECT * FROM runtime_dnd35_monster_instances").all()).toEqual(
+      before.health,
+    );
+    expect(sqlite.prepare("SELECT * FROM game_encounter_participants").all()).toEqual(
+      before.participants,
+    );
+    expect(sqlite.prepare("SELECT * FROM game_events").all()).toEqual(before.events);
   });
 });

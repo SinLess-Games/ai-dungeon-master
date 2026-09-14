@@ -38,9 +38,10 @@ function bool(value: boolean): number {
   return value ? 1 : 0;
 }
 
-function combineGuards(
-  guards: readonly { sql: string; bindings: readonly unknown[] }[],
-): { sql: string; bindings: readonly unknown[] } {
+function combineGuards(guards: readonly { sql: string; bindings: readonly unknown[] }[]): {
+  sql: string;
+  bindings: readonly unknown[];
+} {
   if (guards.length === 0) return { sql: "1 = 1", bindings: [] };
   return {
     sql: guards.map((guard) => `(${guard.sql})`).join(" AND "),
@@ -150,7 +151,8 @@ function actionUpdate(db: D1Database, event: GameEventWrite, action: EncounterAc
 }
 
 function healthGuard(mutation: ActorHealthMutation) {
-  const table = mutation.kind === "character" ? "dnd35_characters" : "runtime_dnd35_monster_instances";
+  const table =
+    mutation.kind === "character" ? "dnd35_characters" : "runtime_dnd35_monster_instances";
   const id = mutation.kind === "character" ? "character_id" : "actor_id";
   return {
     sql: `EXISTS (
@@ -172,7 +174,8 @@ function healthGuard(mutation: ActorHealthMutation) {
 }
 
 function healthUpdate(db: D1Database, event: GameEventWrite, mutation: ActorHealthMutation) {
-  const table = mutation.kind === "character" ? "dnd35_characters" : "runtime_dnd35_monster_instances";
+  const table =
+    mutation.kind === "character" ? "dnd35_characters" : "runtime_dnd35_monster_instances";
   const id = mutation.kind === "character" ? "character_id" : "actor_id";
   return db
     .prepare(
@@ -308,7 +311,9 @@ export class D1ResolvedCastingStore {
   ): D1PreparedStatement[] {
     return [
       ...(effects?.health ?? []).map((mutation) => healthUpdate(this.binding, event, mutation)),
-      ...(effects?.conditions ?? []).map((mutation) => conditionInsert(this.binding, event, mutation)),
+      ...(effects?.conditions ?? []).map((mutation) =>
+        conditionInsert(this.binding, event, mutation),
+      ),
     ];
   }
 
@@ -327,28 +332,24 @@ export class D1ResolvedCastingStore {
       ...this.effectGuards(input.effects),
     ]);
     const timestamp = Math.floor(input.event.occurredAt.getTime() / 1000);
-    return this.commitBatch(
-      input.event,
-      guard,
-      [
-        this.binding
-          .prepare(
-            `UPDATE dnd35_character_spell_preparations
+    return this.commitBatch(input.event, guard, [
+      this.binding
+        .prepare(
+          `UPDATE dnd35_character_spell_preparations
              SET expended_count = ?, updated_at = ?
              WHERE id = ? AND expended_count = ?
                AND EXISTS (SELECT 1 FROM game_events WHERE id = ?)`,
-          )
-          .bind(
-            input.nextExpendedCount,
-            timestamp,
-            input.preparationId,
-            input.expectedExpendedCount,
-            input.event.id,
-          ),
-        ...this.effectStatements(input.event, input.effects),
-        ...(input.action ? [actionUpdate(this.binding, input.event, input.action)] : []),
-      ],
-    );
+        )
+        .bind(
+          input.nextExpendedCount,
+          timestamp,
+          input.preparationId,
+          input.expectedExpendedCount,
+          input.event.id,
+        ),
+      ...this.effectStatements(input.event, input.effects),
+      ...(input.action ? [actionUpdate(this.binding, input.event, input.action)] : []),
+    ]);
   }
 
   async commitSpontaneous(input: {
@@ -366,13 +367,10 @@ export class D1ResolvedCastingStore {
       ...this.effectGuards(input.effects),
     ]);
     const timestamp = Math.floor(input.event.occurredAt.getTime() / 1000);
-    return this.commitBatch(
-      input.event,
-      guard,
-      [
-        this.binding
-          .prepare(
-            `INSERT INTO runtime_dnd35_character_spontaneous_slot_usage (
+    return this.commitBatch(input.event, guard, [
+      this.binding
+        .prepare(
+          `INSERT INTO runtime_dnd35_character_spontaneous_slot_usage (
                casting_track_id, spell_level, expended_count, created_at, updated_at
              )
              SELECT ?, ?, ?, ?, ?
@@ -381,20 +379,19 @@ export class D1ResolvedCastingStore {
                expended_count = excluded.expended_count,
                updated_at = excluded.updated_at
              WHERE runtime_dnd35_character_spontaneous_slot_usage.expended_count = ?`,
-          )
-          .bind(
-            input.castingTrackId,
-            input.spellLevel,
-            input.nextExpendedCount,
-            timestamp,
-            timestamp,
-            input.event.id,
-            input.expectedExpendedCount,
-          ),
-        ...this.effectStatements(input.event, input.effects),
-        ...(input.action ? [actionUpdate(this.binding, input.event, input.action)] : []),
-      ],
-    );
+        )
+        .bind(
+          input.castingTrackId,
+          input.spellLevel,
+          input.nextExpendedCount,
+          timestamp,
+          timestamp,
+          input.event.id,
+          input.expectedExpendedCount,
+        ),
+      ...this.effectStatements(input.event, input.effects),
+      ...(input.action ? [actionUpdate(this.binding, input.event, input.action)] : []),
+    ]);
   }
 
   async commitPower(input: {

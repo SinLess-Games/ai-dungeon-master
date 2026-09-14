@@ -72,7 +72,8 @@ function healthGuard(mutation: ActorHealthMutation): {
   sql: string;
   bindings: readonly unknown[];
 } {
-  const table = mutation.kind === "character" ? "dnd35_characters" : "runtime_dnd35_monster_instances";
+  const table =
+    mutation.kind === "character" ? "dnd35_characters" : "runtime_dnd35_monster_instances";
   const idColumn = mutation.kind === "character" ? "character_id" : "actor_id";
   return {
     sql: `EXISTS (
@@ -98,7 +99,8 @@ function healthUpdate(
   event: GameEventWrite,
   mutation: ActorHealthMutation,
 ): D1PreparedStatement {
-  const table = mutation.kind === "character" ? "dnd35_characters" : "runtime_dnd35_monster_instances";
+  const table =
+    mutation.kind === "character" ? "dnd35_characters" : "runtime_dnd35_monster_instances";
   const idColumn = mutation.kind === "character" ? "character_id" : "actor_id";
   return db
     .prepare(
@@ -109,7 +111,7 @@ function healthUpdate(
          AND temporary_hit_points = ?
          AND nonlethal_damage = ?
          AND stable = ?
-         AND EXISTS (SELECT 1 FROM game_events WHERE id = ?)` ,
+         AND EXISTS (SELECT 1 FROM game_events WHERE id = ?)`,
     )
     .bind(
       mutation.next.currentHitPoints,
@@ -182,7 +184,7 @@ function actionUpdate(
            swift_debt_next_turn = ?, attacks_of_opportunity_per_round = ?,
            attacks_of_opportunity_remaining = ?, last_turn_round = ?, updated_at = ?
        WHERE encounter_id = ? AND actor_id = ? AND ${guard.sql}
-         AND EXISTS (SELECT 1 FROM game_events WHERE id = ?)` ,
+         AND EXISTS (SELECT 1 FROM game_events WHERE id = ?)`,
     )
     .bind(
       bool(action.next.standardAvailable),
@@ -214,7 +216,8 @@ export class D1ActorHealthStore {
     health?: ActorHealthMutation;
     action?: EncounterActionMutation;
   }): Promise<boolean> {
-    if (!input.health && !input.action) throw new RangeError("Actor commit requires a state mutation.");
+    if (!input.health && !input.action)
+      throw new RangeError("Actor commit requires a state mutation.");
 
     const guards = [
       ...(input.health ? [healthGuard(input.health)] : []),

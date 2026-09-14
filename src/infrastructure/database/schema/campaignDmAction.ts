@@ -66,9 +66,9 @@ export const campaignDmActions = sqliteTable(
       .notNull()
       .references(() => characters.id, { onDelete: "cascade" }),
     actorId: text("actor_id").notNull(),
-    kind: text("kind", { enum: campaignDmActionKinds }).notNull(),
+    kind: text("kind").$type<CampaignDmActionKind>().notNull(),
     arguments: text("arguments", { mode: "json" }).$type<CampaignDmActionArguments>().notNull(),
-    status: text("status", { enum: campaignDmActionStatuses }).notNull().default("pending"),
+    status: text("status").$type<CampaignDmActionStatus>().notNull().default("pending"),
     result: text("result", { mode: "json" }).$type<Record<string, unknown> | null>(),
     error: text("error"),
     createdAt: integer("created_at", { mode: "timestamp" })

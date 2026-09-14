@@ -1,31 +1,101 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
+  /**
+   * Keep this identifier stable after public release.
+   *
+   * Android package:
+   *   com.sinlessindustries.endlesscodex
+   */
   appId: "com.sinlessindustries.endlesscodex",
-  appName: "Endless Codex",
+
+  /**
+   * User-facing application name.
+   */
+  appName: "The Endless Codex",
 
   /**
    * @cloudflare/vite-plugin outputs the browser application here.
    *
-   * The Worker/server build is separate and must not be packaged
-   * into the Android application.
+   * Only the client bundle belongs in the native application.
+   * Cloudflare Worker/server output must remain deployed separately.
    */
   webDir: "dist/client",
 
+  /**
+   * Only emit Capacitor/native logs from debug builds.
+   *
+   * This keeps production logs quieter and reduces the chance of
+   * sensitive debugging information being exposed in release builds.
+   */
+  loggingBehavior: "debug",
+
+  /**
+   * Match the Endless Codex dark theme while the WebView starts.
+   *
+   * This avoids a bright white flash before React renders.
+   */
+  backgroundColor: "#0B0911",
+
+  /**
+   * Application UI controls its own sizing and accessibility.
+   */
+  zoomEnabled: false,
+
+  /**
+   * Give the primary WebView focus when the application starts.
+   */
+  initialFocus: true,
+
   server: {
     /**
-     * Keep the WebView on HTTPS semantics.
+     * Keep the default local Capacitor origin explicit.
      *
-     * Do not enable cleartext HTTP for production.
+     * Do NOT change this to the production API/domain. The packaged
+     * frontend should remain local and communicate with the Cloudflare
+     * backend over HTTPS.
+     */
+    hostname: "localhost",
+
+    /**
+     * Use HTTPS semantics for the Android WebView's local origin.
+     *
+     * This preserves secure-context browser APIs.
      */
     androidScheme: "https",
+
+    /**
+     * Do not add `url` here for production.
+     *
+     * Capacitor's server.url is intended primarily for live reload /
+     * development rather than shipping the application as a remote
+     * website wrapper.
+     */
   },
 
   android: {
     /**
-     * Do not permit mixed HTTP/HTTPS content.
+     * Never allow HTTPS pages to load insecure HTTP resources.
      */
     allowMixedContent: false,
+
+    /**
+     * Use the standard Android input implementation.
+     */
+    captureInput: false,
+
+    /**
+     * Do not force production WebViews into a permanently debuggable state.
+     *
+     * Capacitor still enables WebView debugging appropriately during
+     * development.
+     */
+    webContentsDebuggingEnabled: false,
+
+    /**
+     * Explicitly retain focus behavior on Android.
+     */
+    initialFocus: true,
   },
 };
 

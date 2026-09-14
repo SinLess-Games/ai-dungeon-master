@@ -58,6 +58,27 @@ export const feedbackQuery = (userId: string, type: "bug" | "feature", page: num
     refetchInterval: 30000,
   });
 
+export async function updateFeedbackStatus(
+  type: "bug" | "feature",
+  id: string,
+  status: string,
+) {
+  return checked(
+    await api.api.admin.feedback[":type"][":id"].$patch({
+      param: { type, id },
+      json: { status },
+    }),
+  );
+}
+
+export async function retryFeedbackGitHubSync(type: "bug" | "feature", id: string) {
+  return checked(
+    await api.api.admin.feedback[":type"][":id"].sync.$post({
+      param: { type, id },
+    }),
+  );
+}
+
 export const metricsQuery = (userId: string) =>
   queryOptions({
     queryKey: ["admin", userId, "metrics"],

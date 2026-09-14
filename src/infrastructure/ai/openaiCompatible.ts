@@ -5,6 +5,9 @@ export interface WorkersAIBinding {
       messages: Array<{ role: "system" | "user"; content: string }>;
       temperature?: number;
       max_tokens?: number;
+      chat_template_kwargs?: {
+        enable_thinking?: boolean;
+      };
     },
   ): Promise<unknown>;
 }
@@ -74,6 +77,10 @@ function extractWorkersAIText(value: unknown): string {
   return content;
 }
 
+function usesGemma4(model: string): boolean {
+  return model.startsWith("@cf/google/gemma-4-");
+}
+
 async function generateWorkersAIText(
   env: OpenAICompatibleEnv,
   input: GenerateTextInput,
@@ -88,6 +95,15 @@ async function generateWorkersAIText(
     ],
     temperature: input.temperature ?? 0.5,
     max_tokens: input.maxTokens ?? 2600,
+    ...(usesGemma4(model)
+      ? {
+          // Gemma 4 can spend the completion budget on internal reasoning and
+          // return no assistant content. The campaign/devblog flows need a
+          // user-visible answer, so follow Cloudflare's recommended binding
+          // example and disable thinking for synchronous text generation.
+          chat_template_kwargs: { enable_thinking: false },
+        }
+      : {}),
   });
 
   return extractWorkersAIText(response);

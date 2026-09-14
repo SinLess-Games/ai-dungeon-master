@@ -40,7 +40,7 @@ function RollBreakdown({ entry }: { entry: DiceHistoryEntry }) {
 export function DiceRollerPage() {
   const { expression, history, setExpression, roll, clearHistory } = useDiceStore();
   const [submitted, setSubmitted] = useState(false);
-  const [rollError, setRollError] = useState("");
+  const [rollError, setRollError] = useState<{ expression: string; message: string } | null>(null);
   let preview;
   let validationError = "";
   try {
@@ -49,17 +49,21 @@ export function DiceRollerPage() {
     validationError = error instanceof Error ? error.message : "Check your dice expression.";
   }
   const latest = history[0];
-  const error = rollError || (submitted ? validationError : "");
+  const error =
+    (rollError?.expression === expression ? rollError.message : "") ||
+    (submitted ? validationError : "");
 
   function submitRoll(notation: string) {
     setSubmitted(true);
-    setRollError("");
+    setRollError(null);
     try {
       roll(notation);
     } catch (error) {
-      setRollError(
-        error instanceof Error ? error.message : "The dice could not be rolled. Try again.",
-      );
+      setRollError({
+        expression: notation,
+        message:
+          error instanceof Error ? error.message : "The dice could not be rolled. Try again.",
+      });
     }
   }
 
@@ -71,7 +75,7 @@ export function DiceRollerPage() {
   function chooseExpression(value: string) {
     setExpression(value);
     setSubmitted(false);
-    setRollError("");
+    setRollError(null);
   }
 
   return (
@@ -195,9 +199,7 @@ export function DiceRollerPage() {
         <div className="dice-history-heading">
           <div>
             <h2 id="dice-history-title">Recent rolls</h2>
-            <p className="dice-help">
-              Last 20 rolls from this visit. Refreshing the page clears them.
-            </p>
+            <p className="dice-help">Last 40 rolls on this device, shared with the dice tray.</p>
           </div>
           <Button
             type="button"

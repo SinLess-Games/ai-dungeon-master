@@ -51,7 +51,10 @@ billion per term. Multiplication, division, parentheses, decimals, and keep/drop
 notation are not supported by this additive grammar.
 
 The public `/dice` page is available from Play → Dice and site search. Its personal
-roll history keeps the latest 20 rolls during SPA navigation and clears on reload.
+roll history keeps the latest 40 rolls on this device across navigation and reloads,
+shared with the persistent dice tray. Open the tray from Play → Dice tray, the
+floating Dice button, or Ctrl/⌘ + Shift + D. Both views enforce d2–d1000 and the
+same expression limits. If browser storage is unavailable, rolls still work in memory.
 These browser rolls do not mutate campaign state or replace authoritative server
 game commands. See `tests/e2e/dice-roller.spec.ts` for the desktop/mobile flow.
 

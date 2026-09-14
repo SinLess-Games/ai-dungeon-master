@@ -1,5 +1,6 @@
 import { Link, Outlet, createRootRoute } from "@tanstack/react-router";
 import { AuthModal } from "@/modules/auth/ui/AuthModal";
+import { DiceTray } from "@/modules/dice/ui/DiceTray";
 import { Toaster } from "sonner";
 import { SiteHeader } from "@/components/layout/site-header";
 
@@ -57,6 +58,7 @@ function RootLayout() {
         <Outlet />
       </div>
 
+      <DiceTray />
       <Toaster richColors closeButton position="bottom-right" />
     </>
   );

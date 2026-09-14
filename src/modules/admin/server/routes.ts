@@ -29,6 +29,7 @@ const listQuery = z.object({
 const bugStatusSchema = z.enum(bugReportStatuses);
 const featureStatusSchema = z.enum(featureRequestStatuses);
 const feedbackTypeSchema = z.enum(["bug", "feature"]);
+const closedBugStatuses = new Set(["resolved", "closed", "duplicate", "wont_fix"]);
 const isSuspended = (now: Date) =>
   sql<boolean>`coalesce(${users.banned}, 0) = 1 AND (${users.banExpires} IS NULL OR ${users.banExpires} > ${now.getTime()})`;
 
@@ -97,7 +98,6 @@ export const adminRoutes = new Hono<{ Bindings: AdminBindings }>()
       campaigns: campaignTotal?.value ?? 0,
       // No AI send pipeline or message store exists in the current app.
       aiMessages: null,
-
       administrators: administrators?.value ?? 0,
       suspended: suspended?.value ?? 0,
       activeSessions: activeSessions?.value ?? 0,
@@ -198,7 +198,7 @@ export const adminRoutes = new Hono<{ Bindings: AdminBindings }>()
         .set({
           status,
           updatedAt: now,
-          ...(status === "resolved" || status === "closed" ? { resolvedAt: now } : {}),
+          resolvedAt: closedBugStatuses.has(status) ? now : null,
         })
         .where(eq(bugReports.id, id))
         .run();
@@ -209,7 +209,7 @@ export const adminRoutes = new Hono<{ Bindings: AdminBindings }>()
         .set({
           status,
           updatedAt: now,
-          ...(status === "completed" ? { completedAt: now } : {}),
+          completedAt: status === "completed" ? now : null,
         })
         .where(eq(featureRequests.id, id))
         .run();
@@ -245,7 +245,8 @@ export const adminRoutes = new Hono<{ Bindings: AdminBindings }>()
     } catch (error) {
       console.error("Unable to manually queue GitHub feedback sync", { type, id, error });
     }
-    return c.json({ id, type, queued }, queued ? 202 : 503);
+    if (!queued) return c.json({ id, type, queued }, 503);
+    return c.json({ id, type, queued }, 202);
   })
   .get("/api/admin/users", async (c) => {
     const parsed = listQuery.safeParse(c.req.query());

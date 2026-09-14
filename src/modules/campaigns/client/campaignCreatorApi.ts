@@ -1,13 +1,73 @@
 import type {
+  CampaignDifficulty,
   CampaignPace,
   CampaignScale,
   CampaignStructure,
   CampaignStyleId,
+  CharacterProgressionPolicy,
+  ContentPolicy,
+  DmCreativity,
+  LevelingMode,
+  RulesStrictness,
+  WorldCreationMode,
+  WorldTemplateId,
 } from "../domain/creatorOptions";
 
 export type CampaignVisibility = "private" | "invite_only" | "unlisted" | "public";
 export type CampaignPlayMode = "solo" | "multiplayer";
 export type CampaignGameMasterMode = "ai" | "human" | "hybrid";
+
+export interface CampaignCreatorSettings {
+  creatorVersion: 2;
+  shortDescription: string;
+  genres: CampaignStyleId[];
+  pace: CampaignPace;
+  scale: CampaignScale;
+  structure: CampaignStructure;
+  world: {
+    mode: WorldCreationMode;
+    templateId: WorldTemplateId;
+    multiPlanar: boolean;
+    persistentWorld: boolean;
+  };
+  rules: {
+    levelingMode: LevelingMode;
+    characterProgression: CharacterProgressionPolicy;
+    epicLevels: boolean;
+  };
+  players: {
+    maxPlayers: number;
+    requireApproval: boolean;
+    allowSpectators: boolean;
+    allowPvp: boolean;
+  };
+  dm: {
+    difficulty: CampaignDifficulty;
+    rulesStrictness: RulesStrictness;
+    creativity: DmCreativity;
+    rollNpcDice: boolean;
+    showDmRolls: boolean;
+    persistentNpcs: boolean;
+    idlePlus: boolean;
+  };
+  content: {
+    policy: ContentPolicy;
+    allowHomebrew: boolean;
+    allowThirdParty: boolean;
+    houseRules: string;
+  };
+  ruleset: {
+    id: "dnd35";
+    version: "3.5";
+    worldTemplateId: WorldTemplateId;
+    campaignStyleIds: CampaignStyleId[];
+    pace: CampaignPace;
+    multiPlanar: boolean;
+    epicLevels: boolean;
+    levelingMode: LevelingMode;
+    characterProgression: CharacterProgressionPolicy;
+  };
+}
 
 export interface CreateCampaignInput {
   name: string;
@@ -16,14 +76,19 @@ export interface CreateCampaignInput {
   gameMasterMode: CampaignGameMasterMode;
   visibility: CampaignVisibility;
   maxPlayers?: number | null;
-  settings: {
-    creatorVersion: 1;
-    shortDescription: string;
-    genres: CampaignStyleId[];
-    pace: CampaignPace;
-    scale: CampaignScale;
-    structure: CampaignStructure;
-  };
+  generationSeed?: string;
+  settings: CampaignCreatorSettings;
+}
+
+export interface UpdateCampaignInput {
+  name?: string;
+  description?: string;
+  playMode?: CampaignPlayMode;
+  gameMasterMode?: CampaignGameMasterMode;
+  visibility?: CampaignVisibility;
+  maxPlayers?: number | null;
+  generationSeed?: string;
+  settings?: CampaignCreatorSettings;
 }
 
 export interface CreatedCampaign {
@@ -35,6 +100,8 @@ export interface CreatedCampaign {
   playMode: CampaignPlayMode;
   gameMasterMode: CampaignGameMasterMode;
   visibility: CampaignVisibility;
+  maxPlayers: number | null;
+  generationSeed: string;
   settings: Record<string, unknown>;
 }
 
@@ -72,5 +139,15 @@ export function createCampaign(input: CreateCampaignInput): Promise<CreatedCampa
       ...input,
       timeMode: "paused",
     }),
+  });
+}
+
+export function updateCampaign(
+  campaignId: string,
+  input: UpdateCampaignInput,
+): Promise<CreatedCampaign> {
+  return requestJson<CreatedCampaign>(`/api/campaigns/${encodeURIComponent(campaignId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
   });
 }

@@ -26,7 +26,8 @@
     "GITHUB_REPOSITORY": "SinLess-Games/ai-dungeon-master",
     "DEVBLOG_AI_ENABLED": "true",
     "DEVBLOG_AI_AUTO_PUBLISH": "false",
-    "AI_DEVBLOG_MODEL": "@cf/google/gemma-4-26b-a4b-it"
+    "AI_DEVBLOG_MODEL": "@cf/google/gemma-4-26b-a4b-it",
+    "AI_GAME_MODEL": "@cf/google/gemma-4-26b-a4b-it"
   },
 
   "ai": {

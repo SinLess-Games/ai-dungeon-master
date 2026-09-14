@@ -35,6 +35,7 @@ type CampaignRole = "owner" | "gm" | "player" | "observer";
 const id = z.string().trim().min(1).max(200);
 const targetIds = z.array(id).max(100).optional();
 const dc = z.number().int().min(0).max(1_000_000);
+const d20 = z.number().int().min(1).max(20);
 
 const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("encounter.start"), participantIds: z.array(id).min(1).max(100) }),
@@ -58,6 +59,7 @@ const commandSchema = z.discriminatedUnion("type", [
     skillId: id,
     specialization: z.string().trim().max(200).optional(),
     dc,
+    roll: d20.optional(),
   }),
   z.object({
     type: z.literal("check.save"),
@@ -65,6 +67,7 @@ const commandSchema = z.discriminatedUnion("type", [
     save: z.enum(["fort", "ref", "will"]),
     dc,
     sourceId: id.optional(),
+    roll: d20.optional(),
   }),
   z.object({
     type: z.literal("spell.cast.prepared"),

@@ -1,0 +1,86 @@
+.admin-feedback-controls {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 18px;
+  padding: 14px;
+  border: 1px solid #bba16825;
+  border-radius: 7px;
+  background: #091119;
+}
+
+.admin-feedback-controls label {
+  display: grid;
+  gap: 6px;
+  color: #aeb7c0;
+  font: 12px system-ui;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-feedback-controls select {
+  min-width: 160px;
+  padding: 8px 10px;
+  border: 1px solid #766347;
+  border-radius: 6px;
+  background: #101820;
+  color: #e8ddc7;
+  font: 13px system-ui;
+  text-transform: capitalize;
+}
+
+.admin-feedback-github {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: #9da8b3;
+  font: 12px system-ui;
+}
+
+.admin-feedback-github a {
+  color: #edc778;
+  text-decoration: none;
+}
+
+.admin-feedback-github a:hover {
+  text-decoration: underline;
+}
+
+.admin-feedback-sync {
+  padding: 4px 7px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  text-transform: capitalize;
+}
+
+.admin-feedback-sync-synced {
+  color: #75c991;
+}
+
+.admin-feedback-sync-pending {
+  color: #d8b56b;
+}
+
+.admin-feedback-sync-error {
+  color: #e68181;
+}
+
+p.admin-feedback-sync-error {
+  margin: 12px 0;
+  color: #e68181;
+  font: 12px/1.6 system-ui;
+}
+
+@media (max-width: 750px) {
+  .admin-feedback-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-feedback-github {
+    justify-content: flex-start;
+  }
+}

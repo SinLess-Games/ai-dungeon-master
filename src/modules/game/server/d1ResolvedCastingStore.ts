@@ -38,9 +38,10 @@ function bool(value: boolean): number {
   return value ? 1 : 0;
 }
 
-function combineGuards(
-  guards: readonly { sql: string; bindings: readonly unknown[] }[],
-): { sql: string; bindings: readonly unknown[] } {
+function combineGuards(guards: readonly { sql: string; bindings: readonly unknown[] }[]): {
+  sql: string;
+  bindings: readonly unknown[];
+} {
   if (guards.length === 0) return { sql: "1 = 1", bindings: [] };
   return {
     sql: guards.map((guard) => `(${guard.sql})`).join(" AND "),
@@ -130,7 +131,8 @@ function actionUpdate(db: D1Database, event: GameEventWrite, action: EncounterAc
        SET standard_available = ?, move_available = ?, swift_available = ?,
            swift_debt_next_turn = ?, attacks_of_opportunity_per_round = ?,
            attacks_of_opportunity_remaining = ?, last_turn_round = ?, updated_at = ?
-       WHERE encounter_id = ? AND actor_id = ? AND ${guard.sql}`,
+       WHERE encounter_id = ? AND actor_id = ? AND ${guard.sql}
+         AND EXISTS (SELECT 1 FROM game_events WHERE id = ?)`,
     )
     .bind(
       bool(action.next.standardAvailable),
@@ -144,11 +146,13 @@ function actionUpdate(db: D1Database, event: GameEventWrite, action: EncounterAc
       action.encounterId,
       action.characterId,
       ...guard.bindings,
+      event.id,
     );
 }
 
 function healthGuard(mutation: ActorHealthMutation) {
-  const table = mutation.kind === "character" ? "dnd35_characters" : "runtime_dnd35_monster_instances";
+  const table =
+    mutation.kind === "character" ? "dnd35_characters" : "runtime_dnd35_monster_instances";
   const id = mutation.kind === "character" ? "character_id" : "actor_id";
   return {
     sql: `EXISTS (
@@ -170,7 +174,8 @@ function healthGuard(mutation: ActorHealthMutation) {
 }
 
 function healthUpdate(db: D1Database, event: GameEventWrite, mutation: ActorHealthMutation) {
-  const table = mutation.kind === "character" ? "dnd35_characters" : "runtime_dnd35_monster_instances";
+  const table =
+    mutation.kind === "character" ? "dnd35_characters" : "runtime_dnd35_monster_instances";
   const id = mutation.kind === "character" ? "character_id" : "actor_id";
   return db
     .prepare(
@@ -180,7 +185,8 @@ function healthUpdate(db: D1Database, event: GameEventWrite, mutation: ActorHeal
          AND current_hit_points = ?
          AND temporary_hit_points = ?
          AND nonlethal_damage = ?
-         AND stable = ?`,
+         AND stable = ?
+         AND EXISTS (SELECT 1 FROM game_events WHERE id = ?)`,
     )
     .bind(
       mutation.next.currentHitPoints,
@@ -193,6 +199,7 @@ function healthUpdate(db: D1Database, event: GameEventWrite, mutation: ActorHeal
       mutation.expected.temporaryHitPoints,
       mutation.expected.nonlethalDamage,
       bool(mutation.expected.stable),
+      event.id,
     );
 }
 
@@ -216,7 +223,9 @@ function conditionInsert(
         id, actor_id, condition_id, source_actor_id, source_description,
         duration_kind, remaining_rounds, encounter_id, expires_encounter_round,
         expires_turn_order, expires_at, state, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
+      )
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?
+      WHERE EXISTS (SELECT 1 FROM game_events WHERE id = ?)`,
     )
     .bind(
       condition.id,
@@ -234,6 +243,7 @@ function conditionInsert(
         : JSON.stringify(condition.state),
       timestamp,
       timestamp,
+      event.id,
     );
 }
 
@@ -301,7 +311,9 @@ export class D1ResolvedCastingStore {
   ): D1PreparedStatement[] {
     return [
       ...(effects?.health ?? []).map((mutation) => healthUpdate(this.binding, event, mutation)),
-      ...(effects?.conditions ?? []).map((mutation) => conditionInsert(this.binding, event, mutation)),
+      ...(effects?.conditions ?? []).map((mutation) =>
+        conditionInsert(this.binding, event, mutation),
+      ),
     ];
   }
 
@@ -320,26 +332,24 @@ export class D1ResolvedCastingStore {
       ...this.effectGuards(input.effects),
     ]);
     const timestamp = Math.floor(input.event.occurredAt.getTime() / 1000);
-    return this.commitBatch(
-      input.event,
-      guard,
-      [
-        this.binding
-          .prepare(
-            `UPDATE dnd35_character_spell_preparations
+    return this.commitBatch(input.event, guard, [
+      this.binding
+        .prepare(
+          `UPDATE dnd35_character_spell_preparations
              SET expended_count = ?, updated_at = ?
-             WHERE id = ? AND expended_count = ?`,
-          )
-          .bind(
-            input.nextExpendedCount,
-            timestamp,
-            input.preparationId,
-            input.expectedExpendedCount,
-          ),
-        ...this.effectStatements(input.event, input.effects),
-        ...(input.action ? [actionUpdate(this.binding, input.event, input.action)] : []),
-      ],
-    );
+             WHERE id = ? AND expended_count = ?
+               AND EXISTS (SELECT 1 FROM game_events WHERE id = ?)`,
+        )
+        .bind(
+          input.nextExpendedCount,
+          timestamp,
+          input.preparationId,
+          input.expectedExpendedCount,
+          input.event.id,
+        ),
+      ...this.effectStatements(input.event, input.effects),
+      ...(input.action ? [actionUpdate(this.binding, input.event, input.action)] : []),
+    ]);
   }
 
   async commitSpontaneous(input: {
@@ -357,32 +367,31 @@ export class D1ResolvedCastingStore {
       ...this.effectGuards(input.effects),
     ]);
     const timestamp = Math.floor(input.event.occurredAt.getTime() / 1000);
-    return this.commitBatch(
-      input.event,
-      guard,
-      [
-        this.binding
-          .prepare(
-            `INSERT INTO runtime_dnd35_character_spontaneous_slot_usage (
+    return this.commitBatch(input.event, guard, [
+      this.binding
+        .prepare(
+          `INSERT INTO runtime_dnd35_character_spontaneous_slot_usage (
                casting_track_id, spell_level, expended_count, created_at, updated_at
-             ) VALUES (?, ?, ?, ?, ?)
+             )
+             SELECT ?, ?, ?, ?, ?
+             WHERE EXISTS (SELECT 1 FROM game_events WHERE id = ?)
              ON CONFLICT(casting_track_id, spell_level) DO UPDATE SET
                expended_count = excluded.expended_count,
                updated_at = excluded.updated_at
              WHERE runtime_dnd35_character_spontaneous_slot_usage.expended_count = ?`,
-          )
-          .bind(
-            input.castingTrackId,
-            input.spellLevel,
-            input.nextExpendedCount,
-            timestamp,
-            timestamp,
-            input.expectedExpendedCount,
-          ),
-        ...this.effectStatements(input.event, input.effects),
-        ...(input.action ? [actionUpdate(this.binding, input.event, input.action)] : []),
-      ],
-    );
+        )
+        .bind(
+          input.castingTrackId,
+          input.spellLevel,
+          input.nextExpendedCount,
+          timestamp,
+          timestamp,
+          input.event.id,
+          input.expectedExpendedCount,
+        ),
+      ...this.effectStatements(input.event, input.effects),
+      ...(input.action ? [actionUpdate(this.binding, input.event, input.action)] : []),
+    ]);
   }
 
   async commitPower(input: {
@@ -412,13 +421,15 @@ export class D1ResolvedCastingStore {
         .prepare(
           `UPDATE dnd35_characters
            SET power_points_spent = ?, updated_at = ?
-           WHERE character_id = ? AND power_points_spent = ?`,
+           WHERE character_id = ? AND power_points_spent = ?
+             AND EXISTS (SELECT 1 FROM game_events WHERE id = ?)`,
         )
         .bind(
           input.nextPowerPointsSpent,
           timestamp,
           input.characterId,
           input.expectedPowerPointsSpent,
+          input.event.id,
         ),
     ];
     if (input.nextFocused !== undefined) {
@@ -427,7 +438,9 @@ export class D1ResolvedCastingStore {
           .prepare(
             `INSERT INTO runtime_dnd35_character_psionic_states (
                character_id, focused, created_at, updated_at
-             ) VALUES (?, ?, ?, ?)
+             )
+             SELECT ?, ?, ?, ?
+             WHERE EXISTS (SELECT 1 FROM game_events WHERE id = ?)
              ON CONFLICT(character_id) DO UPDATE SET
                focused = excluded.focused, updated_at = excluded.updated_at
              WHERE runtime_dnd35_character_psionic_states.focused = ?`,
@@ -437,6 +450,7 @@ export class D1ResolvedCastingStore {
             bool(input.nextFocused),
             timestamp,
             timestamp,
+            input.event.id,
             bool(input.expectedFocused ?? false),
           ),
       );

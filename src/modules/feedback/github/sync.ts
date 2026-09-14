@@ -4,10 +4,13 @@ import { and, eq } from "drizzle-orm";
 import { createDatabase } from "@/infrastructure/database/client";
 import {
   bugReports,
+  type BugReportSeverity,
   type BugReportStatus,
 } from "@/infrastructure/database/schema/feedback/bugReport";
 import {
   featureRequests,
+  type FeatureRequestCategory,
+  type FeatureRequestImpact,
   type FeatureRequestStatus,
 } from "@/infrastructure/database/schema/feedback/featureRequest";
 import {
@@ -34,7 +37,14 @@ const FEATURE_LABEL = "type:feature";
 const MANAGED_LABEL_PREFIXES = ["status:", "severity:", "impact:", "category:"] as const;
 const knownLabels = new Set<string>();
 
+const BUG_OPEN = new Set<BugReportStatus>(["open", "triaged", "in_progress"]);
 const BUG_CLOSED = new Set<BugReportStatus>(["resolved", "closed", "duplicate", "wont_fix"]);
+const FEATURE_OPEN = new Set<FeatureRequestStatus>([
+  "submitted",
+  "under_review",
+  "planned",
+  "in_progress",
+]);
 const FEATURE_CLOSED = new Set<FeatureRequestStatus>(["completed", "declined", "duplicate"]);
 
 interface FeedbackMarker {
@@ -71,6 +81,15 @@ function isManagedLabel(label: string): boolean {
     label === BUG_LABEL ||
     label === FEATURE_LABEL ||
     MANAGED_LABEL_PREFIXES.some((prefix) => label.startsWith(prefix))
+  );
+}
+
+function isCoreSyncLabel(label: string): boolean {
+  return (
+    label === SOURCE_LABEL ||
+    label === BUG_LABEL ||
+    label === FEATURE_LABEL ||
+    label.startsWith("status:")
   );
 }
 
@@ -161,38 +180,67 @@ function cleanImportedTitle(title: string): string {
   return title.replace(/^\s*\[(?:bug|feature|enhancement)\]\s*/i, "").trim() || title.trim();
 }
 
+function statusLabel(issue: GitHubIssueSnapshot): string | undefined {
+  return issueLabels(issue)
+    .find((label) => label.startsWith("status:"))
+    ?.slice("status:".length)
+    .replaceAll("-", "_");
+}
+
 function bugStatusFromIssue(issue: GitHubIssueSnapshot): BugReportStatus {
-  const status = issueLabels(issue).find((label) => label.startsWith("status:"));
-  const mapped = status?.slice("status:".length).replaceAll("-", "_");
-  if (
-    mapped === "open" ||
-    mapped === "triaged" ||
-    mapped === "in_progress" ||
-    mapped === "resolved" ||
-    mapped === "closed" ||
-    mapped === "duplicate" ||
-    mapped === "wont_fix"
-  ) {
-    return mapped;
-  }
-  return issue.state === "closed" ? "closed" : "open";
+  const mapped = statusLabel(issue) as BugReportStatus | undefined;
+  if (issue.state === "closed") return mapped && BUG_CLOSED.has(mapped) ? mapped : "closed";
+  return mapped && BUG_OPEN.has(mapped) ? mapped : "open";
 }
 
 function featureStatusFromIssue(issue: GitHubIssueSnapshot): FeatureRequestStatus {
-  const status = issueLabels(issue).find((label) => label.startsWith("status:"));
-  const mapped = status?.slice("status:".length).replaceAll("-", "_");
-  if (
-    mapped === "submitted" ||
-    mapped === "under_review" ||
-    mapped === "planned" ||
-    mapped === "in_progress" ||
-    mapped === "completed" ||
-    mapped === "declined" ||
-    mapped === "duplicate"
-  ) {
-    return mapped;
+  const mapped = statusLabel(issue) as FeatureRequestStatus | undefined;
+  if (issue.state === "closed") {
+    return mapped && FEATURE_CLOSED.has(mapped) ? mapped : "completed";
   }
-  return issue.state === "closed" ? "completed" : "submitted";
+  return mapped && FEATURE_OPEN.has(mapped) ? mapped : "submitted";
+}
+
+function bugSeverityFromIssue(issue: GitHubIssueSnapshot): BugReportSeverity {
+  const value = issueLabels(issue)
+    .find((label) => label.startsWith("severity:"))
+    ?.slice("severity:".length);
+  return value === "low" || value === "high" || value === "critical" ? value : "medium";
+}
+
+function featureImpactFromIssue(issue: GitHubIssueSnapshot): FeatureRequestImpact {
+  const value = issueLabels(issue)
+    .find((label) => label.startsWith("impact:"))
+    ?.slice("impact:".length);
+  return value === "low" || value === "high" || value === "critical" ? value : "medium";
+}
+
+function featureCategoryFromIssue(issue: GitHubIssueSnapshot): FeatureRequestCategory {
+  const value = issueLabels(issue)
+    .find((label) => label.startsWith("category:"))
+    ?.slice("category:".length);
+  const allowed = new Set<FeatureRequestCategory>([
+    "gameplay",
+    "ai",
+    "rules",
+    "maps",
+    "multiplayer",
+    "characters",
+    "worlds",
+    "campaigns",
+    "content",
+    "ui",
+    "mobile",
+    "desktop",
+    "billing",
+    "account",
+    "performance",
+    "accessibility",
+    "other",
+  ]);
+  return value && allowed.has(value as FeatureRequestCategory)
+    ? (value as FeatureRequestCategory)
+    : "other";
 }
 
 function bodyForBug(input: {
@@ -415,13 +463,15 @@ async function importGitHubIssue(
   const db = createDatabase(requireDatabase(env));
   const id = crypto.randomUUID();
   const body = issue.body?.trim() || `Imported from GitHub issue #${issue.number}.`;
+  const description = stripFeedbackMarker(body) || `Imported from GitHub issue #${issue.number}.`;
   if (feedbackType === "bug") {
     await db.insert(bugReports).values({
       id,
       reporterUserId: null,
       title: cleanImportedTitle(issue.title),
-      description: stripFeedbackMarker(body),
+      description,
       status: bugStatusFromIssue(issue),
+      severity: bugSeverityFromIssue(issue),
       platform: "unknown",
     });
   } else {
@@ -429,8 +479,10 @@ async function importGitHubIssue(
       id,
       requesterUserId: null,
       title: cleanImportedTitle(issue.title),
-      description: stripFeedbackMarker(body),
+      description,
       status: featureStatusFromIssue(issue),
+      impact: featureImpactFromIssue(issue),
+      category: featureCategoryFromIssue(issue),
       platform: "unknown",
     });
   }
@@ -450,15 +502,17 @@ async function updateFeedbackFromIssue(
 
   if (feedbackType === "bug") {
     const steps = extractSection(body, "Steps to reproduce");
+    const status = bugStatusFromIssue(issue);
     await db
       .update(bugReports)
       .set({
         title: cleanImportedTitle(issue.title),
         ...(description ? { description } : {}),
         ...(steps !== undefined ? { stepsToReproduce: steps } : {}),
-        status: bugStatusFromIssue(issue),
+        status,
+        severity: bugSeverityFromIssue(issue),
         updatedAt: now,
-        ...(issue.state === "closed" ? { resolvedAt: now } : { resolvedAt: null }),
+        resolvedAt: BUG_CLOSED.has(status) ? now : null,
       })
       .where(eq(bugReports.id, feedbackId))
       .run();
@@ -472,15 +526,17 @@ async function updateFeedbackFromIssue(
         ...(description ? { description } : {}),
         ...(problem !== undefined ? { problem } : {}),
         status,
+        impact: featureImpactFromIssue(issue),
+        category: featureCategoryFromIssue(issue),
         updatedAt: now,
-        ...(status === "completed" ? { completedAt: now } : { completedAt: null }),
+        completedAt: status === "completed" ? now : null,
       })
       .where(eq(featureRequests.id, feedbackId))
       .run();
   }
 }
 
-async function normalizeImportedIssueLabels(
+async function normalizeInboundIssueLabels(
   env: GitHubFeedbackEnv,
   feedbackType: GitHubFeedbackType,
   issue: GitHubIssueSnapshot,
@@ -494,7 +550,9 @@ async function normalizeImportedIssueLabels(
     ),
   ];
   await ensureManagedLabels(env, required);
-  const preserved = current.filter((label) => !isManagedLabel(label));
+  // Preserve severity/impact/category labels supplied in GitHub. Only the
+  // identity and status labels are normalized by the inbound path.
+  const preserved = current.filter((label) => !isCoreSyncLabel(label));
   const labels = [...preserved, ...required];
   if (sameLabelSet(current, labels)) return issue;
   return updateGitHubIssue(env, requireRepository(env), issue.number, { labels });
@@ -541,7 +599,7 @@ async function syncGitHubIssueToFeedback(env: GitHubFeedbackEnv, job: GitHubSync
     const feedbackType = feedbackTypeFromIssue(issue);
     if (!feedbackType) return;
     const feedbackId = await importGitHubIssue(env, issue, feedbackType);
-    issue = await normalizeImportedIssueLabels(env, feedbackType, issue);
+    issue = await normalizeInboundIssueLabels(env, feedbackType, issue);
     await saveIssueLink(env, feedbackType, feedbackId, job.repositoryFullName, issue);
     link = await db
       .select()
@@ -557,6 +615,7 @@ async function syncGitHubIssueToFeedback(env: GitHubFeedbackEnv, job: GitHubSync
 
   if (!link) return;
   await updateFeedbackFromIssue(env, link.feedbackType, link.feedbackId, issue);
+  issue = await normalizeInboundIssueLabels(env, link.feedbackType, issue);
   await saveIssueLink(env, link.feedbackType, link.feedbackId, job.repositoryFullName, issue);
 }
 

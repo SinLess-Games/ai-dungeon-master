@@ -15,6 +15,7 @@ import { adminRoutes } from "@/modules/admin/server/routes";
 import { authRoutes, authHandler } from "@/modules/auth/server/routes";
 import type { AuthEnv } from "@/modules/auth/server/auth";
 import { campaignDeleteRoutes } from "@/modules/campaigns/server/deleteRoutes";
+import { campaignDmActionRoutes } from "@/modules/campaigns/server/dmActionRoutes";
 import { campaignPlayCharacterRoutes } from "@/modules/campaigns/server/playCharacterRoutes";
 import { campaignPlayMessageRoutes } from "@/modules/campaigns/server/playMessageRoutes";
 import { campaignRoutes } from "@/modules/campaigns/server/routes";
@@ -205,6 +206,7 @@ const routes = app
   .route("/", campaignDeleteRoutes)
   .route("/", campaignPlayCharacterRoutes)
   .route("/", campaignPlayMessageRoutes)
+  .route("/", campaignDmActionRoutes)
   .route("/", characterCreationRoutes)
   .route("/", characterRoutes)
   .route("/", actorRoutes)
@@ -227,6 +229,7 @@ const routes = app
         campaigns: "/api/campaigns",
         campaignPlayMessages: "/api/campaigns/:campaignId/play/messages",
         campaignPlayChecks: "/api/campaigns/:campaignId/play/characters/:characterId/checks",
+        campaignDmAction: "/api/campaigns/:campaignId/play/dm-actions/pending",
         game: "/api/campaigns/:campaignId/game",
         gameState: "/api/campaigns/:campaignId/game/state",
         gameCommands: "/api/campaigns/:campaignId/game/commands",

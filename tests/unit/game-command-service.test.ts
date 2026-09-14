@@ -47,6 +47,60 @@ describe("unified game command service", () => {
     });
   });
 
+  it("forwards a player-supplied natural roll to a skill check", async () => {
+    const h = handlers();
+    const result = await executeGameCommand(
+      deps,
+      "campaign-1",
+      {
+        type: "check.skill",
+        actorId: "rogue-1",
+        skillId: "search",
+        specialization: "traps",
+        dc: 18,
+        roll: 14,
+      },
+      h,
+    );
+
+    expect(result.type).toBe("check.skill");
+    expect(h.skillCheck).toHaveBeenCalledWith(deps, {
+      campaignId: "campaign-1",
+      actorId: "rogue-1",
+      skillId: "search",
+      specialization: "traps",
+      dc: 18,
+      roll: 14,
+    });
+  });
+
+  it("forwards a player-supplied natural roll to a saving throw", async () => {
+    const h = handlers();
+    const result = await executeGameCommand(
+      deps,
+      "campaign-1",
+      {
+        type: "check.save",
+        actorId: "cleric-1",
+        save: "will",
+        dc: 17,
+        sourceId: "rune-1",
+        roll: 9,
+      },
+      h,
+    );
+
+    expect(result.type).toBe("check.save");
+    expect(h.savingThrow).toHaveBeenCalledWith(deps, {
+      campaignId: "campaign-1",
+      actorId: "cleric-1",
+      save: "will",
+      dc: 17,
+      sourceId: "rune-1",
+      roll: 9,
+    });
+  });
+
   it("routes resolved prepared spell casts with authoritative targets", async () => {
     const h = handlers();
     const result = await executeGameCommand(

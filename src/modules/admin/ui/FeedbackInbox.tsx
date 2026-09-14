@@ -6,6 +6,7 @@ import {
   retryFeedbackGitHubSync,
   updateFeedbackStatus,
 } from "../client/queries";
+import "./feedbackSync.css";
 
 const bugStatuses = [
   "open",

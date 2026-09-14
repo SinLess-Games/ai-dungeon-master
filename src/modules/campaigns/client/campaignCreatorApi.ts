@@ -16,6 +16,7 @@ import type {
 export type CampaignVisibility = "private" | "invite_only" | "unlisted" | "public";
 export type CampaignPlayMode = "solo" | "multiplayer";
 export type CampaignGameMasterMode = "ai" | "human" | "hybrid";
+export type CampaignAccessRole = "owner" | "gm" | "player" | "observer";
 
 export interface CampaignCreatorSettings {
   creatorVersion: 2;
@@ -93,6 +94,7 @@ export interface UpdateCampaignInput {
 
 export interface CreatedCampaign {
   id: string;
+  ownerUserId: string;
   name: string;
   slug: string;
   description: string | null;
@@ -126,6 +128,7 @@ export interface CampaignDetailResponse {
     rulesetVersion: string;
     worldId: string | null;
   };
+  role: CampaignAccessRole;
   characters: Array<{
     id: string;
     name: string;
@@ -201,5 +204,31 @@ export function startCampaign(campaignId: string): Promise<{
 }> {
   return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/start`, {
     method: "POST",
+  });
+}
+
+export function pauseCampaign(
+  campaignId: string,
+): Promise<{ campaignId: string; status: "paused" }> {
+  return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/play/pause`, {
+    method: "POST",
+  });
+}
+
+export function resumeCampaign(
+  campaignId: string,
+): Promise<{ campaignId: string; status: "active" }> {
+  return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/play/resume`, {
+    method: "POST",
+  });
+}
+
+export function deleteCampaign(
+  campaignId: string,
+  confirmationName: string,
+): Promise<{ deleted: true; campaignId: string; name: string }> {
+  return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}`, {
+    method: "DELETE",
+    body: JSON.stringify({ confirmationName }),
   });
 }

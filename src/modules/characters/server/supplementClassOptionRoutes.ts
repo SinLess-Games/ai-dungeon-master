@@ -15,24 +15,13 @@ import {
 import { createAuth, type AuthEnv } from "@/modules/auth/server/auth";
 import { requireUser } from "@/modules/auth/server/requireAuth";
 import { ServiceUnavailableError } from "@/server/middleware/errors";
-import { characterOptionRoutes } from "./optionsRoutes";
+import { loadCharacterCreationOptions } from "./optionsRoutes";
 
 interface CharacterOptionBindings extends AuthEnv {
   DB?: D1Database;
 }
 
 type CharacterOptionEnv = { Bindings: CharacterOptionBindings };
-
-type ExistingClassOption = {
-  id: string;
-  name: string;
-  [key: string]: unknown;
-};
-
-type CharacterCreationPayload = {
-  classes: ExistingClassOption[];
-  [key: string]: unknown;
-};
 
 function requireDatabase(binding: D1Database | undefined): D1Database {
   if (!binding) throw new ServiceUnavailableError("Character rules data is unavailable.");
@@ -52,15 +41,14 @@ function visibleToUser(ownerUserId: AnySQLiteColumn, userId: string) {
  * therefore renders the cards and their requirements, but its validation cannot begin
  * a level-one character with a prestige class.
  */
-export const supplementClassOptionRoutes = new Hono<CharacterOptionEnv>()
-  .get("/api/dnd35/character-creation-options", async (c) => {
+export const supplementClassOptionRoutes = new Hono<CharacterOptionEnv>().get(
+  "/api/dnd35/character-creation-options",
+  async (c) => {
     c.header("Cache-Control", "private, max-age=300");
     const session = await requireUser(createAuth(c.env), c.req.raw.headers);
     const db = createDatabase(requireDatabase(c.env.DB));
 
-    const baseResponse = await characterOptionRoutes.fetch(c.req.raw, c.env);
-    if (!baseResponse.ok) return baseResponse;
-    const payload = (await baseResponse.json()) as CharacterCreationPayload;
+    const payload = await loadCharacterCreationOptions(db, session.user.id);
 
     const prestigeRows = await db
       .select({
@@ -100,36 +88,37 @@ export const supplementClassOptionRoutes = new Hono<CharacterOptionEnv>()
       .all();
 
     const prestigeIds = prestigeRows.map(({ id }) => id);
-    const [prerequisiteRows, classSkillRows] = prestigeIds.length === 0
-      ? [[], []] as const
-      : await Promise.all([
-          db
-            .select({
-              classId: classPrerequisites.classId,
-              explanation: classPrerequisites.explanation,
-            })
-            .from(classPrerequisites)
-            .where(inArray(classPrerequisites.classId, prestigeIds))
-            .all(),
-          db
-            .select({
-              classId: classSkills.classId,
-              id: skills.id,
-              slug: skills.slug,
-              name: skills.name,
-            })
-            .from(classSkills)
-            .innerJoin(skills, eq(classSkills.skillId, skills.id))
-            .where(
-              and(
-                inArray(classSkills.classId, prestigeIds),
-                eq(skills.isEnabled, true),
-                visibleToUser(skills.ownerUserId, session.user.id),
-              ),
-            )
-            .orderBy(asc(skills.name))
-            .all(),
-        ]);
+    const [prerequisiteRows, classSkillRows] =
+      prestigeIds.length === 0
+        ? ([[], []] as const)
+        : await Promise.all([
+            db
+              .select({
+                classId: classPrerequisites.classId,
+                explanation: classPrerequisites.explanation,
+              })
+              .from(classPrerequisites)
+              .where(inArray(classPrerequisites.classId, prestigeIds))
+              .all(),
+            db
+              .select({
+                classId: classSkills.classId,
+                id: skills.id,
+                slug: skills.slug,
+                name: skills.name,
+              })
+              .from(classSkills)
+              .innerJoin(skills, eq(classSkills.skillId, skills.id))
+              .where(
+                and(
+                  inArray(classSkills.classId, prestigeIds),
+                  eq(skills.isEnabled, true),
+                  visibleToUser(skills.ownerUserId, session.user.id),
+                ),
+              )
+              .orderBy(asc(skills.name))
+              .all(),
+          ]);
 
     const prerequisitesByClass = new Map(
       prerequisiteRows.map((row) => [row.classId, row.explanation]),
@@ -143,10 +132,13 @@ export const supplementClassOptionRoutes = new Hono<CharacterOptionEnv>()
 
     const prestigeClasses = prestigeRows.map((characterClass) => {
       const printedRequirements = prerequisitesByClass.get(characterClass.id)?.trim();
-      const sourceLabel = characterClass.sourceAbbreviation ?? characterClass.sourceName ?? characterClass.sourceId;
+      const sourceLabel =
+        characterClass.sourceAbbreviation ?? characterClass.sourceName ?? characterClass.sourceId;
       const levelOneExplanation = [
         "Prestige class — not available as a 1st-level class.",
-        printedRequirements ? `Requirements: ${printedRequirements}` : "Requirements must be met through character advancement.",
+        printedRequirements
+          ? `Requirements: ${printedRequirements}`
+          : "Requirements must be met through character advancement.",
       ].join(" ");
       const expandedDescription = [
         characterClass.description,
@@ -162,7 +154,8 @@ export const supplementClassOptionRoutes = new Hono<CharacterOptionEnv>()
         ...characterClass,
         description: expandedDescription,
         firstLevelHitPoints: characterClass.levelOneHitDie ?? characterClass.hitDie,
-        firstLevelSkillPoints: characterClass.levelOneSkillPoints ?? characterClass.skillPointsPerLevel,
+        firstLevelSkillPoints:
+          characterClass.levelOneSkillPoints ?? characterClass.skillPointsPerLevel,
         allowedAlignments: [],
         prerequisiteExplanation: levelOneExplanation,
         classSkills: skillsByClass.get(characterClass.id) ?? [],
@@ -170,7 +163,10 @@ export const supplementClassOptionRoutes = new Hono<CharacterOptionEnv>()
       };
     });
 
-    const byId = new Map<string, ExistingClassOption>();
+    const byId = new Map<
+      string,
+      (typeof payload.classes)[number] | (typeof prestigeClasses)[number]
+    >();
     for (const characterClass of [...payload.classes, ...prestigeClasses]) {
       byId.set(characterClass.id, characterClass);
     }
@@ -179,4 +175,5 @@ export const supplementClassOptionRoutes = new Hono<CharacterOptionEnv>()
       ...payload,
       classes: [...byId.values()].sort((a, b) => a.name.localeCompare(b.name)),
     });
-  });
+  },
+);

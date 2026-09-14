@@ -19,11 +19,12 @@ import {
   weaponDamage,
   weapons,
 } from "@/infrastructure/database/schema";
+import { maximumHitPointsFromClassTracks } from "@/modules/characters/domain/hitPoints";
+import { racialHitPoints } from "@/modules/characters/domain/monsterRaceCreation";
 import {
   abilityModifier,
   aggregateClassProgression,
   effectiveAbilityScore,
-  hitPointsFromGainedLevels,
   type Dnd35Size,
 } from "@/rulesets/dnd35";
 import type {
@@ -430,19 +431,32 @@ export async function loadHealthSnapshot(input: {
     loadDndCharacter(input.db, input.characterId),
     loadEffectiveAbility(input.db, input.characterId, "con"),
     input.db
-      .select({ hitPointsGained: characterClassLevels.hitPointsGained, track: characterClassLevels.track })
+      .select({
+        characterLevel: characterClassLevels.characterLevel,
+        hitPointsGained: characterClassLevels.hitPointsGained,
+      })
       .from(characterClassLevels)
       .where(eq(characterClassLevels.characterId, input.characterId))
       .orderBy(characterClassLevels.characterLevel)
       .all(),
   ]);
   if (!extension || constitution === null) return null;
-  const gained = hpRows.filter((row) => row.track === 1).map((row) => row.hitPointsGained);
-  if (gained.length === 0) return null;
-  const maximum = hitPointsFromGainedLevels({
-    gainedHitPoints: gained,
-    constitutionModifier: abilityModifier(constitution),
-  }).maximumHitPoints;
+
+  const selectedRace = extension.raceId
+    ? await input.db
+        .select({ racialHitDice: races.racialHitDice, racialHitDie: races.racialHitDie })
+        .from(races)
+        .where(eq(races.id, extension.raceId))
+        .get()
+    : undefined;
+  const constitutionModifier = abilityModifier(constitution);
+  const maximum =
+    racialHitPoints(
+      selectedRace?.racialHitDice ?? 0,
+      selectedRace?.racialHitDie ?? null,
+      constitutionModifier,
+    ) + maximumHitPointsFromClassTracks(hpRows, constitutionModifier);
+  if (maximum < 1) return null;
 
   return {
     characterId: input.characterId,

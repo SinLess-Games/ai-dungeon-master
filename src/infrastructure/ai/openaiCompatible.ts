@@ -5,6 +5,9 @@ export interface WorkersAIBinding {
       messages: Array<{ role: "system" | "user"; content: string }>;
       temperature?: number;
       max_tokens?: number;
+      chat_template_kwargs?: {
+        enable_thinking?: boolean;
+      };
     },
   ): Promise<unknown>;
 }
@@ -17,13 +20,20 @@ export interface OpenAICompatibleEnv {
    */
   AI?: WorkersAIBinding;
 
-  /**
-   * Optional fallback for another OpenAI-compatible provider. The weekly
-   * devblog does not require this when the Workers AI binding is available.
-   */
+  /** Optional fallback for another OpenAI-compatible provider. */
   AI_API_KEY?: string;
   AI_BASE_URL?: string;
   AI_DEVBLOG_MODEL?: string;
+  AI_GAME_MODEL?: string;
+}
+
+export interface GenerateTextInput {
+  system: string;
+  prompt: string;
+  temperature?: number;
+  /** Optional provider-specific model override for this workflow. */
+  model?: string;
+  maxTokens?: number;
 }
 
 interface ChatCompletionResponse {
@@ -67,24 +77,33 @@ function extractWorkersAIText(value: unknown): string {
   return content;
 }
 
+function usesGemma4(model: string): boolean {
+  return model.startsWith("@cf/google/gemma-4-");
+}
+
 async function generateWorkersAIText(
   env: OpenAICompatibleEnv,
-  input: {
-    system: string;
-    prompt: string;
-    temperature?: number;
-  },
+  input: GenerateTextInput,
 ): Promise<string> {
   if (!env.AI) throw new Error("Workers AI binding is unavailable.");
 
-  const model = env.AI_DEVBLOG_MODEL?.trim() || DEFAULT_WORKERS_AI_DEVBLOG_MODEL;
+  const model = input.model?.trim() || env.AI_DEVBLOG_MODEL?.trim() || DEFAULT_WORKERS_AI_DEVBLOG_MODEL;
   const response = await env.AI.run(model, {
     messages: [
       { role: "system", content: input.system },
       { role: "user", content: input.prompt },
     ],
     temperature: input.temperature ?? 0.5,
-    max_tokens: 2600,
+    max_tokens: input.maxTokens ?? 2600,
+    ...(usesGemma4(model)
+      ? {
+          // Gemma 4 can spend the completion budget on internal reasoning and
+          // return no assistant content. The campaign/devblog flows need a
+          // user-visible answer, so follow Cloudflare's recommended binding
+          // example and disable thinking for synchronous text generation.
+          chat_template_kwargs: { enable_thinking: false },
+        }
+      : {}),
   });
 
   return extractWorkersAIText(response);
@@ -92,16 +111,12 @@ async function generateWorkersAIText(
 
 async function generateOpenAIProviderText(
   env: OpenAICompatibleEnv,
-  input: {
-    system: string;
-    prompt: string;
-    temperature?: number;
-  },
+  input: GenerateTextInput,
 ): Promise<string> {
   if (!env.AI_API_KEY) throw new Error("AI_API_KEY is not configured.");
 
   const baseUrl = (env.AI_BASE_URL?.trim() || "https://api.openai.com/v1").replace(/\/+$/, "");
-  const model = env.AI_DEVBLOG_MODEL?.trim() || "gpt-5-mini";
+  const model = input.model?.trim() || env.AI_DEVBLOG_MODEL?.trim() || "gpt-5-mini";
 
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
@@ -116,6 +131,7 @@ async function generateOpenAIProviderText(
         { role: "user", content: input.prompt },
       ],
       temperature: input.temperature ?? 0.6,
+      max_tokens: input.maxTokens,
     }),
   });
 
@@ -139,11 +155,7 @@ async function generateOpenAIProviderText(
  */
 export async function generateOpenAICompatibleText(
   env: OpenAICompatibleEnv,
-  input: {
-    system: string;
-    prompt: string;
-    temperature?: number;
-  },
+  input: GenerateTextInput,
 ): Promise<string> {
   if (env.AI) return generateWorkersAIText(env, input);
   if (env.AI_API_KEY) return generateOpenAIProviderText(env, input);

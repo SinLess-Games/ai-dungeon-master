@@ -2,7 +2,8 @@
 
 import type { Database } from "@/infrastructure/database/client";
 import { consciousnessState, type Dnd35HealthPool } from "@/rulesets/dnd35";
-import { loadActiveGameContext, loadHealthSnapshot } from "./d1Dnd35State";
+import { loadHealthSnapshot } from "./d1Dnd35State";
+import { loadPlayableGameContext } from "./playableGameContext";
 
 export interface GameReadModelDependencies {
   db: Database;
@@ -137,13 +138,14 @@ async function actorHealth(
 /**
  * Stable hydration/reconnect projection for UI and AI consumers.
  * D1 is read directly so a hibernated/missing Durable Object can never block
- * authoritative state reconstruction.
+ * authoritative state reconstruction. Paused campaigns can hydrate this
+ * projection while mutation services remain active-campaign-only.
  */
 export async function getCampaignGameReadModel(
   deps: GameReadModelDependencies,
   input: { campaignId: string; afterSequence?: number; eventLimit?: number },
 ) {
-  const context = await loadActiveGameContext(deps.db, input.campaignId);
+  const context = await loadPlayableGameContext(deps.db, input.campaignId);
   if (!context) throw new Error("CAMPAIGN_GAME_NOT_ACTIVE");
 
   const afterSequence = input.afterSequence ?? 0;

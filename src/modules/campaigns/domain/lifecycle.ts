@@ -256,6 +256,51 @@ export function completeCampaignStart(input: {
 }
 
 /**
+ * Freeze rule mutations while preserving the active session for table history,
+ * OOC conversation, and reconnect hydration.
+ */
+export function pauseCampaignPlay(
+  campaign: CampaignLifecycleSnapshot,
+): EngineResult<CampaignLifecycleSnapshot> {
+  if (campaign.status !== "active") {
+    return engineFailure(
+      "CAMPAIGN_PAUSE_INVALID_STATUS",
+      `Campaign ${campaign.id} cannot pause from status ${campaign.status}.`,
+      { path: "campaign.status" },
+    );
+  }
+  if (!campaign.worldId || campaign.startedAt === null) {
+    return engineFailure(
+      "CAMPAIGN_PAUSE_RUNTIME_REQUIRED",
+      "An active campaign must have a generated world and start timestamp before it can be paused.",
+      { path: "campaign" },
+    );
+  }
+  return engineSuccess({ ...campaign, status: "paused" });
+}
+
+/** Resume authoritative rules-engine actions without creating a new session. */
+export function resumeCampaignPlay(
+  campaign: CampaignLifecycleSnapshot,
+): EngineResult<CampaignLifecycleSnapshot> {
+  if (campaign.status !== "paused") {
+    return engineFailure(
+      "CAMPAIGN_RESUME_INVALID_STATUS",
+      `Campaign ${campaign.id} cannot resume from status ${campaign.status}.`,
+      { path: "campaign.status" },
+    );
+  }
+  if (!campaign.worldId || campaign.startedAt === null) {
+    return engineFailure(
+      "CAMPAIGN_RESUME_RUNTIME_REQUIRED",
+      "A paused campaign must retain its generated world and start timestamp before it can resume.",
+      { path: "campaign" },
+    );
+  }
+  return engineSuccess({ ...campaign, status: "active" });
+}
+
+/**
  * Recover from failed world generation. The persistence transaction must also
  * remove or archive the failed world so a later start can allocate a new one.
  */

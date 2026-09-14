@@ -228,6 +228,27 @@ try {
   assert.match(await invalid.text(), /no more than 5 campaign styles/i);
   console.log("✓ campaign E2E: server rejects more than five campaign styles");
 
+  const wrongDelete = await page.request.delete(`${origin}/api/campaigns/${campaign.id}`, {
+    headers: { Origin: origin },
+    data: { confirmationName: "ashes of the north" },
+  });
+  assert.equal(wrongDelete.status(), 422);
+  assert.match(await wrongDelete.text(), /enter the campaign name exactly/i);
+  console.log("✓ campaign E2E: server rejects an inexact deletion confirmation");
+
+  await page.getByRole("button", { name: /Back to campaigns/ }).click();
+  await page.getByRole("heading", { name: "Your Campaigns" }).waitFor();
+  await page.getByRole("button", { name: "Delete Ashes of the North", exact: true }).click();
+  const confirmation = page.getByLabel("Campaign name confirmation", { exact: true });
+  await confirmation.fill("Wrong campaign name");
+  assert.equal(await page.getByRole("button", { name: "Delete campaign", exact: true }).isDisabled(), true);
+  await confirmation.fill("Ashes of the North");
+  await page.getByRole("button", { name: "Delete campaign", exact: true }).click();
+  await page.getByRole("heading", { name: "Ashes of the North" }).waitFor({ state: "detached" });
+  const afterDelete = await api(page, "GET", "/api/campaigns");
+  assert.equal(afterDelete.items.some((entry) => entry.id === campaign.id), false);
+  console.log("✓ campaign E2E: typed-name confirmation deletes the campaign");
+
   assert.deepEqual(pageErrors, []);
   console.log("\n✓ Campaign creator MVP end-to-end verification passed.");
 } finally {

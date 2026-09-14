@@ -137,31 +137,25 @@ DISCORD_CLIENT_SECRET=
 
 
 # -----------------------------------------------------------------------------
-# Weekly AI devblog writer - server-only
+# AI workflows - server-only
 # -----------------------------------------------------------------------------
 #
 # Production uses the Cloudflare Workers AI binding configured in wrangler.jsonc.
 # That is the default/free setup and requires NO AI_API_KEY.
 #
-# The Devblog Studio also exposes an admin-only "Generate now" action.
-#
-# GITHUB_TOKEN is still required because the source repository is private.
-# Use a fine-grained, read-only token scoped only to this repository.
-# Never prefix it with VITE_.
-#
-
-# The production default is configured in wrangler.jsonc:
-#   @cf/google/gemma-4-26b-a4b-it
-# Override only if you intentionally want another Workers AI model.
+# AI_DEVBLOG_MODEL controls the weekly/admin devblog writer.
+# AI_GAME_MODEL controls the in-campaign AI Dungeon Master.
+# The production defaults are configured in wrangler.jsonc.
 AI_DEVBLOG_MODEL=
+AI_GAME_MODEL=
 
 # Optional fallback for development or a non-Cloudflare deployment.
 # Leave blank when using the Workers AI binding.
 AI_API_KEY=
 AI_BASE_URL=
 
-# Private repository source material. In production wrangler.jsonc already supplies
-# the repository name, but it can be overridden per environment.
+# Private repository source material for the weekly devblog writer. In production
+# wrangler.jsonc already supplies the repository name, but it can be overridden.
 GITHUB_REPOSITORY=SinLess-Games/ai-dungeon-master
 GITHUB_TOKEN=
 

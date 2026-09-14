@@ -64,7 +64,7 @@ async function initiativeModifierForActor(
 export async function startActorEncounter(
   deps: EncounterServiceDependencies,
   input: { campaignId: string; participantIds: readonly string[] },
-): Promise<ActiveEncounterView> {
+): Promise<ActiveEncounterView & { eventId: string }> {
   if (input.participantIds.length === 0) {
     throw new RangeError("An encounter requires participants.");
   }
@@ -82,10 +82,7 @@ export async function startActorEncounter(
     .select({ id: gameEncounters.id })
     .from(gameEncounters)
     .where(
-      and(
-        eq(gameEncounters.sessionId, context.sessionId),
-        eq(gameEncounters.status, "active"),
-      ),
+      and(eq(gameEncounters.sessionId, context.sessionId), eq(gameEncounters.status, "active")),
     )
     .get();
   if (existing) throw new Error("ENCOUNTER_ALREADY_ACTIVE");
@@ -251,5 +248,6 @@ export async function startActorEncounter(
     activeTurnIndex: state.activeTurnIndex,
     currentCharacterId: current.characterId,
     participants: state.participants,
+    eventId,
   };
 }

@@ -21,7 +21,7 @@ CREATE TABLE `campaign_dm_actions` (
   FOREIGN KEY (`requested_user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade,
   FOREIGN KEY (`character_id`) REFERENCES `characters`(`id`) ON UPDATE no action ON DELETE cascade,
   CONSTRAINT `campaign_dm_actions_kind_valid` CHECK (`kind` IN ('check.skill', 'check.save')),
-  CONSTRAINT `campaign_dm_actions_status_valid` CHECK (`status` IN ('pending', 'resolved', 'failed', 'cancelled')),
+  CONSTRAINT `campaign_dm_actions_status_valid` CHECK (`status` IN ('pending', 'resolving', 'resolved', 'failed', 'cancelled')),
   CONSTRAINT `campaign_dm_actions_arguments_json_valid` CHECK (json_valid(`arguments`)),
   CONSTRAINT `campaign_dm_actions_result_json_valid` CHECK (`result` IS NULL OR json_valid(`result`))
 );

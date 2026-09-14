@@ -31,6 +31,7 @@ import {
   type CampaignPlayMessage,
   type CampaignPlayMessageChannel,
 } from "../client/campaignPlayApi";
+import { CampaignResolutionPanel } from "./CampaignResolutionPanel";
 
 type PlayChannel = "campaign" | "ooc" | "character";
 
@@ -225,6 +226,9 @@ export function CampaignPlayScreen({
       currentTurnActor &&
       currentTurnActor.controllerUserId === currentUserId,
   );
+  const canControlSelectedActor = Boolean(
+    currentUserId && selectedActor && selectedActor.controllerUserId === currentUserId,
+  );
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -418,11 +422,16 @@ export function CampaignPlayScreen({
 
             {channel === "character" ? (
               <CharacterChannel
+                campaignId={campaignId}
                 name={selectedCharacter?.name ?? "No character selected"}
                 status={selectedCharacter?.status ?? "unavailable"}
                 actor={selectedActor}
                 conditions={conditions}
                 initiative={initiative}
+                canControl={canControlSelectedActor}
+                onResolved={async () => {
+                  await game.refetch();
+                }}
               />
             ) : null}
 
@@ -491,7 +500,7 @@ export function CampaignPlayScreen({
                 <Sparkles className="h-4 w-4" /> Campaign play MVP
               </div>
               <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                Campaign and private OOC chat are persistent. AI and hybrid tables receive stored DM replies backed by current campaign context. Encounter turns use the authoritative command pipeline; free text never edits rules state directly.
+                Campaign and private OOC chat are persistent. AI and hybrid tables receive stored DM replies backed by current campaign context. Skill checks, saves, and encounter turns use the authoritative command pipeline; free text never edits rules state directly.
               </p>
             </div>
           </aside>
@@ -607,17 +616,23 @@ function EventCard({ event, actorName }: { event: CampaignGameEvent; actorName?:
 }
 
 function CharacterChannel({
+  campaignId,
   name,
   status,
   actor,
   conditions,
   initiative,
+  canControl,
+  onResolved,
 }: {
+  campaignId: string;
   name: string;
   status: string;
   actor: CampaignGameActor | null;
   conditions: Array<{ id: string; conditionId: string; remainingRounds: number | null }>;
   initiative: CampaignEncounterParticipant | null;
+  canControl: boolean;
+  onResolved: () => Promise<unknown> | unknown;
 }) {
   return (
     <div className="flex-1 overflow-y-auto p-5 md:p-7">
@@ -674,10 +689,17 @@ function CharacterChannel({
         </StatCard>
       </div>
 
+      <CampaignResolutionPanel
+        campaignId={campaignId}
+        actor={actor}
+        enabled={canControl}
+        onResolved={onResolved}
+      />
+
       <div className="mt-5 rounded-xl border border-border bg-card/60 p-5">
         <h3 className="font-display text-xl">Live character snapshot</h3>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          This channel reflects authoritative runtime state. Inventory, spells, full sheet actions, and tactical controls can layer onto this surface without duplicating campaign state.
+          This channel reflects authoritative runtime state. Skill checks and saves above write through the rules engine; inventory, spells, full sheet actions, and tactical controls can layer onto the same surface without duplicating campaign state.
         </p>
       </div>
     </div>

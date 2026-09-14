@@ -13,6 +13,7 @@ import { feedbackRoutes } from "@/modules/feedback/server/routes";
 import { adminRoutes } from "@/modules/admin/server/routes";
 import { authRoutes, authHandler } from "@/modules/auth/server/routes";
 import type { AuthEnv } from "@/modules/auth/server/auth";
+import { campaignDeleteRoutes } from "@/modules/campaigns/server/deleteRoutes";
 import { campaignRoutes } from "@/modules/campaigns/server/routes";
 import { characterRoutes } from "@/modules/characters/server/routes";
 import { characterCreationRoutes } from "@/modules/characters/server/creationRoutes";
@@ -196,6 +197,7 @@ const routes = app
   .route("/", devblogAdminRoutes)
   .route("/", devblogAIRoutes)
   .route("/", campaignRoutes)
+  .route("/", campaignDeleteRoutes)
   .route("/", characterCreationRoutes)
   .route("/", characterRoutes)
   .route("/", actorRoutes)

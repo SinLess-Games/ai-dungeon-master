@@ -598,7 +598,10 @@ function ConversationChannel({
   loading: boolean;
   error: string | null;
 }) {
-  const names = useMemo(() => new Map(actors.map((actor) => [actor.id, actor.name])), [actors]);
+  const names = useMemo(
+    () => new globalThis.Map<string, string>(actors.map((actor) => [actor.id, actor.name] as const)),
+    [actors],
+  );
   return (
     <>
       <div className="border-b border-border px-5 py-4">

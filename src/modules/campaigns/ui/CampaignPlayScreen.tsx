@@ -1,5 +1,5 @@
-import { useMemo, useState, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   ArrowLeft,
@@ -16,17 +16,32 @@ import {
   UserRound,
   Users,
 } from "lucide-react";
+import { toast } from "sonner";
 import { getCampaign } from "../client/campaignCreatorApi";
 import {
   getCampaignGameState,
+  listCampaignPlayMessages,
+  sendCampaignPlayMessage,
+  type CampaignEncounter,
+  type CampaignEncounterParticipant,
   type CampaignGameActor,
   type CampaignGameEvent,
+  type CampaignPlayMessage,
+  type CampaignPlayMessageChannel,
 } from "../client/campaignPlayApi";
 
 type PlayChannel = "campaign" | "ooc" | "character";
 
+type TimelineEntry =
+  | { kind: "message"; id: string; at: number; message: CampaignPlayMessage }
+  | { kind: "event"; id: string; at: number; event: CampaignGameEvent };
+
+function epochMilliseconds(value: number) {
+  return value < 10_000_000_000 ? value * 1000 : value;
+}
+
 function eventTime(value: number) {
-  const date = new Date(value < 10_000_000_000 ? value * 1000 : value);
+  const date = new Date(epochMilliseconds(value));
   return Number.isNaN(date.getTime())
     ? ""
     : date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
@@ -46,6 +61,14 @@ function actorHealthLabel(actor: CampaignGameActor | null) {
   return `${actor.health.currentHitPoints}/${actor.health.maximumHitPoints} HP${temp}`;
 }
 
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "The table could not complete that request.";
+}
+
+function apiChannel(channel: PlayChannel): CampaignPlayMessageChannel {
+  return channel === "ooc" ? "ooc_dm" : "campaign";
+}
+
 export function CampaignPlayScreen({
   campaignId,
   onBack,
@@ -53,6 +76,7 @@ export function CampaignPlayScreen({
   campaignId: string;
   onBack: () => void;
 }) {
+  const queryClient = useQueryClient();
   const [channel, setChannel] = useState<PlayChannel>("campaign");
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const [composer, setComposer] = useState("");
@@ -70,7 +94,16 @@ export function CampaignPlayScreen({
     queryKey: ["campaigns", "play", campaignId, "state"],
     queryFn: () => getCampaignGameState(campaignId),
     enabled: playable,
-    refetchInterval: 5_000,
+    refetchInterval: 4_000,
+    retry: 1,
+  });
+
+  const messageChannel = apiChannel(channel);
+  const messages = useQuery({
+    queryKey: ["campaigns", "play", campaignId, "messages", messageChannel],
+    queryFn: () => listCampaignPlayMessages(campaignId, messageChannel),
+    enabled: playable && channel !== "character",
+    refetchInterval: 4_000,
   });
 
   const selectedCharacter = useMemo(() => {
@@ -81,9 +114,7 @@ export function CampaignPlayScreen({
 
   const selectedActor = useMemo(() => {
     if (!selectedCharacter) return null;
-    return (
-      game.data?.actors.find((actor) => actor.characterId === selectedCharacter.id) ?? null
-    );
+    return game.data?.actors.find((actor) => actor.characterId === selectedCharacter.id) ?? null;
   }, [game.data?.actors, selectedCharacter]);
 
   const conditions = useMemo(
@@ -96,12 +127,63 @@ export function CampaignPlayScreen({
 
   const initiative = useMemo(() => {
     if (!selectedActor || !game.data?.encounter) return null;
-    return (
-      game.data.encounter.participants.find(
-        (participant) => participant.actorId === selectedActor.id,
-      ) ?? null
-    );
+    return game.data.encounter.participants.find(
+      (participant) => participant.actorId === selectedActor.id,
+    ) ?? null;
   }, [game.data?.encounter, selectedActor]);
+
+  const timeline = useMemo<TimelineEntry[]>(() => {
+    const entries: TimelineEntry[] = (messages.data ?? []).map((message) => ({
+      kind: "message",
+      id: `message:${message.id}`,
+      at: epochMilliseconds(message.createdAt),
+      message,
+    }));
+    if (channel === "campaign") {
+      entries.push(
+        ...(game.data?.events ?? []).map((event) => ({
+          kind: "event" as const,
+          id: `event:${event.id}`,
+          at: epochMilliseconds(event.occurredAt),
+          event,
+        })),
+      );
+    }
+    return entries.sort((a, b) => a.at - b.at || a.id.localeCompare(b.id));
+  }, [channel, game.data?.events, messages.data]);
+
+  const send = useMutation({
+    mutationFn: () =>
+      sendCampaignPlayMessage(campaignId, {
+        channel: apiChannel(channel),
+        content: composer.trim(),
+        ...(channel === "campaign" && selectedCharacter
+          ? { characterId: selectedCharacter.id }
+          : {}),
+      }),
+    onSuccess: async (result) => {
+      setComposer("");
+      await queryClient.invalidateQueries({
+        queryKey: ["campaigns", "play", campaignId, "messages", apiChannel(channel)],
+      });
+      if (result.aiError) toast.warning(result.aiError);
+      else if (result.awaitingHumanDm) toast.info("Message sent. Waiting for the Game Master.");
+    },
+    onError: (error) => toast.error(errorMessage(error)),
+  });
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!composer.trim() || send.isPending || channel === "character") return;
+    send.mutate();
+  }
+
+  async function refreshTable() {
+    await Promise.all([
+      game.refetch(),
+      channel === "character" ? Promise.resolve() : messages.refetch(),
+    ]);
+  }
 
   if (detail.isLoading) {
     return <PlayState title="Opening the table…" body="Loading the campaign and party." />;
@@ -113,11 +195,7 @@ export function CampaignPlayScreen({
         title="Campaign could not be opened"
         body={detail.error?.message ?? "Campaign data was unavailable."}
         action={
-          <button
-            type="button"
-            onClick={onBack}
-            className="rounded-lg border border-border px-4 py-2.5 font-semibold"
-          >
+          <button type="button" onClick={onBack} className="rounded-lg border border-border px-4 py-2.5 font-semibold">
             Back to campaigns
           </button>
         }
@@ -133,11 +211,7 @@ export function CampaignPlayScreen({
         title="This campaign is not in play yet"
         body="Finish setup and start the campaign before entering the campaign table."
         action={
-          <button
-            type="button"
-            onClick={onBack}
-            className="rounded-lg border border-border px-4 py-2.5 font-semibold"
-          >
+          <button type="button" onClick={onBack} className="rounded-lg border border-border px-4 py-2.5 font-semibold">
             Back to campaigns
           </button>
         }
@@ -173,16 +247,16 @@ export function CampaignPlayScreen({
 
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1.5">
-              <Radio className={`h-3.5 w-3.5 ${game.isError ? "text-destructive" : "text-emerald-500"}`} />
-              {game.isError ? "State unavailable" : game.isFetching ? "Syncing" : "Live state"}
+              <Radio className={`h-3.5 w-3.5 ${game.isError ? "text-amber-500" : "text-emerald-500"}`} />
+              {game.isError ? "Chat live · game state unavailable" : game.isFetching ? "Syncing" : "Live table"}
             </span>
             <button
               type="button"
-              onClick={() => void game.refetch()}
+              onClick={() => void refreshTable()}
               className="grid h-8 w-8 place-items-center rounded-lg border border-border hover:text-gold"
-              aria-label="Refresh campaign state"
+              aria-label="Refresh campaign table"
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${game.isFetching ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-3.5 w-3.5 ${game.isFetching || messages.isFetching ? "animate-spin" : ""}`} />
             </button>
           </div>
         </header>
@@ -196,21 +270,30 @@ export function CampaignPlayScreen({
                 icon={<MessageSquare className="h-4 w-4" />}
                 label="Campaign"
                 detail="In-character table"
-                onClick={() => setChannel("campaign")}
+                onClick={() => {
+                  setChannel("campaign");
+                  setComposer("");
+                }}
               />
               <ChannelButton
                 active={channel === "ooc"}
                 icon={<Bot className="h-4 w-4" />}
                 label="OOC · DM"
-                detail="Talk to the DM"
-                onClick={() => setChannel("ooc")}
+                detail="Private DM chat"
+                onClick={() => {
+                  setChannel("ooc");
+                  setComposer("");
+                }}
               />
               <ChannelButton
                 active={channel === "character"}
                 icon={<UserRound className="h-4 w-4" />}
                 label="Character"
                 detail="Sheet & live state"
-                onClick={() => setChannel("character")}
+                onClick={() => {
+                  setChannel("character");
+                  setComposer("");
+                }}
               />
             </nav>
 
@@ -225,10 +308,7 @@ export function CampaignPlayScreen({
                       <button
                         key={character.id}
                         type="button"
-                        onClick={() => {
-                          setSelectedCharacterId(character.id);
-                          setChannel("character");
-                        }}
+                        onClick={() => setSelectedCharacterId(character.id)}
                         className={`w-full rounded-lg border px-3 py-2 text-left transition ${
                           selected
                             ? "border-gold/40 bg-gold/10"
@@ -249,15 +329,29 @@ export function CampaignPlayScreen({
 
           <section className="flex min-w-0 flex-col bg-background/15">
             {channel === "campaign" ? (
-              <CampaignChannel
-                events={game.data?.events ?? []}
+              <ConversationChannel
+                title="The Table"
+                eyebrow="Campaign channel"
+                description="In-character actions, dialogue, DM narration, and authoritative game events share one timeline."
+                timeline={timeline}
                 actors={game.data?.actors ?? []}
                 encounter={game.data?.encounter ?? null}
-                composer={composer}
-                setComposer={setComposer}
+                loading={messages.isLoading}
               />
             ) : null}
-            {channel === "ooc" ? <OocDmChannel composer={composer} setComposer={setComposer} /> : null}
+
+            {channel === "ooc" ? (
+              <ConversationChannel
+                title="OOC with the Dungeon Master"
+                eyebrow="Private channel"
+                description="Rules questions and table talk here are private to you and the Dungeon Master."
+                timeline={timeline}
+                actors={[]}
+                encounter={null}
+                loading={messages.isLoading}
+              />
+            ) : null}
+
             {channel === "character" ? (
               <CharacterChannel
                 name={selectedCharacter?.name ?? "No character selected"}
@@ -267,13 +361,34 @@ export function CampaignPlayScreen({
                 initiative={initiative}
               />
             ) : null}
+
+            {channel !== "character" ? (
+              <Composer
+                value={composer}
+                onChange={setComposer}
+                onSubmit={submit}
+                pending={send.isPending}
+                placeholder={
+                  channel === "campaign"
+                    ? "Speak in character or describe what you do…"
+                    : "Ask the Dungeon Master privately…"
+                }
+                note={
+                  channel === "campaign"
+                    ? selectedCharacter
+                      ? `Speaking as ${selectedCharacter.name}. Mechanical outcomes remain authoritative through the rules engine.`
+                      : "Send an in-character action or dialogue to the table."
+                    : "Only you and the Dungeon Master can hydrate this conversation."
+                }
+              />
+            ) : null}
           </section>
 
           <aside className="hidden border-l border-border bg-background/35 p-4 lg:block">
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">At a glance</p>
             <div className="mt-3 space-y-3">
               <SideCard icon={<Map className="h-4 w-4" />} title="World">
-                <p>{game.data?.worldId ? "Persistent world connected" : "World state loading"}</p>
+                <p>{game.data?.worldId ? "Persistent world connected" : "World state unavailable"}</p>
               </SideCard>
               <SideCard icon={<Users className="h-4 w-4" />} title="Party">
                 <p>{detail.data.characters.length} character{detail.data.characters.length === 1 ? "" : "s"}</p>
@@ -292,10 +407,10 @@ export function CampaignPlayScreen({
 
             <div className="mt-5 rounded-xl border border-gold/25 bg-gold/5 p-4">
               <div className="flex items-center gap-2 text-sm font-semibold text-gold">
-                <Sparkles className="h-4 w-4" /> Play screen foundation
+                <Sparkles className="h-4 w-4" /> Campaign play MVP
               </div>
               <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                Campaign state and character health are live. Persistent campaign chat and OOC DM transport are the next backend slice.
+                Campaign and private OOC chat are persistent. AI and hybrid tables receive stored DM replies backed by current campaign context; rules state still changes only through authoritative game commands.
               </p>
             </div>
           </aside>
@@ -305,27 +420,32 @@ export function CampaignPlayScreen({
   );
 }
 
-function CampaignChannel({
-  events,
+function ConversationChannel({
+  title,
+  eyebrow,
+  description,
+  timeline,
   actors,
   encounter,
-  composer,
-  setComposer,
+  loading,
 }: {
-  events: CampaignGameEvent[];
+  title: string;
+  eyebrow: string;
+  description: string;
+  timeline: TimelineEntry[];
   actors: CampaignGameActor[];
-  encounter: { roundNumber: number; currentActorId: string | null } | null;
-  composer: string;
-  setComposer: (value: string) => void;
+  encounter: CampaignEncounter | null;
+  loading: boolean;
 }) {
   const names = useMemo(() => new Map(actors.map((actor) => [actor.id, actor.name])), [actors]);
   return (
     <>
       <div className="border-b border-border px-5 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gold">Campaign channel</p>
-            <h2 className="mt-1 font-display text-2xl">The Table</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gold">{eyebrow}</p>
+            <h2 className="mt-1 font-display text-2xl">{title}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
           </div>
           {encounter ? (
             <span className="rounded-full border border-destructive/30 bg-destructive/10 px-3 py-1 text-xs font-semibold text-destructive">
@@ -336,60 +456,66 @@ function CampaignChannel({
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto p-5">
-        {events.length ? (
-          events.slice(-40).map((event) => (
-            <article key={event.id} className="rounded-xl border border-border bg-card/70 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-xs font-semibold text-gold">
-                  {event.actorId ? names.get(event.actorId) ?? "Campaign" : "Campaign"}
-                </span>
-                <span className="text-[11px] text-muted-foreground">{eventTime(event.occurredAt)}</span>
-              </div>
-              <p className="mt-2 text-sm leading-6 text-foreground/90">{eventTitle(event)}</p>
-              <p className="mt-2 text-[11px] uppercase tracking-wider text-muted-foreground">#{event.sequence} · {event.type}</p>
-            </article>
-          ))
+        {loading ? (
+          <p className="py-10 text-center text-sm text-muted-foreground">Loading conversation…</p>
+        ) : timeline.length ? (
+          timeline.map((entry) =>
+            entry.kind === "message" ? (
+              <MessageCard key={entry.id} message={entry.message} />
+            ) : (
+              <EventCard key={entry.id} event={entry.event} actorName={entry.event.actorId ? names.get(entry.event.actorId) : undefined} />
+            ),
+          )
         ) : (
           <EmptyFeed
             icon={<MessageSquare className="h-7 w-7" />}
-            title="The table is quiet"
-            body="Live campaign events will appear here as the session unfolds."
+            title="The conversation starts here"
+            body="Send a message below. Campaign messages persist with the world, and private OOC messages stay scoped to your DM conversation."
           />
         )}
       </div>
-
-      <Composer
-        value={composer}
-        onChange={setComposer}
-        placeholder="Speak in character or describe an action…"
-        note="Persistent campaign chat transport is not connected yet."
-      />
     </>
   );
 }
 
-function OocDmChannel({ composer, setComposer }: { composer: string; setComposer: (value: string) => void }) {
+function MessageCard({ message }: { message: CampaignPlayMessage }) {
+  const dm = message.authorKind === "dm";
+  const system = message.authorKind === "system";
   return (
-    <>
-      <div className="border-b border-border px-5 py-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gold">Private channel</p>
-        <h2 className="mt-1 font-display text-2xl">OOC with the Dungeon Master</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Ask rules questions, clarify intent, or talk to the DM outside the fiction.</p>
+    <article
+      className={`rounded-xl border p-4 ${
+        dm
+          ? "border-gold/30 bg-gold/5"
+          : system
+            ? "border-border bg-muted/20"
+            : "border-border bg-card/75"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${dm ? "text-gold" : "text-foreground"}`}>
+          {dm ? <Bot className="h-3.5 w-3.5" /> : <UserRound className="h-3.5 w-3.5" />}
+          {message.authorName}
+          {dm ? <span className="rounded bg-gold/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wider">DM</span> : null}
+        </span>
+        <span className="text-[11px] text-muted-foreground">{eventTime(message.createdAt)}</span>
       </div>
-      <div className="flex flex-1 items-center justify-center p-6">
-        <EmptyFeed
-          icon={<Bot className="h-8 w-8" />}
-          title="OOC DM channel is laid out"
-          body="The next slice will connect this private channel to the AI Dungeon Master and persist its conversation separately from campaign chat."
-        />
+      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground/90">{message.content}</p>
+    </article>
+  );
+}
+
+function EventCard({ event, actorName }: { event: CampaignGameEvent; actorName?: string }) {
+  return (
+    <article className="rounded-xl border border-dashed border-border bg-background/30 p-3.5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <Activity className="h-3.5 w-3.5" /> {actorName ?? "Rules engine"}
+        </span>
+        <span className="text-[11px] text-muted-foreground">{eventTime(event.occurredAt)}</span>
       </div>
-      <Composer
-        value={composer}
-        onChange={setComposer}
-        placeholder="Ask the DM out of character…"
-        note="OOC DM transport is not connected yet."
-      />
-    </>
+      <p className="mt-2 text-sm leading-6 text-foreground/80">{eventTitle(event)}</p>
+      <p className="mt-2 text-[10px] uppercase tracking-wider text-muted-foreground">#{event.sequence} · {event.type}</p>
+    </article>
   );
 }
 
@@ -404,56 +530,68 @@ function CharacterChannel({
   status: string;
   actor: CampaignGameActor | null;
   conditions: Array<{ id: string; conditionId: string; remainingRounds: number | null }>;
-  initiative: { initiativeTotal: number; turnOrder: number } | null;
+  initiative: CampaignEncounterParticipant | null;
 }) {
   return (
     <div className="flex-1 overflow-y-auto p-5 md:p-7">
-      <div className="mx-auto max-w-4xl">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gold">Character view</p>
-            <h2 className="mt-1 font-display text-3xl">{name}</h2>
-            <p className="mt-1 text-sm capitalize text-muted-foreground">{status}</p>
-          </div>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gold">Character channel</p>
+          <h2 className="mt-1 font-display text-3xl">{name}</h2>
+          <p className="mt-1 text-sm capitalize text-muted-foreground">{status} · {actor?.status ?? "not in live scene"}</p>
+        </div>
+        {initiative ? (
+          <span className="rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-sm font-semibold text-gold">
+            Initiative {initiative.initiativeTotal}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <StatCard icon={<Heart className="h-5 w-5" />} label="Health">
           {actor?.health ? (
-            <span className="rounded-full border border-border px-3 py-1.5 text-sm font-semibold capitalize">
-              {actor.health.state}
-            </span>
-          ) : null}
-        </div>
-
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard icon={<Heart className="h-5 w-5" />} label="Hit Points" value={actor?.health ? `${actor.health.currentHitPoints} / ${actor.health.maximumHitPoints}` : "—"} />
-          <StatCard icon={<Shield className="h-5 w-5" />} label="Temporary HP" value={actor?.health ? String(actor.health.temporaryHitPoints) : "—"} />
-          <StatCard icon={<Swords className="h-5 w-5" />} label="Initiative" value={initiative ? String(initiative.initiativeTotal) : "—"} />
-          <StatCard icon={<Activity className="h-5 w-5" />} label="Conditions" value={String(conditions.length)} />
-        </div>
-
-        <section className="mt-6 rounded-2xl border border-border bg-card/70 p-5">
-          <h3 className="font-display text-xl">Active conditions</h3>
+            <>
+              <strong className="text-2xl">{actor.health.currentHitPoints}/{actor.health.maximumHitPoints}</strong>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                {actor.health.temporaryHitPoints} temp · {actor.health.nonlethalDamage} nonlethal · {actor.health.state}
+              </span>
+            </>
+          ) : (
+            <span className="text-sm text-muted-foreground">No live health data</span>
+          )}
+        </StatCard>
+        <StatCard icon={<Shield className="h-5 w-5" />} label="Conditions">
           {conditions.length ? (
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {conditions.map((condition) => (
-                <span key={condition.id} className="rounded-full border border-border bg-background/50 px-3 py-1.5 text-sm">
-                  {condition.conditionId.replaceAll("_", " ")}
-                  {condition.remainingRounds === null ? "" : ` · ${condition.remainingRounds} rounds`}
+                <span key={condition.id} className="rounded-full border border-border px-2 py-1 text-xs">
+                  {condition.conditionId}{condition.remainingRounds === null ? "" : ` · ${condition.remainingRounds}r`}
                 </span>
               ))}
             </div>
           ) : (
-            <p className="mt-3 text-sm text-muted-foreground">No active conditions.</p>
+            <span className="text-sm text-muted-foreground">No active conditions</span>
           )}
-        </section>
+        </StatCard>
+        <StatCard icon={<Swords className="h-5 w-5" />} label="Turn state">
+          {initiative ? (
+            <div className="space-y-1 text-sm">
+              <p>Initiative: <strong>{initiative.initiativeTotal}</strong></p>
+              <p className="text-muted-foreground">
+                Standard {initiative.actionEconomy.standardAvailable ? "✓" : "—"} · Move {initiative.actionEconomy.moveAvailable ? "✓" : "—"} · Swift {initiative.actionEconomy.swiftAvailable ? "✓" : "—"}
+              </p>
+            </div>
+          ) : (
+            <span className="text-sm text-muted-foreground">Not currently in initiative</span>
+          )}
+        </StatCard>
+      </div>
 
-        <section className="mt-4 rounded-2xl border border-border bg-card/70 p-5">
-          <h3 className="font-display text-xl">Live combat state</h3>
-          <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
-            <InfoLine label="Actor status" value={actor?.status ?? "Not hydrated"} />
-            <InfoLine label="Turn order" value={initiative ? String(initiative.turnOrder + 1) : "Not in encounter"} />
-            <InfoLine label="Stable" value={actor?.health ? (actor.health.stable ? "Yes" : "No") : "—"} />
-            <InfoLine label="Nonlethal" value={actor?.health ? String(actor.health.nonlethalDamage) : "—"} />
-          </div>
-        </section>
+      <div className="mt-5 rounded-xl border border-border bg-card/60 p-5">
+        <h3 className="font-display text-xl">Live character snapshot</h3>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          This channel reflects authoritative runtime state. Inventory, spells, full sheet actions, and tactical controls can layer onto this surface without duplicating campaign state.
+        </p>
       </div>
     </div>
   );
@@ -462,35 +600,42 @@ function CharacterChannel({
 function Composer({
   value,
   onChange,
+  onSubmit,
+  pending,
   placeholder,
   note,
 }: {
   value: string;
   onChange: (value: string) => void;
+  onSubmit: (event: FormEvent) => void;
+  pending: boolean;
   placeholder: string;
   note: string;
 }) {
   return (
-    <div className="border-t border-border bg-card/60 p-4">
-      <div className="flex gap-2">
+    <form onSubmit={onSubmit} className="border-t border-border bg-background/55 p-4">
+      <div className="rounded-xl border border-border bg-card p-2 focus-within:border-gold/40">
         <textarea
-          rows={2}
+          aria-label="Campaign play message"
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
-          className="min-h-14 flex-1 resize-none rounded-xl border border-border bg-background/70 px-3 py-2.5 text-sm outline-none focus:border-gold/50"
+          maxLength={4000}
+          rows={3}
+          className="w-full resize-none bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-muted-foreground"
         />
-        <button
-          type="button"
-          disabled
-          title={note}
-          className="grid w-12 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground opacity-40"
-        >
-          <Send className="h-4 w-4" />
-        </button>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-2 pt-2">
+          <span className="text-[11px] text-muted-foreground">{note}</span>
+          <button
+            type="submit"
+            disabled={!value.trim() || pending}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Send className="h-4 w-4" /> {pending ? "DM is responding…" : "Send"}
+          </button>
+        </div>
       </div>
-      <p className="mt-2 text-[11px] text-muted-foreground">{note}</p>
-    </div>
+    </form>
   );
 }
 
@@ -511,14 +656,16 @@ function ChannelButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition ${
-        active ? "border-gold/40 bg-gold/10" : "border-transparent hover:border-border hover:bg-muted/30"
+      className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition ${
+        active
+          ? "border-gold/30 bg-gold/10 text-foreground"
+          : "border-transparent text-muted-foreground hover:border-border hover:bg-muted/30 hover:text-foreground"
       }`}
     >
-      <span className={active ? "text-gold" : "text-muted-foreground"}>{icon}</span>
+      <span className={active ? "text-gold" : ""}>{icon}</span>
       <span className="min-w-0">
-        <strong className="block truncate text-sm">{label}</strong>
-        <small className="block truncate text-[11px] text-muted-foreground">{detail}</small>
+        <span className="block text-sm font-semibold">{label}</span>
+        <span className="block truncate text-[11px] opacity-75">{detail}</span>
       </span>
     </button>
   );
@@ -526,40 +673,34 @@ function ChannelButton({
 
 function SideCard({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
   return (
-    <section className="rounded-xl border border-border bg-card/60 p-3">
-      <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-        {icon}
-        {title}
+    <div className="rounded-xl border border-border bg-card/60 p-3.5">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {icon} {title}
       </div>
-      <div className="mt-2 text-sm font-medium">{children}</div>
-    </section>
+      <div className="mt-2 text-sm text-foreground/90">{children}</div>
+    </div>
   );
 }
 
-function StatCard({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+function StatCard({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
   return (
-    <section className="rounded-2xl border border-border bg-card/70 p-4">
-      <div className="flex items-center gap-2 text-gold">{icon}<span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</span></div>
-      <p className="mt-3 font-display text-2xl">{value}</p>
-    </section>
-  );
-}
-
-function InfoLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-background/35 px-3 py-2">
-      <span className="text-muted-foreground">{label}</span>
-      <strong className="capitalize">{value}</strong>
+    <div className="rounded-xl border border-border bg-card/75 p-4">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gold">
+        {icon} {label}
+      </div>
+      <div className="mt-3">{children}</div>
     </div>
   );
 }
 
 function EmptyFeed({ icon, title, body }: { icon: ReactNode; title: string; body: string }) {
   return (
-    <div className="mx-auto max-w-lg rounded-2xl border border-dashed border-border p-8 text-center">
-      <div className="mx-auto grid h-14 w-14 place-items-center rounded-full border border-gold/30 bg-gold/10 text-gold">{icon}</div>
-      <h3 className="mt-4 font-display text-xl">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">{body}</p>
+    <div className="grid min-h-64 place-items-center rounded-xl border border-dashed border-border p-8 text-center">
+      <div>
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-full border border-gold/20 bg-gold/5 text-gold">{icon}</div>
+        <h3 className="mt-4 font-display text-xl">{title}</h3>
+        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">{body}</p>
+      </div>
     </div>
   );
 }

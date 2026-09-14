@@ -203,3 +203,13 @@ export function startCampaign(campaignId: string): Promise<{
     method: "POST",
   });
 }
+
+export function deleteCampaign(
+  campaignId: string,
+  confirmationName: string,
+): Promise<{ deleted: true; campaignId: string; name: string }> {
+  return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}`, {
+    method: "DELETE",
+    body: JSON.stringify({ confirmationName }),
+  });
+}

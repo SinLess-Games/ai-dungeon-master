@@ -105,12 +105,45 @@ export interface CreatedCampaign {
   settings: Record<string, unknown>;
 }
 
+export interface CampaignListItem {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  status: string;
+  playMode: CampaignPlayMode;
+  gameMasterMode: CampaignGameMasterMode;
+  rulesetId: string;
+  rulesetVersion: string;
+  worldId: string | null;
+  updatedAt: string | number | null;
+  createdAt: string | number;
+}
+
+export interface CampaignDetailResponse {
+  campaign: CreatedCampaign & {
+    rulesetId: string;
+    rulesetVersion: string;
+    worldId: string | null;
+  };
+  characters: Array<{
+    id: string;
+    name: string;
+    status: string;
+    ownerUserId: string | null;
+    rulesetId: string;
+    rulesetVersion: string;
+    readyAt: string | number | null;
+  }>;
+  world: Record<string, unknown> | null;
+}
+
 interface ErrorEnvelope {
   error?: string | { message?: string };
   message?: string;
 }
 
-async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
+export async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
   const response = await fetch(input, {
     credentials: "same-origin",
     headers: { "Content-Type": "application/json", ...init?.headers },
@@ -149,5 +182,24 @@ export function updateCampaign(
   return requestJson<CreatedCampaign>(`/api/campaigns/${encodeURIComponent(campaignId)}`, {
     method: "PATCH",
     body: JSON.stringify(input),
+  });
+}
+
+export async function listCampaigns(): Promise<CampaignListItem[]> {
+  const response = await requestJson<{ items: CampaignListItem[] }>("/api/campaigns");
+  return response.items;
+}
+
+export function getCampaign(campaignId: string): Promise<CampaignDetailResponse> {
+  return requestJson<CampaignDetailResponse>(`/api/campaigns/${encodeURIComponent(campaignId)}`);
+}
+
+export function startCampaign(campaignId: string): Promise<{
+  campaignId: string;
+  worldId: string;
+  status: string;
+}> {
+  return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/start`, {
+    method: "POST",
   });
 }

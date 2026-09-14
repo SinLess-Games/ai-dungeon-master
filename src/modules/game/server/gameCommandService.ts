@@ -204,9 +204,7 @@ export async function executeGameCommand(
           actorId: command.actorId,
           castingTrackId: command.castingTrackId,
           powerId: command.powerId,
-          ...(command.augmentations === undefined
-            ? {}
-            : { augmentations: command.augmentations }),
+          ...(command.augmentations === undefined ? {} : { augmentations: command.augmentations }),
           ...(command.targetIds === undefined ? {} : { targetIds: command.targetIds }),
         }),
       };

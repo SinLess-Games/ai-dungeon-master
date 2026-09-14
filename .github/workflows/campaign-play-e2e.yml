@@ -1,0 +1,61 @@
+name: Campaign Play E2E
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/campaign-play-e2e.yml"
+      - "drizzle/**"
+      - "package.json"
+      - "package-lock.json"
+      - "src/app/routes/campaigns/**"
+      - "src/infrastructure/ai/**"
+      - "src/infrastructure/database/**"
+      - "src/modules/campaigns/**"
+      - "src/modules/game/**"
+      - "src/modules/auth/**"
+      - "src/server/**"
+      - "tests/e2e/campaign-play.e2e.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: campaign-play-e2e-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  campaign-play-e2e:
+    name: campaign-play-e2e
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Campaign Play MVP browser and API E2E
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:e2e:campaign-play 2>&1 | tee campaign-play-e2e.log
+
+      - name: Upload failing E2E log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: campaign-play-e2e-log
+          path: campaign-play-e2e.log
+          if-no-files-found: warn

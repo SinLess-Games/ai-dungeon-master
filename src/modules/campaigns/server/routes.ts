@@ -43,6 +43,7 @@ interface CampaignBindings extends AuthEnv {
 }
 
 type CampaignEnv = { Bindings: CampaignBindings };
+type CampaignAccessRole = "owner" | "gm" | "player" | "observer";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -403,6 +404,29 @@ async function requireCampaignAccess(input: {
   return campaign;
 }
 
+async function campaignAccessRole(input: {
+  db: ReturnType<typeof createDatabase>;
+  campaignId: string;
+  userId: string;
+  ownerUserId: string;
+}): Promise<CampaignAccessRole> {
+  if (input.ownerUserId === input.userId) return "owner";
+  const membership = await input.db
+    .select({ role: campaignMemberships.role, status: campaignMemberships.status })
+    .from(campaignMemberships)
+    .where(
+      and(
+        eq(campaignMemberships.campaignId, input.campaignId),
+        eq(campaignMemberships.userId, input.userId),
+      ),
+    )
+    .get();
+  if (!membership || membership.status !== "active") {
+    throw new ForbiddenError("You do not have access to this campaign.");
+  }
+  return membership.role;
+}
+
 function throwStartFailure(
   errors: readonly { code: string; message: string; path?: string; details?: unknown }[],
 ): never {
@@ -512,7 +536,7 @@ export const campaignRoutes = new Hono<CampaignEnv>()
       campaignId: c.req.param("campaignId"),
       userId: session.user.id,
     });
-    const [campaignCharacters, world] = await Promise.all([
+    const [campaignCharacters, world, role] = await Promise.all([
       db
         .select({
           id: characters.id,
@@ -529,8 +553,14 @@ export const campaignRoutes = new Hono<CampaignEnv>()
       campaign.worldId
         ? db.select().from(worlds).where(eq(worlds.id, campaign.worldId)).get()
         : Promise.resolve(undefined),
+      campaignAccessRole({
+        db,
+        campaignId: campaign.id,
+        userId: session.user.id,
+        ownerUserId: campaign.ownerUserId,
+      }),
     ]);
-    return c.json({ campaign, characters: campaignCharacters, world: world ?? null });
+    return c.json({ campaign, characters: campaignCharacters, world: world ?? null, role });
   })
   .patch("/api/campaigns/:campaignId", zValidator("json", updateCampaignSchema), async (c) => {
     const session = await requireUser(createAuth(c.env), c.req.raw.headers);

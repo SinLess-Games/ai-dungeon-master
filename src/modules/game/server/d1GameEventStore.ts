@@ -168,7 +168,8 @@ function healthUpdate(db: D1Database, event: GameEventWrite, mutation: HealthMut
        WHERE character_id = ?
          AND current_hit_points = ?
          AND temporary_hit_points = ?
-         AND nonlethal_damage = ?`,
+         AND nonlethal_damage = ?
+         AND EXISTS (SELECT 1 FROM game_events WHERE id = ?)`,
     )
     .bind(
       mutation.next.currentHitPoints,
@@ -179,6 +180,7 @@ function healthUpdate(db: D1Database, event: GameEventWrite, mutation: HealthMut
       mutation.expected.currentHitPoints,
       mutation.expected.temporaryHitPoints,
       mutation.expected.nonlethalDamage,
+      event.id,
     );
 }
 
@@ -194,7 +196,8 @@ function encounterActionUpdate(
        SET standard_available = ?, move_available = ?, swift_available = ?,
            swift_debt_next_turn = ?, attacks_of_opportunity_per_round = ?,
            attacks_of_opportunity_remaining = ?, last_turn_round = ?, updated_at = ?
-       WHERE encounter_id = ? AND actor_id = ? AND ${guard.sql}`,
+       WHERE encounter_id = ? AND actor_id = ? AND ${guard.sql}
+         AND EXISTS (SELECT 1 FROM game_events WHERE id = ?)`,
     )
     .bind(
       booleanInt(mutation.next.standardAvailable),
@@ -208,6 +211,7 @@ function encounterActionUpdate(
       mutation.encounterId,
       mutation.characterId,
       ...guard.bindings,
+      event.id,
     );
 }
 

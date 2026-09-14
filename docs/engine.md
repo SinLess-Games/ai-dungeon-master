@@ -38,6 +38,11 @@ Persistent state remains owned by D1/application repositories. The engine takes 
 
 `random.ts` provides an injectable random source and deterministic seeded PRNG. `dice.ts` parses and rolls bounded single-group tabletop notation such as `d20`, `2d6+3`, and `d%`.
 
+`parseDiceFormula` and `rollDiceFormula` also support signed dice groups and flat
+modifiers using the existing configurable engine limits. Structured formulas are
+validated before consuming randomness. The personal dice UI uses the narrower
+`diceNotation.ts` limits described below.
+
 `diceNotation.ts` layers additive expressions over those primitives without changing
 the existing `rollDice` contract. `parseDiceNotation` validates and normalizes dice
 groups and signed integer modifiers, with a minimum/maximum total.

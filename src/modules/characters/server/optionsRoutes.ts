@@ -29,10 +29,7 @@ import {
 } from "@/infrastructure/database/schema";
 import { createAuth, type AuthEnv } from "@/modules/auth/server/auth";
 import { requireUser } from "@/modules/auth/server/requireAuth";
-import {
-  pointBuyBudgets,
-  rollAbilitySet,
-} from "@/modules/characters/domain/abilityGeneration";
+import { pointBuyBudgets, rollAbilitySet } from "@/modules/characters/domain/abilityGeneration";
 import { ServiceUnavailableError } from "@/server/middleware/errors";
 
 interface CharacterOptionBindings extends AuthEnv {
@@ -55,238 +52,228 @@ function visibleToUser(ownerUserId: AnySQLiteColumn, userId: string) {
   return or(isNull(ownerUserId), eq(ownerUserId, userId));
 }
 
+export async function loadCharacterCreationOptions(
+  db: ReturnType<typeof createDatabase>,
+  userId: string,
+) {
+  const [
+    raceRows,
+    racialAbilityRows,
+    racialTraitRows,
+    classRows,
+    prerequisiteRows,
+    classSkillRows,
+    wealthRows,
+  ] = await Promise.all([
+    db
+      .select({
+        id: races.id,
+        sourceId: races.sourceId,
+        sourcePage: races.sourcePage,
+        sourceName: sources.name,
+        sourceAbbreviation: sources.abbreviation,
+        name: races.name,
+        description: races.description,
+        rulesText: races.rulesText,
+        size: races.size,
+        baseSpeedFeet: races.baseSpeedFeet,
+        levelAdjustment: races.levelAdjustment,
+        racialHitDice: races.racialHitDice,
+        racialHitDie: races.racialHitDie,
+        naturalArmor: races.naturalArmor,
+        isHomebrew: races.isHomebrew,
+      })
+      .from(races)
+      .leftJoin(sources, eq(races.sourceId, sources.id))
+      .where(and(eq(races.isEnabled, true), visibleToUser(races.ownerUserId, userId)))
+      .orderBy(asc(races.levelAdjustment), asc(races.name))
+      .all(),
+    db
+      .select({
+        raceId: raceAbilities.raceId,
+        ability: raceAbilities.ability,
+        modifier: raceAbilities.modifier,
+      })
+      .from(raceAbilities)
+      .innerJoin(races, eq(raceAbilities.raceId, races.id))
+      .where(and(eq(races.isEnabled, true), visibleToUser(races.ownerUserId, userId)))
+      .all(),
+    db
+      .select({
+        id: raceTraits.id,
+        raceId: raceTraits.raceId,
+        name: raceTraits.name,
+        rulesText: raceTraits.rulesText,
+        position: raceTraits.position,
+        specialAbilityId: raceTraits.specialAbilityId,
+        specialAbilityName: specialAbilities.name,
+        specialAbilityDescription: specialAbilities.description,
+        specialAbilityRulesText: specialAbilities.rulesText,
+        specialAbilityCategory: specialAbilities.category,
+        specialAbilityActionType: specialAbilities.actionType,
+      })
+      .from(raceTraits)
+      .innerJoin(races, eq(raceTraits.raceId, races.id))
+      .leftJoin(specialAbilities, eq(raceTraits.specialAbilityId, specialAbilities.id))
+      .where(and(eq(races.isEnabled, true), visibleToUser(races.ownerUserId, userId)))
+      .orderBy(asc(raceTraits.raceId), asc(raceTraits.position))
+      .all(),
+    db
+      .select({
+        id: classes.id,
+        slug: classes.slug,
+        name: classes.name,
+        description: classes.description,
+        rulesText: classes.rulesText,
+        category: classes.category,
+        hitDie: classes.hitDie,
+        skillPointsPerLevel: classes.skillPointsPerLevel,
+        babProgression: classes.babProgression,
+        fortProgression: classes.fortProgression,
+        refProgression: classes.refProgression,
+        willProgression: classes.willProgression,
+        isHomebrew: classes.isHomebrew,
+        classLevelId: classLevels.id,
+        levelOneHitDie: classLevels.hitDie,
+        levelOneSkillPoints: classLevels.skillPoints,
+      })
+      .from(classes)
+      .innerJoin(sources, eq(classes.sourceId, sources.id))
+      .innerJoin(classLevels, and(eq(classLevels.classId, classes.id), eq(classLevels.level, 1)))
+      .where(
+        and(
+          eq(classes.isEnabled, true),
+          eq(classes.category, "base"),
+          eq(sources.edition, "3.5"),
+          visibleToUser(classes.ownerUserId, userId),
+        ),
+      )
+      .orderBy(asc(classes.name))
+      .all(),
+    db
+      .select({
+        classId: classPrerequisites.classId,
+        expression: classPrerequisites.expression,
+        explanation: classPrerequisites.explanation,
+      })
+      .from(classPrerequisites)
+      .all(),
+    db
+      .select({ classId: classSkills.classId, id: skills.id, slug: skills.slug, name: skills.name })
+      .from(classSkills)
+      .innerJoin(skills, eq(classSkills.skillId, skills.id))
+      .where(and(eq(skills.isEnabled, true), visibleToUser(skills.ownerUserId, userId)))
+      .orderBy(asc(skills.name))
+      .all(),
+    db
+      .select({
+        classId: classStartingWealth.classId,
+        diceCount: classStartingWealth.diceCount,
+        dieSides: classStartingWealth.dieSides,
+        multiplierGp: classStartingWealth.multiplierGp,
+      })
+      .from(classStartingWealth)
+      .all(),
+  ]);
+
+  const modifiersByRace = new Map<string, Record<string, number>>();
+  for (const row of racialAbilityRows) {
+    const modifiers = modifiersByRace.get(row.raceId) ?? {};
+    modifiers[row.ability] = row.modifier;
+    modifiersByRace.set(row.raceId, modifiers);
+  }
+
+  const traitsByRace = new Map<string, typeof racialTraitRows>();
+  for (const row of racialTraitRows) {
+    const list = traitsByRace.get(row.raceId) ?? [];
+    list.push(row);
+    traitsByRace.set(row.raceId, list);
+  }
+
+  const skillsByClass = new Map<string, Array<{ id: string; slug: string; name: string }>>();
+  for (const row of classSkillRows) {
+    const list = skillsByClass.get(row.classId) ?? [];
+    list.push({ id: row.id, slug: row.slug, name: row.name });
+    skillsByClass.set(row.classId, list);
+  }
+  const wealthByClass = new Map(
+    wealthRows.map(({ classId, diceCount, dieSides, multiplierGp }) => [
+      classId,
+      { diceCount, dieSides, multiplierGp },
+    ]),
+  );
+  const prerequisitesByClass = new Map(prerequisiteRows.map((row) => [row.classId, row]));
+  const maximumLevelAdjustment = Math.max(0, ...raceRows.map((race) => race.levelAdjustment ?? 0));
+
+  return {
+    races: raceRows.map((race) => {
+      const racialTraits = traitsByRace.get(race.id) ?? [];
+      const traitDetails = racialTraits.map((trait) => {
+        const linkedRules = trait.specialAbilityRulesText?.trim();
+        const traitRules = trait.rulesText.trim();
+        if (!linkedRules || linkedRules === traitRules) return `${trait.name}: ${traitRules}`;
+        return `${trait.name}: ${traitRules} Special ability: ${linkedRules}`;
+      });
+      const sourceLabel = race.sourceAbbreviation ?? race.sourceName ?? race.sourceId;
+      const expandedDescription = [
+        race.description,
+        sourceLabel
+          ? `Source: ${sourceLabel}${race.sourcePage ? ` p. ${race.sourcePage}` : ""}.`
+          : "",
+        traitDetails.length
+          ? `Racial traits and special abilities: ${traitDetails.join(" • ")}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      return {
+        ...race,
+        description: expandedDescription,
+        abilityModifiers: modifiersByRace.get(race.id) ?? {},
+        racialTraits,
+      };
+    }),
+    classes: classRows.map((characterClass) => {
+      const prerequisite = prerequisitesByClass.get(characterClass.id);
+      const condition = prerequisite?.expression.condition;
+      const allowedAlignments = condition?.kind === "alignment" ? condition.allowed : alignments;
+      const wealth = wealthByClass.get(characterClass.id) ?? null;
+      return {
+        ...characterClass,
+        firstLevelHitPoints: characterClass.levelOneHitDie ?? characterClass.hitDie,
+        firstLevelSkillPoints:
+          characterClass.levelOneSkillPoints ?? characterClass.skillPointsPerLevel,
+        allowedAlignments,
+        prerequisiteExplanation: prerequisite?.explanation ?? null,
+        classSkills: skillsByClass.get(characterClass.id) ?? [],
+        startingWealth: wealth,
+      };
+    }),
+    alignments,
+    abilityGeneration: {
+      standardArray: [15, 14, 13, 12, 10, 8],
+      pointBuyBudgets,
+      rollMethods: ["roll-4d6-drop-lowest", "roll-4d6-reroll-1-2"],
+    },
+    maximumLevelAdjustment,
+    progressionModes: ["standard", "gestalt"],
+  };
+}
+
 export const characterOptionRoutes = new Hono<CharacterOptionEnv>()
   .get("/api/dnd35/character-creation-options", async (c) => {
     c.header("Cache-Control", "private, max-age=300");
     const session = await requireUser(createAuth(c.env), c.req.raw.headers);
     const db = createDatabase(requireDatabase(c.env.DB));
 
-    const [
-      raceRows,
-      racialAbilityRows,
-      racialTraitRows,
-      classRows,
-      prerequisiteRows,
-      classSkillRows,
-      wealthRows,
-    ] = await Promise.all([
-      db
-        .select({
-          id: races.id,
-          sourceId: races.sourceId,
-          sourcePage: races.sourcePage,
-          sourceName: sources.name,
-          sourceAbbreviation: sources.abbreviation,
-          name: races.name,
-          description: races.description,
-          rulesText: races.rulesText,
-          size: races.size,
-          baseSpeedFeet: races.baseSpeedFeet,
-          levelAdjustment: races.levelAdjustment,
-          racialHitDice: races.racialHitDice,
-          racialHitDie: races.racialHitDie,
-          naturalArmor: races.naturalArmor,
-          isHomebrew: races.isHomebrew,
-        })
-        .from(races)
-        .leftJoin(sources, eq(races.sourceId, sources.id))
-        .where(
-          and(
-            eq(races.isEnabled, true),
-            visibleToUser(races.ownerUserId, session.user.id),
-          ),
-        )
-        .orderBy(asc(races.levelAdjustment), asc(races.name))
-        .all(),
-      db
-        .select({
-          raceId: raceAbilities.raceId,
-          ability: raceAbilities.ability,
-          modifier: raceAbilities.modifier,
-        })
-        .from(raceAbilities)
-        .innerJoin(races, eq(raceAbilities.raceId, races.id))
-        .where(
-          and(
-            eq(races.isEnabled, true),
-            visibleToUser(races.ownerUserId, session.user.id),
-          ),
-        )
-        .all(),
-      db
-        .select({
-          id: raceTraits.id,
-          raceId: raceTraits.raceId,
-          name: raceTraits.name,
-          rulesText: raceTraits.rulesText,
-          position: raceTraits.position,
-          specialAbilityId: raceTraits.specialAbilityId,
-          specialAbilityName: specialAbilities.name,
-          specialAbilityDescription: specialAbilities.description,
-          specialAbilityRulesText: specialAbilities.rulesText,
-          specialAbilityCategory: specialAbilities.category,
-          specialAbilityActionType: specialAbilities.actionType,
-        })
-        .from(raceTraits)
-        .innerJoin(races, eq(raceTraits.raceId, races.id))
-        .leftJoin(specialAbilities, eq(raceTraits.specialAbilityId, specialAbilities.id))
-        .where(
-          and(
-            eq(races.isEnabled, true),
-            visibleToUser(races.ownerUserId, session.user.id),
-          ),
-        )
-        .orderBy(asc(raceTraits.raceId), asc(raceTraits.position))
-        .all(),
-      db
-        .select({
-          id: classes.id,
-          slug: classes.slug,
-          name: classes.name,
-          description: classes.description,
-          rulesText: classes.rulesText,
-          category: classes.category,
-          hitDie: classes.hitDie,
-          skillPointsPerLevel: classes.skillPointsPerLevel,
-          babProgression: classes.babProgression,
-          fortProgression: classes.fortProgression,
-          refProgression: classes.refProgression,
-          willProgression: classes.willProgression,
-          isHomebrew: classes.isHomebrew,
-          classLevelId: classLevels.id,
-          levelOneHitDie: classLevels.hitDie,
-          levelOneSkillPoints: classLevels.skillPoints,
-        })
-        .from(classes)
-        .innerJoin(sources, eq(classes.sourceId, sources.id))
-        .innerJoin(classLevels, and(eq(classLevels.classId, classes.id), eq(classLevels.level, 1)))
-        .where(
-          and(
-            eq(classes.isEnabled, true),
-            eq(classes.category, "base"),
-            eq(sources.edition, "3.5"),
-            visibleToUser(classes.ownerUserId, session.user.id),
-          ),
-        )
-        .orderBy(asc(classes.name))
-        .all(),
-      db
-        .select({
-          classId: classPrerequisites.classId,
-          expression: classPrerequisites.expression,
-          explanation: classPrerequisites.explanation,
-        })
-        .from(classPrerequisites)
-        .all(),
-      db
-        .select({ classId: classSkills.classId, id: skills.id, slug: skills.slug, name: skills.name })
-        .from(classSkills)
-        .innerJoin(skills, eq(classSkills.skillId, skills.id))
-        .where(and(eq(skills.isEnabled, true), visibleToUser(skills.ownerUserId, session.user.id)))
-        .orderBy(asc(skills.name))
-        .all(),
-      db
-        .select({
-          classId: classStartingWealth.classId,
-          diceCount: classStartingWealth.diceCount,
-          dieSides: classStartingWealth.dieSides,
-          multiplierGp: classStartingWealth.multiplierGp,
-        })
-        .from(classStartingWealth)
-        .all(),
-    ]);
-
-    const modifiersByRace = new Map<string, Record<string, number>>();
-    for (const row of racialAbilityRows) {
-      const modifiers = modifiersByRace.get(row.raceId) ?? {};
-      modifiers[row.ability] = row.modifier;
-      modifiersByRace.set(row.raceId, modifiers);
-    }
-
-    const traitsByRace = new Map<string, typeof racialTraitRows>();
-    for (const row of racialTraitRows) {
-      const list = traitsByRace.get(row.raceId) ?? [];
-      list.push(row);
-      traitsByRace.set(row.raceId, list);
-    }
-
-    const skillsByClass = new Map<string, Array<{ id: string; slug: string; name: string }>>();
-    for (const row of classSkillRows) {
-      const list = skillsByClass.get(row.classId) ?? [];
-      list.push({ id: row.id, slug: row.slug, name: row.name });
-      skillsByClass.set(row.classId, list);
-    }
-    const wealthByClass = new Map(
-      wealthRows.map(({ classId, diceCount, dieSides, multiplierGp }) => [
-        classId,
-        { diceCount, dieSides, multiplierGp },
-      ]),
-    );
-    const prerequisitesByClass = new Map(prerequisiteRows.map((row) => [row.classId, row]));
-    const maximumLevelAdjustment = Math.max(
-      0,
-      ...raceRows.map((race) => race.levelAdjustment ?? 0),
-    );
-
-    return c.json({
-      races: raceRows.map((race) => {
-        const racialTraits = traitsByRace.get(race.id) ?? [];
-        const traitDetails = racialTraits.map((trait) => {
-          const linkedRules = trait.specialAbilityRulesText?.trim();
-          const traitRules = trait.rulesText.trim();
-          if (!linkedRules || linkedRules === traitRules) return `${trait.name}: ${traitRules}`;
-          return `${trait.name}: ${traitRules} Special ability: ${linkedRules}`;
-        });
-        const sourceLabel = race.sourceAbbreviation ?? race.sourceName ?? race.sourceId;
-        const expandedDescription = [
-          race.description,
-          sourceLabel ? `Source: ${sourceLabel}${race.sourcePage ? ` p. ${race.sourcePage}` : ""}.` : "",
-          traitDetails.length ? `Racial traits and special abilities: ${traitDetails.join(" • ")}` : "",
-        ]
-          .filter(Boolean)
-          .join("\n\n");
-        return {
-          ...race,
-          description: expandedDescription,
-          abilityModifiers: modifiersByRace.get(race.id) ?? {},
-          racialTraits,
-        };
-      }),
-      classes: classRows.map((characterClass) => {
-        const prerequisite = prerequisitesByClass.get(characterClass.id);
-        const condition = prerequisite?.expression.condition;
-        const allowedAlignments = condition?.kind === "alignment" ? condition.allowed : alignments;
-        const wealth = wealthByClass.get(characterClass.id) ?? null;
-        return {
-          ...characterClass,
-          firstLevelHitPoints: characterClass.levelOneHitDie ?? characterClass.hitDie,
-          firstLevelSkillPoints: characterClass.levelOneSkillPoints ?? characterClass.skillPointsPerLevel,
-          allowedAlignments,
-          prerequisiteExplanation: prerequisite?.explanation ?? null,
-          classSkills: skillsByClass.get(characterClass.id) ?? [],
-          startingWealth: wealth,
-        };
-      }),
-      alignments,
-      abilityGeneration: {
-        standardArray: [15, 14, 13, 12, 10, 8],
-        pointBuyBudgets,
-        rollMethods: ["roll-4d6-drop-lowest", "roll-4d6-reroll-1-2"],
-      },
-      maximumLevelAdjustment,
-      progressionModes: ["standard", "gestalt"],
-    });
+    return c.json(await loadCharacterCreationOptions(db, session.user.id));
   })
-  .post(
-    "/api/dnd35/ability-generation/roll",
-    zValidator("json", abilityRollSchema),
-    async (c) => {
-      c.header("Cache-Control", "no-store");
-      await requireUser(createAuth(c.env), c.req.raw.headers);
-      const { method } = c.req.valid("json");
-      return c.json({ method, ...rollAbilitySet(method) });
-    },
-  )
+  .post("/api/dnd35/ability-generation/roll", zValidator("json", abilityRollSchema), async (c) => {
+    c.header("Cache-Control", "no-store");
+    await requireUser(createAuth(c.env), c.req.raw.headers);
+    const { method } = c.req.valid("json");
+    return c.json({ method, ...rollAbilitySet(method) });
+  })
   .get("/api/dnd35/character-creation-reference-options", async (c) => {
     c.header("Cache-Control", "private, max-age=300");
     const session = await requireUser(createAuth(c.env), c.req.raw.headers);
@@ -316,7 +303,9 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>()
         db
           .select({ id: skills.id, slug: skills.slug, name: skills.name })
           .from(skills)
-          .where(and(eq(skills.isEnabled, true), visibleToUser(skills.ownerUserId, session.user.id)))
+          .where(
+            and(eq(skills.isEnabled, true), visibleToUser(skills.ownerUserId, session.user.id)),
+          )
           .orderBy(asc(skills.name))
           .all(),
         db
@@ -340,7 +329,9 @@ export const characterOptionRoutes = new Hono<CharacterOptionEnv>()
         db
           .select({ id: spells.id, slug: spells.slug, name: spells.name })
           .from(spells)
-          .where(and(eq(spells.isEnabled, true), visibleToUser(spells.ownerUserId, session.user.id)))
+          .where(
+            and(eq(spells.isEnabled, true), visibleToUser(spells.ownerUserId, session.user.id)),
+          )
           .orderBy(asc(spells.name))
           .all(),
         db

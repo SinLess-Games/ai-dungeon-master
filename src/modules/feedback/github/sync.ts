@@ -46,6 +46,25 @@ const FEATURE_OPEN = new Set<FeatureRequestStatus>([
   "in_progress",
 ]);
 const FEATURE_CLOSED = new Set<FeatureRequestStatus>(["completed", "declined", "duplicate"]);
+const FEATURE_CATEGORIES = new Set<FeatureRequestCategory>([
+  "gameplay",
+  "ai",
+  "rules",
+  "maps",
+  "multiplayer",
+  "characters",
+  "worlds",
+  "campaigns",
+  "content",
+  "ui",
+  "mobile",
+  "desktop",
+  "billing",
+  "account",
+  "performance",
+  "accessibility",
+  "other",
+]);
 
 interface FeedbackMarker {
   type: GitHubFeedbackType;
@@ -140,17 +159,22 @@ function parseFeedbackMarker(body: string | null): FeedbackMarker | null {
   const match = body.match(
     /<!--\s*endless-codex-feedback\s+type="(bug|feature)"\s+id="([^"]+)"\s*-->/i,
   );
-  if (!match) return null;
-  return { type: match[1] as GitHubFeedbackType, id: match[2] };
+  const type = match?.[1];
+  const id = match?.[2];
+  if ((type !== "bug" && type !== "feature") || !id) return null;
+  return { type, id };
 }
 
 function extractSection(body: string, heading: string): string | undefined {
-  const marker = `## ${heading}`;
-  const start = body.indexOf(marker);
-  if (start < 0) return undefined;
-  const contentStart = start + marker.length;
+  const escapedHeading = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const headingPattern = new RegExp(`^#{2,3}\\s+${escapedHeading}\\s*$`, "im");
+  const headingMatch = headingPattern.exec(body);
+  if (!headingMatch) return undefined;
+  const contentStart = headingMatch.index + headingMatch[0].length;
   const remaining = body.slice(contentStart).replace(/^\s+/, "");
-  const boundary = remaining.search(/\n##\s|\n---(?:\n|$)|\n<!--\s*endless-codex-feedback/);
+  const boundary = remaining.search(
+    /\n#{2,3}\s+|\n---(?:\n|$)|\n<!--\s*endless-codex-feedback/,
+  );
   const value = (boundary >= 0 ? remaining.slice(0, boundary) : remaining).trim();
   return value || undefined;
 }
@@ -219,26 +243,7 @@ function featureCategoryFromIssue(issue: GitHubIssueSnapshot): FeatureRequestCat
   const value = issueLabels(issue)
     .find((label) => label.startsWith("category:"))
     ?.slice("category:".length);
-  const allowed = new Set<FeatureRequestCategory>([
-    "gameplay",
-    "ai",
-    "rules",
-    "maps",
-    "multiplayer",
-    "characters",
-    "worlds",
-    "campaigns",
-    "content",
-    "ui",
-    "mobile",
-    "desktop",
-    "billing",
-    "account",
-    "performance",
-    "accessibility",
-    "other",
-  ]);
-  return value && allowed.has(value as FeatureRequestCategory)
+  return value && FEATURE_CATEGORIES.has(value as FeatureRequestCategory)
     ? (value as FeatureRequestCategory)
     : "other";
 }
@@ -463,13 +468,18 @@ async function importGitHubIssue(
   const db = createDatabase(requireDatabase(env));
   const id = crypto.randomUUID();
   const body = issue.body?.trim() || `Imported from GitHub issue #${issue.number}.`;
-  const description = stripFeedbackMarker(body) || `Imported from GitHub issue #${issue.number}.`;
+  const description =
+    extractSection(body, "Description") ??
+    extractSection(body, "Problem to solve") ??
+    stripFeedbackMarker(body) ||
+    `Imported from GitHub issue #${issue.number}.`;
   if (feedbackType === "bug") {
     await db.insert(bugReports).values({
       id,
       reporterUserId: null,
       title: cleanImportedTitle(issue.title),
       description,
+      stepsToReproduce: extractSection(body, "Steps to reproduce") ?? null,
       status: bugStatusFromIssue(issue),
       severity: bugSeverityFromIssue(issue),
       platform: "unknown",
@@ -480,6 +490,8 @@ async function importGitHubIssue(
       requesterUserId: null,
       title: cleanImportedTitle(issue.title),
       description,
+      problem: extractSection(body, "Problem to solve") ?? null,
+      proposedSolution: extractSection(body, "Proposed solution") ?? null,
       status: featureStatusFromIssue(issue),
       impact: featureImpactFromIssue(issue),
       category: featureCategoryFromIssue(issue),
@@ -497,7 +509,10 @@ async function updateFeedbackFromIssue(
 ): Promise<void> {
   const db = createDatabase(requireDatabase(env));
   const body = issue.body ?? "";
-  const description = extractSection(body, "Description") ?? stripFeedbackMarker(body);
+  const description =
+    extractSection(body, "Description") ??
+    (feedbackType === "feature" ? extractSection(body, "Proposed solution") : undefined) ??
+    stripFeedbackMarker(body);
   const now = new Date();
 
   if (feedbackType === "bug") {
@@ -518,6 +533,7 @@ async function updateFeedbackFromIssue(
       .run();
   } else {
     const problem = extractSection(body, "Problem to solve");
+    const proposedSolution = extractSection(body, "Proposed solution");
     const status = featureStatusFromIssue(issue);
     await db
       .update(featureRequests)
@@ -525,6 +541,7 @@ async function updateFeedbackFromIssue(
         title: cleanImportedTitle(issue.title),
         ...(description ? { description } : {}),
         ...(problem !== undefined ? { problem } : {}),
+        ...(proposedSolution !== undefined ? { proposedSolution } : {}),
         status,
         impact: featureImpactFromIssue(issue),
         category: featureCategoryFromIssue(issue),

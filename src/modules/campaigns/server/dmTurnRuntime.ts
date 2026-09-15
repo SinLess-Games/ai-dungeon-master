@@ -1,6 +1,10 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import {
+  loadDmCampaignCharacterProfiles,
+  serializeDmCampaignCharacterProfiles,
+} from "./dmCharacterProfiles";
+import {
   loadDmToolActiveConditions,
   loadDmToolCharacterContext,
   loadDmToolEncounterContext,
@@ -154,15 +158,44 @@ function formatConversationRows(rows: readonly DmConversationRow[]): string {
     .join("\n");
 }
 
+export function composeDmConversationContext(input: {
+  characterProfilesJson: string;
+  privateOoc: string;
+  campaign: string;
+}): string {
+  const sections: string[] = [];
+
+  if (input.characterProfilesJson && input.characterProfilesJson !== "[]") {
+    sections.push(
+      [
+        "Authoritative current campaign character sheets (DM reference context):",
+        "These sheets cover every campaign character, including identity, race/deity/alignment, XP, raw and derived abilities, class history, combat/health/encumbrance, skills, feats, inventory and item state, languages, domains, templates, race traits, class features, spellbooks, known/prepared spells, powers, casting resources, psionic state, alignment state, metadata, player notes, and other persisted character selections available to the system.",
+        "Use this information to keep narration, rules calls, NPC reactions, and OOC answers consistent. Knowing another character's sheet does NOT grant permission to choose that player's actions or bypass authoritative game tools. Treat player notes and sheet metadata as DM reference, not automatically as public/NPC knowledge.",
+        input.characterProfilesJson,
+      ].join("\n"),
+    );
+  }
+  if (input.privateOoc) {
+    sections.push(
+      `Private OOC · DM context for this player (DM-only; not character speech or public table knowledge):\n${input.privateOoc}`,
+    );
+  }
+  if (input.campaign) {
+    sections.push(`Shared campaign table:\n${input.campaign}`);
+  }
+
+  return sections.join("\n\n");
+}
+
 /**
- * Builds the AI Dungeon Master's shared conversational context.
+ * Builds the AI Dungeon Master's shared context.
  *
- * The campaign table and the requesting player's private OOC · DM thread are
- * intentionally loaded as separate sections. This lets OOC preferences guide
- * campaign narration without treating them as character speech, public table
- * knowledge, or information visible to another player. Private OOC is placed
- * first so the active campaign turn remains the final conversational section
- * consumed by the structured turn planner.
+ * Every call hydrates the complete current campaign character profiles directly
+ * from authoritative D1 state. Character sheets are informational and never
+ * widen the validated tool permissions for the acting character. The requesting
+ * player's private OOC · DM thread remains a separate, private section and the
+ * shared campaign table remains last so the active turn is the final dialogue
+ * the planner sees.
  */
 export async function loadDmConversationText(input: {
   binding: D1Database;
@@ -171,7 +204,7 @@ export async function loadDmConversationText(input: {
   limit?: number;
 }): Promise<string> {
   const limit = input.limit ?? 18;
-  const [campaignResult, privateOocResult] = await Promise.all([
+  const [campaignResult, privateOocResult, characterProfiles] = await Promise.all([
     input.binding
       .prepare(
         `SELECT m.author_kind AS authorKind,
@@ -210,22 +243,17 @@ export async function loadDmConversationText(input: {
       )
       .bind(input.campaignId, input.userId, limit)
       .all<DmConversationRow>(),
+    loadDmCampaignCharacterProfiles(input.binding, input.campaignId),
   ]);
 
   const campaign = formatConversationRows([...campaignResult.results].reverse());
   const privateOoc = formatConversationRows([...privateOocResult.results].reverse());
-  const sections: string[] = [];
 
-  if (privateOoc) {
-    sections.push(
-      `Private OOC · DM context for this player (DM-only; not character speech or public table knowledge):\n${privateOoc}`,
-    );
-  }
-  if (campaign) {
-    sections.push(`Shared campaign table:\n${campaign}`);
-  }
-
-  return sections.join("\n\n");
+  return composeDmConversationContext({
+    characterProfilesJson: serializeDmCampaignCharacterProfiles(characterProfiles),
+    privateOoc,
+    campaign,
+  });
 }
 
 export async function loadDmPlayerMessage(

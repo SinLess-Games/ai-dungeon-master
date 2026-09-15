@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { FeedbackModal } from "@/modules/feedback/ui/FeedbackModal";
+import { OfflineSyncStatus } from "@/modules/sync/ui/OfflineSyncStatus";
 import { UserMenu } from "@/modules/auth/ui/UserMenu";
 import logo from "@/assets/favicon.png";
 import "./site-header.css";
@@ -241,6 +242,7 @@ export function SiteHeader() {
                 <span>Search…</span>
                 <kbd>⌘ K</kbd>
               </button>
+              <OfflineSyncStatus />
               <button
                 type="button"
                 className="codex-icon-button"

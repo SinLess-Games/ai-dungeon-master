@@ -67,9 +67,9 @@ function plannerContext(): DmPlannerContext {
 }
 
 function workersAiReturning(response: string) {
-  const run = vi.fn(async () => ({ response }));
+  const run = vi.fn<WorkersAIBinding["run"]>(async (_model, _input) => ({ response }));
   return {
-    binding: { run } as unknown as WorkersAIBinding,
+    binding: { run } satisfies WorkersAIBinding,
     run,
   };
 }

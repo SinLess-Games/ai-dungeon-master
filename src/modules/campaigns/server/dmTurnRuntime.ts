@@ -160,7 +160,9 @@ function formatConversationRows(rows: readonly DmConversationRow[]): string {
  * The campaign table and the requesting player's private OOC · DM thread are
  * intentionally loaded as separate sections. This lets OOC preferences guide
  * campaign narration without treating them as character speech, public table
- * knowledge, or information visible to another player.
+ * knowledge, or information visible to another player. Private OOC is placed
+ * first so the active campaign turn remains the final conversational section
+ * consumed by the structured turn planner.
  */
 export async function loadDmConversationText(input: {
   binding: D1Database;
@@ -214,13 +216,13 @@ export async function loadDmConversationText(input: {
   const privateOoc = formatConversationRows([...privateOocResult.results].reverse());
   const sections: string[] = [];
 
-  if (campaign) {
-    sections.push(`Shared campaign table:\n${campaign}`);
-  }
   if (privateOoc) {
     sections.push(
       `Private OOC · DM context for this player (DM-only; not character speech or public table knowledge):\n${privateOoc}`,
     );
+  }
+  if (campaign) {
+    sections.push(`Shared campaign table:\n${campaign}`);
   }
 
   return sections.join("\n\n");

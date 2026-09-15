@@ -260,6 +260,57 @@ describe("AI DM turn planner", () => {
     }
   });
 
+  it("requires round conditions to carry exactly one valid round duration", () => {
+    const ctx = context();
+    const missingRounds = parseDmTurnDecision(
+      JSON.stringify({
+        kind: "command",
+        command: {
+          type: "condition.apply",
+          targetId: "goblin-1",
+          conditionRef: "stunned",
+          durationKind: "rounds",
+          reason: "The effect lasts for two rounds.",
+        },
+      }),
+    );
+    expect(() => validateDmTurnDecision(missingRounds, ctx)).toThrow(
+      "AI_DM_CONDITION_DURATION_INVALID",
+    );
+
+    const strayRounds = parseDmTurnDecision(
+      JSON.stringify({
+        kind: "command",
+        command: {
+          type: "condition.apply",
+          targetId: "goblin-1",
+          conditionRef: "prone",
+          durationKind: "special",
+          remainingRounds: 2,
+          reason: "Prone persists until the creature stands.",
+        },
+      }),
+    );
+    expect(() => validateDmTurnDecision(strayRounds, ctx)).toThrow(
+      "AI_DM_CONDITION_DURATION_INVALID",
+    );
+
+    const validRounds = parseDmTurnDecision(
+      JSON.stringify({
+        kind: "command",
+        command: {
+          type: "condition.apply",
+          targetId: "goblin-1",
+          conditionRef: "stunned",
+          durationKind: "rounds",
+          remainingRounds: 2,
+          reason: "The effect lasts for two rounds.",
+        },
+      }),
+    );
+    expect(validateDmTurnDecision(validRounds, ctx)).toEqual(validRounds);
+  });
+
   it("rejects unavailable skills and malformed or unsafe planner output", () => {
     const decision = parseDmTurnDecision(
       JSON.stringify({

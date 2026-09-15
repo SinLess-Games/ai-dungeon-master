@@ -12,7 +12,7 @@ import { campaignPlayMessages } from "./campaignPlayMessage";
 import { characters } from "./character";
 import { users } from "./auth";
 
-export const campaignDmActionKinds = ["check.skill", "check.save"] as const;
+export const campaignDmActionKinds = ["check.skill", "check.save", "check.initiative"] as const;
 export type CampaignDmActionKind = (typeof campaignDmActionKinds)[number];
 
 export const campaignDmActionStatuses = [
@@ -37,6 +37,11 @@ export type CampaignDmActionArguments =
       type: "check.save";
       save: "fort" | "ref" | "will";
       dc: number;
+      reason: string;
+    }
+  | {
+      type: "check.initiative";
+      participantIds: string[];
       reason: string;
     };
 
@@ -97,7 +102,7 @@ export const campaignDmActions = sqliteTable(
     index("campaign_dm_actions_character_idx").on(table.characterId),
     check(
       "campaign_dm_actions_kind_valid",
-      sql`${table.kind} IN ('check.skill', 'check.save')`,
+      sql`${table.kind} IN ('check.skill', 'check.save', 'check.initiative')`,
     ),
     check(
       "campaign_dm_actions_status_valid",

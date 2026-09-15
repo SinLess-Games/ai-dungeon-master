@@ -382,7 +382,6 @@ export function performCampaignSkillCheck(
   skillId: string,
   dc: number,
   specialization?: string,
-  roll?: number,
 ): Promise<unknown> {
   return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/game/commands`, {
     method: "POST",
@@ -392,7 +391,6 @@ export function performCampaignSkillCheck(
       skillId,
       dc,
       ...(specialization ? { specialization } : {}),
-      ...(roll === undefined ? {} : { roll }),
     }),
   });
 }
@@ -402,7 +400,6 @@ export function performCampaignSave(
   actorId: string,
   save: CampaignSaveKind,
   dc: number,
-  roll?: number,
 ): Promise<unknown> {
   return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/game/commands`, {
     method: "POST",
@@ -411,7 +408,6 @@ export function performCampaignSave(
       actorId,
       save,
       dc,
-      ...(roll === undefined ? {} : { roll }),
     }),
   });
 }

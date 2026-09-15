@@ -6,6 +6,7 @@ import {
   generateOpenAICompatibleText,
   type OpenAICompatibleEnv,
 } from "@/infrastructure/ai/openaiCompatible";
+import type { CampaignDmActionArguments } from "@/infrastructure/database/schema";
 import { createAuth, type AuthEnv } from "@/modules/auth/server/auth";
 import { requireUser } from "@/modules/auth/server/requireAuth";
 import {
@@ -15,6 +16,14 @@ import {
   ServiceUnavailableError,
   ValidationError,
 } from "@/server/middleware/errors";
+import {
+  createPendingDmAction,
+  findPendingDmAction,
+  loadDmCharacterContext,
+  type DmCharacterContext,
+  type PublicCampaignDmAction,
+} from "./dmActionService";
+import { planDmTurn, type DmTurnDecision } from "./dmToolPlanner";
 
 type CampaignRole = "owner" | "gm" | "player" | "observer";
 type PlayChannel = "campaign" | "ooc_dm";
@@ -321,15 +330,31 @@ async function recentAuthoritativeEvents(db: D1Database, campaignId: string) {
 async function liveActors(db: D1Database, campaignId: string) {
   const result = await db
     .prepare(
-      `SELECT name, kind, status
+      `SELECT id,
+              character_id AS characterId,
+              name,
+              kind,
+              status
        FROM game_actors
        WHERE campaign_id = ? AND status IN ('active', 'defeated')
        ORDER BY created_at ASC, id ASC
        LIMIT 40`,
     )
     .bind(campaignId)
-    .all<{ name: string; kind: string; status: string }>();
+    .all<{
+      id: string;
+      characterId: string | null;
+      name: string;
+      kind: string;
+      status: string;
+    }>();
   return result.results;
+}
+
+function conversationText(messages: Awaited<ReturnType<typeof readMessages>>): string {
+  return messages
+    .map((message) => `${message.authorKind === "dm" ? "DM" : message.authorName}: ${message.content}`)
+    .join("\n");
 }
 
 function dmSystemPrompt(channel: PlayChannel, rulesetId: string, rulesetVersion: string): string {
@@ -368,9 +393,7 @@ async function generateDmReply(
     liveActors(db, campaign.id),
   ]);
   const settings = parseSettings(campaign.settings);
-  const conversation = messages
-    .map((message) => `${message.authorKind === "dm" ? "DM" : message.authorName}: ${message.content}`)
-    .join("\n");
+  const conversation = conversationText(messages);
 
   const prompt = [
     `Campaign: ${campaign.name}`,
@@ -392,6 +415,63 @@ async function generateDmReply(
     maxTokens: channel === "campaign" ? 900 : 700,
     ...(env.AI && env.AI_GAME_MODEL ? { model: env.AI_GAME_MODEL } : {}),
   });
+}
+
+async function planCampaignDmTurn(
+  env: Bindings,
+  db: D1Database,
+  campaign: CampaignAccess,
+  userId: string,
+  context: DmCharacterContext,
+): Promise<DmTurnDecision> {
+  const [messages, events, actors] = await Promise.all([
+    readMessages(db, campaign.id, "campaign", userId, 18),
+    recentAuthoritativeEvents(db, campaign.id),
+    liveActors(db, campaign.id),
+  ]);
+
+  return planDmTurn(env, {
+    campaignName: campaign.name,
+    campaignDescription: campaign.description,
+    rulesetId: campaign.rulesetId,
+    rulesetVersion: campaign.rulesetVersion,
+    settings: parseSettings(campaign.settings),
+    actors,
+    recentEvents: events,
+    conversation: conversationText(messages),
+    character: context.character,
+    skills: context.skills,
+  });
+}
+
+function actionArguments(
+  decision: Extract<DmTurnDecision, { kind: "check" }>,
+  context: DmCharacterContext,
+): CampaignDmActionArguments {
+  if (decision.check.type === "check.save") {
+    return {
+      type: "check.save",
+      save: decision.check.save,
+      dc: decision.check.dc,
+      reason: decision.check.reason,
+    };
+  }
+
+  const specialization = decision.check.specialization ?? "";
+  const skill = context.skills.find(
+    (option) =>
+      option.id === decision.check.skillId && option.specialization === specialization,
+  );
+  if (!skill) throw new Error("AI_DM_REQUESTED_UNAVAILABLE_SKILL");
+
+  return {
+    type: "check.skill",
+    skillId: skill.id,
+    skillName: skill.name,
+    ...(skill.specialization ? { specialization: skill.specialization } : {}),
+    dc: decision.check.dc,
+    reason: decision.check.reason,
+  };
 }
 
 export const campaignPlayMessageRoutes = new Hono<Env>()
@@ -443,6 +523,16 @@ export const campaignPlayMessageRoutes = new Hono<Env>()
       await validateCharacterControl(db, campaignId, input.characterId, session.user.id);
     }
 
+    const aiManaged = campaign.gameMasterMode === "ai" || campaign.gameMasterMode === "hybrid";
+    if (aiManaged && input.channel === "campaign") {
+      const pending = await findPendingDmAction(db, campaignId, session.user.id);
+      if (pending) {
+        throw new ConflictError(
+          "Resolve the Dungeon Master's outstanding check before taking another in-character action.",
+        );
+      }
+    }
+
     const playerId = await insertMessage(db, {
       campaignId,
       channel: input.channel,
@@ -455,10 +545,42 @@ export const campaignPlayMessageRoutes = new Hono<Env>()
     const playerMessage = await getMessage(db, playerId);
 
     let dmMessage: Awaited<ReturnType<typeof getMessage>> | null = null;
+    let pendingAction: PublicCampaignDmAction | null = null;
     let aiError: string | null = null;
-    if (campaign.gameMasterMode === "ai" || campaign.gameMasterMode === "hybrid") {
+    if (aiManaged) {
       try {
-        const reply = await generateDmReply(c.env, db, campaign, input.channel, session.user.id);
+        let reply: string;
+        let checkDecision: Extract<DmTurnDecision, { kind: "check" }> | null = null;
+        let characterContext: DmCharacterContext | null = null;
+
+        if (input.channel === "campaign" && input.characterId) {
+          characterContext = await loadDmCharacterContext(
+            db,
+            campaignId,
+            input.characterId,
+            session.user.id,
+          );
+          if (characterContext) {
+            const decision = await planCampaignDmTurn(
+              c.env,
+              db,
+              campaign,
+              session.user.id,
+              characterContext,
+            );
+            if (decision.kind === "check") {
+              checkDecision = decision;
+              reply = decision.preface;
+            } else {
+              reply = decision.text;
+            }
+          } else {
+            reply = await generateDmReply(c.env, db, campaign, input.channel, session.user.id);
+          }
+        } else {
+          reply = await generateDmReply(c.env, db, campaign, input.channel, session.user.id);
+        }
+
         const dmId = await insertMessage(db, {
           campaignId,
           channel: input.channel,
@@ -469,6 +591,18 @@ export const campaignPlayMessageRoutes = new Hono<Env>()
           content: reply,
         });
         dmMessage = await getMessage(db, dmId);
+
+        if (checkDecision && characterContext && input.characterId) {
+          pendingAction = await createPendingDmAction(db, {
+            campaignId,
+            requestedByMessageId: playerId,
+            requestMessageId: dmId,
+            requestedUserId: session.user.id,
+            characterId: input.characterId,
+            actorId: characterContext.character.actorId,
+            arguments: actionArguments(checkDecision, characterContext),
+          });
+        }
       } catch (error) {
         console.error("Campaign AI DM response failed", {
           campaignId,
@@ -484,6 +618,7 @@ export const campaignPlayMessageRoutes = new Hono<Env>()
       {
         message: playerMessage,
         dmMessage,
+        pendingAction,
         aiError,
         awaitingHumanDm: campaign.gameMasterMode === "human",
       },

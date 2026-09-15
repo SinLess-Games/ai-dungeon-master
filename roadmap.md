@@ -26,7 +26,11 @@ feature. This audit does not certify production deployment or live provider setu
 - [ ] Streaming AI DM with state tools, player rolls, grants, alignment tracking
   - [x] [Persistent campaign/private DM conversations](src/modules/campaigns/server/playMessageRoutes.ts) and generated AI replies.
   - [x] [Validated game commands](src/modules/game/server/gameCommandRoutes.ts) for encounters, attacks, checks, casting, and psionics, with player controls in campaign play.
-  - [ ] Token streaming, an integrated model tool-calling loop, item/XP grant workflows, and ongoing alignment tracking. Current narration and deterministic commands are separate paths.
+  - [x] Structured AI DM player-roll loop: the model may request a validated skill check or saving throw, the player supplies the natural d20, and the deterministic game-command boundary resolves and persists the authoritative event before narration continues.
+  - [x] Authoritative AI DM state-tool loop: bounded model planning can start/finish encounters, make attacks, cast prepared/spontaneous spells, manifest powers, apply/remove conditions, and apply validated direct damage/healing through the same deterministic command boundary. Tool results are fed back to the planner before narration continues.
+  - [x] Item and XP grant workflows: AI DM grants/removals resolve catalog/inventory references server-side and persist auditable inventory/XP game events instead of mutating state in narration.
+  - [x] Ongoing alignment tracking: meaningful completed choices may produce bounded two-axis drift proposals; deterministic thresholds, persisted axis state, and `alignment.drift` events decide whether the public D&D alignment actually changes.
+  - [ ] Token streaming for progressive DM narration. Structured commands currently complete before the final response is returned.
 - [ ] Standalone world builder + world map — [campaign start](src/modules/campaigns/server/bootstrapWorldGenerator.ts) creates a minimal persistent world root and generation metadata; standalone editing and map generation/display are absent.
 
 ## Phase 2 — Reference, loot, export
@@ -74,6 +78,8 @@ feature. This audit does not certify production deployment or live provider setu
 Reviewed current routes, feature modules, schemas, seeds, and test coverage; excluded
 legacy code. Ran 12 focused unit-test files covering authentication/schema, dice,
 D&D rules and derived stats, character creation rules, campaign options/start,
-game commands, live coordination, and book-rule seeds: **112 tests passed**.
-Browser E2E, live Google/AI calls, remote migrations, and deployment were not run
-for this roadmap audit.
+game commands, live coordination, and book-rule seeds: **112 tests passed** at the
+September 14 audit point. The AI DM state-tool expansion adds focused unit tests,
+but this environment cannot execute the repository test suite and current GitHub
+Actions jobs fail before their workflow steps begin. Browser E2E, live Google/AI
+calls, remote migrations, and deployment were not run for this roadmap audit.

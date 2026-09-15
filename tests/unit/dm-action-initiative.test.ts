@@ -87,7 +87,10 @@ function actionIdForUser(sqlite: DatabaseSync, userId: string): string {
     .prepare(
       `SELECT id
        FROM campaign_dm_actions
-       WHERE campaign_id = 'campaign-1' AND requested_user_id = ?
+       WHERE campaign_id = 'campaign-1'
+         AND requested_user_id = ?
+         AND status IN ('pending', 'resolving')
+       ORDER BY created_at DESC, rowid DESC
        LIMIT 1`,
     )
     .get(userId) as { id: string } | undefined;
@@ -176,5 +179,66 @@ describe("AI DM multiplayer initiative", () => {
       { userId: "user-a", status: "resolved" },
       { userId: "user-b", status: "resolved" },
     ]);
+  });
+
+  it("sequences multiple participating PCs controlled by the same player", async () => {
+    const { sqlite, binding } = database();
+    sqlite.exec(`
+      INSERT INTO game_actors
+        (id, campaign_id, character_id, controller_user_id, kind, status)
+      VALUES ('actor-a2', 'campaign-1', 'character-a2', 'user-a', 'character', 'active');
+    `);
+    const arguments_ = {
+      type: "check.initiative" as const,
+      participantIds: ["actor-a", "actor-a2", "actor-b", "monster-1"],
+      reason: "Combat is beginning. Roll initiative.",
+    };
+
+    const first = await createPendingDmAction(binding, {
+      campaignId: "campaign-1",
+      requestedByMessageId: "player-message-1",
+      requestMessageId: "dm-message-1",
+      requestedUserId: "user-a",
+      characterId: "character-a",
+      actorId: "actor-a",
+      arguments: arguments_,
+    });
+    const userBActionId = actionIdForUser(sqlite, "user-b");
+
+    const firstResolution = await resolvePendingDmAction(binding, {
+      campaignId: "campaign-1",
+      actionId: first.id,
+      userId: "user-a",
+      roll: 16,
+    });
+    expect(firstResolution.action.status).toBe("resolved");
+    expect(firstResolution.nextPendingAction?.actorId).toBe("actor-a2");
+    expect(mocks.startActorEncounter).not.toHaveBeenCalled();
+
+    const secondResolution = await resolvePendingDmAction(binding, {
+      campaignId: "campaign-1",
+      actionId: firstResolution.nextPendingAction!.id,
+      userId: "user-a",
+      roll: 11,
+    });
+    expect(secondResolution.action.status).toBe("resolving");
+    expect(secondResolution.nextPendingAction).toBeNull();
+    expect(mocks.startActorEncounter).not.toHaveBeenCalled();
+
+    await resolvePendingDmAction(binding, {
+      campaignId: "campaign-1",
+      actionId: userBActionId,
+      userId: "user-b",
+      roll: 5,
+    });
+
+    expect(mocks.startActorEncounter).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        campaignId: "campaign-1",
+        participantIds: ["actor-a", "actor-a2", "actor-b", "monster-1"],
+        initiativeRolls: { "actor-a": 16, "actor-a2": 11, "actor-b": 5 },
+      },
+    );
   });
 });

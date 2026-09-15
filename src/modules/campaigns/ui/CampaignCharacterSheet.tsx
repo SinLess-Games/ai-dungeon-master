@@ -494,7 +494,7 @@ function EncumbranceCard({
       ) : null}
       {!value.enabled && value.actualLoad !== "light" ? (
         <p className="mt-3 text-xs text-muted-foreground">
-          The character is actually {value.actualLoad} by carried weight, but movement, Dexterity cap, and armor-check penalties are ignored while the toggle is off.
+          The character is actually {value.actualLoad} by carried weight. Encumbrance penalties are disabled, but armor and other equipment restrictions still apply.
         </p>
       ) : null}
     </section>

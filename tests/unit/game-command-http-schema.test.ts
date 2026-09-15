@@ -52,8 +52,8 @@ describe("public game command schema", () => {
     ).toThrow();
   });
 
-  it("still accepts an explicitly supplied natural d20 for player-facing checks", () => {
-    expect(
+  it("rejects direct d20 overrides for skill checks and saving throws", () => {
+    expect(() =>
       gameCommandSchema.parse({
         type: "check.skill",
         actorId: "hero-1",
@@ -61,9 +61,9 @@ describe("public game command schema", () => {
         dc: 18,
         roll: 14,
       }),
-    ).toMatchObject({ type: "check.skill", roll: 14 });
+    ).toThrow();
 
-    expect(
+    expect(() =>
       gameCommandSchema.parse({
         type: "check.save",
         actorId: "hero-1",
@@ -71,6 +71,36 @@ describe("public game command schema", () => {
         dc: 17,
         roll: 9,
       }),
-    ).toMatchObject({ type: "check.save", roll: 9 });
+    ).toThrow();
+  });
+
+  it("accepts server-rolled public checks without an explicit natural d20", () => {
+    expect(
+      gameCommandSchema.parse({
+        type: "check.skill",
+        actorId: "hero-1",
+        skillId: "search",
+        dc: 18,
+      }),
+    ).toEqual({
+      type: "check.skill",
+      actorId: "hero-1",
+      skillId: "search",
+      dc: 18,
+    });
+
+    expect(
+      gameCommandSchema.parse({
+        type: "check.save",
+        actorId: "hero-1",
+        save: "will",
+        dc: 17,
+      }),
+    ).toEqual({
+      type: "check.save",
+      actorId: "hero-1",
+      save: "will",
+      dc: 17,
+    });
   });
 });

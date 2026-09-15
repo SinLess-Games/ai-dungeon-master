@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 
-const probe = /TS7030|TS18048|TS2532|TS18047/;
+const probe = /src\/infrastructure\/offline\/(?:request|syncEngine)\.ts/;
 const result = spawnSync("npm", ["run", "typecheck"], {
   encoding: "utf8",
   shell: false,

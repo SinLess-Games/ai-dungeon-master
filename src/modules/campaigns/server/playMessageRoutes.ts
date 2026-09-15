@@ -1,8 +1,9 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { legacyDmReplyUserPrompt } from "@/prompts/legacyDmReplyUser";
+import { dmSystemPrompt } from "@/prompts/legacyDmReplySystem";
 import { Hono } from "hono";
 import { z } from "zod";
-import { campaignPacingContext } from "../domain/duration";
 import {
   generateOpenAICompatibleText,
   type OpenAICompatibleEnv,
@@ -24,11 +25,7 @@ import {
   type DmCharacterContext,
   type PublicCampaignDmAction,
 } from "./dmActionService";
-import {
-  planDmTurn,
-  type DmTurnDecision,
-  type LegacyDmTurnDecision,
-} from "./dmToolPlanner";
+import { planDmTurn, type DmTurnDecision, type LegacyDmTurnDecision } from "./dmToolPlanner";
 
 type CampaignRole = "owner" | "gm" | "player" | "observer";
 type PlayChannel = "campaign" | "ooc_dm";
@@ -222,7 +219,8 @@ async function readMessages(
   userId: string,
   limit: number,
 ) {
-  const privacyClause = channel === "campaign" ? "m.private_user_id IS NULL" : "m.private_user_id = ?";
+  const privacyClause =
+    channel === "campaign" ? "m.private_user_id IS NULL" : "m.private_user_id = ?";
   const statement = db.prepare(
     `SELECT m.id,
             m.campaign_id AS campaignId,
@@ -358,31 +356,10 @@ async function liveActors(db: D1Database, campaignId: string) {
 
 function conversationText(messages: Awaited<ReturnType<typeof readMessages>>): string {
   return messages
-    .map((message) => `${message.authorKind === "dm" ? "DM" : message.authorName}: ${message.content}`)
+    .map(
+      (message) => `${message.authorKind === "dm" ? "DM" : message.authorName}: ${message.content}`,
+    )
     .join("\n");
-}
-
-function dmSystemPrompt(channel: PlayChannel, rulesetId: string, rulesetVersion: string): string {
-  if (channel === "ooc_dm") {
-    return [
-      `You are the private Dungeon Master assistant for an ${rulesetId} ${rulesetVersion} campaign.`,
-      "This is an out-of-character private conversation with one player.",
-      "Answer rules, table, intent, world, and clarification questions directly and helpfully.",
-      "Never pretend a die was rolled, HP changed, an item was gained, XP was awarded, or authoritative game state changed unless the supplied authoritative event context says it did.",
-      "If a rules answer depends on missing information, say what is needed instead of inventing it.",
-      "Keep the answer focused and do not include a speaker label.",
-    ].join(" ");
-  }
-
-  return [
-    `You are the Dungeon Master running an ${rulesetId} ${rulesetVersion} campaign in The Endless Codex.`,
-    "Respond to the player's in-character action, dialogue, or intent with immersive table narration.",
-    "You may describe ordinary fictional consequences that do not require a rules resolution.",
-    "For uncertain or mechanical outcomes, call for the appropriate check, save, attack, spell action, or other rules resolution instead of fabricating a roll or silently mutating game state.",
-    "Never claim HP, conditions, inventory, XP, initiative, spell resources, or other authoritative mechanics changed unless the supplied authoritative event context already records that change.",
-    "Respect established campaign facts and recent conversation. Prefer a concise 1-4 paragraph response that gives the player a clear next decision.",
-    "Do not include a speaker label or meta commentary about being an AI.",
-  ].join(" ");
 }
 
 async function generateDmReply(
@@ -400,19 +377,7 @@ async function generateDmReply(
   const settings = parseSettings(campaign.settings);
   const conversation = conversationText(messages);
 
-  const prompt = [
-    `Campaign: ${campaign.name}`,
-    `Description: ${campaign.description || "No campaign description provided."}`,
-    `Status: ${campaign.status}`,
-    `Ruleset: ${campaign.rulesetId} ${campaign.rulesetVersion}`,
-    campaignPacingContext(settings),
-    `Campaign settings: ${JSON.stringify(settings).slice(0, 5000)}`,
-    `Current actors: ${JSON.stringify(actors).slice(0, 4000)}`,
-    `Recent authoritative game events: ${JSON.stringify(events).slice(0, 7000)}`,
-    "Recent conversation:",
-    conversation || "(No previous messages.)",
-    "Respond to the most recent player message now.",
-  ].join("\n\n");
+  const prompt = legacyDmReplyUserPrompt(campaign, settings, actors, events, conversation);
 
   return generateOpenAICompatibleText(env, {
     system: dmSystemPrompt(channel, campaign.rulesetId, campaign.rulesetVersion),
@@ -523,7 +488,9 @@ export const campaignPlayMessageRoutes = new Hono<Env>()
     if (!parsed.success) throw new ValidationError("Campaign play message is invalid.");
     const input = parsed.data;
     if (input.channel === "ooc_dm" && input.characterId) {
-      throw new ValidationError("Private OOC DM messages are sent as the player, not as a character.");
+      throw new ValidationError(
+        "Private OOC DM messages are sent as the player, not as a character.",
+      );
     }
     if (input.characterId) {
       await validateCharacterControl(db, campaignId, input.characterId, session.user.id);

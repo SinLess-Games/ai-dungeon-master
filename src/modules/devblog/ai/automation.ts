@@ -1,3 +1,4 @@
+import { weeklyDevblogUserPrompt } from "@/prompts/weeklyDevblogUser";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { createDatabase } from "@/infrastructure/database/client";
@@ -8,7 +9,7 @@ import {
 import { users } from "@/infrastructure/database/schema/auth";
 import { blogPosts as posts } from "@/infrastructure/database/schema/devblog";
 import { collectWeeklyGitHubActivity } from "./github";
-import { WEEKLY_DEVBLOG_SYSTEM_PROMPT } from "./prompt";
+import { WEEKLY_DEVBLOG_SYSTEM_PROMPT } from "@/prompts/weeklyDevblogSystem";
 import type { DevBlogAIEnv, DevBlogAITrigger, WeeklyDevBlogResult } from "./types";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -55,9 +56,7 @@ function localCalendarParts(date: Date) {
 
 export function weeklyDevBlogKey(now: Date): string {
   const local = localCalendarParts(now);
-  const weekdayIndex = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(
-    local.weekday,
-  );
+  const weekdayIndex = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(local.weekday);
   const calendarDate = new Date(Date.UTC(local.year, local.month - 1, local.day));
   calendarDate.setUTCDate(calendarDate.getUTCDate() - Math.max(weekdayIndex, 0));
   return calendarDate.toISOString().slice(0, 10);
@@ -157,7 +156,9 @@ export async function generateWeeklyDevBlog(
   ]);
 
   if (!github.commits.length && !github.pullRequests.length && !github.issues.length) {
-    throw new Error("No GitHub activity was found for the last seven days; refusing to invent a post.");
+    throw new Error(
+      "No GitHub activity was found for the last seven days; refusing to invent a post.",
+    );
   }
 
   const sourceMaterial = {
@@ -171,7 +172,7 @@ export async function generateWeeklyDevBlog(
 
   const raw = await generateOpenAICompatibleText(env, {
     system: WEEKLY_DEVBLOG_SYSTEM_PROMPT,
-    prompt: `Use the following source material to write this week's Endless Codex development journal.\n\n${JSON.stringify(sourceMaterial, null, 2)}`,
+    prompt: weeklyDevblogUserPrompt(sourceMaterial),
   });
   const generated = generatedPostSchema.parse(extractJsonObject(raw));
   const autoPublish = shouldAutoPublishWeeklyDevBlog(env);

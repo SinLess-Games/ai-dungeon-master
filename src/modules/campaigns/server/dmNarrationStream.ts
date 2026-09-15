@@ -1,8 +1,10 @@
+import { dmNarrationUserPrompt } from "@/prompts/dmNarrationUser";
+import { DM_NARRATION_SYSTEM_PROMPT } from "@/prompts/dmNarrationSystem";
 import {
   streamOpenAICompatibleText,
   type OpenAICompatibleEnv,
 } from "@/infrastructure/ai/openaiCompatible";
-import { assertCampaignDmNarration, CAMPAIGN_DM_NARRATION_POLICY } from "./dmCampaignChatPolicy";
+import { assertCampaignDmNarration } from "./dmCampaignChatPolicy";
 import type { DmResponseStream } from "./dmResponseStream";
 
 /** Tools and their metadata are validated before this presentation-only model call. */
@@ -14,12 +16,8 @@ export async function streamDmNarration(
   const text = await streamOpenAICompatibleText(
     env,
     {
-      system: [
-        "Present the approved Dungeon Master narration as live-play prose. Output only narration.",
-        "Preserve all facts, names, numbers, dialogue, outcomes, pacing, and the ending of the approved narration. Do not add events, items, characters, checks, rolls, or mechanical effects. You cannot execute tools or change state.",
-        CAMPAIGN_DM_NARRATION_POLICY,
-      ].join(" "),
-      prompt: `Approved narration:\n${approvedNarration}`,
+      system: DM_NARRATION_SYSTEM_PROMPT,
+      prompt: dmNarrationUserPrompt(approvedNarration),
       temperature: 0.2,
       maxTokens: 1600,
       signal: stream.signal,

@@ -116,7 +116,16 @@ export async function plannerCommandToGameCommand(
         actorId,
         castingTrackId: command.castingTrackId,
         powerId: command.powerId,
-        ...(command.augmentations === undefined ? {} : { augmentations: command.augmentations }),
+        ...(command.augmentations === undefined
+          ? {}
+          : {
+              augmentations: command.augmentations.map((augmentation) => ({
+                index: augmentation.index,
+                ...(augmentation.applications === undefined
+                  ? {}
+                  : { applications: augmentation.applications }),
+              })),
+            }),
         ...(command.targetIds === undefined ? {} : { targetIds: command.targetIds }),
       };
     case "health.damage":

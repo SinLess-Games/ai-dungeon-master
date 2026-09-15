@@ -127,40 +127,17 @@ export async function loadRecentDmEvents(
   }));
 }
 
-export async function loadDmConversationText(input: {
-  binding: D1Database;
-  campaignId: string;
-  userId: string;
-  limit?: number;
-}): Promise<string> {
-  const result = await input.binding
-    .prepare(
-      `SELECT m.author_kind AS authorKind,
-              m.content,
-              u.name AS userName,
-              u.username,
-              u.display_username AS displayUsername,
-              c.name AS characterName
-       FROM campaign_play_messages m
-       LEFT JOIN users u ON u.id = m.author_user_id
-       LEFT JOIN characters c ON c.id = m.character_id
-       WHERE m.campaign_id = ?
-         AND m.channel = 'campaign'
-         AND m.private_user_id IS NULL
-       ORDER BY m.created_at DESC, m.rowid DESC
-       LIMIT ?`,
-    )
-    .bind(input.campaignId, input.limit ?? 18)
-    .all<{
-      authorKind: "player" | "dm" | "system";
-      content: string;
-      userName: string | null;
-      username: string | null;
-      displayUsername: string | null;
-      characterName: string | null;
-    }>();
-  return result.results
-    .reverse()
+interface DmConversationRow {
+  authorKind: "player" | "dm" | "system";
+  content: string;
+  userName: string | null;
+  username: string | null;
+  displayUsername: string | null;
+  characterName: string | null;
+}
+
+function formatConversationRows(rows: readonly DmConversationRow[]): string {
+  return rows
     .map((message) => {
       const author =
         message.authorKind === "dm"
@@ -175,6 +152,78 @@ export async function loadDmConversationText(input: {
       return `${author}: ${message.content}`;
     })
     .join("\n");
+}
+
+/**
+ * Builds the AI Dungeon Master's shared conversational context.
+ *
+ * The campaign table and the requesting player's private OOC · DM thread are
+ * intentionally loaded as separate sections. This lets OOC preferences guide
+ * campaign narration without treating them as character speech, public table
+ * knowledge, or information visible to another player.
+ */
+export async function loadDmConversationText(input: {
+  binding: D1Database;
+  campaignId: string;
+  userId: string;
+  limit?: number;
+}): Promise<string> {
+  const limit = input.limit ?? 18;
+  const [campaignResult, privateOocResult] = await Promise.all([
+    input.binding
+      .prepare(
+        `SELECT m.author_kind AS authorKind,
+                m.content,
+                u.name AS userName,
+                u.username,
+                u.display_username AS displayUsername,
+                c.name AS characterName
+         FROM campaign_play_messages m
+         LEFT JOIN users u ON u.id = m.author_user_id
+         LEFT JOIN characters c ON c.id = m.character_id
+         WHERE m.campaign_id = ?
+           AND m.channel = 'campaign'
+           AND m.private_user_id IS NULL
+         ORDER BY m.created_at DESC, m.rowid DESC
+         LIMIT ?`,
+      )
+      .bind(input.campaignId, limit)
+      .all<DmConversationRow>(),
+    input.binding
+      .prepare(
+        `SELECT m.author_kind AS authorKind,
+                m.content,
+                u.name AS userName,
+                u.username,
+                u.display_username AS displayUsername,
+                c.name AS characterName
+         FROM campaign_play_messages m
+         LEFT JOIN users u ON u.id = m.author_user_id
+         LEFT JOIN characters c ON c.id = m.character_id
+         WHERE m.campaign_id = ?
+           AND m.channel = 'ooc_dm'
+           AND m.private_user_id = ?
+         ORDER BY m.created_at DESC, m.rowid DESC
+         LIMIT ?`,
+      )
+      .bind(input.campaignId, input.userId, limit)
+      .all<DmConversationRow>(),
+  ]);
+
+  const campaign = formatConversationRows([...campaignResult.results].reverse());
+  const privateOoc = formatConversationRows([...privateOocResult.results].reverse());
+  const sections: string[] = [];
+
+  if (campaign) {
+    sections.push(`Shared campaign table:\n${campaign}`);
+  }
+  if (privateOoc) {
+    sections.push(
+      `Private OOC · DM context for this player (DM-only; not character speech or public table knowledge):\n${privateOoc}`,
+    );
+  }
+
+  return sections.join("\n\n");
 }
 
 export async function loadDmPlayerMessage(

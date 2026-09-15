@@ -26,6 +26,7 @@ interface InventoryRow {
   characterId: string;
   itemId: string;
   itemName: string;
+  itemSlug: string;
   category: string;
   location: "carried" | "stored" | "party";
   equipped: number;
@@ -34,7 +35,17 @@ interface InventoryRow {
   magicSlot: EquipmentSlot | null;
 }
 
-function allowedSlots(row: Pick<InventoryRow, "category" | "magicSlot">): readonly EquipmentSlot[] {
+function isStandardRing(row: Pick<InventoryRow, "category" | "magicSlot" | "itemSlug">): boolean {
+  return (
+    row.category === "magic" &&
+    row.magicSlot === "other" &&
+    /^(?:ring|rings)-/.test(row.itemSlug.toLocaleLowerCase())
+  );
+}
+
+function allowedSlots(
+  row: Pick<InventoryRow, "category" | "magicSlot" | "itemSlug">,
+): readonly EquipmentSlot[] {
   switch (row.category) {
     case "weapon":
       return ["main_hand", "off_hand", "both_hands"];
@@ -43,6 +54,7 @@ function allowedSlots(row: Pick<InventoryRow, "category" | "magicSlot">): readon
     case "shield":
       return ["shield", "off_hand"];
     case "magic":
+      if (isStandardRing(row)) return ["ring_left", "ring_right"];
       return row.magicSlot ? [row.magicSlot] : ["slotless", "other"];
     default:
       return ["slotless", "other"];
@@ -98,6 +110,7 @@ export async function configureCharacterInventory(
               inventory.character_id AS characterId,
               inventory.item_id AS itemId,
               item.name AS itemName,
+              item.slug AS itemSlug,
               item.category,
               inventory.location,
               inventory.equipped,

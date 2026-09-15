@@ -39,7 +39,7 @@ const dc = z.number().int().min(0).max(1_000_000);
 const d20 = z.number().int().min(1).max(20);
 const positiveInteger = z.number().int().min(1).max(1_000_000_000);
 
-const commandSchema = z.discriminatedUnion("type", [
+export const gameCommandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("encounter.start"), participantIds: z.array(id).min(1).max(100) }),
   z.object({ type: z.literal("encounter.end_turn"), encounterId: id, actorId: id }),
   z.object({
@@ -47,17 +47,19 @@ const commandSchema = z.discriminatedUnion("type", [
     encounterId: id,
     status: z.enum(["completed", "abandoned"]).optional(),
   }),
-  z.object({
-    type: z.literal("combat.attack"),
-    attackerId: id,
-    targetId: id,
-    kind: z.enum(["melee", "ranged"]),
-    weaponInventoryId: id.optional(),
-    monsterAttackId: id.optional(),
-    attackRoll: d20.optional(),
-    confirmationRoll: d20.optional(),
-    damageRolls: z.array(positiveInteger).max(1000).optional(),
-  }),
+  // Attack/confirmation/damage roll overrides intentionally stay internal to
+  // GameCommand for deterministic service tests and trusted server workflows.
+  // The public HTTP boundary rolls attacks authoritatively on the server.
+  z
+    .object({
+      type: z.literal("combat.attack"),
+      attackerId: id,
+      targetId: id,
+      kind: z.enum(["melee", "ranged"]),
+      weaponInventoryId: id.optional(),
+      monsterAttackId: id.optional(),
+    })
+    .strict(),
   z.object({
     type: z.literal("check.skill"),
     actorId: id,
@@ -355,7 +357,7 @@ export const gameCommandRoutes = new Hono<Env>()
   })
   .post(
     "/api/campaigns/:campaignId/game/commands",
-    zValidator("json", commandSchema),
+    zValidator("json", gameCommandSchema),
     async (c) => {
       const session = await requireUser(createAuth(c.env), c.req.raw.headers);
       const binding = requireDatabase(c.env.DB);

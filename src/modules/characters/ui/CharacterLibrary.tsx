@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { BookOpen, Plus, Shield, Swords, Trash2, UserRound } from "lucide-react";
 import { toast } from "sonner";
+import { useOfflineSync } from "@/infrastructure/offline";
 import { authClient } from "@/modules/auth/client/authClient";
 import { useAuthModal } from "@/shared/stores/authModal.store";
 import { listCharacters, requestJson, type CharacterLibraryItem } from "../client/creatorApi";
@@ -35,11 +36,14 @@ function systemLabel(character: CharacterLibraryItemWithSystem) {
 
 export function CharacterLibrary() {
   const session = authClient.useSession();
+  const { canUseOfflineData } = useOfflineSync();
+  const hasSaveAccess = Boolean(session.data) || canUseOfflineData;
+  const hasLiveSession = Boolean(session.data);
   const queryClient = useQueryClient();
   const characters = useQuery({
     queryKey: ["characters", "library"],
     queryFn: listCharacters,
-    enabled: Boolean(session.data),
+    enabled: hasSaveAccess,
   });
   const deleteCharacter = useMutation({
     mutationFn: async (character: CharacterLibraryItemWithSystem) => {
@@ -55,7 +59,7 @@ export function CharacterLibrary() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "Character could not be deleted."),
   });
 
-  if (session.isPending) {
+  if (session.isPending && !canUseOfflineData) {
     return (
       <main className="character-library-page" id="main-content">
         <section className="character-library-shell character-library-empty">
@@ -67,7 +71,7 @@ export function CharacterLibrary() {
     );
   }
 
-  if (!session.data) {
+  if (!hasSaveAccess) {
     return (
       <main className="character-library-page" id="main-content">
         <section className="character-library-shell character-library-empty">
@@ -115,7 +119,13 @@ export function CharacterLibrary() {
             <h1>Characters</h1>
             <p>{items.length === 0 ? "Create your first persistent adventurer." : `${items.length} saved character${items.length === 1 ? "" : "s"} across your campaigns.`}</p>
           </div>
-          <Link to="/characters/new" className="creator-primary"><Plus size={17} /> Create character</Link>
+          {hasLiveSession ? (
+            <Link to="/characters/new" className="creator-primary"><Plus size={17} /> Create character</Link>
+          ) : (
+            <button type="button" className="creator-primary" disabled title="Reconnect and verify your session to create a new character.">
+              <Plus size={17} /> Reconnect to create
+            </button>
+          )}
         </header>
 
         {items.length === 0 ? (
@@ -123,7 +133,11 @@ export function CharacterLibrary() {
             <UserRound size={48} />
             <h2>No characters yet</h2>
             <p>Once you create a character, every saved adventurer will appear here.</p>
-            <Link to="/characters/new" className="creator-primary"><Swords size={17} /> Forge your first adventurer</Link>
+            {hasLiveSession ? (
+              <Link to="/characters/new" className="creator-primary"><Swords size={17} /> Forge your first adventurer</Link>
+            ) : (
+              <p>Reconnect to create your first adventurer.</p>
+            )}
           </section>
         ) : (
           <section className="character-library-grid" aria-label="Saved characters">

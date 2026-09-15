@@ -218,7 +218,7 @@ export function createCampaign(input: CreateCampaignInput): Promise<CreatedCampa
     visibility: input.visibility,
     maxPlayers: input.maxPlayers ?? null,
     generationSeed,
-    settings: input.settings,
+    settings: { ...input.settings },
   };
 
   return offlineRequestJson<CreatedCampaign>(
@@ -255,7 +255,8 @@ export async function updateCampaign(
       description:
         input.description === undefined ? detail.campaign.description : input.description,
       maxPlayers: input.maxPlayers === undefined ? detail.campaign.maxPlayers : input.maxPlayers,
-      settings: input.settings === undefined ? detail.campaign.settings : input.settings,
+      settings:
+        input.settings === undefined ? detail.campaign.settings : { ...input.settings },
     };
   };
 

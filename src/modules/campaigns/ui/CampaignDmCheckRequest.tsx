@@ -3,7 +3,7 @@ import { Dice5, LoaderCircle, ShieldQuestion } from "lucide-react";
 import type { CampaignDmAction } from "../client/campaignPlayApi";
 
 function isInitiativeAction(action: CampaignDmAction): boolean {
-  return (action.kind as string) === "check.initiative";
+  return action.kind === "check.initiative";
 }
 
 function actionLabel(action: CampaignDmAction): string {

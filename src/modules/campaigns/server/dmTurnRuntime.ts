@@ -19,21 +19,69 @@ export async function loadDmActors(
   binding: D1Database,
   campaignId: string,
 ): Promise<DmPlannerActor[]> {
-  const result = await binding
-    .prepare(
-      `SELECT id,
-              character_id AS characterId,
-              name,
-              kind,
-              status
-       FROM game_actors
-       WHERE campaign_id = ? AND status IN ('active', 'defeated')
-       ORDER BY created_at ASC, id ASC
-       LIMIT 80`,
-    )
-    .bind(campaignId)
-    .all<DmPlannerActor>();
-  return result.results;
+  const [actors, monsterAttacks] = await Promise.all([
+    binding
+      .prepare(
+        `SELECT id,
+                character_id AS characterId,
+                name,
+                kind,
+                status
+         FROM game_actors
+         WHERE campaign_id = ? AND status IN ('active', 'defeated')
+         ORDER BY created_at ASC, id ASC
+         LIMIT 80`,
+      )
+      .bind(campaignId)
+      .all<Omit<DmPlannerActor, "attacks">>(),
+    binding
+      .prepare(
+        `SELECT instance.actor_id AS actorId,
+                attack.id,
+                attack.name,
+                attack.attack_mode AS attackMode,
+                attack.can_use_as_standard AS canUseAsStandard,
+                attack.attack_count AS attackCount,
+                attack.routine_key AS routineKey,
+                attack.sequence
+         FROM runtime_dnd35_monster_instances instance
+         JOIN game_actors actor ON actor.id = instance.actor_id
+         JOIN dnd35_monster_attacks attack ON attack.monster_id = instance.monster_id
+         WHERE actor.campaign_id = ?
+           AND actor.status = 'active'
+         ORDER BY instance.actor_id, attack.routine_key, attack.sequence, attack.id`,
+      )
+      .bind(campaignId)
+      .all<{
+        actorId: string;
+        id: string;
+        name: string;
+        attackMode: "melee" | "ranged" | "melee_touch" | "ranged_touch";
+        canUseAsStandard: number;
+        attackCount: number;
+        routineKey: string;
+        sequence: number;
+      }>(),
+  ]);
+
+  const byActor = new Map<string, NonNullable<DmPlannerActor["attacks"]>>();
+  for (const attack of monsterAttacks.results) {
+    const list = byActor.get(attack.actorId) ?? [];
+    list.push({
+      id: attack.id,
+      name: attack.name,
+      attackMode: attack.attackMode,
+      canUseAsStandard: Boolean(attack.canUseAsStandard),
+      attackCount: attack.attackCount,
+      routineKey: attack.routineKey,
+      sequence: attack.sequence,
+    });
+    byActor.set(attack.actorId, list);
+  }
+  return actors.results.map((actor) => ({
+    ...actor,
+    ...(byActor.has(actor.id) ? { attacks: byActor.get(actor.id)! } : {}),
+  }));
 }
 
 export async function loadDmPlannerContext(input: {

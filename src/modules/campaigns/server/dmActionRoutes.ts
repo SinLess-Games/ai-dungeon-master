@@ -307,10 +307,10 @@ function pendingArguments(
   };
 }
 
-function initiativeArguments(request: PendingInitiativeRequest): CampaignDmActionArguments {
+function initiativeArguments(request: PendingInitiativeRequest) {
   return {
-    type: "check.initiative",
-    participantIds: [...request.participantIds],
+    type: "check.initiative" as const,
+    participantIds: Array.from(request.participantIds),
     reason: request.reason,
   };
 }

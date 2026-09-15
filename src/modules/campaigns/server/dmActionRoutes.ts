@@ -394,17 +394,18 @@ export const campaignDmActionRoutes = new Hono<Env>()
 
         if (playerMessage && playerMessage.authorUserId === session.user.id) {
           try {
+            const campaignDescriptor: Parameters<typeof runStructuredDmTurn>[0]["campaign"] = {
+              id: campaign.id,
+              name: campaign.name,
+              description: campaign.description,
+              rulesetId: campaign.rulesetId,
+              rulesetVersion: campaign.rulesetVersion,
+              settings: parseSettings(campaign.settings),
+            };
             const turn = await runStructuredDmTurn({
               env: c.env,
               binding: db,
-              campaign: {
-                id: campaign.id,
-                name: campaign.name,
-                description: campaign.description,
-                rulesetId: campaign.rulesetId,
-                rulesetVersion: campaign.rulesetVersion,
-                settings: parseSettings(campaign.settings),
-              },
+              campaign: campaignDescriptor,
               userId: session.user.id,
               characterId: origin.characterId,
               playerMessageId: origin.requestedByMessageId,

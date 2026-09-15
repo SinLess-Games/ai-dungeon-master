@@ -394,7 +394,7 @@ export const campaignDmActionRoutes = new Hono<Env>()
 
         if (playerMessage && playerMessage.authorUserId === session.user.id) {
           try {
-            const campaignDescriptor: Parameters<typeof runStructuredDmTurn>[0]["campaign"] = {
+            const campaignDescriptor = {
               id: campaign.id,
               name: campaign.name,
               description: campaign.description ?? "",

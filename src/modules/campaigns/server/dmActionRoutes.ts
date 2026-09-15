@@ -219,8 +219,9 @@ function actionLabel(action: PublicCampaignDmAction): string {
 }
 
 function initiativeSummary(action: PublicCampaignDmAction, value: Record<string, unknown>): string {
-  const participants = Array.isArray(value["participants"]) ? value["participants"] : [];
-  const participant = participants.find((candidate) => {
+  const rawParticipants = value["participants"];
+  const participants: unknown[] = Array.isArray(rawParticipants) ? rawParticipants : [];
+  const participant = participants.find((candidate: unknown) => {
     if (!candidate || typeof candidate !== "object") return false;
     return (candidate as Record<string, unknown>)["characterId"] === action.actorId;
   });

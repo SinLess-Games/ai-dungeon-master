@@ -1,5 +1,12 @@
 import { sql } from "drizzle-orm";
-import { check, index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  check,
+  index,
+  integer,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 import { campaigns } from "./campaign";
 import { campaignPlayMessages } from "./campaignPlayMessage";
 import { characters } from "./character";
@@ -83,6 +90,9 @@ export const campaignDmActions = sqliteTable(
       table.status,
       table.createdAt,
     ),
+    uniqueIndex("campaign_dm_actions_one_outstanding_per_user_uidx")
+      .on(table.campaignId, table.requestedUserId)
+      .where(sql`${table.status} IN ('pending', 'resolving')`),
     index("campaign_dm_actions_message_idx").on(table.requestedByMessageId),
     index("campaign_dm_actions_character_idx").on(table.characterId),
     check(

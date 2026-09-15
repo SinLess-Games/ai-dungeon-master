@@ -23,7 +23,11 @@ import {
   type DmCharacterContext,
   type PublicCampaignDmAction,
 } from "./dmActionService";
-import { planDmTurn, type DmTurnDecision } from "./dmToolPlanner";
+import {
+  planDmTurn,
+  type DmTurnDecision,
+  type LegacyDmTurnDecision,
+} from "./dmToolPlanner";
 
 type CampaignRole = "owner" | "gm" | "player" | "observer";
 type PlayChannel = "campaign" | "ooc_dm";
@@ -423,7 +427,7 @@ async function planCampaignDmTurn(
   campaign: CampaignAccess,
   userId: string,
   context: DmCharacterContext,
-): Promise<DmTurnDecision> {
+): Promise<LegacyDmTurnDecision> {
   const [messages, events, actors] = await Promise.all([
     readMessages(db, campaign.id, "campaign", userId, 18),
     recentAuthoritativeEvents(db, campaign.id),
@@ -448,19 +452,19 @@ function actionArguments(
   decision: Extract<DmTurnDecision, { kind: "check" }>,
   context: DmCharacterContext,
 ): CampaignDmActionArguments {
-  if (decision.check.type === "check.save") {
+  const check = decision.check;
+  if (check.type === "check.save") {
     return {
       type: "check.save",
-      save: decision.check.save,
-      dc: decision.check.dc,
-      reason: decision.check.reason,
+      save: check.save,
+      dc: check.dc,
+      reason: check.reason,
     };
   }
 
-  const specialization = decision.check.specialization ?? "";
+  const specialization = check.specialization ?? "";
   const skill = context.skills.find(
-    (option) =>
-      option.id === decision.check.skillId && option.specialization === specialization,
+    (option) => option.id === check.skillId && option.specialization === specialization,
   );
   if (!skill) throw new Error("AI_DM_REQUESTED_UNAVAILABLE_SKILL");
 
@@ -469,8 +473,8 @@ function actionArguments(
     skillId: skill.id,
     skillName: skill.name,
     ...(skill.specialization ? { specialization: skill.specialization } : {}),
-    dc: decision.check.dc,
-    reason: decision.check.reason,
+    dc: check.dc,
+    reason: check.reason,
   };
 }
 

@@ -239,6 +239,10 @@ export interface ResolveCampaignDmActionResult {
   action: CampaignDmAction;
   result: { type: "check.skill" | "check.save"; value: unknown };
   dmMessage: CampaignPlayMessage;
+  /** A resolved check may immediately lead to another player-supplied check. */
+  pendingAction: CampaignDmAction | null;
+  /** The original check remains authoritative even when later DM planning fails. */
+  aiError: string | null;
 }
 
 export function getCampaignGameState(campaignId: string): Promise<CampaignGameState> {

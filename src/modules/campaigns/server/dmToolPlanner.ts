@@ -348,8 +348,16 @@ export function validateDmTurnDecision(
     }
     case "health.damage":
     case "health.heal":
+      if (!allowedActors.has(command.targetId)) throw new Error("AI_DM_REQUESTED_UNKNOWN_TARGET");
+      break;
     case "condition.apply":
       if (!allowedActors.has(command.targetId)) throw new Error("AI_DM_REQUESTED_UNKNOWN_TARGET");
+      if (
+        (command.durationKind === "rounds" && command.remainingRounds === undefined) ||
+        (command.durationKind !== "rounds" && command.remainingRounds !== undefined)
+      ) {
+        throw new Error("AI_DM_CONDITION_DURATION_INVALID");
+      }
       break;
     case "condition.remove":
       if (
@@ -448,6 +456,7 @@ export async function planDmTurn(
     "In an active encounter, only the current-turn actor may attack. End each completed actor turn with encounter.end_turn before moving to the next participant.",
     "Use combat.attack for weapon or monster attacks rather than health.damage. Use spell/power commands for casting rather than manually applying their damage or conditions.",
     "Use health.damage/heal only for already-determined direct effects such as environmental damage, a trap whose outcome no longer needs a roll, or explicit narrative healing.",
+    "For round-based conditions, durationKind must be rounds and remainingRounds must be a positive integer. Omit remainingRounds for permanent or special conditions.",
     "Use inventory.grant and progression.xp.grant only when the fiction has actually awarded treasure or XP. Do not award XP merely for attempting an action.",
     "Use condition.apply/remove only when the condition is an authoritative consequence, not as flavor text.",
     "Do not request unnecessary checks for routine actions.",

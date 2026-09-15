@@ -5,12 +5,12 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { authClient } from "@/modules/auth/client/authClient";
 import {
-  bootstrapOfflineCloudState,
   flushOfflineMutations,
   resolveOfflineConflict,
   retryOfflineMutation,
@@ -59,6 +59,7 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
   const queryClient = useQueryClient();
   const [online, setOnline] = useState(currentOnlineState);
   const [syncing, setSyncing] = useState(false);
+  const syncingRef = useRef(false);
   const [offlineUserId, setOfflineUserId] = useState<string | null>(null);
   const [summary, setSummary] = useState<OfflineSyncSummary>(defaultSummary);
   const [mutations, setMutations] = useState<OfflineMutation[]>([]);
@@ -66,23 +67,27 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
   const refresh = useCallback(async () => {
     const rows = await listOfflineMutations();
     setMutations(rows);
-    setSummary(await getOfflineSyncSummary(online, syncing, offlineUserId));
-  }, [offlineUserId, online, syncing]);
+    setSummary(await getOfflineSyncSummary(online, syncingRef.current, offlineUserId));
+  }, [offlineUserId, online]);
 
   const syncNow = useCallback(async () => {
-    if (!online || !offlineUserId || syncing) return;
+    if (!online || !offlineUserId || syncingRef.current) return;
+    syncingRef.current = true;
     setSyncing(true);
     try {
+      // The engine replays queued writes and refreshes the authoritative cloud
+      // bootstrap once the ordered replay is complete.
       await flushOfflineMutations();
-      await bootstrapOfflineCloudState();
       await queryClient.invalidateQueries({ queryKey: ["campaigns"] });
       await queryClient.invalidateQueries({ queryKey: ["characters"] });
     } catch (error) {
       console.warn("Offline/cloud synchronization failed", { error });
     } finally {
+      syncingRef.current = false;
       setSyncing(false);
+      await refresh();
     }
-  }, [offlineUserId, online, queryClient, syncing]);
+  }, [offlineUserId, online, queryClient, refresh]);
 
   useEffect(() => {
     const userId = session.data?.user.id ?? null;
@@ -139,10 +144,10 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     const interval = window.setInterval(() => {
-      if (online && offlineUserId && !syncing) void syncNow();
+      if (online && offlineUserId && !syncingRef.current) void syncNow();
     }, 60_000);
     return () => window.clearInterval(interval);
-  }, [offlineUserId, online, syncNow, syncing]);
+  }, [offlineUserId, online, syncNow]);
 
   useEffect(() => {
     void refresh();

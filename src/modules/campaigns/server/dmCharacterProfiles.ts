@@ -527,12 +527,12 @@ export async function loadDmCampaignCharacterProfiles(
     ),
   ]);
 
-  for (const row of featRows) row.choices = safeJsonValue(row.choices);
+  for (const row of featRows) row["choices"] = safeJsonValue(row["choices"]);
   for (const row of raceTraitRows) {
-    row.parameters = safeJsonValue(row.parameters);
-    row.effects = safeJsonValue(row.effects);
+    row["parameters"] = safeJsonValue(row["parameters"]);
+    row["effects"] = safeJsonValue(row["effects"]);
   }
-  for (const row of classFeatureRows) row.parameters = safeJsonValue(row.parameters);
+  for (const row of classFeatureRows) row["parameters"] = safeJsonValue(row["parameters"]);
 
   const grouped = {
     abilities: groupByCharacter(abilityRows),

@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useOfflineSync } from "@/infrastructure/offline";
 import { authClient } from "@/modules/auth/client/authClient";
 import { useAuthModal } from "@/shared/stores/authModal.store";
 import {
@@ -57,6 +58,10 @@ function dateLabel(value: string | number | null) {
 
 export function CampaignsHub() {
   const session = authClient.useSession();
+  const { canUseOfflineData, online } = useOfflineSync();
+  const hasSaveAccess = Boolean(session.data) || canUseOfflineData;
+  const hasLiveSession = Boolean(session.data);
+  const canUseAuthoritativeActions = hasLiveSession && online;
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<HubMode>("library");
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
@@ -66,13 +71,13 @@ export function CampaignsHub() {
   const campaigns = useQuery({
     queryKey: ["campaigns", "library"],
     queryFn: listCampaigns,
-    enabled: Boolean(session.data),
+    enabled: hasSaveAccess,
   });
 
   const detail = useQuery({
     queryKey: ["campaigns", "detail", selectedCampaignId],
     queryFn: () => getCampaign(selectedCampaignId!),
-    enabled: Boolean(session.data && selectedCampaignId && mode === "edit"),
+    enabled: Boolean(hasSaveAccess && selectedCampaignId && mode === "edit"),
   });
 
   const start = useMutation({
@@ -108,6 +113,7 @@ export function CampaignsHub() {
   }
 
   function enterCampaign(campaign: CampaignListItem) {
+    if (!canUseAuthoritativeActions) return;
     setSelectedCampaignId(campaign.id);
     setMode("play");
   }
@@ -118,11 +124,11 @@ export function CampaignsHub() {
     setDeleteName("");
   }
 
-  if (session.isPending) {
+  if (session.isPending && !canUseOfflineData) {
     return <HubState title="Opening campaigns…" body="Loading your Endless Codex account." />;
   }
 
-  if (!session.data) {
+  if (!hasSaveAccess) {
     return (
       <HubState
         title="Sign in to manage campaigns"
@@ -141,6 +147,23 @@ export function CampaignsHub() {
   }
 
   if (mode === "create") {
+    if (!hasLiveSession) {
+      return (
+        <HubState
+          title="Reconnect to create a campaign"
+          body="Your verified local campaign saves are available offline, but creating a new campaign after a browser restart requires a live account session."
+          action={
+            <button
+              type="button"
+              onClick={openLibrary}
+              className="rounded-lg border border-border px-4 py-2 font-semibold"
+            >
+              Back to campaigns
+            </button>
+          }
+        />
+      );
+    }
     return (
       <div>
         <div className="mx-auto max-w-[1560px] px-4 pt-5 lg:px-8">
@@ -158,6 +181,23 @@ export function CampaignsHub() {
   }
 
   if (mode === "play" && selectedCampaignId) {
+    if (!canUseAuthoritativeActions) {
+      return (
+        <HubState
+          title="Reconnect to enter the campaign"
+          body="Live play, AI turns, combat, and other authoritative game actions remain online-only."
+          action={
+            <button
+              type="button"
+              onClick={openLibrary}
+              className="rounded-lg border border-border px-4 py-2 font-semibold"
+            >
+              Back to campaigns
+            </button>
+          }
+        />
+      );
+    }
     return <CampaignPlayScreen campaignId={selectedCampaignId} onBack={openLibrary} />;
   }
 
@@ -207,13 +247,20 @@ export function CampaignsHub() {
               <p className="mt-2 max-w-2xl text-muted-foreground">
                 Create a campaign, resume setup later, add characters, and enter the table when the world is active.
               </p>
+              {!hasLiveSession ? (
+                <p className="mt-2 text-sm text-gold">
+                  Offline copy open. Cached campaign setup remains editable; reconnect for new campaigns, world generation, and live play.
+                </p>
+              ) : null}
             </div>
             <button
               type="button"
+              disabled={!hasLiveSession}
+              title={hasLiveSession ? undefined : "Reconnect and verify your session to create a new campaign."}
               onClick={() => setMode("create")}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <CirclePlus className="h-5 w-5" /> Create campaign
+              <CirclePlus className="h-5 w-5" /> {hasLiveSession ? "Create campaign" : "Reconnect to create"}
             </button>
           </div>
 
@@ -300,7 +347,8 @@ export function CampaignsHub() {
                     {campaign.status === "ready" ? (
                       <button
                         type="button"
-                        disabled={start.isPending}
+                        disabled={start.isPending || !canUseAuthoritativeActions}
+                        title={canUseAuthoritativeActions ? undefined : "Reconnect before starting the campaign."}
                         onClick={() => {
                           if (
                             window.confirm(
@@ -310,7 +358,7 @@ export function CampaignsHub() {
                             start.mutate(campaign.id);
                           }
                         }}
-                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <Play className="h-4 w-4" /> Start
                       </button>
@@ -318,8 +366,10 @@ export function CampaignsHub() {
                     {["active", "paused"].includes(campaign.status) ? (
                       <button
                         type="button"
+                        disabled={!canUseAuthoritativeActions}
+                        title={canUseAuthoritativeActions ? undefined : "Reconnect before entering live play."}
                         onClick={() => enterCampaign(campaign)}
-                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground"
+                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <Play className="h-4 w-4" /> Enter
                       </button>
@@ -350,10 +400,11 @@ export function CampaignsHub() {
               </p>
               <button
                 type="button"
+                disabled={!hasLiveSession}
                 onClick={() => setMode("create")}
-                className="mt-6 inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground"
+                className="mt-6 inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-3 font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <CirclePlus className="h-5 w-5" /> Create campaign
+                <CirclePlus className="h-5 w-5" /> {hasLiveSession ? "Create campaign" : "Reconnect to create"}
               </button>
             </section>
           )}

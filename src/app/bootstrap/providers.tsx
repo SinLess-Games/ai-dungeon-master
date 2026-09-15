@@ -1,6 +1,7 @@
 import type { PropsWithChildren } from "react";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { OfflineSyncProvider } from "@/infrastructure/offline";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,5 +18,9 @@ const queryClient = new QueryClient({
 });
 
 export function AppProviders({ children }: PropsWithChildren) {
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <OfflineSyncProvider>{children}</OfflineSyncProvider>
+    </QueryClientProvider>
+  );
 }

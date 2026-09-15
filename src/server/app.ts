@@ -34,6 +34,8 @@ import { healthRoutes } from "@/modules/game/server/healthRoutes";
 import { gameLiveRoutes } from "@/modules/game/server/liveRoutes";
 import { resolvedCastingRoutes } from "@/modules/game/server/resolvedCastingRoutes";
 import { gameRoutes } from "@/modules/game/server/routes";
+import { offlineMutationMiddleware } from "@/modules/sync/server/offlineMutationMiddleware";
+import { syncRoutes } from "@/modules/sync/server/routes";
 
 const isolateStartedAt = Date.now();
 
@@ -196,6 +198,11 @@ app.use(
   }),
 );
 
+// Queued browser writes carry explicit sync headers. This middleware is a no-op
+// for ordinary requests and supplies idempotency + optimistic conflict detection
+// when an offline save is replayed.
+app.use("/api/*", offlineMutationMiddleware);
+
 app.route("/", authRoutes);
 app.route("/", authHandler);
 
@@ -205,6 +212,7 @@ const routes = app
   .route("/", devblogRoutes)
   .route("/", devblogAdminRoutes)
   .route("/", devblogAIRoutes)
+  .route("/", syncRoutes)
   .route("/", campaignRoutes)
   .route("/", campaignDeleteRoutes)
   .route("/", campaignPlayCharacterRoutes)
@@ -235,6 +243,7 @@ const routes = app
       endpoints: {
         health: "/api/health",
         live: "/api/health/live",
+        sync: "/api/sync/bootstrap",
         campaigns: "/api/campaigns",
         campaignPlayMessages: "/api/campaigns/:campaignId/play/messages",
         campaignPlayChecks: "/api/campaigns/:campaignId/play/characters/:characterId/checks",

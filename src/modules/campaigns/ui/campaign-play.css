@@ -93,6 +93,13 @@
   }
 }
 
+/* The left rail already tells the player whether they are in Campaign or OOC.
+ * Do not repeat that state in a large header above the conversation feed. */
+section:has(textarea[aria-label="Campaign play message"])
+  > div.border-b.border-border.px-5.py-4 {
+  display: none;
+}
+
 textarea[aria-label="Campaign play message"] {
   max-height: 10rem;
   overflow-y: auto;

@@ -10,6 +10,10 @@ import { evaluateAlignmentAction } from "./alignmentEvaluator";
 import { loadCampaignPlaySchemaReadiness } from "./campaignPlaySchemaReadiness";
 import { CAMPAIGN_DM_NARRATION_POLICY } from "./dmCampaignChatPolicy";
 import { recordNarratedCampaignNpcs } from "./dmNpcRegistry";
+import {
+  loadDmSystemReferences,
+  serializeDmSystemReferences,
+} from "./dmSystemReferencePlanner";
 import { executeDmPlannerCommand } from "./dmToolExecution";
 import { runDmToolLoop } from "./dmToolLoop";
 import { planDmTurn, type DmTurnDecision } from "./dmToolPlanner";
@@ -39,6 +43,18 @@ function withCampaignChatPolicy(conversation: string): string {
     `Campaign chat output policy: ${CAMPAIGN_DM_NARRATION_POLICY}`,
     conversation || "(No previous campaign or private OOC messages.)",
   ].join("\n\n");
+}
+
+function withSystemReferences(conversation: string, systemReferenceText: string): string {
+  if (!systemReferenceText) return withCampaignChatPolicy(conversation);
+  return withCampaignChatPolicy(
+    [
+      conversation,
+      "Source-backed system database references for this turn:",
+      "Use these rows as canonical reference knowledge for the active ruleset. They do not by themselves mutate game state; authoritative mechanics still require validated game commands.",
+      systemReferenceText,
+    ].join("\n\n"),
+  );
 }
 
 /**
@@ -80,13 +96,37 @@ export async function runStructuredDmTurn(input: {
   if (!context) return null;
 
   let recentEvents = await loadRecentDmEvents(input.binding, input.campaign.id);
-  let conversation = withCampaignChatPolicy(
-    await loadDmConversationText({
+  let rawConversation = await loadDmConversationText({
+    binding: input.binding,
+    campaignId: input.campaign.id,
+    userId: input.userId,
+  });
+
+  let systemReferenceText = "";
+  try {
+    const references = await loadDmSystemReferences({
+      env: input.env,
       binding: input.binding,
-      campaignId: input.campaign.id,
       userId: input.userId,
-    }),
-  );
+      rulesetId: input.campaign.rulesetId,
+      rulesetVersion: input.campaign.rulesetVersion,
+      campaignName: input.campaign.name,
+      campaignDescription: input.campaign.description,
+      playerText: input.playerAction,
+      conversation: rawConversation,
+    });
+    systemReferenceText = serializeDmSystemReferences(references);
+  } catch (error) {
+    // Rules/catalog retrieval improves grounding but must never make the table
+    // unusable if a reference lookup or small planning pass fails.
+    console.error("AI DM system reference hydration failed", {
+      campaignId: input.campaign.id,
+      rulesetId: input.campaign.rulesetId,
+      error,
+    });
+  }
+
+  let conversation = withSystemReferences(rawConversation, systemReferenceText);
   const seedResults = [...(input.seedAuthoritativeResults ?? [])];
   const commandResults: GameCommandResult[] = [];
 
@@ -108,7 +148,8 @@ export async function runStructuredDmTurn(input: {
       }),
     ]);
     recentEvents = nextEvents;
-    conversation = withCampaignChatPolicy(nextConversation);
+    rawConversation = nextConversation;
+    conversation = withSystemReferences(rawConversation, systemReferenceText);
   };
 
   const recordCommandResult = async (result: GameCommandResult) => {

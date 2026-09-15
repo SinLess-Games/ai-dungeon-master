@@ -121,6 +121,71 @@ function inferResource(
   return null;
 }
 
+function defaultOfflineQueuePolicy(path: string, method: string): boolean {
+  const pathname = path.split("?", 1)[0] ?? path;
+  if (method === "POST" && pathname === "/api/campaigns") return true;
+  if (method === "PATCH" && /^\/api\/campaigns\/[^/]+$/.test(pathname)) return true;
+  if (method === "DELETE" && /^\/api\/campaigns\/[^/]+$/.test(pathname)) return true;
+  if (method === "POST" && /^\/api\/campaigns\/[^/]+\/characters$/.test(pathname)) return true;
+  if (method === "PATCH" && /^\/api\/characters\/[^/]+$/.test(pathname)) return true;
+  if (method === "DELETE" && /^\/api\/characters\/[^/]+$/.test(pathname)) return true;
+  if (method === "PUT" && /^\/api\/characters\/[^/]+\/.+/.test(pathname)) return true;
+  if (method === "POST" && /^\/api\/characters\/[^/]+\/class-levels$/.test(pathname)) return true;
+  return false;
+}
+
+function withTemporaryCreateId(
+  path: string,
+  method: string,
+  body: BodyInit | null | undefined,
+): { body: BodyInit | null | undefined; resource: OfflineResourceRef | null; tempId: string | null } {
+  const pathname = path.split("?", 1)[0] ?? path;
+  const parsed = parseJsonBody(body);
+  if (method !== "POST" || !parsed) return { body, resource: null, tempId: null };
+
+  if (pathname === "/api/campaigns") {
+    const tempId = typeof parsed["id"] === "string" ? parsed["id"] : crypto.randomUUID();
+    return {
+      body: JSON.stringify({ ...parsed, id: tempId }),
+      resource: { kind: "campaign", id: tempId },
+      tempId,
+    };
+  }
+  if (/^\/api\/campaigns\/[^/]+\/characters$/.test(pathname)) {
+    const tempId = typeof parsed["id"] === "string" ? parsed["id"] : crypto.randomUUID();
+    return {
+      body: JSON.stringify({ ...parsed, id: tempId }),
+      resource: { kind: "character", id: tempId },
+      tempId,
+    };
+  }
+  return { body, resource: null, tempId: null };
+}
+
+function automaticOptimisticValue<T>(
+  path: string,
+  method: string,
+  body: BodyInit | null | undefined,
+  tempId: string | null,
+): T | undefined {
+  if (!tempId || method !== "POST") return undefined;
+  const pathname = path.split("?", 1)[0] ?? path;
+  const parsed = parseJsonBody(body) ?? {};
+  if (pathname === "/api/campaigns") {
+    return {
+      id: tempId,
+      name: typeof parsed["name"] === "string" ? parsed["name"] : "Offline campaign",
+      status: "draft",
+      rulesetId: "dnd35",
+      rulesetVersion: "3.5",
+    } as T;
+  }
+  if (/^\/api\/campaigns\/[^/]+\/characters$/.test(pathname)) {
+    return { id: tempId } as T;
+  }
+  return undefined;
+}
+
 async function errorFromResponse(response: Response): Promise<OfflineHttpError> {
   let message = `Request failed (${response.status}).`;
   let code: string | null = null;
@@ -146,11 +211,15 @@ function networkAvailable(): boolean {
   return typeof navigator === "undefined" || navigator.onLine !== false;
 }
 
-async function optimisticValue<T>(options: OfflineRequestOptions<T>): Promise<T> {
+async function optimisticValue<T>(
+  options: OfflineRequestOptions<T>,
+  automatic: T | undefined,
+): Promise<T> {
   if (typeof options.optimistic === "function") {
     return (await (options.optimistic as () => T | Promise<T>)()) as T;
   }
-  return options.optimistic as T;
+  if (options.optimistic !== undefined) return options.optimistic;
+  return automatic as T;
 }
 
 function replayableBody(body: BodyInit | null | undefined): string | null {
@@ -161,7 +230,10 @@ function replayableBody(body: BodyInit | null | undefined): string | null {
   return body;
 }
 
-function requestInputWithResolvedPath(input: RequestInfo | URL, resolvedPath: string): RequestInfo | URL {
+function requestInputWithResolvedPath(
+  input: RequestInfo | URL,
+  resolvedPath: string,
+): RequestInfo | URL {
   return typeof input === "string" ? resolvedPath : input;
 }
 
@@ -207,8 +279,10 @@ export async function offlineRequestJson<T>(
     throw new OfflineUnavailableError("This data has not been saved on this device yet.");
   }
 
+  const queueWhenOffline = options.queueWhenOffline ?? defaultOfflineQueuePolicy(requestedPath, method);
+  const prepared = withTemporaryCreateId(requestedPath, method, init.body);
   const inferred = options.resource === undefined
-    ? inferResource(requestedPath, method, init.body)
+    ? prepared.resource ?? inferResource(requestedPath, method, prepared.body)
     : options.resource;
   const resource = resolveOfflineResource(userId, inferred);
   const mutationId = crypto.randomUUID();
@@ -243,13 +317,13 @@ export async function offlineRequestJson<T>(
       return value;
     } catch (error) {
       if (error instanceof OfflineHttpError) throw error;
-      if (!options.queueWhenOffline) {
+      if (!queueWhenOffline) {
         throw error instanceof Error ? error : new OfflineUnavailableError(options.onlineOnlyMessage);
       }
     }
   }
 
-  if (!options.queueWhenOffline) {
+  if (!queueWhenOffline) {
     throw new OfflineUnavailableError(options.onlineOnlyMessage);
   }
   if (!userId) {
@@ -260,12 +334,18 @@ export async function offlineRequestJson<T>(
     id: mutationId,
     method: method as "POST" | "PUT" | "PATCH" | "DELETE",
     url: requestedPath,
-    body: replayableBody(init.body),
+    body: replayableBody(prepared.body),
     resource: inferred,
     baseVersion: inferred ? await getResourceVersion(resolveOfflineResource(userId, inferred)!) : null,
     forceLocal: false,
   });
-  const value = await optimisticValue(options);
+  const automatic = automaticOptimisticValue<T>(
+    requestedPath,
+    method,
+    prepared.body,
+    prepared.tempId,
+  );
+  const value = await optimisticValue(options, automatic);
   await options.onQueued?.(value);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("endless-codex:offline-sync-changed"));

@@ -1,0 +1,53 @@
+/* Campaign play owns the desktop viewport below the app header. The conversation
+ * pane scrolls independently so long sessions do not turn the entire document
+ * into one enormous page. Mobile remains document-scrolling because stacked
+ * sidebars need natural page flow on small screens. */
+@media (min-width: 1024px) {
+  main:has(textarea[aria-label="Campaign play message"]) {
+    height: calc(100dvh - 5rem);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  main:has(textarea[aria-label="Campaign play message"]) > div {
+    display: flex;
+    height: 100%;
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  main:has(textarea[aria-label="Campaign play message"]) > div > header,
+  main:has(textarea[aria-label="Campaign play message"]) > div > header + div:not(.grid) {
+    flex: 0 0 auto;
+  }
+
+  main:has(textarea[aria-label="Campaign play message"]) > div > .grid {
+    min-height: 0 !important;
+    flex: 1 1 auto;
+  }
+
+  main:has(textarea[aria-label="Campaign play message"]) > div > .grid > aside {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  main:has(textarea[aria-label="Campaign play message"]) section:has(textarea[aria-label="Campaign play message"]) {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  main:has(textarea[aria-label="Campaign play message"])
+    section:has(textarea[aria-label="Campaign play message"])
+    > .flex-1 {
+    min-height: 0;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+}
+
+textarea[aria-label="Campaign play message"] {
+  max-height: 10rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}

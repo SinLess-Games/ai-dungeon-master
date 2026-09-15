@@ -30,7 +30,10 @@ import {
   resolvePendingDmAction,
   type PublicCampaignDmAction,
 } from "./dmActionService";
-import { runStructuredDmTurn } from "./dmTurnOrchestrator";
+import {
+  runStructuredDmTurn,
+  type PendingInitiativeRequest,
+} from "./dmTurnOrchestrator";
 import { loadDmPlayerMessage } from "./dmTurnRuntime";
 import type { DmTurnDecision } from "./dmToolPlanner";
 
@@ -199,6 +202,7 @@ function publicDmMessage(row: StoredMessageRow) {
 }
 
 function actionLabel(action: PublicCampaignDmAction): string {
+  if (action.kind === "check.initiative") return "Initiative";
   if (action.kind === "check.skill" && action.skill) {
     return `${action.skill.name}${action.skill.specialization ? ` (${action.skill.specialization})` : ""}`;
   }
@@ -214,9 +218,27 @@ function actionLabel(action: PublicCampaignDmAction): string {
   }
 }
 
+function initiativeSummary(action: PublicCampaignDmAction, value: Record<string, unknown>): string {
+  const participants = Array.isArray(value["participants"]) ? value["participants"] : [];
+  const participant = participants.find((candidate) => {
+    if (!candidate || typeof candidate !== "object") return false;
+    return (candidate as Record<string, unknown>)["characterId"] === action.actorId;
+  });
+  if (!participant || typeof participant !== "object") return "Initiative resolved. Combat begins.";
+  const record = participant as Record<string, unknown>;
+  const natural = typeof record["initiativeRoll"] === "number" ? record["initiativeRoll"] : null;
+  const total = typeof record["initiativeTotal"] === "number" ? record["initiativeTotal"] : null;
+  if (natural === null) return "Initiative resolved. Combat begins.";
+  return total === null
+    ? `Initiative: natural ${natural}. Combat begins.`
+    : `Initiative: natural ${natural}, total ${total}. Combat begins.`;
+}
+
 function authoritativeSummary(action: PublicCampaignDmAction, value: unknown): string {
   if (!value || typeof value !== "object") return `${actionLabel(action)} resolved.`;
   const record = value as Record<string, unknown>;
+  if (action.kind === "check.initiative") return initiativeSummary(action, record);
+
   const raw = record["check"] ?? record["result"];
   if (!raw || typeof raw !== "object") return `${actionLabel(action)} resolved.`;
   const check = raw as Record<string, unknown>;
@@ -285,6 +307,14 @@ function pendingArguments(
   };
 }
 
+function initiativeArguments(request: PendingInitiativeRequest): CampaignDmActionArguments {
+  return {
+    type: "check.initiative",
+    participantIds: [...request.participantIds],
+    reason: request.reason,
+  };
+}
+
 function scheduleIfEvent(
   c: { env: Bindings; executionCtx: { waitUntil(promise: Promise<unknown>): void } },
   campaignId: string,
@@ -328,6 +358,10 @@ function translateResolutionError(error: unknown): never {
       throw new ValidationError("That skill can no longer be used for this requested check.");
     case "CAMPAIGN_GAME_NOT_ACTIVE":
       throw new ConflictError("This campaign does not currently have an active game session.");
+    case "ENCOUNTER_ALREADY_ACTIVE":
+      throw new ConflictError("Combat has already started; this initiative request is no longer pending.");
+    case "ENCOUNTER_PARTICIPANT_INVALID":
+      throw new ValidationError("The encounter participants changed before initiative was resolved.");
     case "GAME_ACTOR_OR_SKILL_NOT_FOUND":
     case "GAME_ACTOR_NOT_FOUND":
       throw new NotFoundError("The requested character check is no longer available.");
@@ -379,6 +413,7 @@ export const campaignDmActionRoutes = new Hono<Env>()
         await stream?.saved();
         let content = authoritativeSummary(resolved.action, resolved.result.value);
         let finalDecision: Extract<DmTurnDecision, { kind: "narration" | "check" }> | null = null;
+        let pendingInitiative: PendingInitiativeRequest | null = null;
         let nextPendingAction: PublicCampaignDmAction | null = null;
         let structuredError: string | null = null;
 
@@ -397,6 +432,7 @@ export const campaignDmActionRoutes = new Hono<Env>()
               },
               userId: session.user.id,
               characterId: origin.characterId,
+              playerMessageId: origin.requestedByMessageId,
               playerAction: playerMessage.content,
               seedAuthoritativeResults: [resolved.result.value],
               ...(stream ? { signal: stream.signal } : {}),
@@ -404,6 +440,7 @@ export const campaignDmActionRoutes = new Hono<Env>()
             });
             if (turn) {
               finalDecision = turn.decision;
+              pendingInitiative = turn.pendingInitiative;
               content = turn.decision.kind === "check" ? turn.decision.preface : turn.decision.text;
               if (stream && turn.decision.kind === "narration") {
                 content = await streamDmNarration(c.env, content, stream);
@@ -414,6 +451,7 @@ export const campaignDmActionRoutes = new Hono<Env>()
             await stream?.reset();
             content = authoritativeSummary(resolved.action, resolved.result.value);
             finalDecision = null;
+            pendingInitiative = null;
             console.error("AI DM post-check tool loop failed", {
               campaignId,
               actionId,
@@ -429,7 +467,7 @@ export const campaignDmActionRoutes = new Hono<Env>()
         const message = await insertDmMessage(db, campaignId, content);
         await attachDmResolutionMessage(db, resolved.action.id, message.id);
 
-        if (finalDecision?.kind === "check") {
+        if (pendingInitiative || finalDecision?.kind === "check") {
           try {
             const context = await loadDmCharacterContext(
               db,
@@ -445,7 +483,9 @@ export const campaignDmActionRoutes = new Hono<Env>()
               requestedUserId: session.user.id,
               characterId: origin.characterId,
               actorId: context.character.actorId,
-              arguments: pendingArguments(finalDecision, context),
+              arguments: pendingInitiative
+                ? initiativeArguments(pendingInitiative)
+                : pendingArguments(finalDecision!, context),
             });
           } catch (error) {
             console.error("Unable to persist chained AI DM check", {

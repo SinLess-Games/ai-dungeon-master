@@ -244,12 +244,21 @@ export function CampaignPlayScreen({
       if (!action) throw new Error("There is no pending Dungeon Master roll to resolve.");
       return resolveCampaignDmAction(campaignId, action.id, roll);
     },
-    onSuccess: async () => {
-      toast.success("Roll resolved by the rules engine.");
+    onSuccess: async (result) => {
+      queryClient.setQueryData(
+        ["campaigns", "play", campaignId, "dm-action"],
+        result.pendingAction,
+      );
+
+      if (result.aiError) {
+        toast.warning(result.aiError);
+      } else if (result.pendingAction) {
+        toast.info("Roll resolved. The Dungeon Master requests another roll.");
+      } else {
+        toast.success("Roll resolved by the rules engine.");
+      }
+
       await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: ["campaigns", "play", campaignId, "dm-action"],
-        }),
         queryClient.invalidateQueries({
           queryKey: ["campaigns", "play", campaignId, "messages", "campaign"],
         }),

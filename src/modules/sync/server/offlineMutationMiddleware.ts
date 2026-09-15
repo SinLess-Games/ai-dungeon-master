@@ -58,6 +58,22 @@ function parseStoredHeaders(value: string): HeadersInit {
   }
 }
 
+async function syncSchemaReady(db: D1Database): Promise<boolean> {
+  try {
+    const row = await db
+      .prepare(
+        `SELECT count(*) AS count
+         FROM sqlite_master
+         WHERE type = 'table'
+           AND name IN ('offline_sync_mutations', 'world_maps')`,
+      )
+      .first<{ count: number }>();
+    return Number(row?.count ?? 0) === 2;
+  } catch {
+    return false;
+  }
+}
+
 async function loadResourceVersion(
   db: D1Database,
   userId: string,
@@ -65,14 +81,18 @@ async function loadResourceVersion(
 ): Promise<number | null> {
   if (resource.kind === "campaign") {
     const row = await db
-      .prepare("SELECT updated_at AS version FROM campaigns WHERE id = ? AND owner_user_id = ? LIMIT 1")
+      .prepare(
+        "SELECT updated_at AS version FROM campaigns WHERE id = ? AND owner_user_id = ? LIMIT 1",
+      )
       .bind(resource.id, userId)
       .first<{ version: number }>();
     return row?.version ?? null;
   }
   if (resource.kind === "character") {
     const row = await db
-      .prepare("SELECT updated_at AS version FROM characters WHERE id = ? AND owner_user_id = ? LIMIT 1")
+      .prepare(
+        "SELECT updated_at AS version FROM characters WHERE id = ? AND owner_user_id = ? LIMIT 1",
+      )
       .bind(resource.id, userId)
       .first<{ version: number }>();
     return row?.version ?? null;
@@ -91,7 +111,9 @@ async function loadResourceVersion(
     return row?.version ?? null;
   }
   const row = await db
-    .prepare("SELECT revision AS version FROM world_maps WHERE id = ? AND owner_user_id = ? LIMIT 1")
+    .prepare(
+      "SELECT revision AS version FROM world_maps WHERE id = ? AND owner_user_id = ? LIMIT 1",
+    )
     .bind(resource.id, userId)
     .first<{ version: number }>();
   return row?.version ?? null;
@@ -147,7 +169,9 @@ function responseHeaderSnapshot(response: Response): Record<string, string> {
 /**
  * Wraps queued write replays with server-side idempotency and optimistic
  * concurrency. Normal application requests without the sync headers pass
- * through unchanged.
+ * through unchanged. Until migration 0026 exists remotely, sync-aware online
+ * requests also pass through unchanged so deploying the code cannot break the
+ * existing application before the D1 migration is applied.
  */
 export const offlineMutationMiddleware = createMiddleware<Env>(async (c, next) => {
   const method = c.req.method.toUpperCase();
@@ -162,14 +186,28 @@ export const offlineMutationMiddleware = createMiddleware<Env>(async (c, next) =
     return;
   }
   if (!mutationIdPattern.test(mutationId)) {
-    return c.json({ error: { code: "OFFLINE_SYNC_MUTATION_ID_INVALID", message: "Invalid offline mutation id." } }, 400);
+    return c.json(
+      {
+        error: {
+          code: "OFFLINE_SYNC_MUTATION_ID_INVALID",
+          message: "Invalid offline mutation id.",
+        },
+      },
+      400,
+    );
   }
   if (!c.env.DB) {
-    return c.json({ error: { code: "OFFLINE_SYNC_UNAVAILABLE", message: "Offline sync storage is unavailable." } }, 503);
+    await next();
+    return;
+  }
+
+  const db = c.env.DB;
+  if (!(await syncSchemaReady(db))) {
+    await next();
+    return;
   }
 
   const session = await requireUser(createAuth(c.env), c.req.raw.headers);
-  const db = c.env.DB;
   const receipt = await db
     .prepare(
       `SELECT response_status AS responseStatus,
@@ -216,7 +254,9 @@ export const offlineMutationMiddleware = createMiddleware<Env>(async (c, next) =
 
   if (resource && method !== "DELETE") {
     const version = await bumpMutableResourceVersion(db, session.user.id, resource);
-    if (version !== null) c.res.headers.set("X-Endless-Codex-Resource-Version", String(version));
+    if (version !== null) {
+      c.res.headers.set("X-Endless-Codex-Resource-Version", String(version));
+    }
   }
 
   const clone = c.res.clone();

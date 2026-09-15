@@ -28,14 +28,19 @@ const saveCheckSchema = z.object({
   reason,
 });
 
+const narrationDecisionSchema = z.object({
+  kind: z.literal("narration"),
+  text: z.string().trim().min(1).max(4000),
+});
+const checkDecisionSchema = z.object({
+  kind: z.literal("check"),
+  preface: z.string().trim().min(1).max(1500),
+  check: z.discriminatedUnion("type", [skillCheckSchema, saveCheckSchema]),
+});
+
 const dmCommandSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("encounter.start"),
-    participantIds: z.array(id).min(1).max(40),
-  }),
-  z.object({
-    type: z.literal("encounter.end_turn"),
-  }),
+  z.object({ type: z.literal("encounter.start"), participantIds: z.array(id).min(1).max(40) }),
+  z.object({ type: z.literal("encounter.end_turn") }),
   z.object({
     type: z.literal("encounter.finish"),
     status: z.enum(["completed", "abandoned"]).optional(),
@@ -120,24 +125,24 @@ const dmCommandSchema = z.discriminatedUnion("type", [
   }),
 ]);
 
+const commandDecisionSchema = z.object({
+  kind: z.literal("command"),
+  command: dmCommandSchema,
+});
+
 export const dmTurnDecisionSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("narration"),
-    text: z.string().trim().min(1).max(4000),
-  }),
-  z.object({
-    kind: z.literal("check"),
-    preface: z.string().trim().min(1).max(1500),
-    check: z.discriminatedUnion("type", [skillCheckSchema, saveCheckSchema]),
-  }),
-  z.object({
-    kind: z.literal("command"),
-    command: dmCommandSchema,
-  }),
+  narrationDecisionSchema,
+  checkDecisionSchema,
+  commandDecisionSchema,
+]);
+const legacyDmTurnDecisionSchema = z.discriminatedUnion("kind", [
+  narrationDecisionSchema,
+  checkDecisionSchema,
 ]);
 
 export type DmTurnDecision = z.infer<typeof dmTurnDecisionSchema>;
 export type DmPlannerCommand = z.infer<typeof dmCommandSchema>;
+export type LegacyDmTurnDecision = z.infer<typeof legacyDmTurnDecisionSchema>;
 
 export interface DmPlannerSkillOption {
   id: string;
@@ -163,6 +168,28 @@ export interface DmPlannerContext {
   character: DmToolCharacterContext;
 }
 
+interface CommonDmTurnInput {
+  campaignName: string;
+  campaignDescription: string | null;
+  rulesetId: string;
+  rulesetVersion: string;
+  settings: Record<string, unknown>;
+  recentEvents: unknown[];
+  conversation: string;
+}
+
+export interface StructuredDmTurnInput extends CommonDmTurnInput {
+  context: DmPlannerContext;
+  authoritativeToolResults?: unknown[];
+}
+
+/** Compatibility shape used by the first check-only route while the structured route is registered ahead of it. */
+export interface LegacyDmTurnInput extends CommonDmTurnInput {
+  actors: unknown[];
+  character: { id: string; name: string; actorId: string };
+  skills: DmPlannerSkillOption[];
+}
+
 function extractJsonObject(value: string): string {
   const trimmed = value.trim();
   if (trimmed.startsWith("```") && trimmed.endsWith("```")) {
@@ -171,7 +198,6 @@ function extractJsonObject(value: string): string {
       .replace(/\s*```$/, "")
       .trim();
   }
-
   const first = trimmed.indexOf("{");
   const last = trimmed.lastIndexOf("}");
   if (first >= 0 && last > first) return trimmed.slice(first, last + 1);
@@ -181,6 +207,11 @@ function extractJsonObject(value: string): string {
 export function parseDmTurnDecision(value: string): DmTurnDecision {
   const parsed = JSON.parse(extractJsonObject(value)) as unknown;
   return dmTurnDecisionSchema.parse(parsed);
+}
+
+function parseLegacyDmTurnDecision(value: string): LegacyDmTurnDecision {
+  const parsed = JSON.parse(extractJsonObject(value)) as unknown;
+  return legacyDmTurnDecisionSchema.parse(parsed);
 }
 
 function actorIds(context: DmPlannerContext): Set<string> {
@@ -195,11 +226,6 @@ function requireTargets(context: DmPlannerContext, ids: readonly string[] | unde
   }
 }
 
-/**
- * Rejects planner output that references state the acting character cannot use.
- * Rules validation still happens again in executeGameCommand; this layer prevents
- * invented ids from ever reaching the authoritative command boundary.
- */
 export function validateDmTurnDecision(
   decision: DmTurnDecision,
   context: DmPlannerContext,
@@ -226,7 +252,10 @@ export function validateDmTurnDecision(
       }
       break;
     case "encounter.end_turn":
-      if (!context.encounter || context.encounter.currentActorId !== context.character.character.actorId) {
+      if (
+        !context.encounter ||
+        context.encounter.currentActorId !== context.character.character.actorId
+      ) {
         throw new Error("AI_DM_END_TURN_NOT_AVAILABLE");
       }
       break;
@@ -234,7 +263,10 @@ export function validateDmTurnDecision(
       if (!context.encounter) throw new Error("AI_DM_ENCOUNTER_NOT_ACTIVE");
       break;
     case "combat.attack": {
-      if (!allowedActors.has(command.targetId) || command.targetId === context.character.character.actorId) {
+      if (
+        !allowedActors.has(command.targetId) ||
+        command.targetId === context.character.character.actorId
+      ) {
         throw new Error("AI_DM_REQUESTED_UNKNOWN_TARGET");
       }
       if (command.weaponInventoryId) {
@@ -285,7 +317,11 @@ export function validateDmTurnDecision(
       if (!allowedActors.has(command.targetId)) throw new Error("AI_DM_REQUESTED_UNKNOWN_TARGET");
       break;
     case "condition.remove":
-      if (!context.activeConditions.some((condition) => condition.runtimeConditionId === command.runtimeConditionId)) {
+      if (
+        !context.activeConditions.some(
+          (condition) => condition.runtimeConditionId === command.runtimeConditionId,
+        )
+      ) {
         throw new Error("AI_DM_REQUESTED_UNKNOWN_CONDITION");
       }
       break;
@@ -305,20 +341,65 @@ export function validateDmTurnDecision(
   return decision;
 }
 
+function validateLegacySkill(
+  decision: LegacyDmTurnDecision,
+  skills: readonly DmPlannerSkillOption[],
+): LegacyDmTurnDecision {
+  if (decision.kind !== "check" || decision.check.type !== "check.skill") return decision;
+  const requestedSpecialization = decision.check.specialization ?? "";
+  const allowed = skills.find(
+    (skill) =>
+      skill.id === decision.check.skillId && skill.specialization === requestedSpecialization,
+  );
+  if (!allowed) throw new Error("AI_DM_REQUESTED_UNAVAILABLE_SKILL");
+  return decision;
+}
+
+export function planDmTurn(
+  env: OpenAICompatibleEnv,
+  input: LegacyDmTurnInput,
+): Promise<LegacyDmTurnDecision>;
+export function planDmTurn(
+  env: OpenAICompatibleEnv,
+  input: StructuredDmTurnInput,
+): Promise<DmTurnDecision>;
 export async function planDmTurn(
   env: OpenAICompatibleEnv,
-  input: {
-    campaignName: string;
-    campaignDescription: string | null;
-    rulesetId: string;
-    rulesetVersion: string;
-    settings: Record<string, unknown>;
-    recentEvents: unknown[];
-    conversation: string;
-    context: DmPlannerContext;
-    authoritativeToolResults?: unknown[];
-  },
+  input: LegacyDmTurnInput | StructuredDmTurnInput,
 ): Promise<DmTurnDecision> {
+  if (!("context" in input)) {
+    const system = [
+      `You are the Dungeon Master turn planner for an ${input.rulesetId} ${input.rulesetVersion} campaign.`,
+      "Return exactly one JSON object and no markdown.",
+      "Choose narration when no mechanical uncertainty needs resolution.",
+      "Choose check only when the player's declared action requires a D&D skill check or saving throw before the outcome can be narrated.",
+      "Never invent a roll or mechanical outcome.",
+      "For skill checks, use only an exact skillId from the supplied allowed skills and preserve specialization exactly when present.",
+      '{"kind":"narration","text":"..."}',
+      '{"kind":"check","preface":"...","check":{"type":"check.skill","skillId":"...","dc":15,"reason":"..."}}',
+      '{"kind":"check","preface":"...","check":{"type":"check.save","save":"fort|ref|will","dc":15,"reason":"..."}}',
+    ].join(" ");
+    const response = await generateOpenAICompatibleText(env, {
+      system,
+      prompt: [
+        `Campaign: ${input.campaignName}`,
+        `Description: ${input.campaignDescription || "No campaign description provided."}`,
+        `Campaign settings: ${JSON.stringify(input.settings).slice(0, 5000)}`,
+        `Current actors: ${JSON.stringify(input.actors).slice(0, 5000)}`,
+        `Recent authoritative events: ${JSON.stringify(input.recentEvents).slice(0, 7000)}`,
+        `Acting character: ${JSON.stringify(input.character)}`,
+        `Allowed skills: ${JSON.stringify(input.skills).slice(0, 9000)}`,
+        "Recent conversation:",
+        input.conversation || "(No previous messages.)",
+        "Plan the response to the most recent player message.",
+      ].join("\n\n"),
+      temperature: 0.15,
+      maxTokens: 700,
+      ...(env.AI && env.AI_GAME_MODEL ? { model: env.AI_GAME_MODEL } : {}),
+    });
+    return validateLegacySkill(parseLegacyDmTurnDecision(response), input.skills);
+  }
+
   const context = input.context;
   const system = [
     `You are the Dungeon Master turn planner for an ${input.rulesetId} ${input.rulesetVersion} campaign.`,
@@ -360,26 +441,22 @@ export async function planDmTurn(
     alignment: context.character.alignment,
     activeConditions: context.activeConditions,
   };
-
-  const prompt = [
-    `Campaign: ${input.campaignName}`,
-    `Description: ${input.campaignDescription || "No campaign description provided."}`,
-    `Campaign settings: ${JSON.stringify(input.settings).slice(0, 5000)}`,
-    `Tool context: ${JSON.stringify(toolContext).slice(0, 18000)}`,
-    `Recent authoritative events: ${JSON.stringify(input.recentEvents).slice(0, 7000)}`,
-    `Authoritative results from this turn: ${JSON.stringify(input.authoritativeToolResults ?? []).slice(0, 9000)}`,
-    "Recent conversation:",
-    input.conversation || "(No previous messages.)",
-    "Choose the single next step for the most recent player turn.",
-  ].join("\n\n");
-
   const response = await generateOpenAICompatibleText(env, {
     system,
-    prompt,
+    prompt: [
+      `Campaign: ${input.campaignName}`,
+      `Description: ${input.campaignDescription || "No campaign description provided."}`,
+      `Campaign settings: ${JSON.stringify(input.settings).slice(0, 5000)}`,
+      `Tool context: ${JSON.stringify(toolContext).slice(0, 18000)}`,
+      `Recent authoritative events: ${JSON.stringify(input.recentEvents).slice(0, 7000)}`,
+      `Authoritative results from this turn: ${JSON.stringify(input.authoritativeToolResults ?? []).slice(0, 9000)}`,
+      "Recent conversation:",
+      input.conversation || "(No previous messages.)",
+      "Choose the single next step for the most recent player turn.",
+    ].join("\n\n"),
     temperature: 0.1,
     maxTokens: 1100,
     ...(env.AI && env.AI_GAME_MODEL ? { model: env.AI_GAME_MODEL } : {}),
   });
-
   return validateDmTurnDecision(parseDmTurnDecision(response), context);
 }

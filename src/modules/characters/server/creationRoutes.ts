@@ -12,7 +12,6 @@ import { characterFeatCreationRoutes } from "./featCreationRoutes";
 import { characterFinalizeCreationRoutes } from "./finalizeCreationRoutes";
 import { characterOptionRoutes } from "./optionsRoutes";
 import { characterSkillLanguageRoutes } from "./skillLanguageRoutes";
-import { supplementClassOptionRoutes } from "./supplementClassOptionRoutes";
 
 interface CharacterCreationBindings extends AuthEnv {
   DB?: D1Database;
@@ -21,7 +20,6 @@ type CharacterCreationEnv = { Bindings: CharacterCreationBindings };
 
 export const characterCreationRoutes = new Hono<CharacterCreationEnv>()
   .route("/", characterAdvancedCreationRoutes)
-  .route("/", supplementClassOptionRoutes)
   .route("/", characterOptionRoutes)
   .route("/", characterFinalizeCreationRoutes)
   .route("/", characterSkillLanguageRoutes)

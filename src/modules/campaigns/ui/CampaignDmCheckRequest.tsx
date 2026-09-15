@@ -28,18 +28,39 @@ export function CampaignDmCheckRequest({
   onResolve: (roll: number) => void;
 }) {
   const [rollText, setRollText] = useState("");
+  const [rolledWithButton, setRolledWithButton] = useState(false);
+  const [lockedRoll, setLockedRoll] = useState<number | null>(null);
+  const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
     setRollText("");
+    setRolledWithButton(false);
+    setLockedRoll(null);
+    setSubmitted(false);
   }, [action.id]);
 
-  const roll = Number.parseInt(rollText, 10);
+  useEffect(() => {
+    if (action.status === "pending" && action.error) setSubmitted(false);
+  }, [action.error, action.status]);
+
+  const enteredRoll = Number.parseInt(rollText, 10);
+  const roll = lockedRoll ?? enteredRoll;
   const validRoll = Number.isInteger(roll) && roll >= 1 && roll <= 20;
-  const resolving = disabled || action.status === "resolving";
+  const resolving = disabled || submitted || action.status === "resolving";
+  const rollInputLocked = resolving || rolledWithButton || lockedRoll !== null;
 
   function rollD20() {
+    if (resolving || rolledWithButton || lockedRoll !== null) return;
     const natural = Math.floor(Math.random() * 20) + 1;
     setRollText(String(natural));
+    setRolledWithButton(true);
+  }
+
+  function submitRoll() {
+    if (resolving || !validRoll) return;
+    setLockedRoll(roll);
+    setSubmitted(true);
+    onResolve(roll);
   }
 
   return (
@@ -75,7 +96,7 @@ export function CampaignDmCheckRequest({
               max={20}
               inputMode="numeric"
               value={rollText}
-              disabled={resolving}
+              disabled={rollInputLocked}
               onChange={(event) => setRollText(event.target.value)}
               className="h-10 w-full rounded-lg border border-border bg-background px-3 text-center text-lg font-bold outline-none transition focus:border-gold/50 disabled:opacity-50"
               aria-label="Natural d20 roll"
@@ -83,25 +104,29 @@ export function CampaignDmCheckRequest({
           </label>
           <button
             type="button"
-            disabled={resolving}
+            disabled={resolving || rolledWithButton || lockedRoll !== null}
             onClick={rollD20}
             className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-semibold transition hover:border-gold/40 hover:text-gold disabled:opacity-50"
           >
-            <Dice5 className="h-4 w-4" /> Roll d20
+            <Dice5 className="h-4 w-4" /> {rolledWithButton ? "Rolled" : "Roll d20"}
           </button>
           <button
             type="button"
             disabled={resolving || !validRoll}
-            onClick={() => onResolve(roll)}
+            onClick={submitRoll}
             className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
           >
             {resolving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Dice5 className="h-4 w-4" />}
-            {resolving ? "Resolving…" : "Submit roll"}
+            {resolving
+              ? "Resolving…"
+              : action.error && lockedRoll !== null
+                ? "Retry same roll"
+                : "Submit roll"}
           </button>
         </div>
 
         <p className="mt-3 text-[11px] leading-5 text-muted-foreground">
-          The number you submit is the natural d20. Your character modifiers, DC, and success or failure are resolved by the authoritative rules engine.
+          The number you submit is the natural d20. Your character modifiers, DC, and success or failure are resolved by the authoritative rules engine. Each requested check gets one roll; retries reuse that same natural result.
         </p>
       </div>
     </section>

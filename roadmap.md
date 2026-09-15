@@ -83,5 +83,5 @@ September 14 audit point. Later AI-DM, campaign-duration, and live-sheet/encumbr
 work adds focused unit coverage, but this environment cannot execute the repository
 test suite and current GitHub Actions jobs fail before their workflow steps begin.
 Browser E2E, live Google/AI calls, remote migrations, and production deployment were
-not run as part of this roadmap audit. Pull-request deployment previews may still run
+not run as part of this roadmap audit. Pull-request deployment previews may run
 separately from this audit.

@@ -252,11 +252,11 @@ export function validateDmTurnDecision(
 ): DmTurnDecision {
   if (decision.kind === "narration") return decision;
   if (decision.kind === "check") {
-    if (decision.check.type !== "check.skill") return decision;
-    const requestedSpecialization = decision.check.specialization ?? "";
+    const check = decision.check;
+    if (check.type !== "check.skill") return decision;
+    const requestedSpecialization = check.specialization ?? "";
     const allowed = context.character.skills.find(
-      (skill) =>
-        skill.id === decision.check.skillId && skill.specialization === requestedSpecialization,
+      (skill) => skill.id === check.skillId && skill.specialization === requestedSpecialization,
     );
     if (!allowed) throw new Error("AI_DM_REQUESTED_UNAVAILABLE_SKILL");
     return decision;
@@ -306,7 +306,11 @@ export function validateDmTurnDecision(
           throw new Error("AI_DM_REQUESTED_UNAVAILABLE_MONSTER_ATTACK");
         }
         const attack = attacker.attacks?.find((option) => option.id === command.monsterAttackId);
-        if (!attack || !attack.canUseAsStandard || monsterAttackKind(attack.attackMode) !== command.kind) {
+        if (
+          !attack ||
+          !attack.canUseAsStandard ||
+          monsterAttackKind(attack.attackMode) !== command.kind
+        ) {
           throw new Error("AI_DM_REQUESTED_UNAVAILABLE_MONSTER_ATTACK");
         }
       } else {
@@ -388,11 +392,12 @@ function validateLegacySkill(
   decision: LegacyDmTurnDecision,
   skills: readonly DmPlannerSkillOption[],
 ): LegacyDmTurnDecision {
-  if (decision.kind !== "check" || decision.check.type !== "check.skill") return decision;
-  const requestedSpecialization = decision.check.specialization ?? "";
+  if (decision.kind !== "check") return decision;
+  const check = decision.check;
+  if (check.type !== "check.skill") return decision;
+  const requestedSpecialization = check.specialization ?? "";
   const allowed = skills.find(
-    (skill) =>
-      skill.id === decision.check.skillId && skill.specialization === requestedSpecialization,
+    (skill) => skill.id === check.skillId && skill.specialization === requestedSpecialization,
   );
   if (!allowed) throw new Error("AI_DM_REQUESTED_UNAVAILABLE_SKILL");
   return decision;

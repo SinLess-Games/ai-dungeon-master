@@ -7,6 +7,7 @@ import {
   type GameCommandResult,
 } from "@/modules/game/server/gameCommandService";
 import { evaluateAlignmentAction } from "./alignmentEvaluator";
+import { loadCampaignPlaySchemaReadiness } from "./campaignPlaySchemaReadiness";
 import { executeDmPlannerCommand } from "./dmToolExecution";
 import { runDmToolLoop } from "./dmToolLoop";
 import { planDmTurn, type DmTurnDecision } from "./dmToolPlanner";
@@ -52,6 +53,15 @@ export async function runStructuredDmTurn(input: {
   seedAuthoritativeResults?: readonly unknown[];
   onCommittedResult?: (result: GameCommandResult) => void;
 }): Promise<StructuredDmTurnResult | null> {
+  const readiness = await loadCampaignPlaySchemaReadiness(input.binding);
+  if (!readiness.structuredDm) {
+    console.warn("Structured AI DM is unavailable until campaign-play migrations are applied", {
+      campaignId: input.campaign.id,
+      missingTables: readiness.missingTables,
+    });
+    return null;
+  }
+
   let context = await loadDmPlannerContext({
     binding: input.binding,
     campaignId: input.campaign.id,

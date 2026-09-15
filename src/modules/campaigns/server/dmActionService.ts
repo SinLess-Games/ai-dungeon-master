@@ -7,6 +7,7 @@ import {
   type GameCommand,
   type GameCommandResult,
 } from "@/modules/game/server/gameCommandService";
+import { loadCampaignPlaySchemaReadiness } from "./campaignPlaySchemaReadiness";
 import type { DmPlannerSkillOption } from "./dmToolPlanner";
 
 interface DmActionRow {
@@ -137,6 +138,9 @@ export async function findPendingDmAction(
   campaignId: string,
   userId: string,
 ): Promise<PublicCampaignDmAction | null> {
+  const readiness = await loadCampaignPlaySchemaReadiness(binding);
+  if (!readiness.dmActions) return null;
+
   const row = await binding
     .prepare(
       `SELECT id,

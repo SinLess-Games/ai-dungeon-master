@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  loadCampaignPlaySchemaReadiness: vi.fn(),
   loadDmPlannerContext: vi.fn(),
   loadRecentDmEvents: vi.fn(),
   loadDmConversationText: vi.fn(),
@@ -13,6 +14,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/infrastructure/database/client", () => ({
   createDatabase: mocks.createDatabase,
+}));
+
+vi.mock("@/modules/campaigns/server/campaignPlaySchemaReadiness", () => ({
+  loadCampaignPlaySchemaReadiness: mocks.loadCampaignPlaySchemaReadiness,
 }));
 
 vi.mock("@/modules/campaigns/server/dmTurnRuntime", () => ({
@@ -82,6 +87,12 @@ const input = {
 describe("structured AI DM turn orchestration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.loadCampaignPlaySchemaReadiness.mockResolvedValue({
+      dmActions: true,
+      alignmentTracking: true,
+      structuredDm: true,
+      missingTables: [],
+    });
     mocks.loadDmPlannerContext.mockResolvedValue(context());
     mocks.loadRecentDmEvents.mockResolvedValue([]);
     mocks.loadDmConversationText.mockResolvedValue("Ari: I finish the objective.");
@@ -91,6 +102,19 @@ describe("structured AI DM turn orchestration", () => {
       goodEvilDelta: 0,
       reason: "No meaningful alignment drift.",
     });
+  });
+
+  it("falls back before loading structured state when its D1 migrations are unavailable", async () => {
+    mocks.loadCampaignPlaySchemaReadiness.mockResolvedValueOnce({
+      dmActions: false,
+      alignmentTracking: false,
+      structuredDm: false,
+      missingTables: ["campaign_dm_actions", "runtime_dnd35_alignment_states"],
+    });
+
+    await expect(runStructuredDmTurn(input)).resolves.toBeNull();
+    expect(mocks.loadDmPlannerContext).not.toHaveBeenCalled();
+    expect(mocks.planDmTurn).not.toHaveBeenCalled();
   });
 
   it("reports every committed command immediately instead of waiting for the whole model loop", async () => {

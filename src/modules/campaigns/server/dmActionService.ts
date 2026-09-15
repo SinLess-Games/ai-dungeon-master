@@ -7,6 +7,7 @@ import {
   type GameCommand,
   type GameCommandResult,
 } from "@/modules/game/server/gameCommandService";
+import { startActorEncounter } from "@/modules/game/server/actorEncounterService";
 import { loadCampaignPlaySchemaReadiness } from "./campaignPlaySchemaReadiness";
 import type { DmPlannerSkillOption } from "./dmToolPlanner";
 
@@ -19,7 +20,7 @@ interface DmActionRow {
   requestedUserId: string;
   characterId: string;
   actorId: string;
-  kind: "check.skill" | "check.save";
+  kind: "check.skill" | "check.save" | "check.initiative";
   arguments: string;
   status: "pending" | "resolving" | "resolved" | "failed" | "cancelled";
   result: string | null;
@@ -56,9 +57,9 @@ export interface PublicCampaignDmAction {
   campaignId: string;
   characterId: string;
   actorId: string;
-  kind: "check.skill" | "check.save";
+  kind: "check.skill" | "check.save" | "check.initiative";
   status: "pending" | "resolving" | "resolved" | "failed" | "cancelled";
-  dc: number;
+  dc: number | null;
   reason: string;
   skill: { id: string; name: string; specialization: string } | null;
   save: "fort" | "ref" | "will" | null;
@@ -70,7 +71,19 @@ export interface PublicCampaignDmAction {
 function parseArguments(value: string): CampaignDmActionArguments {
   const parsed = JSON.parse(value) as CampaignDmActionArguments;
   if (!parsed || typeof parsed !== "object") throw new Error("AI_DM_ACTION_ARGUMENTS_INVALID");
-  if (parsed.type !== "check.skill" && parsed.type !== "check.save") {
+  if (
+    parsed.type !== "check.skill" &&
+    parsed.type !== "check.save" &&
+    parsed.type !== "check.initiative"
+  ) {
+    throw new Error("AI_DM_ACTION_ARGUMENTS_INVALID");
+  }
+  if (
+    parsed.type === "check.initiative" &&
+    (!Array.isArray(parsed.participantIds) ||
+      parsed.participantIds.length === 0 ||
+      parsed.participantIds.some((id) => typeof id !== "string" || id.trim().length === 0))
+  ) {
     throw new Error("AI_DM_ACTION_ARGUMENTS_INVALID");
   }
   return parsed;
@@ -83,9 +96,9 @@ function publicAction(row: DmActionRow): PublicCampaignDmAction {
     campaignId: row.campaignId,
     characterId: row.characterId,
     actorId: row.actorId,
-    kind: row.kind,
+    kind: args.type,
     status: row.status,
-    dc: args.dc,
+    dc: args.type === "check.initiative" ? null : args.dc,
     reason: args.reason,
     skill:
       args.type === "check.skill"
@@ -307,7 +320,7 @@ export async function createPendingDmAction(
 
 function commandForAction(
   row: DmActionRow,
-  args: CampaignDmActionArguments,
+  args: Exclude<CampaignDmActionArguments, { type: "check.initiative" }>,
   roll: number,
 ): GameCommand {
   if (args.type === "check.skill") {
@@ -338,6 +351,8 @@ function isTerminalResolutionError(error: unknown): boolean {
     "CAMPAIGN_RULESET_UNSUPPORTED",
     "GAME_ACTOR_NOT_FOUND",
     "GAME_ACTOR_OR_SKILL_NOT_FOUND",
+    "ENCOUNTER_ALREADY_ACTIVE",
+    "ENCOUNTER_PARTICIPANT_INVALID",
   ]).has(error.message);
 }
 
@@ -376,11 +391,24 @@ export async function resolvePendingDmAction(
 
   const args = parseArguments(row.arguments);
   try {
-    const result = await executeGameCommand(
-      { db: createDatabase(binding), binding },
-      input.campaignId,
-      commandForAction(row, args, input.roll),
-    );
+    const result: GameCommandResult =
+      args.type === "check.initiative"
+        ? {
+            type: "encounter.start",
+            value: await startActorEncounter(
+              { db: createDatabase(binding), binding },
+              {
+                campaignId: input.campaignId,
+                participantIds: args.participantIds,
+                initiativeRolls: { [row.actorId]: input.roll },
+              },
+            ),
+          }
+        : await executeGameCommand(
+            { db: createDatabase(binding), binding },
+            input.campaignId,
+            commandForAction(row, args, input.roll),
+          );
     if (resultIsDisallowed(result.value)) {
       throw new Error("AI_DM_ACTION_SKILL_NOT_ALLOWED");
     }

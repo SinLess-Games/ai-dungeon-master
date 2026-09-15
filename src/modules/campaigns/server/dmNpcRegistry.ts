@@ -1,13 +1,13 @@
 /// <reference types="@cloudflare/workers-types" />
 
 export interface NarratedNpcReference {
-  id?: string;
+  id?: string | undefined;
   name: string;
-  role?: string;
-  description?: string;
-  location?: string;
-  attitude?: string;
-  notes?: string;
+  role?: string | undefined;
+  description?: string | undefined;
+  location?: string | undefined;
+  attitude?: string | undefined;
+  notes?: string | undefined;
 }
 
 export interface CampaignNpcMemory {
@@ -33,13 +33,13 @@ interface ActorRow {
 }
 
 interface NpcExtension {
-  role?: string;
-  description?: string;
-  location?: string;
-  attitude?: string;
-  notes?: string;
-  firstSeenAt?: number;
-  lastSeenAt?: number;
+  role?: string | undefined;
+  description?: string | undefined;
+  location?: string | undefined;
+  attitude?: string | undefined;
+  notes?: string | undefined;
+  firstSeenAt?: number | undefined;
+  lastSeenAt?: number | undefined;
 }
 
 function objectValue(value: unknown): Record<string, unknown> {

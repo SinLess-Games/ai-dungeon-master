@@ -29,6 +29,8 @@ import {
   calculateEncumbranceState,
   combineArmorCheckPenalty,
   combineMaximumDexterityBonus,
+  encumberedLandSpeed,
+  encumbrancePenaltyProfile,
   effectiveAbilityScore,
   grappleSizeModifier,
   type Dnd35Size,
@@ -278,6 +280,10 @@ async function loadDefensiveEquipment(db: Database, characterId: string) {
       shieldBonus: 0,
       maximumDexterityBonus: null as number | null,
       armorCheckPenalty: 0,
+      speedAt30Feet: null as number | null,
+      speedAt20Feet: null as number | null,
+      movementRestricted: false,
+      runMultiplier: 4,
     };
   }
 
@@ -288,6 +294,15 @@ async function loadDefensiveEquipment(db: Database, characterId: string) {
   const dexCaps = [...armorRows, ...shieldRows]
     .map((entry) => entry.maxDexBonus)
     .filter((value): value is number => value !== null);
+  const speedAt30 = [...armorRows, ...shieldRows]
+    .map((entry) => entry.speedAt30Feet)
+    .filter((value): value is number => value !== null);
+  const speedAt20 = [...armorRows, ...shieldRows]
+    .map((entry) => entry.speedAt20Feet)
+    .filter((value): value is number => value !== null);
+  const movementRestricted =
+    armorRows.some((entry) => entry.category === "medium" || entry.category === "heavy") ||
+    shieldRows.some((entry) => entry.speedAt30Feet !== null || entry.speedAt20Feet !== null);
 
   return {
     armorBonus: armorRows.reduce((best, entry) => Math.max(best, entry.acBonus), 0),
@@ -296,7 +311,27 @@ async function loadDefensiveEquipment(db: Database, characterId: string) {
     armorCheckPenalty:
       armorRows.reduce((sum, entry) => sum + entry.armorCheckPenalty, 0) +
       shieldRows.reduce((sum, entry) => sum + entry.armorCheckPenalty, 0),
+    speedAt30Feet: speedAt30.length === 0 ? null : Math.min(...speedAt30),
+    speedAt20Feet: speedAt20.length === 0 ? null : Math.min(...speedAt20),
+    movementRestricted,
+    runMultiplier: armorRows.some((entry) => entry.category === "heavy") ? 3 : 4,
   };
+}
+
+function equipmentAdjustedLandSpeed(
+  baseSpeedFeet: number,
+  defense: Awaited<ReturnType<typeof loadDefensiveEquipment>>,
+): number {
+  if (baseSpeedFeet === 30 && defense.speedAt30Feet !== null) {
+    return Math.min(baseSpeedFeet, defense.speedAt30Feet);
+  }
+  if (baseSpeedFeet === 20 && defense.speedAt20Feet !== null) {
+    return Math.min(baseSpeedFeet, defense.speedAt20Feet);
+  }
+  if (defense.movementRestricted) {
+    return encumberedLandSpeed(baseSpeedFeet, encumbrancePenaltyProfile("medium"));
+  }
+  return baseSpeedFeet;
 }
 
 export async function loadEncumbranceSnapshot(input: {
@@ -305,10 +340,11 @@ export async function loadEncumbranceSnapshot(input: {
   characterId: string;
 }): Promise<RuntimeEncumbranceSnapshot | null> {
   if (!(await requireActiveCharacter(input.db, input.campaignId, input.characterId))) return null;
-  const [extension, strength, raceData, inventoryRows] = await Promise.all([
+  const [extension, strength, raceData, defense, inventoryRows] = await Promise.all([
     loadDndCharacter(input.db, input.characterId),
     loadEffectiveAbility(input.db, input.characterId, "str"),
     loadRaceCombatData(input.db, input.characterId),
+    loadDefensiveEquipment(input.db, input.characterId),
     input.db
       .select({ quantity: characterInventory.quantity, weightPounds: items.weightPounds })
       .from(characterInventory)
@@ -333,14 +369,19 @@ export async function loadEncumbranceSnapshot(input: {
     carriedWeight += row.weightPounds * row.quantity;
   }
 
+  const encumbrance = calculateEncumbranceState({
+    strength,
+    size: raceData.size,
+    carriedWeight,
+    baseLandSpeedFeet: raceData.baseSpeedFeet,
+    enabled: extension.encumbranceEnabled,
+  });
+  const equipmentLandSpeed = equipmentAdjustedLandSpeed(raceData.baseSpeedFeet, defense);
+
   return {
-    ...calculateEncumbranceState({
-      strength,
-      size: raceData.size,
-      carriedWeight,
-      baseLandSpeedFeet: raceData.baseSpeedFeet,
-      enabled: extension.encumbranceEnabled,
-    }),
+    ...encumbrance,
+    landSpeedFeet: Math.min(encumbrance.landSpeedFeet, equipmentLandSpeed),
+    runMultiplier: Math.min(encumbrance.runMultiplier, defense.runMultiplier),
     weightComplete: unknownWeightItems === 0,
     unknownWeightItems,
   };

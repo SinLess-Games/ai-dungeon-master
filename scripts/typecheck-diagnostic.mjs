@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 
-const probe = /src\/modules\/campaigns\/(?:client|ui)\//;
+const probe = /src\/modules\/characters\/(?:client|ui)\//;
 const result = spawnSync("npm", ["run", "typecheck"], {
   encoding: "utf8",
   shell: false,

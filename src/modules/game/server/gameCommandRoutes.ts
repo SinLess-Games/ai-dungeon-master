@@ -33,9 +33,11 @@ type Env = { Bindings: Bindings };
 type CampaignRole = "owner" | "gm" | "player" | "observer";
 
 const id = z.string().trim().min(1).max(200);
+const reason = z.string().trim().min(1).max(1000);
 const targetIds = z.array(id).max(100).optional();
 const dc = z.number().int().min(0).max(1_000_000);
 const d20 = z.number().int().min(1).max(20);
+const positiveInteger = z.number().int().min(1).max(1_000_000_000);
 
 const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("encounter.start"), participantIds: z.array(id).min(1).max(100) }),
@@ -52,6 +54,9 @@ const commandSchema = z.discriminatedUnion("type", [
     kind: z.enum(["melee", "ranged"]),
     weaponInventoryId: id.optional(),
     monsterAttackId: id.optional(),
+    attackRoll: d20.optional(),
+    confirmationRoll: d20.optional(),
+    damageRolls: z.array(positiveInteger).max(1000).optional(),
   }),
   z.object({
     type: z.literal("check.skill"),
@@ -101,6 +106,64 @@ const commandSchema = z.discriminatedUnion("type", [
       .optional(),
     targetIds,
   }),
+  z.object({
+    type: z.literal("health.damage"),
+    targetId: id,
+    amount: z.number().int().min(0).max(1_000_000_000),
+    sourceActorId: id.optional(),
+    reason,
+  }),
+  z.object({
+    type: z.literal("health.heal"),
+    targetId: id,
+    amount: z.number().int().min(0).max(1_000_000_000),
+    sourceActorId: id.optional(),
+    reason,
+  }),
+  z.object({
+    type: z.literal("condition.apply"),
+    targetId: id,
+    conditionId: id,
+    sourceActorId: id.optional(),
+    sourceDescription: z.string().trim().max(1000).optional(),
+    durationKind: z.enum(["rounds", "permanent", "special"]),
+    remainingRounds: z.number().int().min(1).max(1_000_000).optional(),
+    reason,
+  }),
+  z.object({
+    type: z.literal("condition.remove"),
+    runtimeConditionId: id,
+    sourceActorId: id.optional(),
+    reason,
+  }),
+  z.object({
+    type: z.literal("inventory.grant"),
+    actorId: id,
+    itemId: id,
+    quantity: positiveInteger,
+    location: z.enum(["carried", "stored", "party"]).optional(),
+    reason,
+  }),
+  z.object({
+    type: z.literal("inventory.remove"),
+    actorId: id,
+    inventoryId: id,
+    quantity: positiveInteger,
+    reason,
+  }),
+  z.object({
+    type: z.literal("progression.xp.grant"),
+    actorId: id,
+    amount: positiveInteger,
+    reason,
+  }),
+  z.object({
+    type: z.literal("alignment.record"),
+    actorId: id,
+    lawChaosDelta: z.number().int().min(-20).max(20),
+    goodEvilDelta: z.number().int().min(-20).max(20),
+    reason,
+  }),
 ]);
 
 function requireDatabase(binding: D1Database | undefined): D1Database {
@@ -136,6 +199,24 @@ async function role(input: {
   return membership.role;
 }
 
+function gmOnlyCommand(command: GameCommand): boolean {
+  switch (command.type) {
+    case "encounter.start":
+    case "encounter.finish":
+    case "health.damage":
+    case "health.heal":
+    case "condition.apply":
+    case "condition.remove":
+    case "inventory.grant":
+    case "inventory.remove":
+    case "progression.xp.grant":
+    case "alignment.record":
+      return true;
+    default:
+      return false;
+  }
+}
+
 function controlledActorId(command: GameCommand): string | null {
   switch (command.type) {
     case "encounter.end_turn":
@@ -144,11 +225,19 @@ function controlledActorId(command: GameCommand): string | null {
     case "spell.cast.prepared":
     case "spell.cast.spontaneous":
     case "power.manifest":
+    case "inventory.grant":
+    case "inventory.remove":
+    case "progression.xp.grant":
+    case "alignment.record":
       return command.actorId;
     case "combat.attack":
       return command.attackerId;
     case "encounter.start":
     case "encounter.finish":
+    case "health.damage":
+    case "health.heal":
+    case "condition.apply":
+    case "condition.remove":
       return null;
   }
 }
@@ -160,9 +249,9 @@ async function authorizeCommand(input: {
   role: CampaignRole;
   command: GameCommand;
 }): Promise<void> {
-  if (input.command.type === "encounter.start" || input.command.type === "encounter.finish") {
+  if (gmOnlyCommand(input.command)) {
     if (input.role !== "owner" && input.role !== "gm") {
-      throw new ForbiddenError("Only the campaign owner or Game Master can manage encounters.");
+      throw new ForbiddenError("Only the campaign owner or Game Master can issue this command.");
     }
     return;
   }
@@ -216,10 +305,16 @@ function translate(error: unknown): never {
       throw new ConflictError(error.message.replaceAll("_", " ").toLowerCase());
     case "ENCOUNTER_NOT_ACTIVE":
     case "GAME_ACTOR_NOT_FOUND":
+    case "GAME_CHARACTER_ACTOR_NOT_FOUND":
+    case "GAME_CHARACTER_STATE_NOT_FOUND":
     case "GAME_ACTOR_OR_SKILL_NOT_FOUND":
     case "GAME_ATTACK_PARTICIPANT_NOT_FOUND":
     case "GAME_TARGET_HEALTH_UNAVAILABLE":
     case "GAME_TARGET_SAVE_UNAVAILABLE":
+    case "GAME_CONDITION_NOT_FOUND":
+    case "GAME_CONDITION_INSTANCE_NOT_FOUND":
+    case "GAME_ITEM_NOT_FOUND":
+    case "GAME_INVENTORY_ITEM_NOT_FOUND":
     case "CASTING_TRACK_NOT_FOUND":
     case "SPELL_NOT_AVAILABLE":
     case "SPELL_PREPARATION_NOT_FOUND":
@@ -231,6 +326,7 @@ function translate(error: unknown): never {
     case "ENCOUNTER_PARTICIPANT_INVALID":
     case "ENCOUNTER_STATE_INVALID":
     case "GAME_WEAPON_INVALID":
+    case "GAME_INVENTORY_ITEM_EQUIPPED":
     case "CASTING_TRACK_RUNTIME_UNSUPPORTED":
     case "CASTING_ACTION_TYPE_UNSUPPORTED":
     case "CASTING_MODE_MISMATCH":

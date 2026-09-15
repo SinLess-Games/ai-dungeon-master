@@ -106,7 +106,7 @@ async function requireCampaignAccess(
   if (!membership || membership.status !== "active") {
     throw new ForbiddenError("You do not have access to this campaign.");
   }
-  return { role: membership.role, status: campaign.status };
+  return { role: membership.role, status: membership.status };
 }
 
 async function loadCharacterAccess(
@@ -281,6 +281,7 @@ export const campaignCharacterSheetRoutes = new Hono<Env>()
             id: characterInventory.id,
             itemId: characterInventory.itemId,
             instanceId: characterInventory.instanceId,
+            itemSlug: items.slug,
             name: items.name,
             category: items.category,
             quantity: characterInventory.quantity,
@@ -371,19 +372,23 @@ export const campaignCharacterSheetRoutes = new Hono<Env>()
         health: snapshot.health,
       },
       encumbrance: snapshot.encumbrance,
-      inventory: inventoryRows.map((entry) => ({
+      inventory: inventoryRows.map(({ itemSlug, ...entry }) => ({
         ...entry,
         totalWeightPounds:
           entry.weightPounds === null ? null : entry.weightPounds * entry.quantity,
         suggestedSlot:
-          entry.suggestedSlot ??
-          (entry.category === "armor"
-            ? "body"
-            : entry.category === "shield"
-              ? "shield"
-              : entry.category === "weapon"
-                ? "main_hand"
-                : null),
+          entry.category === "magic" &&
+          entry.suggestedSlot === "other" &&
+          /^(?:ring|rings)-/.test(itemSlug.toLocaleLowerCase())
+            ? "ring_left"
+            : entry.suggestedSlot ??
+              (entry.category === "armor"
+                ? "body"
+                : entry.category === "shield"
+                  ? "shield"
+                  : entry.category === "weapon"
+                    ? "main_hand"
+                    : null),
       })),
       skills: skillRows.map((skill) => ({
         ...skill,
@@ -513,14 +518,14 @@ export const campaignCharacterSheetRoutes = new Hono<Env>()
            FROM dnd35_items item
            LEFT JOIN dnd35_magic_items magic ON magic.item_id = item.id
            WHERE item.is_enabled = 1
-             AND (item.owner_user_id IS NULL OR item.owner_user_id = ?)
+             AND item.owner_user_id IS NULL
              AND (lower(item.name) LIKE ? OR lower(item.slug) LIKE ?)
            ORDER BY CASE WHEN lower(item.name) = lower(?) THEN 0 ELSE 1 END,
                     item.name,
                     item.id
            LIMIT 30`,
         )
-        .bind(session.user.id, pattern, pattern, query)
+        .bind(pattern, pattern, query)
         .all<{
           id: string;
           name: string;

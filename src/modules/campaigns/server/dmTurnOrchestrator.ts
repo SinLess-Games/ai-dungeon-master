@@ -7,6 +7,7 @@ import {
   type GameCommandResult,
 } from "@/modules/game/server/gameCommandService";
 import { evaluateAlignmentAction } from "./alignmentEvaluator";
+import { loadResolvedDmActionHistory, serializeDmActionProgress } from "./dmActionHistory";
 import { loadCampaignPlaySchemaReadiness } from "./campaignPlaySchemaReadiness";
 import { CAMPAIGN_DM_NARRATION_POLICY } from "./dmCampaignChatPolicy";
 import { isRepeatedAuthoritativeCheck } from "./dmCheckDedup";
@@ -26,10 +27,16 @@ export interface DmCampaignDescriptor {
   settings: Record<string, unknown>;
 }
 
+export interface PendingInitiativeRequest {
+  participantIds: readonly string[];
+  reason: string;
+}
+
 export interface StructuredDmTurnResult {
   decision: Extract<DmTurnDecision, { kind: "narration" | "check" }>;
   commandResults: GameCommandResult[];
   alignmentResult: GameCommandResult | null;
+  pendingInitiative: PendingInitiativeRequest | null;
 }
 
 function withCampaignChatPolicy(conversation: string): string {
@@ -51,6 +58,29 @@ function withSystemReferences(conversation: string, systemReferenceText: string)
   );
 }
 
+function plannerConversation(input: {
+  playerMessageId: string;
+  playerAction: string;
+  actionProgress: string;
+  historicalConversation: string;
+  systemReferenceText: string;
+}): string {
+  return withSystemReferences(
+    [
+      "AUTHORITATIVE CURRENT PLAYER TURN — this is the action you must resolve now:",
+      `Player message id: ${input.playerMessageId}`,
+      input.playerAction,
+      "Do not substitute, revive, or continue an older player action merely because it appears later in historical context. Older messages are context only. If this current action changes intent or position, advance the scene from this action.",
+      "Resolved DM-requested checks ledger:",
+      input.actionProgress,
+      "Any ledger entry marked current is already resolved for this exact player turn and must not be requested again. Historical entries belong to older player turns; they inform continuity but do not make the old action current. A new check of the same skill is allowed only when this current action independently warrants it.",
+      "Historical campaign conversation and persistent DM memory:",
+      input.historicalConversation || "(No previous campaign or private OOC messages.)",
+    ].join("\n\n"),
+    input.systemReferenceText,
+  );
+}
+
 /**
  * Runs the model as a planner over the deterministic command boundary.
  * Immediate commands may chain, but the loop stops as soon as narration or a
@@ -68,6 +98,7 @@ export async function runStructuredDmTurn(input: {
   campaign: DmCampaignDescriptor;
   userId: string;
   characterId: string;
+  playerMessageId: string;
   playerAction: string;
   signal?: AbortSignal;
   seedAuthoritativeResults?: readonly unknown[];
@@ -97,6 +128,12 @@ export async function runStructuredDmTurn(input: {
     campaignId: input.campaign.id,
     userId: input.userId,
   });
+  const resolvedActions = await loadResolvedDmActionHistory(
+    input.binding,
+    input.campaign.id,
+    input.userId,
+  );
+  const actionProgress = serializeDmActionProgress(resolvedActions, input.playerMessageId);
 
   let systemReferenceText = "";
   try {
@@ -114,6 +151,8 @@ export async function runStructuredDmTurn(input: {
     });
     systemReferenceText = serializeDmSystemReferences(references);
   } catch (error) {
+    // Rules/catalog retrieval improves grounding but must never make the table
+    // unusable if a reference lookup or small planning pass fails.
     console.error("AI DM system reference hydration failed", {
       campaignId: input.campaign.id,
       rulesetId: input.campaign.rulesetId,
@@ -121,9 +160,16 @@ export async function runStructuredDmTurn(input: {
     });
   }
 
-  let conversation = withSystemReferences(rawConversation, systemReferenceText);
+  let conversation = plannerConversation({
+    playerMessageId: input.playerMessageId,
+    playerAction: input.playerAction,
+    actionProgress,
+    historicalConversation: rawConversation,
+    systemReferenceText,
+  });
   const seedResults = [...(input.seedAuthoritativeResults ?? [])];
   const commandResults: GameCommandResult[] = [];
+  let pendingInitiative: PendingInitiativeRequest | null = null;
 
   const refreshRuntimeContext = async () => {
     const refreshed = await loadDmPlannerContext({
@@ -144,7 +190,13 @@ export async function runStructuredDmTurn(input: {
     ]);
     recentEvents = nextEvents;
     rawConversation = nextConversation;
-    conversation = withSystemReferences(rawConversation, systemReferenceText);
+    conversation = plannerConversation({
+      playerMessageId: input.playerMessageId,
+      playerAction: input.playerAction,
+      actionProgress,
+      historicalConversation: rawConversation,
+      systemReferenceText,
+    });
   };
 
   const recordCommandResult = async (result: GameCommandResult) => {
@@ -175,6 +227,24 @@ export async function runStructuredDmTurn(input: {
         authoritativeToolResults,
       };
       const decision = await planDmTurn(input.env, plannerInput);
+
+      if (
+        decision.kind === "command" &&
+        decision.command.type === "encounter.start" &&
+        decision.command.participantIds.includes(context!.character.character.actorId)
+      ) {
+        pendingInitiative = {
+          participantIds: [...decision.command.participantIds],
+          reason: "Combat is beginning. Roll initiative to determine turn order.",
+        };
+        return {
+          kind: "narration" as const,
+          text: "The situation tips into combat. Roll initiative before the first turn begins.",
+          npcs: [],
+          itemAwards: [],
+        };
+      }
+
       if (!isRepeatedAuthoritativeCheck(decision, authoritativeToolResults)) return decision;
 
       const corrected = await planDmTurn(input.env, {
@@ -206,7 +276,11 @@ export async function runStructuredDmTurn(input: {
   });
 
   input.signal?.throwIfAborted();
-  if (loop.decision.kind === "narration") {
+  if (loop.decision.kind === "narration" && !pendingInitiative) {
+    // A model should normally award inventory through inventory.grant before it
+    // narrates possession. itemAwards is a safety net: it is still translated
+    // through the same authoritative command path before the chat reply can be
+    // persisted, so prose can never be the only record of a granted item.
     for (const award of loop.decision.itemAwards ?? []) {
       input.signal?.throwIfAborted();
       const result = await executeDmPlannerCommand({
@@ -224,6 +298,10 @@ export async function runStructuredDmTurn(input: {
       await recordCommandResult(result);
     }
 
+    // NPC memory is intentionally non-mechanical. Store every named NPC the
+    // narration says was created/reused so the DM can recall it long after the
+    // chat window rolls out of recent context. Failure here should not erase a
+    // mechanically completed turn, but it is logged loudly for diagnosis.
     if (loop.decision.npcs?.length) {
       try {
         await recordNarratedCampaignNpcs(input.binding, input.campaign.id, loop.decision.npcs);
@@ -238,7 +316,7 @@ export async function runStructuredDmTurn(input: {
   }
 
   let alignmentResult: GameCommandResult | null = null;
-  if (loop.decision.kind === "narration") {
+  if (loop.decision.kind === "narration" && !pendingInitiative) {
     try {
       const current = context.character.alignment;
       input.signal?.throwIfAborted();
@@ -268,6 +346,8 @@ export async function runStructuredDmTurn(input: {
         input.onCommittedResult?.(alignmentResult);
       }
     } catch (error) {
+      // Alignment tracking is important but should never make a completed turn
+      // disappear. Fail closed and leave the character's alignment untouched.
       console.error("AI DM alignment evaluation failed", {
         campaignId: input.campaign.id,
         characterId: input.characterId,
@@ -281,5 +361,6 @@ export async function runStructuredDmTurn(input: {
     decision: loop.decision,
     commandResults,
     alignmentResult,
+    pendingInitiative,
   };
 }

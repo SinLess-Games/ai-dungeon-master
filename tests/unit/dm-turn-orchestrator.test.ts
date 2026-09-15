@@ -8,6 +8,11 @@ const mocks = vi.hoisted(() => ({
   planDmTurn: vi.fn(),
   evaluateAlignmentAction: vi.fn(),
   executeGameCommand: vi.fn(),
+  createDatabase: vi.fn(() => ({})),
+}));
+
+vi.mock("@/infrastructure/database/client", () => ({
+  createDatabase: mocks.createDatabase,
 }));
 
 vi.mock("@/modules/campaigns/server/dmTurnRuntime", () => ({
@@ -106,9 +111,9 @@ describe("structured AI DM turn orchestration", () => {
     mocks.executeDmPlannerCommand.mockResolvedValueOnce(committed);
     const onCommittedResult = vi.fn();
 
-    await expect(
-      runStructuredDmTurn({ ...input, onCommittedResult }),
-    ).rejects.toThrow("AI provider failed after the commit");
+    await expect(runStructuredDmTurn({ ...input, onCommittedResult })).rejects.toThrow(
+      "AI provider failed after the commit",
+    );
 
     expect(mocks.executeDmPlannerCommand).toHaveBeenCalledOnce();
     expect(onCommittedResult).toHaveBeenCalledOnce();
@@ -140,6 +145,7 @@ describe("structured AI DM turn orchestration", () => {
       text: "The rescued travelers make it safely home.",
     });
     expect(result?.alignmentResult).toEqual(alignmentResult);
+    expect(mocks.createDatabase).toHaveBeenCalledOnce();
     expect(onCommittedResult).toHaveBeenCalledOnce();
     expect(onCommittedResult).toHaveBeenCalledWith(alignmentResult);
   });

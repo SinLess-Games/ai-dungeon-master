@@ -14,6 +14,7 @@ import { feedbackRoutes } from "@/modules/feedback/server/routes";
 import { adminRoutes } from "@/modules/admin/server/routes";
 import { authRoutes, authHandler } from "@/modules/auth/server/routes";
 import type { AuthEnv } from "@/modules/auth/server/auth";
+import { campaignCharacterSheetRoutes } from "@/modules/campaigns/server/characterSheetRoutes";
 import { campaignDeleteRoutes } from "@/modules/campaigns/server/deleteRoutes";
 import { campaignDmActionRoutes } from "@/modules/campaigns/server/dmActionRoutes";
 import { campaignPlayCharacterRoutes } from "@/modules/campaigns/server/playCharacterRoutes";
@@ -206,6 +207,7 @@ const routes = app
   .route("/", campaignRoutes)
   .route("/", campaignDeleteRoutes)
   .route("/", campaignPlayCharacterRoutes)
+  .route("/", campaignCharacterSheetRoutes)
   // The structured POST route must be registered before the legacy campaign
   // message module. The latter still owns message GETs and remains a safe
   // fallback for non-structured paths.
@@ -234,6 +236,7 @@ const routes = app
         campaigns: "/api/campaigns",
         campaignPlayMessages: "/api/campaigns/:campaignId/play/messages",
         campaignPlayChecks: "/api/campaigns/:campaignId/play/characters/:characterId/checks",
+        campaignCharacterSheet: "/api/campaigns/:campaignId/play/characters/:characterId/sheet",
         campaignDmAction: "/api/campaigns/:campaignId/play/dm-actions/pending",
         game: "/api/campaigns/:campaignId/game",
         gameState: "/api/campaigns/:campaignId/game/state",

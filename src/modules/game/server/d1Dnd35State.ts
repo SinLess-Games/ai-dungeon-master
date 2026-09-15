@@ -12,6 +12,7 @@ import {
   classLevels,
   dnd35Characters,
   gameSessions,
+  items,
   raceAbilities,
   races,
   shields,
@@ -24,8 +25,17 @@ import { racialHitPoints } from "@/modules/characters/domain/monsterRaceCreation
 import {
   abilityModifier,
   aggregateClassProgression,
+  calculateArmorClass,
+  calculateEncumbranceState,
+  combineArmorCheckPenalty,
+  combineMaximumDexterityBonus,
+  combineMovementRestriction,
+  encumberedLandSpeed,
+  encumbrancePenaltyProfile,
   effectiveAbilityScore,
+  grappleSizeModifier,
   type Dnd35Size,
+  type EncumbranceState,
 } from "@/rulesets/dnd35";
 import type {
   Dnd35AttackActionSnapshot,
@@ -36,6 +46,7 @@ import type {
 } from "../domain/dnd35ActionRuntime";
 
 export type AbilityKey = "str" | "dex" | "con" | "int" | "wis" | "cha";
+const ABILITY_KEYS: readonly AbilityKey[] = ["str", "dex", "con", "int", "wis", "cha"];
 
 export interface ActiveGameContext {
   campaignId: string;
@@ -61,6 +72,31 @@ export interface RuntimeHealthSnapshot {
   currentHitPoints: number;
   temporaryHitPoints: number;
   nonlethalDamage: number;
+}
+
+export interface RuntimeEncumbranceSnapshot extends EncumbranceState {
+  /** False means one or more carried catalog items have no recorded weight. */
+  weightComplete: boolean;
+  unknownWeightItems: number;
+}
+
+export interface RuntimeCharacterSheetSnapshot {
+  characterId: string;
+  abilities: Record<AbilityKey, { score: number; modifier: number }>;
+  characterLevel: number;
+  baseAttackBonus: number;
+  armorClass: {
+    normal: number;
+    touch: number;
+    flatFooted: number;
+    dexterityModifierApplied: number;
+    maximumDexterityBonus: number | null;
+  };
+  saves: Record<Dnd35SaveKind, number>;
+  initiative: number;
+  grapple: number;
+  health: RuntimeHealthSnapshot;
+  encumbrance: RuntimeEncumbranceSnapshot;
 }
 
 function saveAbility(save: Dnd35SaveKind): AbilityKey {
@@ -207,10 +243,15 @@ async function loadRaceCombatData(db: Database, characterId: string) {
     return {
       size: (extension.sizeOverride ?? "medium") as Dnd35Size,
       naturalArmor: 0,
+      baseSpeedFeet: 30,
     };
   }
   const race = await db
-    .select({ size: races.size, naturalArmor: races.naturalArmor })
+    .select({
+      size: races.size,
+      naturalArmor: races.naturalArmor,
+      baseSpeedFeet: races.baseSpeedFeet,
+    })
     .from(races)
     .where(eq(races.id, extension.raceId))
     .get();
@@ -218,6 +259,7 @@ async function loadRaceCombatData(db: Database, characterId: string) {
   return {
     size: (extension.sizeOverride ?? race.size) as Dnd35Size,
     naturalArmor: race.naturalArmor,
+    baseSpeedFeet: race.baseSpeedFeet,
   };
 }
 
@@ -234,7 +276,16 @@ async function loadDefensiveEquipment(db: Database, characterId: string) {
     .all();
   const itemIds = equipped.map((entry) => entry.itemId);
   if (itemIds.length === 0) {
-    return { armorBonus: 0, shieldBonus: 0, maximumDexterityBonus: null as number | null, armorCheckPenalty: 0 };
+    return {
+      armorBonus: 0,
+      shieldBonus: 0,
+      maximumDexterityBonus: null as number | null,
+      armorCheckPenalty: 0,
+      speedAt30Feet: null as number | null,
+      speedAt20Feet: null as number | null,
+      movementRestricted: false,
+      runMultiplier: 4,
+    };
   }
 
   const [armorRows, shieldRows] = await Promise.all([
@@ -244,6 +295,15 @@ async function loadDefensiveEquipment(db: Database, characterId: string) {
   const dexCaps = [...armorRows, ...shieldRows]
     .map((entry) => entry.maxDexBonus)
     .filter((value): value is number => value !== null);
+  const speedAt30 = [...armorRows, ...shieldRows]
+    .map((entry) => entry.speedAt30Feet)
+    .filter((value): value is number => value !== null);
+  const speedAt20 = [...armorRows, ...shieldRows]
+    .map((entry) => entry.speedAt20Feet)
+    .filter((value): value is number => value !== null);
+  const movementRestricted =
+    armorRows.some((entry) => entry.category === "medium" || entry.category === "heavy") ||
+    shieldRows.some((entry) => entry.speedAt30Feet !== null || entry.speedAt20Feet !== null);
 
   return {
     armorBonus: armorRows.reduce((best, entry) => Math.max(best, entry.acBonus), 0),
@@ -252,6 +312,168 @@ async function loadDefensiveEquipment(db: Database, characterId: string) {
     armorCheckPenalty:
       armorRows.reduce((sum, entry) => sum + entry.armorCheckPenalty, 0) +
       shieldRows.reduce((sum, entry) => sum + entry.armorCheckPenalty, 0),
+    speedAt30Feet: speedAt30.length === 0 ? null : Math.min(...speedAt30),
+    speedAt20Feet: speedAt20.length === 0 ? null : Math.min(...speedAt20),
+    movementRestricted,
+    runMultiplier: armorRows.some((entry) => entry.category === "heavy") ? 3 : 4,
+  };
+}
+
+function equipmentAdjustedLandSpeed(
+  baseSpeedFeet: number,
+  defense: Awaited<ReturnType<typeof loadDefensiveEquipment>>,
+): number {
+  if (baseSpeedFeet === 30 && defense.speedAt30Feet !== null) {
+    return Math.min(baseSpeedFeet, defense.speedAt30Feet);
+  }
+  if (baseSpeedFeet === 20 && defense.speedAt20Feet !== null) {
+    return Math.min(baseSpeedFeet, defense.speedAt20Feet);
+  }
+  if (defense.movementRestricted) {
+    return encumberedLandSpeed(baseSpeedFeet, encumbrancePenaltyProfile("medium"));
+  }
+  return baseSpeedFeet;
+}
+
+export async function loadEncumbranceSnapshot(input: {
+  db: Database;
+  campaignId: string;
+  characterId: string;
+}): Promise<RuntimeEncumbranceSnapshot | null> {
+  if (!(await requireActiveCharacter(input.db, input.campaignId, input.characterId))) return null;
+  const [extension, strength, raceData, defense, inventoryRows] = await Promise.all([
+    loadDndCharacter(input.db, input.characterId),
+    loadEffectiveAbility(input.db, input.characterId, "str"),
+    loadRaceCombatData(input.db, input.characterId),
+    loadDefensiveEquipment(input.db, input.characterId),
+    input.db
+      .select({ quantity: characterInventory.quantity, weightPounds: items.weightPounds })
+      .from(characterInventory)
+      .innerJoin(items, eq(characterInventory.itemId, items.id))
+      .where(
+        and(
+          eq(characterInventory.characterId, input.characterId),
+          eq(characterInventory.location, "carried"),
+        ),
+      )
+      .all(),
+  ]);
+  if (!extension || strength === null || !raceData) return null;
+
+  let carriedWeight = 0;
+  let unknownWeightItems = 0;
+  for (const row of inventoryRows) {
+    if (row.weightPounds === null) {
+      unknownWeightItems += row.quantity;
+      continue;
+    }
+    carriedWeight += row.weightPounds * row.quantity;
+  }
+
+  const encumbrance = calculateEncumbranceState({
+    strength,
+    size: raceData.size,
+    carriedWeight,
+    baseLandSpeedFeet: raceData.baseSpeedFeet,
+    enabled: extension.encumbranceEnabled,
+  });
+  const equipmentLandSpeed = equipmentAdjustedLandSpeed(raceData.baseSpeedFeet, defense);
+  const equipmentMovement =
+    equipmentLandSpeed < raceData.baseSpeedFeet ? ("reduced" as const) : ("normal" as const);
+
+  return {
+    ...encumbrance,
+    landSpeedFeet: Math.min(encumbrance.landSpeedFeet, equipmentLandSpeed),
+    runMultiplier: Math.min(encumbrance.runMultiplier, defense.runMultiplier),
+    movement: combineMovementRestriction(encumbrance.movement, equipmentMovement),
+    weightComplete: unknownWeightItems === 0,
+    unknownWeightItems,
+  };
+}
+
+export async function loadCharacterSheetSnapshot(input: {
+  db: Database;
+  campaignId: string;
+  characterId: string;
+}): Promise<RuntimeCharacterSheetSnapshot | null> {
+  if (!(await requireActiveCharacter(input.db, input.campaignId, input.characterId))) return null;
+
+  const abilityValues = await Promise.all(
+    ABILITY_KEYS.map((ability) => loadEffectiveAbility(input.db, input.characterId, ability)),
+  );
+  if (abilityValues.some((value) => value === null)) return null;
+  const abilities = {} as RuntimeCharacterSheetSnapshot["abilities"];
+  ABILITY_KEYS.forEach((ability, index) => {
+    const score = abilityValues[index];
+    if (score === null || score === undefined) return;
+    abilities[ability] = { score, modifier: abilityModifier(score) };
+  });
+
+  const [progression, raceData, defense, health, encumbrance] = await Promise.all([
+    loadProgression(input.db, input.characterId),
+    loadRaceCombatData(input.db, input.characterId),
+    loadDefensiveEquipment(input.db, input.characterId),
+    loadHealthSnapshot(input),
+    loadEncumbranceSnapshot(input),
+  ]);
+  if (!raceData || !health || !encumbrance) return null;
+
+  const maximumDexterityBonus = combineMaximumDexterityBonus(
+    defense.maximumDexterityBonus,
+    encumbrance.maxDexterityBonus,
+  );
+  const armorClass = calculateArmorClass({
+    dexterityModifier: abilities.dex.modifier,
+    size: raceData.size,
+    maxDexterityBonus: maximumDexterityBonus,
+    modifiers: [
+      ...(defense.armorBonus > 0
+        ? [{ id: "equipment:armor", source: "equipment", kind: "armor", value: defense.armorBonus }]
+        : []),
+      ...(defense.shieldBonus > 0
+        ? [{ id: "equipment:shield", source: "equipment", kind: "shield", value: defense.shieldBonus }]
+        : []),
+      ...(raceData.naturalArmor > 0
+        ? [
+            {
+              id: "race:natural-armor",
+              source: "race",
+              kind: "natural-armor",
+              value: raceData.naturalArmor,
+            },
+          ]
+        : []),
+    ],
+  });
+
+  return {
+    characterId: input.characterId,
+    abilities,
+    characterLevel: progression.characterLevel,
+    baseAttackBonus: progression.baseAttackBonus,
+    armorClass: {
+      normal: armorClass.normal,
+      touch: armorClass.touch,
+      flatFooted: armorClass.flatFooted,
+      dexterityModifierApplied: armorClass.dexterityModifierApplied,
+      maximumDexterityBonus,
+    },
+    saves: {
+      fort: progression.fort + abilities.con.modifier,
+      ref: progression.ref + abilities.dex.modifier,
+      will: progression.will + abilities.wis.modifier,
+    },
+    initiative: abilities.dex.modifier,
+    grapple:
+      progression.baseAttackBonus + abilities.str.modifier + grappleSizeModifier(raceData.size),
+    health,
+    encumbrance: {
+      ...encumbrance,
+      armorCheckPenalty: combineArmorCheckPenalty(
+        defense.armorCheckPenalty,
+        encumbrance.armorCheckPenalty,
+      ),
+    },
   };
 }
 
@@ -272,7 +494,7 @@ export async function loadSkillActionSnapshot(input: {
   if (!definition || !definition.ability) return null;
 
   const specialization = input.specialization ?? "";
-  const [rankRow, abilityScore, defense] = await Promise.all([
+  const [rankRow, abilityScore, defense, encumbrance] = await Promise.all([
     input.db
       .select({ ranks: characterSkills.ranks })
       .from(characterSkills)
@@ -286,15 +508,24 @@ export async function loadSkillActionSnapshot(input: {
       .get(),
     loadEffectiveAbility(input.db, input.characterId, definition.ability as AbilityKey),
     loadDefensiveEquipment(input.db, input.characterId),
+    loadEncumbranceSnapshot({
+      db: input.db,
+      campaignId: input.campaignId,
+      characterId: input.characterId,
+    }),
   ]);
   if (abilityScore === null) return null;
 
+  const baseArmorCheckPenalty = combineArmorCheckPenalty(
+    defense.armorCheckPenalty,
+    encumbrance?.armorCheckPenalty ?? 0,
+  );
   return {
     actorId: input.characterId,
     skillId: input.skillId,
     ranks: rankRow?.ranks ?? 0,
     abilityModifier: abilityModifier(abilityScore),
-    armorCheckPenalty: defense.armorCheckPenalty * definition.armorCheckMultiplier,
+    armorCheckPenalty: baseArmorCheckPenalty * definition.armorCheckMultiplier,
     trainedOnly: definition.trainedOnly,
   };
 }
@@ -395,15 +626,27 @@ export async function loadAttackActionSnapshot(input: {
   ]);
   if (!attacker || !target) return null;
 
-  const [attackerRace, targetRace, progression, attackAbility, targetDexterity, targetDefense] =
-    await Promise.all([
-      loadRaceCombatData(input.db, input.attackerId),
-      loadRaceCombatData(input.db, input.targetId),
-      loadProgression(input.db, input.attackerId),
-      loadEffectiveAbility(input.db, input.attackerId, input.kind === "melee" ? "str" : "dex"),
-      loadEffectiveAbility(input.db, input.targetId, "dex"),
-      loadDefensiveEquipment(input.db, input.targetId),
-    ]);
+  const [
+    attackerRace,
+    targetRace,
+    progression,
+    attackAbility,
+    targetDexterity,
+    targetDefense,
+    targetEncumbrance,
+  ] = await Promise.all([
+    loadRaceCombatData(input.db, input.attackerId),
+    loadRaceCombatData(input.db, input.targetId),
+    loadProgression(input.db, input.attackerId),
+    loadEffectiveAbility(input.db, input.attackerId, input.kind === "melee" ? "str" : "dex"),
+    loadEffectiveAbility(input.db, input.targetId, "dex"),
+    loadDefensiveEquipment(input.db, input.targetId),
+    loadEncumbranceSnapshot({
+      db: input.db,
+      campaignId: input.campaignId,
+      characterId: input.targetId,
+    }),
+  ]);
   if (!attackerRace || !targetRace || attackAbility === null || targetDexterity === null) return null;
 
   return {
@@ -417,7 +660,10 @@ export async function loadAttackActionSnapshot(input: {
     targetNaturalArmor: targetRace.naturalArmor,
     targetArmorBonus: targetDefense.armorBonus,
     targetShieldBonus: targetDefense.shieldBonus,
-    targetMaximumDexterityBonus: targetDefense.maximumDexterityBonus,
+    targetMaximumDexterityBonus: combineMaximumDexterityBonus(
+      targetDefense.maximumDexterityBonus,
+      targetEncumbrance?.maxDexterityBonus ?? null,
+    ),
   };
 }
 

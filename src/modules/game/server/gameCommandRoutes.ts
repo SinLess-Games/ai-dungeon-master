@@ -11,6 +11,7 @@ import {
 } from "@/infrastructure/cloudflare/backgroundJobs";
 import { createDatabase } from "@/infrastructure/database/client";
 import { campaignMemberships, campaigns, gameActors } from "@/infrastructure/database/schema";
+import { equipmentSlots } from "@/infrastructure/database/schema/dnd35/primitives";
 import { createAuth, type AuthEnv } from "@/modules/auth/server/auth";
 import { requireUser } from "@/modules/auth/server/requireAuth";
 import type { CampaignRoom } from "@/modules/game/live/CampaignRoom";
@@ -155,6 +156,23 @@ export const gameCommandSchema = z.discriminatedUnion("type", [
     quantity: positiveInteger,
     reason,
   }),
+  z
+    .object({
+      type: z.literal("inventory.configure"),
+      actorId: id,
+      inventoryId: id,
+      location: z.enum(["carried", "stored", "party"]).optional(),
+      equippedSlot: z.enum(equipmentSlots).nullable().optional(),
+      notes: z.string().max(4000).nullable().optional(),
+      reason,
+    })
+    .refine(
+      (command) =>
+        command.location !== undefined ||
+        command.equippedSlot !== undefined ||
+        command.notes !== undefined,
+      "Inventory configuration requires at least one changed field.",
+    ),
   z.object({
     type: z.literal("progression.xp.grant"),
     actorId: id,
@@ -231,6 +249,7 @@ function controlledActorId(command: GameCommand): string | null {
     case "power.manifest":
     case "inventory.grant":
     case "inventory.remove":
+    case "inventory.configure":
     case "progression.xp.grant":
     case "alignment.record":
       return command.actorId;
@@ -306,6 +325,7 @@ function translate(error: unknown): never {
     case "GAME_STATE_CONFLICT":
     case "ENCOUNTER_ALREADY_ACTIVE":
     case "ENCOUNTER_NOT_ACTORS_TURN":
+    case "GAME_INVENTORY_SLOT_OCCUPIED":
       throw new ConflictError(error.message.replaceAll("_", " ").toLowerCase());
     case "ENCOUNTER_NOT_ACTIVE":
     case "GAME_ACTOR_NOT_FOUND":
@@ -331,6 +351,7 @@ function translate(error: unknown): never {
     case "ENCOUNTER_STATE_INVALID":
     case "GAME_WEAPON_INVALID":
     case "GAME_INVENTORY_ITEM_EQUIPPED":
+    case "GAME_INVENTORY_SLOT_INVALID":
     case "CASTING_TRACK_RUNTIME_UNSUPPORTED":
     case "CASTING_ACTION_TYPE_UNSUPPORTED":
     case "CASTING_MODE_MISMATCH":

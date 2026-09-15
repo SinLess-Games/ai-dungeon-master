@@ -89,6 +89,28 @@ export type CampaignSaveKind = "fort" | "ref" | "will";
 export type CampaignAttackKind = "melee" | "ranged";
 export type CampaignCastingMode = "prepared" | "spontaneous" | "psionic" | "other";
 export type CampaignCastingTradition = "arcane" | "divine" | "psionic" | "other";
+export type CampaignInventoryLocation = "carried" | "stored" | "party";
+export type CampaignLoadCategory = "light" | "medium" | "heavy" | "overloaded";
+export type CampaignEquipmentSlot =
+  | "head"
+  | "face"
+  | "throat"
+  | "shoulders"
+  | "body"
+  | "torso"
+  | "waist"
+  | "arms"
+  | "hands"
+  | "feet"
+  | "ring_left"
+  | "ring_right"
+  | "main_hand"
+  | "off_hand"
+  | "both_hands"
+  | "shield"
+  | "slotless"
+  | "other";
+export type CampaignAbilityKey = "str" | "dex" | "con" | "int" | "wis" | "cha";
 
 export interface CampaignPlayMessage {
   id: string;
@@ -197,7 +219,7 @@ export interface CampaignCastingStateTrack {
   id: string;
   mode: CampaignCastingMode;
   tradition: CampaignCastingTradition;
-  castingAbility: "str" | "dex" | "con" | "int" | "wis" | "cha";
+  castingAbility: CampaignAbilityKey;
   effectiveProgressionLevel: number;
   casterOrManifesterLevel: number;
   prepared?: Array<{
@@ -225,6 +247,128 @@ export interface CampaignCastingState {
     currentPowerPoints: number;
     focused: boolean;
   };
+}
+
+export interface CampaignCharacterInventoryEntry {
+  id: string;
+  itemId: string;
+  instanceId: string | null;
+  name: string;
+  category: string;
+  quantity: number;
+  weightPounds: number | null;
+  totalWeightPounds: number | null;
+  priceCopper: number | null;
+  equipped: boolean;
+  equippedSlot: CampaignEquipmentSlot | null;
+  suggestedSlot: CampaignEquipmentSlot | null;
+  location: CampaignInventoryLocation;
+  notes: string | null;
+}
+
+export interface CampaignItemCatalogEntry {
+  id: string;
+  name: string;
+  category: string;
+  weightPounds: number | null;
+  priceCopper: number | null;
+  suggestedSlot: CampaignEquipmentSlot | null;
+}
+
+export interface CampaignCharacterSheet {
+  campaignStatus: string;
+  character: {
+    id: string;
+    actorId: string | null;
+    name: string;
+    status: string;
+    pronouns: string | null;
+    playerNotes: string;
+    alignment: string;
+    experiencePoints: number;
+    progressionMode: string;
+    race: { id: string; name: string; size: string; baseSpeedFeet: number } | null;
+    classes: Array<{
+      classId: string;
+      name: string;
+      level: number;
+      track: number;
+      lastCharacterLevel: number;
+    }>;
+  };
+  permissions: {
+    canEdit: boolean;
+    canArrangeInventory: boolean;
+    canManageInventory: boolean;
+  };
+  abilities: Record<CampaignAbilityKey, { score: number; modifier: number }>;
+  combat: {
+    characterLevel: number;
+    baseAttackBonus: number;
+    armorClass: {
+      normal: number;
+      touch: number;
+      flatFooted: number;
+      dexterityModifierApplied: number;
+      maximumDexterityBonus: number | null;
+    };
+    saves: Record<CampaignSaveKind, number>;
+    initiative: number;
+    grapple: number;
+    health: {
+      characterId: string;
+      maximumHitPoints: number;
+      currentHitPoints: number;
+      temporaryHitPoints: number;
+      nonlethalDamage: number;
+    };
+  };
+  encumbrance: {
+    enabled: boolean;
+    carriedWeight: number;
+    actualLoad: CampaignLoadCategory;
+    load: CampaignLoadCategory;
+    capacity: {
+      strength: number;
+      size: string;
+      quadruped: boolean;
+      lightMaximum: number;
+      mediumMaximum: number;
+      heavyMaximum: number;
+      liftOverHead: number;
+      liftOffGround: number;
+      pushOrDrag: number;
+    };
+    baseLandSpeedFeet: number;
+    landSpeedFeet: number;
+    maxDexterityBonus: number | null;
+    armorCheckPenalty: number;
+    runMultiplier: number;
+    movement: "normal" | "reduced" | "stagger" | "immobile";
+    weightComplete: boolean;
+    unknownWeightItems: number;
+  };
+  inventory: CampaignCharacterInventoryEntry[];
+  skills: Array<{
+    id: string;
+    name: string;
+    ability: CampaignAbilityKey | null;
+    specialization: string;
+    ranks: number;
+    trainedOnly: boolean;
+    armorCheckMultiplier: number;
+    total: number;
+  }>;
+  feats: Array<{
+    id: string;
+    featId: string;
+    name: string;
+    occurrence: number;
+    gainedAtLevel: number | null;
+    grantKind: string;
+    choices: unknown;
+  }>;
+  equipmentSlots: CampaignEquipmentSlot[];
 }
 
 export interface SendCampaignPlayMessageResult {
@@ -327,6 +471,96 @@ export function getCampaignCastingState(
   return requestJson<CampaignCastingState>(
     `/api/campaigns/${encodeURIComponent(campaignId)}/game/casting/${encodeURIComponent(characterId)}`,
   );
+}
+
+export function getCampaignCharacterSheet(
+  campaignId: string,
+  characterId: string,
+): Promise<CampaignCharacterSheet> {
+  return requestJson<CampaignCharacterSheet>(
+    `/api/campaigns/${encodeURIComponent(campaignId)}/play/characters/${encodeURIComponent(characterId)}/sheet`,
+  );
+}
+
+export function updateCampaignCharacterSheet(
+  campaignId: string,
+  characterId: string,
+  input: {
+    name?: string;
+    pronouns?: string | null;
+    playerNotes?: string | null;
+    encumbranceEnabled?: boolean;
+  },
+): Promise<{ ok: true }> {
+  return requestJson(
+    `/api/campaigns/${encodeURIComponent(campaignId)}/play/characters/${encodeURIComponent(characterId)}/sheet`,
+    { method: "PATCH", body: JSON.stringify(input) },
+  );
+}
+
+export function updateCampaignInventoryEntry(
+  campaignId: string,
+  characterId: string,
+  inventoryId: string,
+  input: {
+    location?: CampaignInventoryLocation;
+    equippedSlot?: CampaignEquipmentSlot | null;
+    notes?: string | null;
+  },
+): Promise<unknown> {
+  return requestJson(
+    `/api/campaigns/${encodeURIComponent(campaignId)}/play/characters/${encodeURIComponent(characterId)}/inventory/${encodeURIComponent(inventoryId)}`,
+    { method: "PATCH", body: JSON.stringify(input) },
+  );
+}
+
+export async function searchCampaignItemCatalog(
+  campaignId: string,
+  characterId: string,
+  query: string,
+): Promise<CampaignItemCatalogEntry[]> {
+  const response = await requestJson<{ items: CampaignItemCatalogEntry[] }>(
+    `/api/campaigns/${encodeURIComponent(campaignId)}/play/characters/${encodeURIComponent(characterId)}/inventory/catalog?q=${encodeURIComponent(query)}`,
+  );
+  return response.items;
+}
+
+export function grantCampaignInventoryItem(
+  campaignId: string,
+  actorId: string,
+  itemId: string,
+  quantity: number,
+  location: CampaignInventoryLocation = "carried",
+): Promise<unknown> {
+  return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/game/commands`, {
+    method: "POST",
+    body: JSON.stringify({
+      type: "inventory.grant",
+      actorId,
+      itemId,
+      quantity,
+      location,
+      reason: "Manual live character sheet inventory edit.",
+    }),
+  });
+}
+
+export function removeCampaignInventoryItem(
+  campaignId: string,
+  actorId: string,
+  inventoryId: string,
+  quantity: number,
+): Promise<unknown> {
+  return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/game/commands`, {
+    method: "POST",
+    body: JSON.stringify({
+      type: "inventory.remove",
+      actorId,
+      inventoryId,
+      quantity,
+      reason: "Manual live character sheet inventory edit.",
+    }),
+  });
 }
 
 export function castPreparedCampaignSpell(

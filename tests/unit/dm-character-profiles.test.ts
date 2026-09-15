@@ -14,6 +14,8 @@ const migrationFiles = readdirSync(migrationDirectory)
   .filter((file) => file.endsWith(".sql"))
   .sort();
 
+type SqliteBindings = Parameters<ReturnType<DatabaseSync["prepare"]>["get"]>;
+
 let sqlite: DatabaseSync | null = null;
 
 afterEach(() => {
@@ -31,10 +33,10 @@ function migrate(database: DatabaseSync) {
 function d1(database: DatabaseSync): D1Database {
   return {
     prepare(sql: string) {
-      let bindings: unknown[] = [];
+      let bindings: SqliteBindings = [];
       const prepared = {
         bind(...values: unknown[]) {
-          bindings = values;
+          bindings = values as SqliteBindings;
           return prepared;
         },
         async first<T>(column?: string): Promise<T | null> {

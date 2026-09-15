@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { DM_REPEATED_CHECK_CORRECTION } from "@/prompts/dmRepeatedCheckCorrection";
+import { withSystemReferences } from "@/prompts/dmTurnContext";
 import type { OpenAICompatibleEnv } from "@/infrastructure/ai/openaiCompatible";
 import { createDatabase } from "@/infrastructure/database/client";
 import {
@@ -9,7 +11,6 @@ import {
 import { evaluateAlignmentAction } from "./alignmentEvaluator";
 import { loadResolvedDmActionHistory, serializeDmActionProgress } from "./dmActionHistory";
 import { loadCampaignPlaySchemaReadiness } from "./campaignPlaySchemaReadiness";
-import { CAMPAIGN_DM_NARRATION_POLICY } from "./dmCampaignChatPolicy";
 import { isRepeatedAuthoritativeCheck } from "./dmCheckDedup";
 import { recordNarratedCampaignNpcs } from "./dmNpcRegistry";
 import { loadDmSystemReferences, serializeDmSystemReferences } from "./dmSystemReferencePlanner";
@@ -37,25 +38,6 @@ export interface StructuredDmTurnResult {
   commandResults: GameCommandResult[];
   alignmentResult: GameCommandResult | null;
   pendingInitiative: PendingInitiativeRequest | null;
-}
-
-function withCampaignChatPolicy(conversation: string): string {
-  return [
-    `Campaign chat output policy: ${CAMPAIGN_DM_NARRATION_POLICY}`,
-    conversation || "(No previous campaign or private OOC messages.)",
-  ].join("\n\n");
-}
-
-function withSystemReferences(conversation: string, systemReferenceText: string): string {
-  if (!systemReferenceText) return withCampaignChatPolicy(conversation);
-  return withCampaignChatPolicy(
-    [
-      conversation,
-      "Source-backed system database references for this turn:",
-      "Use these rows as canonical reference knowledge for the active ruleset. They do not by themselves mutate game state; authoritative mechanics still require validated game commands.",
-      systemReferenceText,
-    ].join("\n\n"),
-  );
 }
 
 function plannerConversation(input: {
@@ -151,8 +133,6 @@ export async function runStructuredDmTurn(input: {
     });
     systemReferenceText = serializeDmSystemReferences(references);
   } catch (error) {
-    // Rules/catalog retrieval improves grounding but must never make the table
-    // unusable if a reference lookup or small planning pass fails.
     console.error("AI DM system reference hydration failed", {
       campaignId: input.campaign.id,
       rulesetId: input.campaign.rulesetId,
@@ -249,10 +229,7 @@ export async function runStructuredDmTurn(input: {
 
       const corrected = await planDmTurn(input.env, {
         ...plannerInput,
-        conversation: [
-          conversation,
-          "Planner correction: that exact skill check or saving throw already has an authoritative result for this continuation. Do not ask the player to roll it again. Continue from the existing result with narration, an immediate command, or a genuinely different unresolved check.",
-        ].join("\n\n"),
+        conversation: [conversation, DM_REPEATED_CHECK_CORRECTION].join("\n\n"),
       });
       if (!isRepeatedAuthoritativeCheck(corrected, authoritativeToolResults)) return corrected;
 
@@ -277,10 +254,6 @@ export async function runStructuredDmTurn(input: {
 
   input.signal?.throwIfAborted();
   if (loop.decision.kind === "narration" && !pendingInitiative) {
-    // A model should normally award inventory through inventory.grant before it
-    // narrates possession. itemAwards is a safety net: it is still translated
-    // through the same authoritative command path before the chat reply can be
-    // persisted, so prose can never be the only record of a granted item.
     for (const award of loop.decision.itemAwards ?? []) {
       input.signal?.throwIfAborted();
       const result = await executeDmPlannerCommand({
@@ -298,10 +271,6 @@ export async function runStructuredDmTurn(input: {
       await recordCommandResult(result);
     }
 
-    // NPC memory is intentionally non-mechanical. Store every named NPC the
-    // narration says was created/reused so the DM can recall it long after the
-    // chat window rolls out of recent context. Failure here should not erase a
-    // mechanically completed turn, but it is logged loudly for diagnosis.
     if (loop.decision.npcs?.length) {
       try {
         await recordNarratedCampaignNpcs(input.binding, input.campaign.id, loop.decision.npcs);
@@ -346,8 +315,6 @@ export async function runStructuredDmTurn(input: {
         input.onCommittedResult?.(alignmentResult);
       }
     } catch (error) {
-      // Alignment tracking is important but should never make a completed turn
-      // disappear. Fail closed and leave the character's alignment untouched.
       console.error("AI DM alignment evaluation failed", {
         campaignId: input.campaign.id,
         characterId: input.characterId,

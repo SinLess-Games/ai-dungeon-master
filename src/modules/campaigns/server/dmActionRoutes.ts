@@ -218,36 +218,10 @@ function actionLabel(action: PublicCampaignDmAction): string {
   }
 }
 
-function initiativeSummary(action: PublicCampaignDmAction, value: Record<string, unknown>): string {
-  const rawParticipants = value["participants"];
-  if (!Array.isArray(rawParticipants)) return "Initiative resolved. Combat begins.";
-
-  let participant: Record<string, unknown> | null = null;
-  for (const candidate of rawParticipants as unknown[]) {
-    if (!candidate || typeof candidate !== "object") continue;
-    const record = candidate as Record<string, unknown>;
-    if (record["characterId"] === action.actorId) {
-      participant = record;
-      break;
-    }
-  }
-
-  if (!participant) return "Initiative resolved. Combat begins.";
-  const naturalValue = participant["initiativeRoll"];
-  const totalValue = participant["initiativeTotal"];
-  const natural = typeof naturalValue === "number" ? naturalValue : null;
-  const total = typeof totalValue === "number" ? totalValue : null;
-  if (natural === null) return "Initiative resolved. Combat begins.";
-  return total === null
-    ? `Initiative: natural ${natural}. Combat begins.`
-    : `Initiative: natural ${natural}, total ${total}. Combat begins.`;
-}
-
 function authoritativeSummary(action: PublicCampaignDmAction, value: unknown): string {
+  if (action.kind === "check.initiative") return "Initiative resolved. Combat begins.";
   if (!value || typeof value !== "object") return `${actionLabel(action)} resolved.`;
   const record = value as Record<string, unknown>;
-  if (action.kind === "check.initiative") return initiativeSummary(action, record);
-
   const raw = record["check"] ?? record["result"];
   if (!raw || typeof raw !== "object") return `${actionLabel(action)} resolved.`;
   const check = raw as Record<string, unknown>;

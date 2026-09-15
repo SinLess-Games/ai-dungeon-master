@@ -21,6 +21,7 @@ function handlers() {
     removeCondition: vi.fn(async (_deps, input) => ({ removedCondition: input })),
     grantItem: vi.fn(async (_deps, input) => ({ grantedItem: input })),
     removeItem: vi.fn(async (_deps, input) => ({ removedItem: input })),
+    configureInventory: vi.fn(async (_deps, input) => ({ configuredInventory: input })),
     grantXp: vi.fn(async (_deps, input) => ({ grantedXp: input })),
     recordAlignment: vi.fn(async (_deps, input) => ({ alignment: input })),
   } as unknown as GameCommandHandlers;
@@ -243,7 +244,7 @@ describe("unified game command service", () => {
     });
   });
 
-  it("routes inventory and XP grants through the same command boundary", async () => {
+  it("routes inventory, equipment configuration, and XP through the same command boundary", async () => {
     const h = handlers();
     await executeGameCommand(
       deps,
@@ -255,6 +256,20 @@ describe("unified game command service", () => {
         quantity: 2,
         location: "carried",
         reason: "Treasure from the ruined shrine.",
+      },
+      h,
+    );
+    await executeGameCommand(
+      deps,
+      "campaign-1",
+      {
+        type: "inventory.configure",
+        actorId: "hero-1",
+        inventoryId: "longsword-stack",
+        location: "carried",
+        equippedSlot: "main_hand",
+        notes: "Primary weapon",
+        reason: "The player equips the longsword.",
       },
       h,
     );
@@ -289,6 +304,15 @@ describe("unified game command service", () => {
       quantity: 2,
       location: "carried",
       reason: "Treasure from the ruined shrine.",
+    });
+    expect(h.configureInventory).toHaveBeenCalledWith(deps, {
+      campaignId: "campaign-1",
+      actorId: "hero-1",
+      inventoryId: "longsword-stack",
+      location: "carried",
+      equippedSlot: "main_hand",
+      notes: "Primary weapon",
+      reason: "The player equips the longsword.",
     });
     expect(h.removeItem).toHaveBeenCalledWith(deps, {
       campaignId: "campaign-1",

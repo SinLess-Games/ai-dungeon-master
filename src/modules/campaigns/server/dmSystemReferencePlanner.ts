@@ -53,6 +53,7 @@ async function systemCatalogReady(binding: D1Database): Promise<boolean> {
 }
 
 export interface DmSystemReferenceInput {
+  signal?: AbortSignal;
   env: OpenAICompatibleEnv;
   binding: D1Database;
   userId: string;
@@ -82,6 +83,7 @@ export async function loadDmSystemReferences(
   let planned: z.infer<typeof planSchema> | null = null;
   try {
     const response = await generateOpenAICompatibleText(input.env, {
+      ...(input.signal ? { signal: input.signal } : {}),
       system: [
         `You select authoritative database references for an AI Dungeon Master running ${input.rulesetId} ${input.rulesetVersion}.`,
         "Return exactly one JSON object and no markdown.",

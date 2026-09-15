@@ -209,6 +209,7 @@ export interface DmPlannerContext {
 }
 
 interface CommonDmTurnInput {
+  signal?: AbortSignal;
   campaignName: string;
   campaignDescription: string | null;
   rulesetId: string;
@@ -455,6 +456,7 @@ export async function planDmTurn(
       '{"kind":"check","preface":"...","check":{"type":"check.save","save":"fort|ref|will","dc":15,"reason":"..."}}',
     ].join(" ");
     const response = await generateOpenAICompatibleText(env, {
+      ...(input.signal ? { signal: input.signal } : {}),
       system,
       prompt: [
         `Campaign: ${input.campaignName}`,
@@ -527,6 +529,7 @@ export async function planDmTurn(
     activeConditions: context.activeConditions,
   };
   const response = await generateOpenAICompatibleText(env, {
+    ...(input.signal ? { signal: input.signal } : {}),
     system,
     prompt: [
       `Campaign: ${input.campaignName}`,

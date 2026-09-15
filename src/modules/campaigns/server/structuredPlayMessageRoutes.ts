@@ -5,6 +5,7 @@ import { z } from "zod";
 import { campaignPacingContext } from "../domain/duration";
 import {
   generateOpenAICompatibleText,
+  streamOpenAICompatibleText,
   type OpenAICompatibleEnv,
 } from "@/infrastructure/ai/openaiCompatible";
 import {
@@ -36,13 +37,13 @@ import {
   CAMPAIGN_DM_NARRATION_POLICY,
   campaignDmNarrationViolation,
 } from "./dmCampaignChatPolicy";
-import {
-  loadDmSystemReferences,
-  serializeDmSystemReferences,
-} from "./dmSystemReferencePlanner";
+import { loadDmSystemReferences, serializeDmSystemReferences } from "./dmSystemReferencePlanner";
 import { runStructuredDmTurn } from "./dmTurnOrchestrator";
 import { loadDmConversationText, loadRecentDmEvents } from "./dmTurnRuntime";
 import type { DmTurnDecision } from "./dmToolPlanner";
+
+import { respondWithDmStream, type DmResponseStream } from "./dmResponseStream";
+import { streamDmNarration } from "./dmNarrationStream";
 
 interface Bindings extends AuthEnv, OpenAICompatibleEnv {
   DB?: D1Database;
@@ -260,6 +261,7 @@ async function basicDmReply(
   channel: PlayChannel,
   userId: string,
   playerText: string,
+  stream?: DmResponseStream,
 ): Promise<string> {
   const conversation = await loadDmConversationText({
     binding: db,
@@ -271,6 +273,7 @@ async function basicDmReply(
   let systemReferenceText = "";
   try {
     const references = await loadDmSystemReferences({
+      ...(stream ? { signal: stream.signal } : {}),
       env,
       binding: db,
       userId,
@@ -318,10 +321,7 @@ async function basicDmReply(
     campaignPacingContext(parseSettings(campaign.settings)),
     `Recent events: ${JSON.stringify(await loadRecentDmEvents(db, campaign.id)).slice(0, 7000)}`,
     ...(systemReferenceText
-      ? [
-          "Source-backed system database references for this response:",
-          systemReferenceText,
-        ]
+      ? ["Source-backed system database references for this response:", systemReferenceText]
       : []),
     "Shared DM context:",
     conversation || "(No previous campaign or private OOC messages.)",
@@ -333,13 +333,19 @@ async function basicDmReply(
   let retryInstruction = "";
   const attempts = channel === "campaign" ? 2 : 1;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const response = await generateOpenAICompatibleText(env, {
+    stream?.signal.throwIfAborted();
+    if (attempt > 0) await stream?.reset();
+    const options = {
       system,
       prompt: retryInstruction ? `${basePrompt}\n\n${retryInstruction}` : basePrompt,
       temperature: channel === "campaign" ? 0.7 : 0.3,
       maxTokens: channel === "campaign" ? 900 : 700,
       ...(env.AI && env.AI_GAME_MODEL ? { model: env.AI_GAME_MODEL } : {}),
-    });
+      ...(stream ? { signal: stream.signal } : {}),
+    };
+    const response = stream
+      ? await streamOpenAICompatibleText(env, options, stream.delta)
+      : await generateOpenAICompatibleText(env, options);
     if (channel === "ooc_dm") return response;
 
     const violation = campaignDmNarrationViolation(response);
@@ -350,7 +356,9 @@ async function basicDmReply(
     ].join(" ");
   }
 
-  throw new Error("AI_DM_CAMPAIGN_NARRATION_POLICY: model repeated a rejected campaign-chat format");
+  throw new Error(
+    "AI_DM_CAMPAIGN_NARRATION_POLICY: model repeated a rejected campaign-chat format",
+  );
 }
 
 function pendingArguments(
@@ -419,7 +427,9 @@ export const structuredPlayMessageRoutes = new Hono<Env>().post(
     if (!parsed.success) throw new ValidationError("Campaign play message is invalid.");
     const input = parsed.data;
     if (input.channel === "ooc_dm" && input.characterId) {
-      throw new ValidationError("Private OOC DM messages are sent as the player, not as a character.");
+      throw new ValidationError(
+        "Private OOC DM messages are sent as the player, not as a character.",
+      );
     }
     if (input.characterId) {
       await validateCharacterControl(db, campaignId, input.characterId, session.user.id);
@@ -456,116 +466,131 @@ export const structuredPlayMessageRoutes = new Hono<Env>().post(
       }
     }
 
-    const playerId = await insertMessage(db, {
-      campaignId,
-      channel: input.channel,
-      authorKind: "player",
-      authorUserId: session.user.id,
-      privateUserId: input.channel === "ooc_dm" ? session.user.id : null,
-      characterId: input.channel === "campaign" ? (input.characterId ?? null) : null,
-      content: messageContent,
-    });
-    const playerMessage = await getMessage(db, playerId);
-
-    let dmMessage: Awaited<ReturnType<typeof getMessage>> | null = null;
-    let pendingAction: PublicCampaignDmAction | null = null;
-    let aiError: string | null = null;
-    if (aiManaged) {
-      try {
-        let reply: string;
-        let decision: Extract<DmTurnDecision, { kind: "narration" | "check" }> | null = null;
-        if (input.channel === "campaign" && input.characterId && campaign.status === "active") {
-          const structured = await runStructuredDmTurn({
-            env: c.env,
-            binding: db,
-            campaign: {
-              id: campaign.id,
-              name: campaign.name,
-              description: campaign.description,
-              rulesetId: campaign.rulesetId,
-              rulesetVersion: campaign.rulesetVersion,
-              settings: parseSettings(campaign.settings),
-            },
-            userId: session.user.id,
-            characterId: input.characterId,
-            playerAction: messageContent,
-            onCommittedResult: (result) => scheduleResult(c, campaignId, result),
-          });
-          if (structured) {
-            decision = structured.decision;
-            reply = decision.kind === "check" ? decision.preface : decision.text;
-          } else {
-            reply = await basicDmReply(
-              c.env,
-              db,
-              campaign,
-              input.channel,
-              session.user.id,
-              messageContent,
-            );
-          }
-        } else {
-          reply = await basicDmReply(
-            c.env,
-            db,
-            campaign,
-            input.channel,
-            session.user.id,
-            messageContent,
-          );
-        }
-
-        if (input.channel === "campaign") {
-          reply = assertCampaignDmNarration(reply);
-        }
-
-        const dmId = await insertMessage(db, {
+    return respondWithDmStream(
+      c,
+      async (stream) => {
+        stream?.signal.throwIfAborted();
+        const playerId = await insertMessage(db, {
           campaignId,
           channel: input.channel,
-          authorKind: "dm",
-          authorUserId: null,
+          authorKind: "player",
+          authorUserId: session.user.id,
           privateUserId: input.channel === "ooc_dm" ? session.user.id : null,
-          characterId: null,
-          content: reply,
+          characterId: input.channel === "campaign" ? (input.characterId ?? null) : null,
+          content: messageContent,
         });
-        dmMessage = await getMessage(db, dmId);
+        const playerMessage = await getMessage(db, playerId);
+        await stream?.saved();
 
-        if (decision?.kind === "check" && input.characterId) {
-          const context = await loadDmCharacterContext(
-            db,
-            campaignId,
-            input.characterId,
-            session.user.id,
-          );
-          if (!context) throw new Error("AI_DM_CHARACTER_CONTEXT_LOST");
-          pendingAction = await createPendingDmAction(db, {
-            campaignId,
-            requestedByMessageId: playerId,
-            requestMessageId: dmId,
-            requestedUserId: session.user.id,
-            characterId: input.characterId,
-            actorId: context.character.actorId,
-            arguments: pendingArguments(decision, context),
-          });
+        let dmMessage: Awaited<ReturnType<typeof getMessage>> | null = null;
+        let pendingAction: PublicCampaignDmAction | null = null;
+        let aiError: string | null = null;
+        if (aiManaged) {
+          try {
+            let reply: string;
+            let decision: Extract<DmTurnDecision, { kind: "narration" | "check" }> | null = null;
+            if (input.channel === "campaign" && input.characterId && campaign.status === "active") {
+              const structured = await runStructuredDmTurn({
+                env: c.env,
+                binding: db,
+                campaign: {
+                  id: campaign.id,
+                  name: campaign.name,
+                  description: campaign.description,
+                  rulesetId: campaign.rulesetId,
+                  rulesetVersion: campaign.rulesetVersion,
+                  settings: parseSettings(campaign.settings),
+                },
+                userId: session.user.id,
+                characterId: input.characterId,
+                playerAction: messageContent,
+                ...(stream ? { signal: stream.signal } : {}),
+                onCommittedResult: (result) => scheduleResult(c, campaignId, result),
+              });
+              if (structured) {
+                decision = structured.decision;
+                reply = decision.kind === "check" ? decision.preface : decision.text;
+                if (stream && decision.kind === "narration") {
+                  reply = await streamDmNarration(c.env, reply, stream);
+                }
+              } else {
+                reply = await basicDmReply(
+                  c.env,
+                  db,
+                  campaign,
+                  input.channel,
+                  session.user.id,
+                  messageContent,
+                  stream,
+                );
+              }
+            } else {
+              reply = await basicDmReply(
+                c.env,
+                db,
+                campaign,
+                input.channel,
+                session.user.id,
+                messageContent,
+                stream,
+              );
+            }
+
+            if (input.channel === "campaign") {
+              reply = assertCampaignDmNarration(reply);
+            }
+
+            stream?.signal.throwIfAborted();
+            const dmId = await insertMessage(db, {
+              campaignId,
+              channel: input.channel,
+              authorKind: "dm",
+              authorUserId: null,
+              privateUserId: input.channel === "ooc_dm" ? session.user.id : null,
+              characterId: null,
+              content: reply,
+            });
+            dmMessage = await getMessage(db, dmId);
+
+            if (decision?.kind === "check" && input.characterId) {
+              const context = await loadDmCharacterContext(
+                db,
+                campaignId,
+                input.characterId,
+                session.user.id,
+              );
+              if (!context) throw new Error("AI_DM_CHARACTER_CONTEXT_LOST");
+              pendingAction = await createPendingDmAction(db, {
+                campaignId,
+                requestedByMessageId: playerId,
+                requestMessageId: dmId,
+                requestedUserId: session.user.id,
+                characterId: input.characterId,
+                actorId: context.character.actorId,
+                arguments: pendingArguments(decision, context),
+              });
+            }
+          } catch (error) {
+            stream?.signal.throwIfAborted();
+            await stream?.reset();
+            console.error("Structured campaign AI DM response failed", {
+              campaignId,
+              channel: input.channel,
+              userId: session.user.id,
+              error,
+            });
+            aiError =
+              "The Dungeon Master response is temporarily unavailable. Your message was saved.";
+          }
         }
-      } catch (error) {
-        console.error("Structured campaign AI DM response failed", {
-          campaignId,
-          channel: input.channel,
-          userId: session.user.id,
-          error,
-        });
-        aiError = "The Dungeon Master response is temporarily unavailable. Your message was saved.";
-      }
-    }
 
-    return c.json(
-      {
-        message: playerMessage,
-        dmMessage,
-        pendingAction,
-        aiError,
-        awaitingHumanDm: campaign.gameMasterMode === "human",
+        return {
+          message: playerMessage,
+          dmMessage,
+          pendingAction,
+          aiError,
+          awaitingHumanDm: campaign.gameMasterMode === "human",
+        };
       },
       201,
     );

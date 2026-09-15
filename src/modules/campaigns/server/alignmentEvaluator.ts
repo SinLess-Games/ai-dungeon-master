@@ -43,6 +43,7 @@ export function parseAlignmentEvaluation(value: string): AlignmentEvaluation {
 export async function evaluateAlignmentAction(
   env: OpenAICompatibleEnv,
   input: {
+    signal?: AbortSignal;
     rulesetId: string;
     rulesetVersion: string;
     characterName: string;
@@ -55,7 +56,7 @@ export async function evaluateAlignmentAction(
   const system = [
     `You adjudicate ongoing alignment drift for an ${input.rulesetId} ${input.rulesetVersion} character.`,
     "Return exactly one JSON object and no markdown.",
-    "Most ordinary actions are not alignment events. Return {\"record\":false} unless the player's completed choice meaningfully demonstrates lawful/chaotic or good/evil conduct.",
+    'Most ordinary actions are not alignment events. Return {"record":false} unless the player\'s completed choice meaningfully demonstrates lawful/chaotic or good/evil conduct.',
     "Judge the player's actual choice and authoritative outcome, not hypothetical consequences.",
     "Positive lawChaosDelta means lawful; negative means chaotic. Positive goodEvilDelta means good; negative means evil.",
     "Use small magnitudes for ordinary but meaningful conduct (1-5), medium for strong conduct (6-10), and 11-20 only for extraordinary defining acts.",
@@ -74,6 +75,7 @@ export async function evaluateAlignmentAction(
   ].join("\n\n");
 
   const response = await generateOpenAICompatibleText(env, {
+    ...(input.signal ? { signal: input.signal } : {}),
     system,
     prompt,
     temperature: 0,
@@ -81,11 +83,7 @@ export async function evaluateAlignmentAction(
     ...(env.AI && env.AI_GAME_MODEL ? { model: env.AI_GAME_MODEL } : {}),
   });
   const evaluation = parseAlignmentEvaluation(response);
-  if (
-    evaluation.record &&
-    evaluation.lawChaosDelta === 0 &&
-    evaluation.goodEvilDelta === 0
-  ) {
+  if (evaluation.record && evaluation.lawChaosDelta === 0 && evaluation.goodEvilDelta === 0) {
     return { record: false };
   }
   return evaluation;

@@ -10,18 +10,11 @@ import { evaluateAlignmentAction } from "./alignmentEvaluator";
 import { loadCampaignPlaySchemaReadiness } from "./campaignPlaySchemaReadiness";
 import { CAMPAIGN_DM_NARRATION_POLICY } from "./dmCampaignChatPolicy";
 import { recordNarratedCampaignNpcs } from "./dmNpcRegistry";
-import {
-  loadDmSystemReferences,
-  serializeDmSystemReferences,
-} from "./dmSystemReferencePlanner";
+import { loadDmSystemReferences, serializeDmSystemReferences } from "./dmSystemReferencePlanner";
 import { executeDmPlannerCommand } from "./dmToolExecution";
 import { runDmToolLoop } from "./dmToolLoop";
 import { planDmTurn, type DmTurnDecision } from "./dmToolPlanner";
-import {
-  loadDmConversationText,
-  loadDmPlannerContext,
-  loadRecentDmEvents,
-} from "./dmTurnRuntime";
+import { loadDmConversationText, loadDmPlannerContext, loadRecentDmEvents } from "./dmTurnRuntime";
 
 export interface DmCampaignDescriptor {
   id: string;
@@ -75,9 +68,11 @@ export async function runStructuredDmTurn(input: {
   userId: string;
   characterId: string;
   playerAction: string;
+  signal?: AbortSignal;
   seedAuthoritativeResults?: readonly unknown[];
   onCommittedResult?: (result: GameCommandResult) => void;
 }): Promise<StructuredDmTurnResult | null> {
+  input.signal?.throwIfAborted();
   const readiness = await loadCampaignPlaySchemaReadiness(input.binding);
   if (!readiness.structuredDm) {
     console.warn("Structured AI DM is unavailable until campaign-play migrations are applied", {
@@ -105,6 +100,7 @@ export async function runStructuredDmTurn(input: {
   let systemReferenceText = "";
   try {
     const references = await loadDmSystemReferences({
+      ...(input.signal ? { signal: input.signal } : {}),
       env: input.env,
       binding: input.binding,
       userId: input.userId,
@@ -162,7 +158,9 @@ export async function runStructuredDmTurn(input: {
   const loop = await runDmToolLoop({
     maxCommands: 8,
     plan: async (executions) => {
+      input.signal?.throwIfAborted();
       return planDmTurn(input.env, {
+        ...(input.signal ? { signal: input.signal } : {}),
         campaignName: input.campaign.name,
         campaignDescription: input.campaign.description,
         rulesetId: input.campaign.rulesetId,
@@ -171,13 +169,11 @@ export async function runStructuredDmTurn(input: {
         recentEvents,
         conversation,
         context: context!,
-        authoritativeToolResults: [
-          ...seedResults,
-          ...executions.map((entry) => entry.result),
-        ],
+        authoritativeToolResults: [...seedResults, ...executions.map((entry) => entry.result)],
       });
     },
     execute: async (command) => {
+      input.signal?.throwIfAborted();
       const result = await executeDmPlannerCommand({
         binding: input.binding,
         campaignId: input.campaign.id,
@@ -188,12 +184,14 @@ export async function runStructuredDmTurn(input: {
     },
   });
 
+  input.signal?.throwIfAborted();
   if (loop.decision.kind === "narration") {
     // A model should normally award inventory through inventory.grant before it
     // narrates possession. itemAwards is a safety net: it is still translated
     // through the same authoritative command path before the chat reply can be
     // persisted, so prose can never be the only record of a granted item.
     for (const award of loop.decision.itemAwards ?? []) {
+      input.signal?.throwIfAborted();
       const result = await executeDmPlannerCommand({
         binding: input.binding,
         campaignId: input.campaign.id,
@@ -230,18 +228,18 @@ export async function runStructuredDmTurn(input: {
   if (loop.decision.kind === "narration") {
     try {
       const current = context.character.alignment;
+      input.signal?.throwIfAborted();
       const evaluation = await evaluateAlignmentAction(input.env, {
+        ...(input.signal ? { signal: input.signal } : {}),
         rulesetId: input.campaign.rulesetId,
         rulesetVersion: input.campaign.rulesetVersion,
         characterName: context.character.character.name,
         current,
         playerAction: input.playerAction,
-        authoritativeResults: [
-          ...seedResults,
-          ...commandResults.map((result) => result.value),
-        ],
+        authoritativeResults: [...seedResults, ...commandResults.map((result) => result.value)],
         recentEvents,
       });
+      input.signal?.throwIfAborted();
       if (evaluation.record) {
         alignmentResult = await executeGameCommand(
           { db: createDatabase(input.binding), binding: input.binding },
@@ -267,6 +265,7 @@ export async function runStructuredDmTurn(input: {
     }
   }
 
+  input.signal?.throwIfAborted();
   return {
     decision: loop.decision,
     commandResults,

@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
@@ -103,15 +103,50 @@ export function CampaignPlayScreen({
   const [channel, setChannel] = useState<PlayChannel>("campaign");
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
   const [composer, setComposer] = useState("");
+  const [draft, setDraft] = useState<{ channel: PlayChannel; text: string } | null>(null);
+  const streamController = useRef<AbortController | null>(null);
+  useEffect(
+    () => () => {
+      streamController.current?.abort();
+    },
+    [campaignId],
+  );
+  function startStream(targetChannel: PlayChannel, clearComposer = false) {
+    streamController.current?.abort();
+    const submittedContent = composer;
+    const controller = new AbortController();
+    streamController.current = controller;
+    setDraft({ channel: targetChannel, text: "" });
+    return {
+      signal: controller.signal,
+      onDelta: (text: string) => {
+        if (!controller.signal.aborted)
+          setDraft((current) => (current ? { ...current, text: current.text + text } : null));
+      },
+      onReset: () => {
+        if (!controller.signal.aborted)
+          setDraft((current) => (current ? { ...current, text: "" } : null));
+      },
+      onSaved: () => {
+        if (controller.signal.aborted) return;
+        if (clearComposer) setComposer((current) => (current === submittedContent ? "" : current));
+        void queryClient.invalidateQueries({
+          queryKey: ["campaigns", "play", campaignId, "messages", apiChannel(targetChannel)],
+        });
+      },
+    };
+  }
+  async function finishStream() {
+    setDraft(null);
+    await queryClient.invalidateQueries({ queryKey: ["campaigns", "play", campaignId] });
+  }
 
   const detail = useQuery({
     queryKey: ["campaigns", "play", campaignId, "detail"],
     queryFn: () => getCampaign(campaignId),
   });
 
-  const playable = detail.data
-    ? ["active", "paused"].includes(detail.data.campaign.status)
-    : false;
+  const playable = detail.data ? ["active", "paused"].includes(detail.data.campaign.status) : false;
 
   const game = useQuery({
     queryKey: ["campaigns", "play", campaignId, "state"],
@@ -182,7 +217,8 @@ export function CampaignPlayScreen({
   const conditions = useMemo(
     () =>
       selectedActor
-        ? (game.data?.conditions.filter((condition) => condition.actorId === selectedActor.id) ?? [])
+        ? (game.data?.conditions.filter((condition) => condition.actorId === selectedActor.id) ??
+          [])
         : [],
     [game.data?.conditions, selectedActor],
   );
@@ -218,15 +254,19 @@ export function CampaignPlayScreen({
 
   const send = useMutation({
     mutationFn: () =>
-      sendCampaignPlayMessage(campaignId, {
-        channel: apiChannel(channel),
-        content: composer.trim(),
-        ...(channel === "campaign" && speakingCharacter
-          ? { characterId: speakingCharacter.id }
-          : {}),
-      }),
+      sendCampaignPlayMessage(
+        campaignId,
+        {
+          channel: apiChannel(channel),
+          content: composer.trim(),
+          ...(channel === "campaign" && speakingCharacter
+            ? { characterId: speakingCharacter.id }
+            : {}),
+        },
+        startStream(channel, true),
+      ),
+    onSettled: finishStream,
     onSuccess: async (result) => {
-      setComposer("");
       if (result.pendingAction) {
         queryClient.setQueryData(
           ["campaigns", "play", campaignId, "dm-action"],
@@ -250,10 +290,11 @@ export function CampaignPlayScreen({
   });
 
   const resolveDmAction = useMutation({
+    onSettled: finishStream,
     mutationFn: (roll: number) => {
       const action = pendingDmAction.data;
       if (!action) throw new Error("There is no pending Dungeon Master roll to resolve.");
-      return resolveCampaignDmAction(campaignId, action.id, roll);
+      return resolveCampaignDmAction(campaignId, action.id, roll, startStream("campaign"));
     },
     onSuccess: async (result) => {
       queryClient.setQueryData(
@@ -319,14 +360,14 @@ export function CampaignPlayScreen({
   const hasGameMasterControl = detail.data?.role === "owner" || detail.data?.role === "gm";
   const canEndTurn = Boolean(
     campaignStatus === "active" &&
-      currentTurnActor &&
-      (hasGameMasterControl ||
-        (currentUserId && currentTurnActor.controllerUserId === currentUserId)),
+    currentTurnActor &&
+    (hasGameMasterControl ||
+      (currentUserId && currentTurnActor.controllerUserId === currentUserId)),
   );
   const canControlSelectedActor = Boolean(
     campaignStatus === "active" &&
-      selectedActor &&
-      (hasGameMasterControl || (currentUserId && selectedActor.controllerUserId === currentUserId)),
+    selectedActor &&
+    (hasGameMasterControl || (currentUserId && selectedActor.controllerUserId === currentUserId)),
   );
   const canManageLifecycle = Boolean(
     hasGameMasterControl && (campaignStatus === "active" || campaignStatus === "paused"),
@@ -338,6 +379,7 @@ export function CampaignPlayScreen({
     if (
       !composer.trim() ||
       send.isPending ||
+      resolveDmAction.isPending ||
       channel === "character" ||
       campaignComposerBlocked
     ) {
@@ -584,6 +626,7 @@ export function CampaignPlayScreen({
                 timeline={timeline}
                 actors={game.data?.actors ?? []}
                 encounter={game.data?.encounter ?? null}
+                draft={draft?.channel === channel ? draft.text : null}
                 loading={messages.isLoading}
                 error={messages.error ? errorMessage(messages.error) : null}
               />
@@ -600,6 +643,7 @@ export function CampaignPlayScreen({
                 timeline={timeline}
                 actors={[]}
                 encounter={null}
+                draft={draft?.channel === channel ? draft.text : null}
                 loading={messages.isLoading}
                 error={messages.error ? errorMessage(messages.error) : null}
               />
@@ -624,7 +668,9 @@ export function CampaignPlayScreen({
             {channel === "campaign" && pendingDmAction.data ? (
               <CampaignDmCheckRequest
                 action={pendingDmAction.data}
-                disabled={resolveDmAction.isPending || campaign.status !== "active"}
+                disabled={
+                  send.isPending || resolveDmAction.isPending || campaign.status !== "active"
+                }
                 onResolve={(roll) => resolveDmAction.mutate(roll)}
               />
             ) : null}
@@ -634,7 +680,7 @@ export function CampaignPlayScreen({
                 value={composer}
                 onChange={setComposer}
                 onSubmit={submit}
-                pending={send.isPending}
+                pending={send.isPending || resolveDmAction.isPending}
                 disabled={campaignComposerBlocked}
                 placeholder={
                   channel === "campaign"
@@ -707,9 +753,9 @@ export function CampaignPlayScreen({
                 <Sparkles className="h-4 w-4" /> Campaign play MVP
               </div>
               <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                Persistent campaign/OOC chat, structured AI DM check requests, authoritative
-                player rolls, combat, saves, spells, powers, encounter turns, and runtime character
-                state now share the campaign table.
+                Persistent campaign/OOC chat, structured AI DM check requests, authoritative player
+                rolls, combat, saves, spells, powers, encounter turns, and runtime character state
+                now share the campaign table.
               </p>
             </div>
           </aside>
@@ -731,6 +777,7 @@ function ConversationChannel({
   encounter,
   loading,
   error,
+  draft,
 }: {
   campaignId: string;
   currentUserId: string | null;
@@ -738,14 +785,21 @@ function ConversationChannel({
   title: string;
   eyebrow: string;
   description: string;
+  draft: string | null;
   timeline: TimelineEntry[];
   actors: CampaignGameActor[];
   encounter: CampaignEncounter | null;
   loading: boolean;
   error: string | null;
 }) {
+  const feed = useRef<HTMLDivElement>(null);
+  const followingLatest = useRef(true);
+  useEffect(() => {
+    if (feed.current && followingLatest.current) feed.current.scrollTop = feed.current.scrollHeight;
+  }, [draft, timeline.length]);
   const names = useMemo(
-    () => new globalThis.Map<string, string>(actors.map((actor) => [actor.id, actor.name] as const)),
+    () =>
+      new globalThis.Map<string, string>(actors.map((actor) => [actor.id, actor.name] as const)),
     [actors],
   );
   return (
@@ -753,9 +807,7 @@ function ConversationChannel({
       <div className="border-b border-border px-5 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gold">
-              {eyebrow}
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gold">{eyebrow}</p>
             <h2 className="mt-1 font-display text-2xl">{title}</h2>
             <p className="mt-1 text-sm text-muted-foreground">{description}</p>
           </div>
@@ -767,7 +819,14 @@ function ConversationChannel({
         </div>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto p-5">
+      <div
+        ref={feed}
+        onScroll={(event) => {
+          const node = event.currentTarget;
+          followingLatest.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80;
+        }}
+        className="flex-1 space-y-3 overflow-y-auto p-5"
+      >
         {error ? (
           <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
             {error}
@@ -781,11 +840,7 @@ function ConversationChannel({
                 key={entry.id}
                 campaignId={campaignId}
                 message={entry.message}
-                canManage={canManageMessage(
-                  entry.message,
-                  currentUserId,
-                  hasGameMasterControl,
-                )}
+                canManage={canManageMessage(entry.message, currentUserId, hasGameMasterControl)}
               />
             ) : (
               <EventCard
@@ -802,6 +857,20 @@ function ConversationChannel({
             body="Send a message below. Campaign messages persist with the world, and private OOC messages stay scoped to your DM conversation."
           />
         )}
+        {draft !== null ? (
+          <article
+            data-testid="dm-stream-draft"
+            aria-busy="true"
+            className="rounded-xl border border-gold/30 bg-gold/5 p-4"
+          >
+            <p role="status" className="text-xs font-semibold text-gold">
+              {draft ? "Dungeon Master · writing…" : "The Dungeon Master is thinking…"}
+            </p>
+            {draft ? (
+              <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6">{draft}</p>
+            ) : null}
+          </article>
+        ) : null}
       </div>
     </>
   );
@@ -1078,15 +1147,7 @@ function EmptyFeed({ icon, title, body }: { icon: ReactNode; title: string; body
   );
 }
 
-function PlayState({
-  title,
-  body,
-  action,
-}: {
-  title: string;
-  body: string;
-  action?: ReactNode;
-}) {
+function PlayState({ title, body, action }: { title: string; body: string; action?: ReactNode }) {
   return (
     <main className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-3xl items-center justify-center px-6 py-16">
       <section className="w-full rounded-2xl border border-border bg-card p-10 text-center">

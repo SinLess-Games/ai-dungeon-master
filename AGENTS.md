@@ -266,11 +266,15 @@ history must never replace authoritative server rolls or mutate campaign state.
 The AI DM narrates and orchestrates. Free-form model text must never silently mutate
 game state, and providers must never receive unrestricted database access. New AI
 tools must use explicit validated application commands and authoritative reads.
-Do not mistake the existing command dispatcher for an already integrated model tool loop.
+Structured planning runs through `dmTurnOrchestrator.ts` and the bounded `dmToolLoop.ts`;
+inspect those paths when extending AI-triggered mechanics.
 
-`src/modules/campaigns/server/playMessageRoutes.ts` implements persisted campaign
-and private OOC DM messages with generated replies. Preserve channel visibility and
-private message isolation in history, AI context, and live delivery.
+`src/modules/campaigns/server/structuredPlayMessageRoutes.ts` handles message creation;
+`playMessageRoutes.ts` retains history and message management. Campaign/private replies
+and post-roll narration support SSE; read `docs/ai-dm-streaming.md` before changing the
+transport. Preserve JSON client compatibility, completion-only DM persistence, and
+private channel isolation in history, AI context, and live delivery. Never broadcast
+partial drafts or replay a mutating POST automatically after a stream interruption.
 
 `src/infrastructure/ai/openaiCompatible.ts` prefers the `AI` binding, with an optional
 OpenAI-compatible fallback. Read `docs/cloudflare-workers-ai.md` for configuration.

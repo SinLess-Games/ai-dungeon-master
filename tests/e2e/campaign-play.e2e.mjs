@@ -80,6 +80,9 @@ async function startApp(configPath) {
 
 async function startAiMock() {
   const requests = [];
+  let releaseStream;
+  let holdStream = false;
+  let failStream = false;
   const instance = createHttpServer(async (request, response) => {
     if (request.method !== "POST" || request.url !== "/v1/chat/completions") {
       response.writeHead(404).end();
@@ -93,6 +96,20 @@ async function startAiMock() {
     const content = system.includes("private Dungeon Master assistant")
       ? "The rule is clear: resolve uncertain outcomes through the rules engine."
       : "The old stones answer with a low hum. What do you do next?";
+    if (body.stream) {
+      response.writeHead(200, { "Content-Type": "text/event-stream" });
+      response.write(
+        `data: ${JSON.stringify({ choices: [{ delta: { content: content.slice(0, 20) } }] })}\n\n`,
+      );
+      if (holdStream)
+        await new Promise((resolve) => {
+          releaseStream = resolve;
+        });
+      response.end(
+        `data: ${JSON.stringify({ choices: [{ delta: { content: content.slice(20) }, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`,
+      );
+      return;
+    }
     response.writeHead(200, { "Content-Type": "application/json" });
     response.end(
       JSON.stringify({
@@ -108,7 +125,21 @@ async function startAiMock() {
   });
   const address = instance.address();
   assert.ok(address && typeof address === "object");
-  return { instance, requests, baseUrl: `http://127.0.0.1:${address.port}/v1` };
+  return {
+    instance,
+    requests,
+    fail: () => {
+      failStream = true;
+    },
+    hold: () => {
+      holdStream = true;
+    },
+    release: () => {
+      holdStream = false;
+      releaseStream?.();
+    },
+    baseUrl: `http://127.0.0.1:${address.port}/v1`,
+  };
 }
 
 try {
@@ -153,7 +184,13 @@ try {
   const page = await browser.newPage({ viewport: { width: 1500, height: 1100 } });
   page.setDefaultTimeout(20_000);
   const pageErrors = [];
-  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("pageerror", (error) => {
+    pageErrors.push(error.message);
+    console.error("Browser error:", error.message);
+  });
+  page.on("console", (message) => {
+    if (message.type() === "error") console.error("Browser console:", message.text());
+  });
 
   await page.goto(origin);
   await page.getByRole("button", { name: "Create Account", exact: true }).click();
@@ -177,7 +214,13 @@ try {
       maxPlayers: 1,
       settings: {
         pace: "fast",
-        duration: { length: "short", estimatedSessions: 4, startLevel: 1, endLevel: 5, endingTarget: "Silence the standing stone." },
+        duration: {
+          length: "short",
+          estimatedSessions: 4,
+          startLevel: 1,
+          endLevel: 5,
+          endingTarget: "Silence the standing stone.",
+        },
       },
     },
     201,
@@ -231,24 +274,65 @@ try {
   await page.getByRole("heading", { name: "The Black Glass Road", exact: true }).waitFor();
 
   const composer = page.getByLabel("Campaign play message");
+  ai.hold();
   await composer.fill("I place my hand against the black standing stone and listen.");
   await page.getByRole("button", { name: "Send", exact: true }).click();
-  await page.getByText("I place my hand against the black standing stone and listen.", { exact: true }).waitFor();
-  await page.getByText("The old stones answer with a low hum. What do you do next?", { exact: true }).waitFor();
+  const draft = page.getByTestId("dm-stream-draft");
+  await draft.getByText("The old stones answe", { exact: true }).waitFor();
+  assert.equal(
+    await page.getByRole("button", { name: "DM is responding…", exact: true }).isDisabled(),
+    true,
+  );
+  const whileStreaming = await api(
+    page,
+    "GET",
+    `/api/campaigns/${campaign.id}/play/messages?channel=campaign`,
+  );
+  assert.equal(whileStreaming.items.filter((message) => message.authorKind === "player").length, 1);
+  assert.equal(whileStreaming.items.filter((message) => message.authorKind === "dm").length, 0);
+  ai.release();
+  await draft.waitFor({ state: "detached" });
+  await page
+    .getByText("I place my hand against the black standing stone and listen.", { exact: true })
+    .waitFor();
+  await page
+    .getByText("The old stones answer with a low hum. What do you do next?", { exact: true })
+    .waitFor();
   assert.equal(ai.requests.length, 1);
   const pacingPrompt = ai.requests[0].messages.find((entry) => entry.role === "user").content;
   assert.match(pacingPrompt, /Campaign length: short/);
   assert.match(pacingPrompt, /limit unrelated detours/);
   assert.match(pacingPrompt, /Scene pace: fast/);
   assert.match(pacingPrompt, /Silence the standing stone/);
-  console.log("✓ campaign play E2E: Campaign chat persists a player turn and AI DM reply");
+  assert.equal(ai.requests[0].stream, true);
+  const completed = await api(
+    page,
+    "GET",
+    `/api/campaigns/${campaign.id}/play/messages?channel=campaign`,
+  );
+  assert.equal(completed.items.filter((message) => message.authorKind === "dm").length, 1);
+  console.log(
+    "✓ campaign play E2E: genuine partial narration is visible before completion and only the final reply is persisted once",
+  );
 
   await page.getByRole("button", { name: /OOC · DM/ }).click();
+  ai.hold();
   await composer.fill("OOC: should an uncertain action change HP before a rules check?");
   await page.getByRole("button", { name: "Send", exact: true }).click();
-  await page.getByText("OOC: should an uncertain action change HP before a rules check?", { exact: true }).waitFor();
+  await draft.getByText("The rule is clear: r", { exact: true }).waitFor();
+  await page.getByRole("button", { name: /^Campaign/ }).click();
+  assert.equal(await draft.count(), 0, "Private drafts must stay out of the campaign channel");
+  await page.getByRole("button", { name: /OOC · DM/ }).click();
+  await draft.getByText("The rule is clear: r", { exact: true }).waitFor();
+  ai.release();
+  await draft.waitFor({ state: "detached" });
   await page
-    .getByText("The rule is clear: resolve uncertain outcomes through the rules engine.", { exact: true })
+    .getByText("OOC: should an uncertain action change HP before a rules check?", { exact: true })
+    .waitFor();
+  await page
+    .getByText("The rule is clear: resolve uncertain outcomes through the rules engine.", {
+      exact: true,
+    })
     .waitFor();
   assert.equal(ai.requests.length, 2);
   assert.match(
@@ -257,16 +341,45 @@ try {
   );
   await page.getByRole("button", { name: /^Campaign/ }).click();
   assert.equal(
-    await page.getByText("OOC: should an uncertain action change HP before a rules check?", { exact: true }).count(),
+    await page
+      .getByText("OOC: should an uncertain action change HP before a rules check?", { exact: true })
+      .count(),
     0,
   );
   console.log("✓ campaign play E2E: private OOC DM chat is isolated from Campaign chat");
 
+  await page.getByRole("button", { name: /OOC · DM/ }).click();
+  ai.fail();
+  await composer.fill("This reply will be interrupted.");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await page
+    .getByText("The Dungeon Master response is temporarily unavailable. Your message was saved.", {
+      exact: true,
+    })
+    .waitFor();
+  await draft.waitFor({ state: "detached" });
+  const interrupted = await api(
+    page,
+    "GET",
+    `/api/campaigns/${campaign.id}/play/messages?channel=ooc_dm`,
+  );
+  assert.equal(interrupted.items.filter((message) => message.authorKind === "player").length, 2);
+  assert.equal(interrupted.items.filter((message) => message.authorKind === "dm").length, 1);
+  assert.equal(await composer.inputValue(), "");
+  console.log(
+    "✓ campaign play E2E: truncated provider reply preserves the player message and discards the draft",
+  );
+  await page.getByRole("button", { name: /^Campaign/ }).click();
+
   await page.reload();
   await page.getByRole("heading", { name: "Your Campaigns" }).waitFor();
   await page.getByRole("button", { name: "Enter", exact: true }).click();
-  await page.getByText("I place my hand against the black standing stone and listen.", { exact: true }).waitFor();
-  await page.getByText("The old stones answer with a low hum. What do you do next?", { exact: true }).waitFor();
+  await page
+    .getByText("I place my hand against the black standing stone and listen.", { exact: true })
+    .waitFor();
+  await page
+    .getByText("The old stones answer with a low hum. What do you do next?", { exact: true })
+    .waitFor();
   console.log("✓ campaign play E2E: campaign conversation survives a full page reload");
 
   await page.getByRole("button", { name: "Pause", exact: true }).click();
@@ -275,17 +388,26 @@ try {
   const pausedDetail = await api(page, "GET", `/api/campaigns/${campaign.id}`);
   assert.equal(pausedDetail.campaign.status, "paused");
 
-  const pausedState = await api(page, "GET", `/api/campaigns/${campaign.id}/game/state?eventLimit=100`);
+  const pausedState = await api(
+    page,
+    "GET",
+    `/api/campaigns/${campaign.id}/game/state?eventLimit=100`,
+  );
   assert.equal(pausedState.campaignId, campaign.id);
   assert.equal(pausedState.worldId, started.worldId);
   assert.ok(pausedState.events.some((event) => event.type === "campaign.started"));
 
-  const blockedAction = await page.request.post(`${origin}/api/campaigns/${campaign.id}/game/commands`, {
-    headers: { Origin: origin },
-    data: { type: "check.save", actorId: characterId, save: "will", dc: 10 },
-  });
+  const blockedAction = await page.request.post(
+    `${origin}/api/campaigns/${campaign.id}/game/commands`,
+    {
+      headers: { Origin: origin },
+      data: { type: "check.save", actorId: characterId, save: "will", dc: 10 },
+    },
+  );
   assert.equal(blockedAction.status(), 409, await blockedAction.text());
-  console.log("✓ campaign play E2E: pause keeps hydration live while blocking rules-engine mutations");
+  console.log(
+    "✓ campaign play E2E: pause keeps hydration live while blocking rules-engine mutations",
+  );
 
   await page.getByRole("button", { name: "Resume", exact: true }).click();
   await page.getByText("Campaign resumed.", { exact: true }).waitFor();

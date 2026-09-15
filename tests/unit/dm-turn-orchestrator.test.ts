@@ -173,4 +173,38 @@ describe("structured AI DM turn orchestration", () => {
     expect(onCommittedResult).toHaveBeenCalledOnce();
     expect(onCommittedResult).toHaveBeenCalledWith(alignmentResult);
   });
+
+  it("does not execute a proposed command after the requesting stream is aborted", async () => {
+    const controller = new AbortController();
+    mocks.planDmTurn.mockImplementationOnce(async () => {
+      controller.abort();
+      return {
+        kind: "command",
+        command: { type: "progression.xp.grant", amount: 100, reason: "Completed." },
+      };
+    });
+    await expect(runStructuredDmTurn({ ...input, signal: controller.signal })).rejects.toThrow();
+    expect(mocks.executeDmPlannerCommand).not.toHaveBeenCalled();
+    expect(mocks.executeGameCommand).not.toHaveBeenCalled();
+  });
+
+  it("preserves and publishes a committed command but stops further planning on cancellation", async () => {
+    const controller = new AbortController();
+    const committed = {
+      type: "progression.xp.grant",
+      value: { eventId: "event-1", sessionId: "session-1", amount: 100 },
+    };
+    mocks.planDmTurn.mockResolvedValueOnce({
+      kind: "command",
+      command: { type: "progression.xp.grant", amount: 100, reason: "Completed." },
+    });
+    mocks.executeDmPlannerCommand.mockResolvedValueOnce(committed);
+    const onCommittedResult = vi.fn(() => controller.abort());
+    await expect(
+      runStructuredDmTurn({ ...input, signal: controller.signal, onCommittedResult }),
+    ).rejects.toThrow();
+    expect(mocks.planDmTurn).toHaveBeenCalledTimes(1);
+    expect(mocks.executeDmPlannerCommand).toHaveBeenCalledTimes(1);
+    expect(onCommittedResult).toHaveBeenCalledWith(committed);
+  });
 });

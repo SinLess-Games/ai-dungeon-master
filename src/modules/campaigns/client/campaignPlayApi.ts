@@ -1,3 +1,4 @@
+import { requestDmStream, type DmStreamOptions } from "./dmStreamApi";
 import { requestJson } from "./campaignCreatorApi";
 
 export interface CampaignGameActorHealth {
@@ -413,7 +414,14 @@ export function sendCampaignPlayMessage(
     content: string;
     characterId?: string | null;
   },
+  stream?: DmStreamOptions,
 ): Promise<SendCampaignPlayMessageResult> {
+  if (stream)
+    return requestDmStream(
+      `/api/campaigns/${encodeURIComponent(campaignId)}/play/messages`,
+      input,
+      stream,
+    );
   return requestJson<SendCampaignPlayMessageResult>(
     `/api/campaigns/${encodeURIComponent(campaignId)}/play/messages`,
     {
@@ -436,7 +444,14 @@ export function resolveCampaignDmAction(
   campaignId: string,
   actionId: string,
   roll: number,
+  stream?: DmStreamOptions,
 ): Promise<ResolveCampaignDmActionResult> {
+  if (stream)
+    return requestDmStream(
+      `/api/campaigns/${encodeURIComponent(campaignId)}/play/dm-actions/${encodeURIComponent(actionId)}/resolve`,
+      { roll },
+      stream,
+    );
   return requestJson<ResolveCampaignDmActionResult>(
     `/api/campaigns/${encodeURIComponent(campaignId)}/play/dm-actions/${encodeURIComponent(actionId)}/resolve`,
     {
@@ -573,10 +588,13 @@ export function castPreparedCampaignSpell(
     targetIds?: string[];
   },
 ): Promise<unknown> {
-  return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/game/resolved-casting/spells`, {
-    method: "POST",
-    body: JSON.stringify({ mode: "prepared", ...input }),
-  });
+  return requestJson(
+    `/api/campaigns/${encodeURIComponent(campaignId)}/game/resolved-casting/spells`,
+    {
+      method: "POST",
+      body: JSON.stringify({ mode: "prepared", ...input }),
+    },
+  );
 }
 
 export function castSpontaneousCampaignSpell(
@@ -589,10 +607,13 @@ export function castSpontaneousCampaignSpell(
     targetIds?: string[];
   },
 ): Promise<unknown> {
-  return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/game/resolved-casting/spells`, {
-    method: "POST",
-    body: JSON.stringify({ mode: "spontaneous", ...input }),
-  });
+  return requestJson(
+    `/api/campaigns/${encodeURIComponent(campaignId)}/game/resolved-casting/spells`,
+    {
+      method: "POST",
+      body: JSON.stringify({ mode: "spontaneous", ...input }),
+    },
+  );
 }
 
 export function manifestCampaignPower(
@@ -604,10 +625,13 @@ export function manifestCampaignPower(
     targetIds?: string[];
   },
 ): Promise<unknown> {
-  return requestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/game/resolved-casting/powers`, {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
+  return requestJson(
+    `/api/campaigns/${encodeURIComponent(campaignId)}/game/resolved-casting/powers`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export function performCampaignSkillCheck(

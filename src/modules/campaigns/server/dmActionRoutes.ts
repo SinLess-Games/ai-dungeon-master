@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { respondWithDmStream } from "./dmResponseStream";
+import { streamDmNarration } from "./dmNarrationStream";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { OpenAICompatibleEnv } from "@/infrastructure/ai/openaiCompatible";
@@ -319,7 +321,9 @@ function translateResolutionError(error: unknown): never {
     case "AI_DM_ACTION_NOT_FOUND":
       throw new NotFoundError("The requested Dungeon Master action no longer exists.");
     case "AI_DM_ACTION_NOT_PENDING":
-      throw new ConflictError("This Dungeon Master action has already been resolved or is resolving.");
+      throw new ConflictError(
+        "This Dungeon Master action has already been resolved or is resolving.",
+      );
     case "AI_DM_ACTION_SKILL_NOT_ALLOWED":
       throw new ValidationError("That skill can no longer be used for this requested check.");
     case "CAMPAIGN_GAME_NOT_ACTIVE":
@@ -371,86 +375,98 @@ export const campaignDmActionRoutes = new Hono<Env>()
       });
       scheduleIfEvent(c, campaignId, resolved.result.value);
 
-      let content = authoritativeSummary(resolved.action, resolved.result.value);
-      let finalDecision: Extract<DmTurnDecision, { kind: "narration" | "check" }> | null = null;
-      let nextPendingAction: PublicCampaignDmAction | null = null;
-      let structuredError: string | null = null;
+      return respondWithDmStream(c, async (stream) => {
+        await stream?.saved();
+        let content = authoritativeSummary(resolved.action, resolved.result.value);
+        let finalDecision: Extract<DmTurnDecision, { kind: "narration" | "check" }> | null = null;
+        let nextPendingAction: PublicCampaignDmAction | null = null;
+        let structuredError: string | null = null;
 
-      if (playerMessage && playerMessage.authorUserId === session.user.id) {
-        try {
-          const turn = await runStructuredDmTurn({
-            env: c.env,
-            binding: db,
-            campaign: {
-              id: campaign.id,
-              name: campaign.name,
-              description: campaign.description,
-              rulesetId: campaign.rulesetId,
-              rulesetVersion: campaign.rulesetVersion,
-              settings: parseSettings(campaign.settings),
-            },
-            userId: session.user.id,
-            characterId: origin.characterId,
-            playerAction: playerMessage.content,
-            seedAuthoritativeResults: [resolved.result.value],
-            onCommittedResult: (result) => scheduleResult(c, campaignId, result),
-          });
-          if (turn) {
-            finalDecision = turn.decision;
-            content = turn.decision.kind === "check" ? turn.decision.preface : turn.decision.text;
+        if (playerMessage && playerMessage.authorUserId === session.user.id) {
+          try {
+            const turn = await runStructuredDmTurn({
+              env: c.env,
+              binding: db,
+              campaign: {
+                id: campaign.id,
+                name: campaign.name,
+                description: campaign.description,
+                rulesetId: campaign.rulesetId,
+                rulesetVersion: campaign.rulesetVersion,
+                settings: parseSettings(campaign.settings),
+              },
+              userId: session.user.id,
+              characterId: origin.characterId,
+              playerAction: playerMessage.content,
+              seedAuthoritativeResults: [resolved.result.value],
+              ...(stream ? { signal: stream.signal } : {}),
+              onCommittedResult: (result) => scheduleResult(c, campaignId, result),
+            });
+            if (turn) {
+              finalDecision = turn.decision;
+              content = turn.decision.kind === "check" ? turn.decision.preface : turn.decision.text;
+              if (stream && turn.decision.kind === "narration") {
+                content = await streamDmNarration(c.env, content, stream);
+              }
+            }
+          } catch (error) {
+            stream?.signal.throwIfAborted();
+            await stream?.reset();
+            content = authoritativeSummary(resolved.action, resolved.result.value);
+            finalDecision = null;
+            console.error("AI DM post-check tool loop failed", {
+              campaignId,
+              actionId,
+              userId: session.user.id,
+              error,
+            });
+            structuredError =
+              "The check was resolved, but the Dungeon Master could not continue the structured turn. The authoritative result was preserved.";
           }
-        } catch (error) {
-          console.error("AI DM post-check tool loop failed", {
-            campaignId,
-            actionId,
-            userId: session.user.id,
-            error,
-          });
-          structuredError =
-            "The check was resolved, but the Dungeon Master could not continue the structured turn. The authoritative result was preserved.";
         }
-      }
 
-      const message = await insertDmMessage(db, campaignId, content);
-      await attachDmResolutionMessage(db, resolved.action.id, message.id);
+        stream?.signal.throwIfAborted();
+        const message = await insertDmMessage(db, campaignId, content);
+        await attachDmResolutionMessage(db, resolved.action.id, message.id);
 
-      if (finalDecision?.kind === "check") {
-        try {
-          const context = await loadDmCharacterContext(
-            db,
-            campaignId,
-            origin.characterId,
-            session.user.id,
-          );
-          if (!context) throw new Error("AI_DM_CHARACTER_CONTEXT_LOST");
-          nextPendingAction = await createPendingDmAction(db, {
-            campaignId,
-            requestedByMessageId: origin.requestedByMessageId,
-            requestMessageId: message.id,
-            requestedUserId: session.user.id,
-            characterId: origin.characterId,
-            actorId: context.character.actorId,
-            arguments: pendingArguments(finalDecision, context),
-          });
-        } catch (error) {
-          console.error("Unable to persist chained AI DM check", {
-            campaignId,
-            actionId,
-            userId: session.user.id,
-            error,
-          });
-          structuredError =
-            structuredError ??
-            "The previous check was resolved, but the next requested check could not be persisted.";
+        if (finalDecision?.kind === "check") {
+          try {
+            const context = await loadDmCharacterContext(
+              db,
+              campaignId,
+              origin.characterId,
+              session.user.id,
+            );
+            if (!context) throw new Error("AI_DM_CHARACTER_CONTEXT_LOST");
+            nextPendingAction = await createPendingDmAction(db, {
+              campaignId,
+              requestedByMessageId: origin.requestedByMessageId,
+              requestMessageId: message.id,
+              requestedUserId: session.user.id,
+              characterId: origin.characterId,
+              actorId: context.character.actorId,
+              arguments: pendingArguments(finalDecision, context),
+            });
+          } catch (error) {
+            console.error("Unable to persist chained AI DM check", {
+              campaignId,
+              actionId,
+              userId: session.user.id,
+              error,
+            });
+            structuredError =
+              structuredError ??
+              "The previous check was resolved, but the next requested check could not be persisted.";
+          }
         }
-      }
 
-      return c.json({
-        action: resolved.action,
-        result: resolved.result,
-        dmMessage: publicDmMessage(message),
-        pendingAction: nextPendingAction,
-        aiError: structuredError,
+        return {
+          action: resolved.action,
+          result: resolved.result,
+          dmMessage: publicDmMessage(message),
+          pendingAction: nextPendingAction,
+          aiError: structuredError,
+        };
       });
     } catch (error) {
       translateResolutionError(error);

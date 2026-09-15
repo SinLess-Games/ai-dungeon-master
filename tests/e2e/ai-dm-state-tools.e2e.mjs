@@ -49,14 +49,29 @@ async function applyMigrations(db) {
   }
 }
 
-async function api(page, method, path, data, status = 200) {
+async function api(page, method, path, data, status = 200, stream = false) {
   const response = await page.request.fetch(origin + path, {
     method,
-    headers: { Origin: origin },
+    headers: { Origin: origin, ...(stream ? { Accept: "text/event-stream" } : {}) },
     ...(data === undefined ? {} : { data }),
   });
   const text = await response.text();
-  assert.equal(response.status(), status, `${method} ${path}: ${response.status()} ${text}`);
+  assert.equal(
+    response.status(),
+    stream && status === 201 ? 200 : status,
+    `${method} ${path}: ${response.status()} ${text}`,
+  );
+  if (stream && response.ok()) {
+    assert.match(response.headers()["content-type"], /text\/event-stream/);
+    const complete = text.split("\n\n").find((event) => event.includes("event: complete"));
+    assert.ok(complete, `Missing completed event: ${text}`);
+    return JSON.parse(
+      complete
+        .split("\n")
+        .find((line) => line.startsWith("data: "))
+        .slice(6),
+    );
+  }
   return text ? JSON.parse(text) : null;
 }
 
@@ -167,7 +182,10 @@ async function startAiMock() {
         const inventoryMatch = prompt.match(
           /"inventoryId":"([^"]+)","itemId":"ai-dm-tools-e2e-potion"/,
         );
-        assert.ok(inventoryMatch, "Expected the planner tool context to expose the granted potion stack.");
+        assert.ok(
+          inventoryMatch,
+          "Expected the planner tool context to expose the granted potion stack.",
+        );
         content = JSON.stringify({
           kind: "command",
           command: {
@@ -191,10 +209,22 @@ async function startAiMock() {
         goodEvilDelta: 6,
         reason: "The character completed the shrine trial to protect travelers on the road.",
       });
+    } else if (body.stream) {
+      content = prompt.replace(/^Approved narration:\n/, "");
     } else {
       content = "The shrine falls quiet.";
     }
 
+    if (body.stream) {
+      response.writeHead(200, { "Content-Type": "text/event-stream" });
+      response.write(
+        `data: ${JSON.stringify({ choices: [{ delta: { content: content.slice(0, 15) } }] })}\n\n`,
+      );
+      response.end(
+        `data: ${JSON.stringify({ choices: [{ delta: { content: content.slice(15) }, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`,
+      );
+      return;
+    }
     response.writeHead(200, { "Content-Type": "application/json" });
     response.end(
       JSON.stringify({
@@ -215,7 +245,10 @@ async function startAiMock() {
 }
 
 async function one(db, sql, ...bindings) {
-  return db.prepare(sql).bind(...bindings).first();
+  return db
+    .prepare(sql)
+    .bind(...bindings)
+    .first();
 }
 
 try {
@@ -357,7 +390,11 @@ try {
   const started = await api(page, "POST", `/api/campaigns/${campaign.id}/start`);
   assert.equal(started.status, "active");
 
-  const initialState = await api(page, "GET", `/api/campaigns/${campaign.id}/game/state?eventLimit=100`);
+  const initialState = await api(
+    page,
+    "GET",
+    `/api/campaigns/${campaign.id}/game/state?eventLimit=100`,
+  );
   const characterActor = initialState.actors.find((entry) => entry.characterId === characterId);
   assert.ok(characterActor, "Expected the started campaign to expose the character actor.");
   actorId = characterActor.id;
@@ -372,6 +409,7 @@ try {
       content: "I complete the shrine trial and accept the blessing meant to protect travelers.",
     },
     201,
+    true,
   );
 
   assert.equal(result.aiError, null);
@@ -383,7 +421,9 @@ try {
   assert.equal(plannerStep, 4);
   assert.equal(alignmentCalls, 1);
   assert.ok(ai.requests.length >= 5, "Expected planner calls plus alignment adjudication.");
-  console.log("✓ AI DM tools E2E: bounded planner executed three authoritative commands then narrated");
+  console.log(
+    "✓ AI DM tools E2E: bounded planner executed three authoritative commands then narrated",
+  );
 
   const checkRequest = await api(
     page,
@@ -412,6 +452,7 @@ try {
       content: "I try to act again before resolving the requested roll.",
     },
     409,
+    true,
   );
   assert.ok(blocked, "Expected an outstanding DM check to block another in-character action.");
   assert.equal(plannerStep, 5);
@@ -435,6 +476,8 @@ try {
     "POST",
     `/api/campaigns/${campaign.id}/play/dm-actions/${firstResolution.pendingAction.id}/resolve`,
     { roll: 12 },
+    200,
+    true,
   );
   assert.equal(secondResolution.result.type, "check.skill");
   assert.equal(secondResolution.pendingAction, null);
@@ -445,7 +488,9 @@ try {
   );
   assert.equal(plannerStep, 8);
   assert.equal(alignmentCalls, 2);
-  console.log("✓ AI DM tools E2E: resolved checks re-enter the tool loop and continue authoritative state changes");
+  console.log(
+    "✓ AI DM tools E2E: resolved checks re-enter the tool loop and continue authoritative state changes",
+  );
 
   const state = await api(page, "GET", `/api/campaigns/${campaign.id}/game/state?eventLimit=100`);
   const eventTypes = state.events.map((event) => event.type);
@@ -506,7 +551,9 @@ try {
   assert.equal(alignment.lawChaosScore, 0);
   assert.equal(alignment.goodEvilScore, 12);
   assert.match(alignment.lastReason, /protect travelers/i);
-  console.log("✓ AI DM tools E2E: condition, inventory, XP, checks, and alignment state persisted in D1");
+  console.log(
+    "✓ AI DM tools E2E: condition, inventory, XP, checks, and alignment state persisted in D1",
+  );
 
   console.log("\n✓ Structured AI DM state-tool end-to-end verification passed.");
 } finally {

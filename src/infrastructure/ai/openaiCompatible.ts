@@ -1,8 +1,11 @@
+import { readServerSentEvents } from "@/shared/serverSentEvents";
+
 export interface WorkersAIBinding {
   run(
     model: string,
     input: {
       messages: Array<{ role: "system" | "user"; content: string }>;
+      stream?: boolean;
       temperature?: number;
       max_tokens?: number;
       chat_template_kwargs?: {
@@ -34,6 +37,7 @@ export interface GenerateTextInput {
   /** Optional provider-specific model override for this workflow. */
   model?: string;
   maxTokens?: number;
+  signal?: AbortSignal;
 }
 
 interface ChatCompletionResponse {
@@ -87,7 +91,9 @@ async function generateWorkersAIText(
 ): Promise<string> {
   if (!env.AI) throw new Error("Workers AI binding is unavailable.");
 
-  const model = input.model?.trim() || env.AI_DEVBLOG_MODEL?.trim() || DEFAULT_WORKERS_AI_DEVBLOG_MODEL;
+  const model =
+    input.model?.trim() || env.AI_DEVBLOG_MODEL?.trim() || DEFAULT_WORKERS_AI_DEVBLOG_MODEL;
+  input.signal?.throwIfAborted();
   const response = await env.AI.run(model, {
     messages: [
       { role: "system", content: input.system },
@@ -106,6 +112,7 @@ async function generateWorkersAIText(
       : {}),
   });
 
+  input.signal?.throwIfAborted();
   return extractWorkersAIText(response);
 }
 
@@ -120,6 +127,7 @@ async function generateOpenAIProviderText(
 
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
+    ...(input.signal ? { signal: input.signal } : {}),
     headers: {
       Authorization: `Bearer ${env.AI_API_KEY}`,
       "Content-Type": "application/json",
@@ -163,4 +171,81 @@ export async function generateOpenAICompatibleText(
   throw new Error(
     "No AI provider is configured. Add the Cloudflare Workers AI binding or configure AI_API_KEY.",
   );
+}
+
+/** Actual provider deltas, never a simulated typewriter over a buffered completion. */
+export async function streamOpenAICompatibleText(
+  env: OpenAICompatibleEnv,
+  input: GenerateTextInput,
+  onDelta: (text: string) => Promise<void>,
+): Promise<string> {
+  input.signal?.throwIfAborted();
+  const model =
+    input.model?.trim() ||
+    env.AI_DEVBLOG_MODEL?.trim() ||
+    (env.AI ? DEFAULT_WORKERS_AI_DEVBLOG_MODEL : "gpt-5-mini");
+  const request = {
+    messages: [
+      { role: "system" as const, content: input.system },
+      { role: "user" as const, content: input.prompt },
+    ],
+    stream: true,
+    temperature: input.temperature ?? 0.5,
+    max_tokens: input.maxTokens ?? 2600,
+    ...(env.AI && usesGemma4(model) ? { chat_template_kwargs: { enable_thinking: false } } : {}),
+  };
+  let body: ReadableStream<Uint8Array>;
+  if (env.AI) {
+    const result = await env.AI.run(model, request);
+    if (!(result instanceof ReadableStream))
+      throw new Error("AI provider did not return a stream.");
+    body = result;
+  } else {
+    if (!env.AI_API_KEY) throw new Error("No AI provider is configured.");
+    const baseUrl = (env.AI_BASE_URL?.trim() || "https://api.openai.com/v1").replace(/\/+$/, "");
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      ...(input.signal ? { signal: input.signal } : {}),
+      headers: { Authorization: `Bearer ${env.AI_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ ...request, model }),
+    });
+    if (
+      !response.ok ||
+      !response.body ||
+      !response.headers.get("Content-Type")?.includes("text/event-stream")
+    ) {
+      await response.body?.cancel();
+      throw new Error(`AI streaming request failed (HTTP ${response.status}).`);
+    }
+    body = response.body;
+  }
+  let text = "";
+  let completed = false;
+  for await (const event of readServerSentEvents(body, input.signal)) {
+    if (event.data.trim() === "[DONE]") {
+      completed = true;
+      break;
+    }
+    const value: unknown = JSON.parse(event.data);
+    if (!value || typeof value !== "object") throw new Error("Invalid AI stream event.");
+    const frame = value as {
+      response?: unknown;
+      error?: unknown;
+      choices?: Array<{ delta?: { content?: unknown }; finish_reason?: string | null }>;
+    };
+    if (event.event === "error" || frame.error) throw new Error("AI stream failed.");
+    const choice = frame.choices?.[0];
+    if (choice?.finish_reason && choice.finish_reason !== "stop") {
+      throw new Error("AI stream ended without a complete reply.");
+    }
+    if (choice?.finish_reason === "stop") completed = true;
+    const delta = typeof frame.response === "string" ? frame.response : choice?.delta?.content;
+    if (typeof delta !== "string" || !delta) continue;
+    text += delta;
+    if (text.length > 20_000) throw new Error("AI reply exceeds the size limit.");
+    await onDelta(delta);
+  }
+  input.signal?.throwIfAborted();
+  if (!completed || !text.trim()) throw new Error("AI stream ended before completing a reply.");
+  return text.trim();
 }

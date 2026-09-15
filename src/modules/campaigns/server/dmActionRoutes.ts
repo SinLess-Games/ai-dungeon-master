@@ -336,6 +336,7 @@ function translateResolutionError(error: unknown): never {
     case "ENCOUNTER_ALREADY_ACTIVE":
       throw new ConflictError("Combat has already started; this initiative request is no longer pending.");
     case "ENCOUNTER_PARTICIPANT_INVALID":
+    case "ENCOUNTER_PLAYER_INITIATIVE_REQUIRED":
       throw new ValidationError("The encounter participants changed before initiative was resolved.");
     case "GAME_ACTOR_OR_SKILL_NOT_FOUND":
     case "GAME_ACTOR_NOT_FOUND":
@@ -383,6 +384,24 @@ export const campaignDmActionRoutes = new Hono<Env>()
         roll: parsed.data.roll,
       });
       scheduleIfEvent(c, campaignId, resolved.result.value);
+
+      if (resolved.result.type === "check.initiative") {
+        return respondWithDmStream(c, async (stream) => {
+          await stream?.saved();
+          const content = resolved.nextPendingAction
+            ? "Initiative recorded. Roll initiative for your next participating character."
+            : "Initiative recorded. Waiting for the remaining player-controlled combatants.";
+          const message = await insertDmMessage(db, campaignId, content);
+          await attachDmResolutionMessage(db, resolved.action.id, message.id);
+          return {
+            action: resolved.action,
+            result: resolved.result,
+            dmMessage: publicDmMessage(message),
+            pendingAction: resolved.nextPendingAction,
+            aiError: null,
+          };
+        });
+      }
 
       return respondWithDmStream(c, async (stream) => {
         await stream?.saved();

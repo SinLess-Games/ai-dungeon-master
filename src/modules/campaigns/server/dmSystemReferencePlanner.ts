@@ -37,6 +37,21 @@ function dnd35CatalogSupported(rulesetId: string): boolean {
   return normalized === "dnd35" || normalized === "dnd-3.5" || normalized === "dnd3.5";
 }
 
+async function systemCatalogReady(binding: D1Database): Promise<boolean> {
+  try {
+    const result = await binding
+      .prepare(
+        `SELECT count(*) AS count
+         FROM sqlite_master
+         WHERE type = 'table' AND name IN ('dnd35_sources', 'dnd35_rules')`,
+      )
+      .first<{ count: number }>();
+    return Number(result?.count ?? 0) === 2;
+  } catch {
+    return false;
+  }
+}
+
 export interface DmSystemReferenceInput {
   env: OpenAICompatibleEnv;
   binding: D1Database;
@@ -62,6 +77,7 @@ export async function loadDmSystemReferences(
   input: DmSystemReferenceInput,
 ): Promise<SystemCatalogLookupResult[]> {
   if (!dnd35CatalogSupported(input.rulesetId) || !input.playerText.trim()) return [];
+  if (!(await systemCatalogReady(input.binding))) return [];
 
   let planned: z.infer<typeof planSchema> | null = null;
   try {

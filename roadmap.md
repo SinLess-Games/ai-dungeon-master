@@ -19,10 +19,10 @@ feature. This audit does not certify production deployment or live provider setu
 - [ ] Local save layer (swap to Cloud when available) — device-local dice history exists, but character/campaign/world saves require the server; there is no offline game-save adapter or reconciliation flow.
 - [x] Dashboard — implemented as the [campaign management hub](src/modules/campaigns/ui/CampaignsHub.tsx) and [character library](src/modules/characters/ui/CharacterLibrary.tsx), with saved records, campaign setup, start/resume, and deletion. There is no separate unified `/dashboard` page.
 - [x] Character creator with inline explanations — [multi-step creator](src/modules/characters/ui/AdvancedCharacterCreator.tsx), persisted selections, explanatory content, and server readiness/finalization are implemented for supported starting characters. Later-level advancement remains separate work.
-- [x] Character sheet (live, editable) — campaign play now exposes an authoritative live D&D 3.5 sheet with abilities, combat stats, HP, saves, skills, feats, classes, XP, alignment, editable identity/notes, an encumbrance toggle, and ongoing carried/stored/party inventory and equipment-slot editing. Owner/GM catalog grants and removals continue to use audited game commands.
-- [ ] Campaign setup wizard (style, type, length, pace, DM temperament, world notes, house rules)
+- [x] Character sheet (live, editable) — campaign play now exposes an authoritative live D&D 3.5 sheet with abilities, combat stats, HP, saves, skills, feats, classes, XP, alignment, editable identity/notes, an encumbrance toggle, and ongoing carried/stored/party inventory and equipment-slot editing. Inventory placement changes use the shared game-command boundary and emit auditable game events; owner/GM catalog grants and removals remain audited commands as well.
+- [x] Campaign setup wizard (style, type, length, pace, DM temperament, world notes, house rules)
   - [x] [Persistent seven-stage wizard](src/modules/campaigns/ui/CampaignCreator.tsx): style, structure, scale, pace, world profile, descriptions, rules, player permissions, DM behavior, and house-rule notes.
-  - [ ] Explicit campaign length/duration setting. Heroic/paragon/epic scale describes levels rather than campaign length. Saved settings also do not prove every chosen behavior is enforced during play.
+  - [x] [Campaign length/duration](docs/campaign-duration.md): short/medium/long/endless, optional session/level/ending targets, draft persistence/editing, and explicit AI DM pacing context. Targets guide narration without forcing mechanical outcomes.
 - [ ] Streaming AI DM with state tools, player rolls, grants, alignment tracking
   - [x] [Persistent campaign/private DM conversations](src/modules/campaigns/server/playMessageRoutes.ts) and generated AI replies.
   - [x] [Validated game commands](src/modules/game/server/gameCommandRoutes.ts) for encounters, attacks, checks, casting, and psionics, with player controls in campaign play.
@@ -79,8 +79,8 @@ Reviewed current routes, feature modules, schemas, seeds, and test coverage; exc
 legacy code. Ran 12 focused unit-test files covering authentication/schema, dice,
 D&D rules and derived stats, character creation rules, campaign options/start,
 game commands, live coordination, and book-rule seeds: **112 tests passed** at the
-September 14 audit point. Later AI-DM and live-sheet/encumbrance work adds focused
-unit coverage, but this environment cannot execute the repository test suite and
-current GitHub Actions jobs fail before their workflow steps begin. Browser E2E,
-live Google/AI calls, remote migrations, and deployment were not run for this
-roadmap audit.
+September 14 audit point. Later AI-DM, campaign-duration, and live-sheet/encumbrance
+work adds focused unit coverage, but this environment cannot execute the repository
+test suite and current GitHub Actions jobs fail before their workflow steps begin.
+Browser E2E, live Google/AI calls, remote migrations, and deployment were not run for
+this roadmap audit.

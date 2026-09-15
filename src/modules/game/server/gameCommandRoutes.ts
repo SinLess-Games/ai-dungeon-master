@@ -36,7 +36,6 @@ const id = z.string().trim().min(1).max(200);
 const reason = z.string().trim().min(1).max(1000);
 const targetIds = z.array(id).max(100).optional();
 const dc = z.number().int().min(0).max(1_000_000);
-const d20 = z.number().int().min(1).max(20);
 const positiveInteger = z.number().int().min(1).max(1_000_000_000);
 
 export const gameCommandSchema = z.discriminatedUnion("type", [
@@ -47,9 +46,10 @@ export const gameCommandSchema = z.discriminatedUnion("type", [
     encounterId: id,
     status: z.enum(["completed", "abandoned"]).optional(),
   }),
-  // Attack/confirmation/damage roll overrides intentionally stay internal to
-  // GameCommand for deterministic service tests and trusted server workflows.
-  // The public HTTP boundary rolls attacks authoritatively on the server.
+  // Explicit roll overrides stay internal to GameCommand for deterministic
+  // service tests and trusted server workflows. Public game commands roll on
+  // the server; the pending DM-action endpoint is the only player-facing path
+  // that accepts a natural d20 supplied by the player.
   z
     .object({
       type: z.literal("combat.attack"),
@@ -60,22 +60,24 @@ export const gameCommandSchema = z.discriminatedUnion("type", [
       monsterAttackId: id.optional(),
     })
     .strict(),
-  z.object({
-    type: z.literal("check.skill"),
-    actorId: id,
-    skillId: id,
-    specialization: z.string().trim().max(200).optional(),
-    dc,
-    roll: d20.optional(),
-  }),
-  z.object({
-    type: z.literal("check.save"),
-    actorId: id,
-    save: z.enum(["fort", "ref", "will"]),
-    dc,
-    sourceId: id.optional(),
-    roll: d20.optional(),
-  }),
+  z
+    .object({
+      type: z.literal("check.skill"),
+      actorId: id,
+      skillId: id,
+      specialization: z.string().trim().max(200).optional(),
+      dc,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("check.save"),
+      actorId: id,
+      save: z.enum(["fort", "ref", "will"]),
+      dc,
+      sourceId: id.optional(),
+    })
+    .strict(),
   z.object({
     type: z.literal("spell.cast.prepared"),
     actorId: id,

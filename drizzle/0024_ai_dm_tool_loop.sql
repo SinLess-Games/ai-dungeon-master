@@ -29,6 +29,10 @@ CREATE TABLE `campaign_dm_actions` (
 CREATE INDEX `campaign_dm_actions_campaign_user_status_created_idx`
   ON `campaign_dm_actions` (`campaign_id`, `requested_user_id`, `status`, `created_at`);
 --> statement-breakpoint
+CREATE UNIQUE INDEX `campaign_dm_actions_one_outstanding_per_user_uidx`
+  ON `campaign_dm_actions` (`campaign_id`, `requested_user_id`)
+  WHERE `status` IN ('pending', 'resolving');
+--> statement-breakpoint
 CREATE INDEX `campaign_dm_actions_message_idx`
   ON `campaign_dm_actions` (`requested_by_message_id`);
 --> statement-breakpoint

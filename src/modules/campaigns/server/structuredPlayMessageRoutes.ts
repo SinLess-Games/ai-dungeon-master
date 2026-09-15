@@ -326,9 +326,9 @@ function pendingArguments(
 function scheduleResult(
   c: { env: Bindings; executionCtx: { waitUntil(promise: Promise<unknown>): void } },
   campaignId: string,
-  result: GameCommandResult | null,
+  result: GameCommandResult,
 ): void {
-  if (!result || typeof result.value !== "object" || result.value === null) return;
+  if (typeof result.value !== "object" || result.value === null) return;
   const value = result.value as { eventId?: unknown; sessionId?: unknown };
   if (typeof value.eventId !== "string" || typeof value.sessionId !== "string") return;
   const event = { campaignId, eventId: value.eventId, sessionId: value.sessionId };
@@ -352,7 +352,9 @@ export const structuredPlayMessageRoutes = new Hono<Env>().post(
     const db = requireDatabase(c.env.DB);
     const campaignId = c.req.param("campaignId");
     const campaign = await requireCampaignAccess(db, campaignId, session.user.id);
-    if (campaign.role === "observer") throw new ForbiddenError("Observers cannot send campaign play messages.");
+    if (campaign.role === "observer") {
+      throw new ForbiddenError("Observers cannot send campaign play messages.");
+    }
 
     const body = await c.req.json().catch(() => null);
     const parsed = createMessageSchema.safeParse(body);
@@ -361,13 +363,17 @@ export const structuredPlayMessageRoutes = new Hono<Env>().post(
     if (input.channel === "ooc_dm" && input.characterId) {
       throw new ValidationError("Private OOC DM messages are sent as the player, not as a character.");
     }
-    if (input.characterId) await validateCharacterControl(db, campaignId, input.characterId, session.user.id);
+    if (input.characterId) {
+      await validateCharacterControl(db, campaignId, input.characterId, session.user.id);
+    }
 
     const aiManaged = campaign.gameMasterMode === "ai" || campaign.gameMasterMode === "hybrid";
     if (aiManaged && input.channel === "campaign") {
       const pending = await findPendingDmAction(db, campaignId, session.user.id);
       if (pending) {
-        throw new ConflictError("Resolve the Dungeon Master's outstanding check before taking another in-character action.");
+        throw new ConflictError(
+          "Resolve the Dungeon Master's outstanding check before taking another in-character action.",
+        );
       }
     }
 
@@ -408,11 +414,10 @@ export const structuredPlayMessageRoutes = new Hono<Env>().post(
             userId: session.user.id,
             characterId: input.characterId,
             playerAction: input.content,
+            onCommittedResult: (result) => scheduleResult(c, campaignId, result),
           });
           if (structured) {
             decision = structured.decision;
-            for (const result of structured.commandResults) scheduleResult(c, campaignId, result);
-            scheduleResult(c, campaignId, structured.alignmentResult);
             reply = decision.kind === "check" ? decision.preface : decision.text;
           } else {
             reply = await basicDmReply(c.env, db, campaign, input.channel, session.user.id);
@@ -433,7 +438,12 @@ export const structuredPlayMessageRoutes = new Hono<Env>().post(
         dmMessage = await getMessage(db, dmId);
 
         if (decision?.kind === "check" && input.characterId) {
-          const context = await loadDmCharacterContext(db, campaignId, input.characterId, session.user.id);
+          const context = await loadDmCharacterContext(
+            db,
+            campaignId,
+            input.characterId,
+            session.user.id,
+          );
           if (!context) throw new Error("AI_DM_CHARACTER_CONTEXT_LOST");
           pendingAction = await createPendingDmAction(db, {
             campaignId,

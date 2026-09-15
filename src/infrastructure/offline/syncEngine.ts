@@ -1,4 +1,9 @@
 import {
+  resolveOfflinePathAliases,
+  resolveOfflineResource,
+  setOfflineResourceAlias,
+} from "./aliases";
+import {
   cacheJsonResponse,
   deleteMutationsForResource,
   deleteOfflineMutation,
@@ -14,7 +19,9 @@ import type { OfflineMutation, SyncBootstrapResponse } from "./types";
 let flushPromise: Promise<void> | null = null;
 
 function emitChanged(): void {
-  if (typeof window !== "undefined") window.dispatchEvent(new Event("endless-codex:offline-sync-changed"));
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("endless-codex:offline-sync-changed"));
+  }
 }
 
 function isOnline(): boolean {
@@ -22,7 +29,10 @@ function isOnline(): boolean {
 }
 
 async function cacheNetworkJson(url: string): Promise<unknown | undefined> {
-  const response = await fetch(url, { credentials: "same-origin", headers: { Accept: "application/json" } });
+  const response = await fetch(url, {
+    credentials: "same-origin",
+    headers: { Accept: "application/json" },
+  });
   if (!response.ok) return undefined;
   const text = await response.text();
   const value = text ? (JSON.parse(text) as unknown) : null;
@@ -47,7 +57,10 @@ export async function bootstrapOfflineCloudState(): Promise<SyncBootstrapRespons
 
   // Prime the core libraries and campaign details so a user who has opened the
   // application online can reopen their saves with no network connection.
-  await Promise.allSettled([cacheNetworkJson("/api/campaigns"), cacheNetworkJson("/api/characters")]);
+  await Promise.allSettled([
+    cacheNetworkJson("/api/campaigns"),
+    cacheNetworkJson("/api/characters"),
+  ]);
   await Promise.allSettled(
     payload.resources.campaigns
       .map((value) => {
@@ -83,21 +96,44 @@ export async function bootstrapOfflineCloudState(): Promise<SyncBootstrapRespons
   return payload;
 }
 
+async function recordCreatedResourceAlias(
+  row: OfflineMutation,
+  response: Response,
+): Promise<void> {
+  if (row.method !== "POST" || !row.resource) return;
+  try {
+    const body = (await response.clone().json()) as unknown;
+    if (!body || typeof body !== "object" || Array.isArray(body)) return;
+    const cloudId = (body as Record<string, unknown>)["id"];
+    if (typeof cloudId !== "string" || !cloudId || cloudId === row.resource.id) return;
+    const userId = getActiveOfflineUserId();
+    if (!userId) return;
+    setOfflineResourceAlias(userId, row.resource, cloudId);
+  } catch {
+    /* Some successful mutations do not return an entity body. */
+  }
+}
+
 async function replayMutation(row: OfflineMutation): Promise<"done" | "stop"> {
+  const userId = getActiveOfflineUserId();
+  const resource = resolveOfflineResource(userId, row.resource);
+  const resolvedUrl = resolveOfflinePathAliases(userId, row.url);
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "X-Endless-Codex-Mutation-Id": row.id,
   };
-  if (row.resource) {
-    headers["X-Endless-Codex-Resource-Kind"] = row.resource.kind;
-    headers["X-Endless-Codex-Resource-Id"] = row.resource.id;
+  if (resource) {
+    headers["X-Endless-Codex-Resource-Kind"] = resource.kind;
+    headers["X-Endless-Codex-Resource-Id"] = resource.id;
   }
-  if (row.baseVersion !== null) headers["X-Endless-Codex-Base-Version"] = String(row.baseVersion);
+  if (row.baseVersion !== null) {
+    headers["X-Endless-Codex-Base-Version"] = String(row.baseVersion);
+  }
   if (row.forceLocal) headers["X-Endless-Codex-Conflict-Policy"] = "local-wins";
 
   let response: Response;
   try {
-    response = await fetch(row.url, {
+    response = await fetch(resolvedUrl, {
       method: row.method,
       credentials: "same-origin",
       headers,
@@ -139,7 +175,10 @@ async function replayMutation(row: OfflineMutation): Promise<"done" | "stop"> {
   if (!response.ok) {
     let message = `Queued save was rejected (${response.status}).`;
     try {
-      const body = (await response.json()) as { error?: string | { message?: string }; message?: string };
+      const body = (await response.json()) as {
+        error?: string | { message?: string };
+        message?: string;
+      };
       if (typeof body.error === "string") message = body.error;
       else if (body.error?.message) message = body.error.message;
       else if (body.message) message = body.message;
@@ -154,9 +193,15 @@ async function replayMutation(row: OfflineMutation): Promise<"done" | "stop"> {
     return "done";
   }
 
+  await recordCreatedResourceAlias(row, response);
   const resourceVersion = Number(response.headers.get("X-Endless-Codex-Resource-Version"));
-  if (row.resource && Number.isSafeInteger(resourceVersion) && resourceVersion >= 0) {
-    await setResourceVersion(row.resource, resourceVersion);
+  const resolvedResourceAfterCreate = resolveOfflineResource(userId, row.resource);
+  if (
+    resolvedResourceAfterCreate &&
+    Number.isSafeInteger(resourceVersion) &&
+    resourceVersion >= 0
+  ) {
+    await setResourceVersion(resolvedResourceAfterCreate, resourceVersion);
   }
   await deleteOfflineMutation(row.id);
   return "done";

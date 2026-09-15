@@ -24,6 +24,7 @@ import {
   ServiceUnavailableError,
   ValidationError,
 } from "@/server/middleware/errors";
+import { resolveCampaignInlineRolls } from "./chatRolls";
 import {
   createPendingDmAction,
   findPendingDmAction,
@@ -395,6 +396,27 @@ export const structuredPlayMessageRoutes = new Hono<Env>().post(
       }
     }
 
+    let messageContent = input.content;
+    if (input.channel === "campaign") {
+      try {
+        const resolvedRolls = await resolveCampaignInlineRolls({
+          binding: db,
+          campaignId,
+          characterId: input.characterId ?? null,
+          userId: session.user.id,
+          content: input.content,
+        });
+        messageContent = resolvedRolls.content;
+        if (messageContent.length > 8_000) {
+          throw new Error("The resolved message is too long. Use fewer inline rolls.");
+        }
+      } catch (error) {
+        throw new ValidationError(
+          error instanceof Error ? error.message : "The inline roll could not be resolved.",
+        );
+      }
+    }
+
     const playerId = await insertMessage(db, {
       campaignId,
       channel: input.channel,
@@ -402,7 +424,7 @@ export const structuredPlayMessageRoutes = new Hono<Env>().post(
       authorUserId: session.user.id,
       privateUserId: input.channel === "ooc_dm" ? session.user.id : null,
       characterId: input.channel === "campaign" ? (input.characterId ?? null) : null,
-      content: input.content,
+      content: messageContent,
     });
     const playerMessage = await getMessage(db, playerId);
 
@@ -431,7 +453,7 @@ export const structuredPlayMessageRoutes = new Hono<Env>().post(
             },
             userId: session.user.id,
             characterId: input.characterId,
-            playerAction: input.content,
+            playerAction: messageContent,
             onCommittedResult: (result) => scheduleResult(c, campaignId, result),
           });
           if (structured) {

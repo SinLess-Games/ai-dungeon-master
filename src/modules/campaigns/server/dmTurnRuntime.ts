@@ -5,6 +5,10 @@ import {
   serializeDmCampaignCharacterProfiles,
 } from "./dmCharacterProfiles";
 import {
+  loadCampaignNpcRegistry,
+  serializeCampaignNpcRegistry,
+} from "./dmNpcRegistry";
+import {
   loadDmToolActiveConditions,
   loadDmToolCharacterContext,
   loadDmToolEncounterContext,
@@ -160,6 +164,7 @@ function formatConversationRows(rows: readonly DmConversationRow[]): string {
 
 export function composeDmConversationContext(input: {
   characterProfilesJson: string;
+  npcRegistryJson?: string;
   privateOoc: string;
   campaign: string;
 }): string {
@@ -172,6 +177,15 @@ export function composeDmConversationContext(input: {
         "These sheets cover every campaign character, including identity, race/deity/alignment, XP, raw and derived abilities, class history, combat/health/encumbrance, skills, feats, inventory and item state, languages, domains, templates, race traits, class features, spellbooks, known/prepared spells, powers, casting resources, psionic state, alignment state, metadata, player notes, and other persisted character selections available to the system.",
         "Use this information to keep narration, rules calls, NPC reactions, and OOC answers consistent. Knowing another character's sheet does NOT grant permission to choose that player's actions or bypass authoritative game tools. Treat player notes and sheet metadata as DM reference, not automatically as public/NPC knowledge.",
         input.characterProfilesJson,
+      ].join("\n"),
+    );
+  }
+  if (input.npcRegistryJson && input.npcRegistryJson !== "[]") {
+    sections.push(
+      [
+        "Persistent campaign NPC registry (DM memory):",
+        "Reuse these NPCs consistently when they return. Their ids are stable runtime identities. Preserve established role, description, location, attitude, and notes unless play changes them. Do not invent a duplicate NPC merely because an earlier appearance fell out of recent chat history.",
+        input.npcRegistryJson,
       ].join("\n"),
     );
   }
@@ -190,12 +204,12 @@ export function composeDmConversationContext(input: {
 /**
  * Builds the AI Dungeon Master's shared context.
  *
- * Every call hydrates the complete current campaign character profiles directly
- * from authoritative D1 state. Character sheets are informational and never
- * widen the validated tool permissions for the acting character. The requesting
- * player's private OOC · DM thread remains a separate, private section and the
- * shared campaign table remains last so the active turn is the final dialogue
- * the planner sees.
+ * Every call hydrates complete current campaign character profiles plus the
+ * persistent NPC registry directly from authoritative D1 state. Character
+ * sheets and NPC memory are informational and never widen the validated tool
+ * permissions for the acting character. The requesting player's private OOC ·
+ * DM thread remains separate and the shared campaign table remains last so the
+ * active turn is the final dialogue the planner sees.
  */
 export async function loadDmConversationText(input: {
   binding: D1Database;
@@ -204,7 +218,7 @@ export async function loadDmConversationText(input: {
   limit?: number;
 }): Promise<string> {
   const limit = input.limit ?? 18;
-  const [campaignResult, privateOocResult, characterProfiles] = await Promise.all([
+  const [campaignResult, privateOocResult, characterProfiles, npcRegistry] = await Promise.all([
     input.binding
       .prepare(
         `SELECT m.author_kind AS authorKind,
@@ -244,6 +258,7 @@ export async function loadDmConversationText(input: {
       .bind(input.campaignId, input.userId, limit)
       .all<DmConversationRow>(),
     loadDmCampaignCharacterProfiles(input.binding, input.campaignId),
+    loadCampaignNpcRegistry(input.binding, input.campaignId, 100),
   ]);
 
   const campaign = formatConversationRows([...campaignResult.results].reverse());
@@ -251,6 +266,7 @@ export async function loadDmConversationText(input: {
 
   return composeDmConversationContext({
     characterProfilesJson: serializeDmCampaignCharacterProfiles(characterProfiles),
+    npcRegistryJson: serializeCampaignNpcRegistry(npcRegistry),
     privateOoc,
     campaign,
   });

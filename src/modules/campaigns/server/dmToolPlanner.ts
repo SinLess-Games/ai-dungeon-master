@@ -29,7 +29,32 @@ const saveCheckSchema = z.object({
   reason,
 });
 
+const narratedNpcSchema = z.object({
+  id: id.optional(),
+  name: z.string().trim().min(1).max(200),
+  role: z.string().trim().min(1).max(300).optional(),
+  description: z.string().trim().min(1).max(1000).optional(),
+  location: z.string().trim().min(1).max(500).optional(),
+  attitude: z.string().trim().min(1).max(300).optional(),
+  notes: z.string().trim().min(1).max(1000).optional(),
+});
+
+const narratedItemAwardSchema = z.object({
+  itemRef: z.string().trim().min(1).max(200),
+  quantity: positiveAmount,
+  location: z.enum(["carried", "stored", "party"]).optional(),
+  reason,
+});
+
 const narrationDecisionSchema = z.object({
+  kind: z.literal("narration"),
+  text: z.string().trim().min(1).max(4000),
+  /** Named NPCs that were created, reused, or materially present in this narration. */
+  npcs: z.array(narratedNpcSchema).max(20).optional(),
+  /** Safety-net awards for items the narration explicitly places in the acting character's possession. */
+  itemAwards: z.array(narratedItemAwardSchema).max(20).optional(),
+});
+const legacyNarrationDecisionSchema = z.object({
   kind: z.literal("narration"),
   text: z.string().trim().min(1).max(4000),
 });
@@ -140,7 +165,7 @@ export const dmTurnDecisionSchema = z.discriminatedUnion("kind", [
   commandDecisionSchema,
 ]);
 const legacyDmTurnDecisionSchema = z.discriminatedUnion("kind", [
-  narrationDecisionSchema,
+  legacyNarrationDecisionSchema,
   checkDecisionSchema,
 ]);
 
@@ -421,7 +446,8 @@ export async function planDmTurn(
       `You are the Dungeon Master turn planner for an ${input.rulesetId} ${input.rulesetVersion} campaign.`,
       "Return exactly one JSON object and no markdown.",
       "Choose narration when no mechanical uncertainty needs resolution.",
-      "Choose check only when the player's declared action requires a D&D skill check or saving throw before the outcome can be narrated.",
+      "Choose check when the player's declared action has meaningful uncertainty and failure would change the scene; use a skill check or saving throw that actually applies.",
+      "Do not skip an appropriate check by simply narrating success, but do not demand rolls for routine actions with no meaningful risk or consequence.",
       "Never invent a roll or mechanical outcome.",
       "For skill checks, use only an exact skillId from the supplied allowed skills and preserve specialization exactly when present.",
       '{"kind":"narration","text":"..."}',
@@ -453,9 +479,10 @@ export async function planDmTurn(
   const context = input.context;
   const system = [
     `You are the Dungeon Master turn planner for an ${input.rulesetId} ${input.rulesetVersion} campaign.`,
-    "Your output is consumed by a deterministic rules engine. Return exactly one JSON object and no markdown.",
+    "Your output is consumed by a deterministic rules engine. Return exactly one JSON object and no markdown outside JSON string values.",
     "Choose narration only when no authoritative mechanic needs to run next.",
-    "Choose check when the acting player must supply a d20 skill check or saving throw before play can continue.",
+    "Choose check when the acting player's declared action has meaningful uncertainty, opposition, danger, hidden information, or a consequential chance of failure and a skill check or saving throw is the correct D&D 3.5 resolution.",
+    "Do not bypass a warranted check by narrating success. Do not request unnecessary checks for routine, uncontested, consequence-free actions. Use sensible D&D 3.5 DCs for the situation.",
     "Choose command for an authoritative action the engine can resolve immediately.",
     "Never invent a roll, HP result, item id, inventory id, spell id, power id, condition instance id, actor id, encounter id, or mechanical outcome.",
     "Use only ids present in the supplied tool context. Item and condition grants are the exception: itemRef/conditionRef may be an exact common catalog name or slug and will be resolved server-side.",
@@ -464,13 +491,16 @@ export async function planDmTurn(
     "Use combat.attack for weapon or monster attacks rather than health.damage. Use spell/power commands for casting rather than manually applying their damage or conditions.",
     "Use health.damage/heal only for already-determined direct effects such as environmental damage, a trap whose outcome no longer needs a roll, or explicit narrative healing.",
     "For round-based conditions, durationKind must be rounds and remainingRounds must be a positive integer. Omit remainingRounds for permanent or special conditions.",
+    "If the acting character receives, picks up, is handed, loots, purchases, or otherwise gains an item that should enter their possession, issue inventory.grant BEFORE narrating that acquisition whenever possible.",
+    "When final narration itself explicitly awards an item that has not already been granted by a successful inventory.grant result this turn, include it once in narration.itemAwards so the server can put it in inventory before the chat response is published. Never duplicate an item already granted this turn.",
     "Use inventory.grant and progression.xp.grant only when the fiction has actually awarded treasure or XP. Do not award XP merely for attempting an action.",
     "Use condition.apply/remove only when the condition is an authoritative consequence, not as flavor text.",
-    "Do not request unnecessary checks for routine actions.",
     "For skill checks, use the exact skillId and specialization from allowed skills.",
+    "Every final narration should include an npcs array containing every named NPC created, reused, or materially present in that response. Use a stable NPC id from the persistent registry in conversation context when one exists; otherwise include name plus useful role/description/location/attitude/notes so it can be remembered. Anonymous crowds and incidental unnamed creatures do not need NPC entries.",
     "When authoritative tool results are supplied, continue from those exact results; do not contradict them or repeat a command that already succeeded.",
     "JSON forms include:",
-    '{"kind":"narration","text":"..."}',
+    '{"kind":"narration","text":"...","npcs":[],"itemAwards":[]}',
+    '{"kind":"narration","text":"...","npcs":[{"id":"existing-npc-id","name":"Mara","location":"West Gate"}],"itemAwards":[{"itemRef":"potion-of-cure-light-wounds","quantity":1,"reason":"Mara hands the potion to the acting character."}]}',
     '{"kind":"check","preface":"...","check":{"type":"check.skill","skillId":"...","dc":15,"reason":"..."}}',
     '{"kind":"check","preface":"...","check":{"type":"check.save","save":"fort|ref|will","dc":15,"reason":"..."}}',
     '{"kind":"command","command":{"type":"combat.attack","targetId":"...","kind":"melee","weaponInventoryId":"..."}}',
@@ -506,12 +536,12 @@ export async function planDmTurn(
       `Tool context: ${JSON.stringify(toolContext).slice(0, 20000)}`,
       `Recent authoritative events: ${JSON.stringify(input.recentEvents).slice(0, 7000)}`,
       `Authoritative results from this turn: ${JSON.stringify(input.authoritativeToolResults ?? []).slice(0, 9000)}`,
-      "Recent conversation:",
+      "Recent conversation and persistent DM memory:",
       input.conversation || "(No previous messages.)",
       "Choose the single next step for the most recent player turn.",
     ].join("\n\n"),
     temperature: 0.1,
-    maxTokens: 1100,
+    maxTokens: 1400,
     ...(env.AI && env.AI_GAME_MODEL ? { model: env.AI_GAME_MODEL } : {}),
   });
   return validateDmTurnDecision(parseDmTurnDecision(response), context);

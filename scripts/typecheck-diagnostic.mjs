@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 
-const probe = /src\/infrastructure\/offline\/(?:aliases|index|types)\.ts/;
+const probe = /src\/modules\/campaigns\/client\/campaignCreatorApi\.ts/;
 const result = spawnSync("npm", ["run", "typecheck"], {
   encoding: "utf8",
   shell: false,

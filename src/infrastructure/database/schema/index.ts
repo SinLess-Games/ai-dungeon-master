@@ -1,5 +1,6 @@
 export * from "./feedback";
 export * from "./world";
+export * from "./worldMap";
 export * from "./campaign";
 export * from "./campaignMembership";
 export * from "./campaignPlayMessage";
@@ -14,6 +15,7 @@ export * from "./gameSession";
 export * from "./gameEvent";
 export * from "./gameEncounter";
 export * from "./gameEncounterParticipant";
+export * from "./offlineSyncMutation";
 export * from "./dnd35";
 export * from "./auth";
 export * from "./devblog";

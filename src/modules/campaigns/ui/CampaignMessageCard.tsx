@@ -9,6 +9,7 @@ import {
   editCampaignPlayMessage,
 } from "../client/campaignMessageApi";
 import type { CampaignPlayMessage } from "../client/campaignPlayApi";
+import "./campaign-play.css";
 
 function epochMilliseconds(value: number) {
   return value < 10_000_000_000 ? value * 1000 : value;

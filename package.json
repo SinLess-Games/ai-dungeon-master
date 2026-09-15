@@ -8,7 +8,7 @@
     "predev": "npm run db:migrate:local",
     "dev": "vite",
     "dev:raw": "vite",
-    "build": "vite build && node scripts/typecheck-diagnostic.mjs",
+    "build": "vite build && npm run typecheck",
     "build:dev": "vite build --mode development && npm run typecheck",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy",

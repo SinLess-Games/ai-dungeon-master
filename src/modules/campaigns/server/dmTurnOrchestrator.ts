@@ -34,7 +34,9 @@ export interface StructuredDmTurnResult {
 /**
  * Runs the model as a planner over the deterministic command boundary.
  * Immediate commands may chain, but the loop stops as soon as narration or a
- * player-supplied d20 check is required.
+ * player-supplied d20 check is required. Eight commands is enough for a normal
+ * player action followed by one or more DM-run creature turns while remaining
+ * strictly bounded against runaway model output.
  */
 export async function runStructuredDmTurn(input: {
   env: OpenAICompatibleEnv;
@@ -63,7 +65,7 @@ export async function runStructuredDmTurn(input: {
   const commandResults: GameCommandResult[] = [];
 
   const loop = await runDmToolLoop({
-    maxCommands: 4,
+    maxCommands: 8,
     plan: async (executions) => {
       return planDmTurn(input.env, {
         campaignName: input.campaign.name,

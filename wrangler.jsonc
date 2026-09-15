@@ -89,6 +89,13 @@
     }
   ],
 
+  "vectorize": [
+    {
+      "binding": "WORLD_VECTOR_INDEX",
+      "index_name": "endless-codex-worlds"
+    }
+  ],
+
   "observability": {
     "enabled": true,
     "head_sampling_rate": 0.5,

@@ -27,6 +27,7 @@ interface WorkerEnv extends AuthEnv, DevBlogAIEnv, GitHubFeedbackEnv {
   BACKGROUND_QUEUE?: Queue<BackgroundJob>;
   GITHUB_SYNC_QUEUE?: Queue<GitHubSyncJob>;
   RUNTIME_CACHE?: KVNamespace;
+  WORLD_VECTOR_INDEX?: VectorizeIndex;
   APP_VERSION?: string;
   BUILD_ID?: string;
   ENVIRONMENT?: string;
@@ -40,8 +41,8 @@ export { CampaignRoom };
  *
  * HTTP traffic is handled by the single Hono application. Scheduled work runs
  * the weekly devblog writer. Queue deliveries are split by queue name so game
- * post-processing and GitHub feedback synchronization fail and retry
- * independently. CampaignRoom is exported as the campaign-scoped Durable
+ * post-processing/world-atlas work and GitHub feedback synchronization fail and
+ * retry independently. CampaignRoom is exported as the campaign-scoped Durable
  * Object used for hibernating WebSocket coordination.
  */
 export default {

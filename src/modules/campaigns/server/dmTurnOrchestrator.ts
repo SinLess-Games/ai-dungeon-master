@@ -9,6 +9,7 @@ import {
 import { evaluateAlignmentAction } from "./alignmentEvaluator";
 import { loadCampaignPlaySchemaReadiness } from "./campaignPlaySchemaReadiness";
 import { CAMPAIGN_DM_NARRATION_POLICY } from "./dmCampaignChatPolicy";
+import { recordNarratedCampaignNpcs } from "./dmNpcRegistry";
 import { executeDmPlannerCommand } from "./dmToolExecution";
 import { runDmToolLoop } from "./dmToolLoop";
 import { planDmTurn, type DmTurnDecision } from "./dmToolPlanner";
@@ -89,6 +90,34 @@ export async function runStructuredDmTurn(input: {
   const seedResults = [...(input.seedAuthoritativeResults ?? [])];
   const commandResults: GameCommandResult[] = [];
 
+  const refreshRuntimeContext = async () => {
+    const refreshed = await loadDmPlannerContext({
+      binding: input.binding,
+      campaignId: input.campaign.id,
+      characterId: input.characterId,
+      userId: input.userId,
+    });
+    if (!refreshed) throw new Error("AI_DM_CHARACTER_CONTEXT_LOST");
+    context = refreshed;
+    const [nextEvents, nextConversation] = await Promise.all([
+      loadRecentDmEvents(input.binding, input.campaign.id),
+      loadDmConversationText({
+        binding: input.binding,
+        campaignId: input.campaign.id,
+        userId: input.userId,
+      }),
+    ]);
+    recentEvents = nextEvents;
+    conversation = withCampaignChatPolicy(nextConversation);
+  };
+
+  const recordCommandResult = async (result: GameCommandResult) => {
+    commandResults.push(result);
+    input.onCommittedResult?.(result);
+    await refreshRuntimeContext();
+    return result;
+  };
+
   const loop = await runDmToolLoop({
     maxCommands: 8,
     plan: async (executions) => {
@@ -114,29 +143,47 @@ export async function runStructuredDmTurn(input: {
         context: context!,
         command,
       });
-      commandResults.push(result);
-      input.onCommittedResult?.(result);
-      const refreshed = await loadDmPlannerContext({
-        binding: input.binding,
-        campaignId: input.campaign.id,
-        characterId: input.characterId,
-        userId: input.userId,
-      });
-      if (!refreshed) throw new Error("AI_DM_CHARACTER_CONTEXT_LOST");
-      context = refreshed;
-      const [nextEvents, nextConversation] = await Promise.all([
-        loadRecentDmEvents(input.binding, input.campaign.id),
-        loadDmConversationText({
-          binding: input.binding,
-          campaignId: input.campaign.id,
-          userId: input.userId,
-        }),
-      ]);
-      recentEvents = nextEvents;
-      conversation = withCampaignChatPolicy(nextConversation);
-      return result;
+      return recordCommandResult(result);
     },
   });
+
+  if (loop.decision.kind === "narration") {
+    // A model should normally award inventory through inventory.grant before it
+    // narrates possession. itemAwards is a safety net: it is still translated
+    // through the same authoritative command path before the chat reply can be
+    // persisted, so prose can never be the only record of a granted item.
+    for (const award of loop.decision.itemAwards ?? []) {
+      const result = await executeDmPlannerCommand({
+        binding: input.binding,
+        campaignId: input.campaign.id,
+        context,
+        command: {
+          type: "inventory.grant",
+          itemRef: award.itemRef,
+          quantity: award.quantity,
+          reason: award.reason,
+          ...(award.location === undefined ? {} : { location: award.location }),
+        },
+      });
+      await recordCommandResult(result);
+    }
+
+    // NPC memory is intentionally non-mechanical. Store every named NPC the
+    // narration says was created/reused so the DM can recall it long after the
+    // chat window rolls out of recent context. Failure here should not erase a
+    // mechanically completed turn, but it is logged loudly for diagnosis.
+    if (loop.decision.npcs?.length) {
+      try {
+        await recordNarratedCampaignNpcs(input.binding, input.campaign.id, loop.decision.npcs);
+      } catch (error) {
+        console.error("AI DM NPC memory update failed", {
+          campaignId: input.campaign.id,
+          characterId: input.characterId,
+          error,
+        });
+      }
+    }
+  }
 
   let alignmentResult: GameCommandResult | null = null;
   if (loop.decision.kind === "narration") {

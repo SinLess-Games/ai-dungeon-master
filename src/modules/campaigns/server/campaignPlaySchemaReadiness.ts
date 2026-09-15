@@ -48,7 +48,7 @@ export async function loadCampaignPlaySchemaReadiness(
     dmActions,
     initiativeActions,
     alignmentTracking,
-    structuredDm: dmActions && alignmentTracking,
+    structuredDm: dmActions && initiativeActions && alignmentTracking,
     missingTables: [...missingTables],
   };
 }

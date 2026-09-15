@@ -106,4 +106,23 @@ describe("AI DM planner command translation", () => {
       targetIds: ["goblin-actor"],
     });
   });
+
+  it("normalizes optional psionic augmentation applications without emitting undefined", async () => {
+    await expect(
+      plannerCommandToGameCommand(unusedBinding, context(), {
+        type: "power.manifest",
+        castingTrackId: "psion-track",
+        powerId: "power-energy-ray",
+        targetIds: ["goblin-actor"],
+        augmentations: [{ index: 0 }, { index: 1, applications: 2 }],
+      }),
+    ).resolves.toEqual({
+      type: "power.manifest",
+      actorId: "hero-actor",
+      castingTrackId: "psion-track",
+      powerId: "power-energy-ray",
+      targetIds: ["goblin-actor"],
+      augmentations: [{ index: 0 }, { index: 1, applications: 2 }],
+    });
+  });
 });

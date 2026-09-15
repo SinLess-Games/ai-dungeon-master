@@ -31,7 +31,7 @@ import {
   type PublicCampaignDmAction,
 } from "./dmActionService";
 import { runStructuredDmTurn } from "./dmTurnOrchestrator";
-import { loadRecentDmEvents } from "./dmTurnRuntime";
+import { loadDmConversationText, loadRecentDmEvents } from "./dmTurnRuntime";
 import type { DmTurnDecision } from "./dmToolPlanner";
 
 interface Bindings extends AuthEnv, OpenAICompatibleEnv {
@@ -250,33 +250,24 @@ async function basicDmReply(
   channel: PlayChannel,
   userId: string,
 ): Promise<string> {
-  const messages = await db
-    .prepare(
-      `SELECT m.author_kind AS authorKind, m.content,
-              COALESCE(c.name, u.display_username, u.username, u.name, 'Player') AS authorName
-       FROM campaign_play_messages m
-       LEFT JOIN users u ON u.id = m.author_user_id
-       LEFT JOIN characters c ON c.id = m.character_id
-       WHERE m.campaign_id = ? AND m.channel = ?
-         AND ${channel === "campaign" ? "m.private_user_id IS NULL" : "m.private_user_id = ?"}
-       ORDER BY m.created_at DESC, m.rowid DESC
-       LIMIT 18`,
-    )
-    .bind(...(channel === "campaign" ? [campaign.id, channel] : [campaign.id, channel, userId]))
-    .all<{ authorKind: string; content: string; authorName: string }>();
-  const conversation = messages.results
-    .reverse()
-    .map((message) => `${message.authorKind === "dm" ? "DM" : message.authorName}: ${message.content}`)
-    .join("\n");
+  const conversation = await loadDmConversationText({
+    binding: db,
+    campaignId: campaign.id,
+    userId,
+    limit: 24,
+  });
   const system =
     channel === "ooc_dm"
       ? [
           `You are the private Dungeon Master assistant for an ${campaign.rulesetId} ${campaign.rulesetVersion} campaign.`,
           "Answer rules, table, intent, world, and clarification questions directly.",
+          "You can see both the shared campaign table and this player's private OOC · DM thread, so keep them consistent with each other.",
+          "Treat private OOC as DM-only preferences, plans, boundaries, and table direction. It is not character speech and is not automatically known by NPCs or other players.",
           "Never invent a roll or claim authoritative state changed unless the supplied game context records it.",
         ].join(" ")
       : [
           `You are the Dungeon Master running an ${campaign.rulesetId} ${campaign.rulesetVersion} campaign.`,
+          "You can see the acting player's private OOC · DM context as well as the shared campaign table. Use that private context to honor campaign goals and player direction without revealing it as character speech or public knowledge.",
           campaign.status === "paused"
             ? "The campaign is paused: narrate or answer table talk, but do not imply authoritative mechanics changed."
             : "Narrate the table faithfully without inventing unrecorded mechanical results.",
@@ -288,9 +279,11 @@ async function basicDmReply(
       `Description: ${campaign.description || "No campaign description provided."}`,
       campaignPacingContext(parseSettings(campaign.settings)),
       `Recent events: ${JSON.stringify(await loadRecentDmEvents(db, campaign.id)).slice(0, 7000)}`,
-      "Conversation:",
-      conversation,
-      "Respond to the most recent player message.",
+      "Shared DM context:",
+      conversation || "(No previous campaign or private OOC messages.)",
+      channel === "ooc_dm"
+        ? "Respond to the most recent private OOC player message while staying consistent with the campaign table."
+        : "Respond to the most recent campaign player message while honoring relevant private OOC direction.",
     ].join("\n\n"),
     temperature: channel === "campaign" ? 0.7 : 0.3,
     maxTokens: channel === "campaign" ? 900 : 700,

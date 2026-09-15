@@ -71,7 +71,7 @@ export async function runStructuredDmTurn(input: {
   if (!context) return null;
 
   let recentEvents = await loadRecentDmEvents(input.binding, input.campaign.id);
-  const conversation = await loadDmConversationText({
+  let conversation = await loadDmConversationText({
     binding: input.binding,
     campaignId: input.campaign.id,
     userId: input.userId,
@@ -114,7 +114,14 @@ export async function runStructuredDmTurn(input: {
       });
       if (!refreshed) throw new Error("AI_DM_CHARACTER_CONTEXT_LOST");
       context = refreshed;
-      recentEvents = await loadRecentDmEvents(input.binding, input.campaign.id);
+      [recentEvents, conversation] = await Promise.all([
+        loadRecentDmEvents(input.binding, input.campaign.id),
+        loadDmConversationText({
+          binding: input.binding,
+          campaignId: input.campaign.id,
+          userId: input.userId,
+        }),
+      ]);
       return result;
     },
   });

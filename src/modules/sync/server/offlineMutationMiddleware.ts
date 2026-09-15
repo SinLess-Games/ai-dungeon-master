@@ -14,6 +14,7 @@ interface Bindings extends AuthEnv {
 type Env = { Bindings: Bindings };
 
 interface ReceiptRow {
+  userId: string;
   responseStatus: number;
   responseHeaders: string;
   responseBody: string | null;
@@ -27,6 +28,7 @@ interface ResourceRef {
 const replayMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const mutationIdPattern = /^[A-Za-z0-9._:-]{8,160}$/;
 const resourceIdPattern = /^[A-Za-z0-9._:-]{1,240}$/;
+const reservationStatus = 0;
 
 function parseResourceRef(headers: Headers): ResourceRef | null {
   const kind = headers.get("X-Endless-Codex-Resource-Kind");
@@ -72,6 +74,75 @@ async function syncSchemaReady(db: D1Database): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function loadReceipt(db: D1Database, mutationId: string): Promise<ReceiptRow | null> {
+  return db
+    .prepare(
+      `SELECT user_id AS userId,
+              response_status AS responseStatus,
+              response_headers AS responseHeaders,
+              response_body AS responseBody
+       FROM offline_sync_mutations
+       WHERE id = ?
+       LIMIT 1`,
+    )
+    .bind(mutationId)
+    .first<ReceiptRow>();
+}
+
+function completedReceiptResponse(receipt: ReceiptRow): Response {
+  return new Response(receipt.responseBody, {
+    status: receipt.responseStatus,
+    headers: parseStoredHeaders(receipt.responseHeaders),
+  });
+}
+
+function mutationInProgressResponse(): Response {
+  return new Response(
+    JSON.stringify({
+      error: {
+        code: "OFFLINE_SYNC_MUTATION_IN_PROGRESS",
+        message: "This save is already being synchronized by another request.",
+      },
+    }),
+    {
+      status: 425,
+      headers: {
+        "Content-Type": "application/json",
+        "Retry-After": "1",
+      },
+    },
+  );
+}
+
+async function reserveMutation(
+  db: D1Database,
+  input: { id: string; userId: string; method: string; path: string },
+): Promise<boolean> {
+  const row = await db
+    .prepare(
+      `INSERT OR IGNORE INTO offline_sync_mutations
+         (id, user_id, request_method, request_path, response_status, response_headers, response_body)
+       VALUES (?, ?, ?, ?, ?, '{}', NULL)
+       RETURNING id`,
+    )
+    .bind(input.id, input.userId, input.method, input.path, reservationStatus)
+    .first<{ id: string }>();
+  return Boolean(row?.id);
+}
+
+async function releaseReservation(
+  db: D1Database,
+  mutationId: string,
+  userId: string,
+): Promise<void> {
+  await db
+    .prepare(
+      "DELETE FROM offline_sync_mutations WHERE id = ? AND user_id = ? AND response_status = ?",
+    )
+    .bind(mutationId, userId, reservationStatus)
+    .run();
 }
 
 async function loadResourceVersion(
@@ -208,23 +279,23 @@ export const offlineMutationMiddleware = createMiddleware<Env>(async (c, next) =
   }
 
   const session = await requireUser(createAuth(c.env), c.req.raw.headers);
-  const receipt = await db
-    .prepare(
-      `SELECT response_status AS responseStatus,
-              response_headers AS responseHeaders,
-              response_body AS responseBody
-       FROM offline_sync_mutations
-       WHERE id = ? AND user_id = ?
-       LIMIT 1`,
-    )
-    .bind(mutationId, session.user.id)
-    .first<ReceiptRow>();
-
-  if (receipt) {
-    return new Response(receipt.responseBody, {
-      status: receipt.responseStatus,
-      headers: parseStoredHeaders(receipt.responseHeaders),
-    });
+  const existingReceipt = await loadReceipt(db, mutationId);
+  if (existingReceipt) {
+    if (existingReceipt.userId !== session.user.id) {
+      return c.json(
+        {
+          error: {
+            code: "OFFLINE_SYNC_MUTATION_ID_REUSED",
+            message: "This offline mutation id has already been used.",
+          },
+        },
+        409,
+      );
+    }
+    if (existingReceipt.responseStatus === reservationStatus) {
+      return mutationInProgressResponse();
+    }
+    return completedReceiptResponse(existingReceipt);
   }
 
   const resource = parseResourceRef(c.req.raw.headers);
@@ -248,35 +319,78 @@ export const offlineMutationMiddleware = createMiddleware<Env>(async (c, next) =
     }
   }
 
-  await next();
-
-  if (c.res.status < 200 || c.res.status >= 400) return;
-
-  if (resource && method !== "DELETE") {
-    const version = await bumpMutableResourceVersion(db, session.user.id, resource);
-    if (version !== null) {
-      c.res.headers.set("X-Endless-Codex-Resource-Version", String(version));
+  const ownsReservation = await reserveMutation(db, {
+    id: mutationId,
+    userId: session.user.id,
+    method,
+    path: c.req.path,
+  });
+  if (!ownsReservation) {
+    const receipt = await loadReceipt(db, mutationId);
+    if (!receipt || receipt.responseStatus === reservationStatus) {
+      return mutationInProgressResponse();
     }
+    if (receipt.userId !== session.user.id) {
+      return c.json(
+        {
+          error: {
+            code: "OFFLINE_SYNC_MUTATION_ID_REUSED",
+            message: "This offline mutation id has already been used.",
+          },
+        },
+        409,
+      );
+    }
+    return completedReceiptResponse(receipt);
   }
 
-  const clone = c.res.clone();
-  const responseBody = await clone.text();
-  if (responseBody.length > 1_000_000) return;
+  let handlerSucceeded = false;
+  try {
+    await next();
+    handlerSucceeded = c.res.status >= 200 && c.res.status < 400;
+    if (!handlerSucceeded) return;
 
-  await db
-    .prepare(
-      `INSERT INTO offline_sync_mutations
-         (id, user_id, request_method, request_path, response_status, response_headers, response_body)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(
-      mutationId,
-      session.user.id,
-      method,
-      c.req.path,
-      c.res.status,
-      JSON.stringify(responseHeaderSnapshot(c.res)),
-      responseBody || null,
-    )
-    .run();
+    if (resource && method !== "DELETE") {
+      const version = await bumpMutableResourceVersion(db, session.user.id, resource);
+      if (version !== null) {
+        c.res.headers.set("X-Endless-Codex-Resource-Version", String(version));
+      }
+    }
+
+    const clone = c.res.clone();
+    const responseBody = await clone.text();
+    if (responseBody.length > 1_000_000) {
+      console.error("Offline sync response exceeded receipt limit", {
+        mutationId,
+        path: c.req.path,
+        responseBytes: responseBody.length,
+      });
+      return;
+    }
+
+    await db
+      .prepare(
+        `UPDATE offline_sync_mutations
+         SET response_status = ?, response_headers = ?, response_body = ?
+         WHERE id = ? AND user_id = ? AND response_status = ?`,
+      )
+      .bind(
+        c.res.status,
+        JSON.stringify(responseHeaderSnapshot(c.res)),
+        responseBody || null,
+        mutationId,
+        session.user.id,
+        reservationStatus,
+      )
+      .run();
+  } catch (error) {
+    if (!handlerSucceeded) {
+      await releaseReservation(db, mutationId, session.user.id);
+    }
+    throw error;
+  } finally {
+    if (!handlerSucceeded) {
+      await releaseReservation(db, mutationId, session.user.id);
+    }
+  }
 });

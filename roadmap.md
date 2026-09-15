@@ -12,14 +12,14 @@ feature. This audit does not certify production deployment or live provider setu
   - [ ] Offline-first saves and cloud synchronization, including maps. Current game persistence uses server-side D1.
 - [x] Design system (dark arcane theme, fonts) — [theme tokens and typography](src/styles/styles.css), shared primitives, and feature styling are implemented.
 - [x] Rules data: races, base classes, skills, feats, alignments — [D&D content seeds](seeds/dnd3-5/) and [alignment definitions](src/infrastructure/database/schema/dnd35/primitives.ts) exist. This checks off the core data catalog, not every sourcebook mechanic or deployment of those seeds.
-- [ ] Rules engine: derived stats, encumbrance (toggleable)
+- [x] Rules engine: derived stats, encumbrance (toggleable)
   - [x] Deterministic [derived character stats](src/rulesets/dnd35/derivedCharacter.ts) and [carrying capacity/load classification](src/rulesets/dnd35/encumbrance.ts).
-  - [ ] Wire the stored `encumbranceEnabled` setting into a player-facing toggle and authoritative carried-weight penalties. The flag currently defaults to true during creation; the complete toggle flow is absent.
+  - [x] Live `encumbranceEnabled` toggle, carried-weight classification, movement/run/Max-Dex/armor-check restrictions, and authoritative skill-check/target-AC integration. Armor and load restrictions use the worse applicable restriction rather than stacking the same restriction twice.
 - [x] Dice roller with large-roll support (100d6+) — [dice page/tray](src/modules/dice/ui/), shared saved history, and [notation engine](src/engine/diceNotation.ts) support up to 1,000 dice per expression.
 - [ ] Local save layer (swap to Cloud when available) — device-local dice history exists, but character/campaign/world saves require the server; there is no offline game-save adapter or reconciliation flow.
 - [x] Dashboard — implemented as the [campaign management hub](src/modules/campaigns/ui/CampaignsHub.tsx) and [character library](src/modules/characters/ui/CharacterLibrary.tsx), with saved records, campaign setup, start/resume, and deletion. There is no separate unified `/dashboard` page.
 - [x] Character creator with inline explanations — [multi-step creator](src/modules/characters/ui/AdvancedCharacterCreator.tsx), persisted selections, explanatory content, and server readiness/finalization are implemented for supported starting characters. Later-level advancement remains separate work.
-- [ ] Character sheet (live, editable) — [campaign play](src/modules/campaigns/ui/CampaignPlayScreen.tsx) exposes live character state, checks, combat, and casting controls. A full editable sheet and ongoing inventory editor remain unfinished.
+- [x] Character sheet (live, editable) — campaign play now exposes an authoritative live D&D 3.5 sheet with abilities, combat stats, HP, saves, skills, feats, classes, XP, alignment, editable identity/notes, an encumbrance toggle, and ongoing carried/stored/party inventory and equipment-slot editing. Owner/GM catalog grants and removals continue to use audited game commands.
 - [ ] Campaign setup wizard (style, type, length, pace, DM temperament, world notes, house rules)
   - [x] [Persistent seven-stage wizard](src/modules/campaigns/ui/CampaignCreator.tsx): style, structure, scale, pace, world profile, descriptions, rules, player permissions, DM behavior, and house-rule notes.
   - [ ] Explicit campaign length/duration setting. Heroic/paragon/epic scale describes levels rather than campaign length. Saved settings also do not prove every chosen behavior is enforced during play.
@@ -36,7 +36,7 @@ feature. This audit does not certify production deployment or live provider setu
 ## Phase 2 — Reference, loot, export
 
 - [ ] Rules wiki with search + filters — rules/content catalogs and creator search exist; a standalone wiki route and browsing UI do not.
-- [ ] Loot tracking (on-person / stored / party) — editable pools, split/assign, item history. Character inventory schema and starting-equipment selection exist; ongoing party loot management does not.
+- [ ] Loot tracking (on-person / stored / party) — the Phase 1 live inventory editor can move and equip character inventory and owner/GM game commands can grant/remove items, but split/assign workflows, party-pool ownership semantics, and item history UI remain Phase 2 work.
 - [ ] PDF character sheet export
 - [ ] Party + NPC companions (roster, outfitting, DM-run or player-run) — [familiar/animal-companion creation](src/modules/characters/server/companionCreationRoutes.ts), character rosters, and runtime actor control exist. Full companion outfitting and NPC party-management workflows remain unfinished.
 
@@ -79,7 +79,8 @@ Reviewed current routes, feature modules, schemas, seeds, and test coverage; exc
 legacy code. Ran 12 focused unit-test files covering authentication/schema, dice,
 D&D rules and derived stats, character creation rules, campaign options/start,
 game commands, live coordination, and book-rule seeds: **112 tests passed** at the
-September 14 audit point. The AI DM state-tool expansion adds focused unit tests,
-but this environment cannot execute the repository test suite and current GitHub
-Actions jobs fail before their workflow steps begin. Browser E2E, live Google/AI
-calls, remote migrations, and deployment were not run for this roadmap audit.
+September 14 audit point. Later AI-DM and live-sheet/encumbrance work adds focused
+unit coverage, but this environment cannot execute the repository test suite and
+current GitHub Actions jobs fail before their workflow steps begin. Browser E2E,
+live Google/AI calls, remote migrations, and deployment were not run for this
+roadmap audit.

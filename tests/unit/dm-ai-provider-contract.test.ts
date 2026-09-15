@@ -75,6 +75,36 @@ function workersAiReturning(response: string) {
 }
 
 describe("AI DM provider contract", () => {
+  it.each(["legacy", "structured"])("includes untruncated pacing in the %s planner", async (mode) => {
+    const ai = workersAiReturning(JSON.stringify({ kind: "narration", text: "The trail leads home." }));
+    const input = {
+      campaignName: "Homeward",
+      campaignDescription: null,
+      rulesetId: "dnd35",
+      rulesetVersion: "3.5",
+      settings: {
+        longNotes: "x".repeat(6000),
+        pace: "slow",
+        duration: { length: "short", estimatedSessions: 4, endingTarget: "Return home." },
+      },
+      recentEvents: [],
+      conversation: "I follow the trail.",
+    };
+    const env = { AI: ai.binding, AI_GAME_MODEL: "@cf/test/game-model" };
+    if (mode === "structured") {
+      await planDmTurn(env, { ...input, context: plannerContext() });
+    } else {
+      await planDmTurn(env, { ...input, actors: [], character: { id: "hero", name: "Ari" }, skills: [] });
+    }
+    const request = ai.run.mock.calls[0]![1];
+    const prompt = request.messages[1]?.content;
+    expect(prompt).toContain("Campaign length: short");
+    expect(prompt).toContain("limit unrelated detours");
+    expect(prompt).toContain("Scene pace: slow");
+    expect(prompt).toContain("campaign: 4");
+    expect(prompt).toContain("Return home.");
+  });
+
   it("feeds authoritative tool context to Workers AI and accepts a validated command", async () => {
     const ai = workersAiReturning(
       JSON.stringify({

@@ -1,3 +1,4 @@
+import type { CampaignDuration } from "../domain/duration";
 import type {
   CampaignDifficulty,
   CampaignPace,
@@ -20,6 +21,7 @@ export type CampaignAccessRole = "owner" | "gm" | "player" | "observer";
 
 export interface CampaignCreatorSettings {
   creatorVersion: 2;
+  duration?: CampaignDuration;
   shortDescription: string;
   genres: CampaignStyleId[];
   pace: CampaignPace;

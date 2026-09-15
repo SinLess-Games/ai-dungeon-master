@@ -2,6 +2,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
+import { campaignPacingContext } from "../domain/duration";
 import {
   generateOpenAICompatibleText,
   type OpenAICompatibleEnv,
@@ -285,6 +286,7 @@ async function basicDmReply(
     prompt: [
       `Campaign: ${campaign.name}`,
       `Description: ${campaign.description || "No campaign description provided."}`,
+      campaignPacingContext(parseSettings(campaign.settings)),
       `Recent events: ${JSON.stringify(await loadRecentDmEvents(db, campaign.id)).slice(0, 7000)}`,
       "Conversation:",
       conversation,

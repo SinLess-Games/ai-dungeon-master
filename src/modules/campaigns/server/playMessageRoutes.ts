@@ -2,6 +2,7 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
+import { campaignPacingContext } from "../domain/duration";
 import {
   generateOpenAICompatibleText,
   type OpenAICompatibleEnv,
@@ -404,6 +405,7 @@ async function generateDmReply(
     `Description: ${campaign.description || "No campaign description provided."}`,
     `Status: ${campaign.status}`,
     `Ruleset: ${campaign.rulesetId} ${campaign.rulesetVersion}`,
+    campaignPacingContext(settings),
     `Campaign settings: ${JSON.stringify(settings).slice(0, 5000)}`,
     `Current actors: ${JSON.stringify(actors).slice(0, 4000)}`,
     `Recent authoritative game events: ${JSON.stringify(events).slice(0, 7000)}`,

@@ -34,6 +34,7 @@ import {
   rulesStrictnessIds,
   worldTemplateIds,
 } from "../domain/creatorOptions";
+import { campaignDurationSchema } from "../domain/duration";
 import { BootstrapWorldGenerator } from "./bootstrapWorldGenerator";
 import { D1CampaignStartRepository } from "./d1StartRepository";
 import { startCampaign } from "./startCampaign";
@@ -97,6 +98,12 @@ function validateGenreArray(
 }
 
 const campaignSettingsSchema = z.record(z.string(), z.unknown()).superRefine((settings, ctx) => {
+  const duration = campaignDurationSchema.optional().safeParse(settings["duration"]);
+  if (!duration.success) {
+    for (const issue of duration.error.issues) {
+      addSettingsIssue(ctx, ["duration", ...issue.path.map(String)], issue.message);
+    }
+  }
   const creatorVersion = settings["creatorVersion"];
   const creatorV1 = creatorVersion === 1;
   const creatorV2 = creatorVersion === 2;
@@ -322,6 +329,9 @@ const campaignSettingsSchema = z.record(z.string(), z.unknown()).superRefine((se
   if (scale === "epic" && rules?.["epicLevels"] !== true) {
     addSettingsIssue(ctx, ["rules", "epicLevels"], "Epic campaigns must enable epic levels.");
   }
+}).transform((settings) => {
+  const duration = campaignDurationSchema.optional().parse(settings["duration"]);
+  return duration === undefined ? settings : { ...settings, duration };
 });
 
 const createCampaignSchema = z.object({

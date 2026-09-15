@@ -36,6 +36,11 @@ import {
   type CampaignPlayMode,
   type CampaignVisibility,
 } from "../client/campaignCreatorApi";
+import { CampaignDurationFields } from "./CampaignDurationFields";
+import {
+  durationDraftFromSettings,
+  parseDurationDraft,
+} from "./durationDraft";
 
 const fieldClass =
   "w-full rounded-xl border border-border bg-background/60 px-3.5 py-3 text-foreground outline-none transition focus:border-gold focus:ring-1 focus:ring-gold";
@@ -172,6 +177,9 @@ export function CampaignDraftEditor({
   onSaved: () => void;
 }) {
   const defaults = useMemo(() => settingsFromCampaign(detail), [detail]);
+  const [duration, setDuration] = useState(() =>
+    durationDraftFromSettings(detail.campaign.settings["duration"]),
+  );
   const [name, setName] = useState(detail.campaign.name);
   const [description, setDescription] = useState(detail.campaign.description ?? "");
   const [shortDescription, setShortDescription] = useState(defaults.shortDescription);
@@ -234,9 +242,12 @@ export function CampaignDraftEditor({
       if (playMode === "multiplayer" && maxPlayers < 2) {
         throw new Error("Multiplayer campaigns need at least two player slots.");
       }
+      const parsedDuration = parseDurationDraft(duration);
+      if (!parsedDuration.success) throw new Error(parsedDuration.error.issues[0]?.message);
       const epicLevels = scale === "epic";
       const settings: CampaignCreatorSettings = {
         creatorVersion: 2,
+        ...(parsedDuration.data ? { duration: parsedDuration.data } : {}),
         shortDescription: shortDescription.trim(),
         genres,
         pace,
@@ -342,6 +353,10 @@ export function CampaignDraftEditor({
               <Field label="Scale"><select className={fieldClass} value={scale} onChange={(e) => setScale(e.target.value as CampaignScale)} disabled={locked}>{campaignScaleOptions.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}</select></Field>
               <Field label="Structure"><select className={fieldClass} value={structure} onChange={(e) => setStructure(e.target.value as CampaignStructure)} disabled={locked}>{campaignStructureOptions.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}</select></Field>
             </div>
+          </Panel>
+
+          <Panel title="Length & targets">
+            <CampaignDurationFields value={duration} onChange={setDuration} disabled={locked} />
           </Panel>
 
           <Panel title="World">

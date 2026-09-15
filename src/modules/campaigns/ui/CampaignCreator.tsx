@@ -58,6 +58,12 @@ import {
   type CampaignVisibility,
   type CreateCampaignInput,
 } from "../client/campaignCreatorApi";
+import { CampaignDurationFields } from "./CampaignDurationFields";
+import {
+  durationDraftFromSettings,
+  parseDurationDraft,
+  type CampaignDurationDraft,
+} from "./durationDraft";
 
 const creatorSteps = [
   { title: "Concept", subtitle: "Genre, scale & basics", icon: Sparkles },
@@ -97,6 +103,7 @@ export function CampaignCreator() {
   const [shortDescription, setShortDescription] = useState("");
   const [description, setDescription] = useState("");
   const [genres, setGenres] = useState<CampaignStyleId[]>([]);
+  const [duration, setDuration] = useState(() => durationDraftFromSettings({ length: "medium" }));
   const [pace, setPace] = useState<CampaignPace>("moderate");
   const [scale, setScale] = useState<CampaignScale>("heroic");
   const [structure, setStructure] = useState<CampaignStructure>("open-world");
@@ -143,8 +150,12 @@ export function CampaignCreator() {
 
   function buildSettings(): CampaignCreatorSettings {
     const epicLevels = scale === "epic";
+    const parsedDuration = parseDurationDraft(duration);
+    if (!parsedDuration.success) throw new Error(parsedDuration.error.issues[0]?.message);
+
     return {
       creatorVersion: 2,
+      ...(parsedDuration.data ? { duration: parsedDuration.data } : {}),
       shortDescription: shortDescription.trim(),
       genres,
       pace,
@@ -212,6 +223,10 @@ export function CampaignCreator() {
 
   function validateStep(targetStep: number): string | null {
     if (targetStep === 0) {
+      const parsedDuration = parseDurationDraft(duration);
+      if (!parsedDuration.success) {
+        return parsedDuration.error.issues[0]?.message ?? "Check campaign duration.";
+      }
       if (!name.trim()) return "Give the campaign a name first.";
       if (!shortDescription.trim()) return "Add a short campaign description.";
       if (genres.length === 0) return "Choose at least one campaign style or genre.";
@@ -415,6 +430,8 @@ export function CampaignCreator() {
           <section className="space-y-5">
             {step === 0 ? (
               <ConceptStep
+                duration={duration}
+                setDuration={setDuration}
                 name={name}
                 setName={setName}
                 shortDescription={shortDescription}
@@ -510,6 +527,7 @@ export function CampaignCreator() {
 
             {step === 6 ? (
               <ReviewStep
+                duration={duration}
                 name={name}
                 shortDescription={shortDescription}
                 genres={selectedGenreNames}
@@ -610,6 +628,7 @@ export function CampaignCreator() {
               <dl className="mt-5 space-y-3 border-t border-border pt-4 text-sm">
                 <PreviewRow label="Scale" value={`${selectedScale.name} (${selectedScale.levelRange})`} />
                 <PreviewRow label="Pace" value={selectedPace.name} />
+                <PreviewRow label="Length" value={duration.length || "Unspecified"} />
                 <PreviewRow label="Structure" value={selectedStructure.name} />
                 <PreviewRow label="World" value={selectedWorldTemplate.name} />
                 <PreviewRow label="Players" value={playMode === "solo" ? "Solo" : `Up to ${maxPlayers}`} />
@@ -637,6 +656,8 @@ export function CampaignCreator() {
 }
 
 function ConceptStep({
+  duration,
+  setDuration,
   name,
   setName,
   shortDescription,
@@ -654,6 +675,8 @@ function ConceptStep({
   visibility,
   setVisibility,
 }: {
+  duration: CampaignDurationDraft;
+  setDuration: (value: CampaignDurationDraft) => void;
   name: string;
   setName: (value: string) => void;
   shortDescription: string;
@@ -827,6 +850,10 @@ function ConceptStep({
           </div>
         </CreatorPanel>
       </div>
+
+      <section className="rounded-2xl border border-border bg-card/80 p-5">
+        <CampaignDurationFields value={duration} onChange={setDuration} />
+      </section>
 
       <CreatorPanel
         icon={<Swords />}
@@ -1335,6 +1362,7 @@ function ContentStep({
 }
 
 function ReviewStep({
+  duration,
   name,
   shortDescription,
   genres,
@@ -1352,6 +1380,7 @@ function ReviewStep({
   difficulty,
   contentPolicy,
 }: {
+  duration: CampaignDurationDraft;
   name: string;
   shortDescription: string;
   genres: string[];
@@ -1385,6 +1414,24 @@ function ReviewStep({
       </div>
       <div className="grid gap-3 md:grid-cols-2">
         <ReviewCard title="Campaign" rows={[["Scale", scale], ["Pace", pace], ["Structure", structure]]} />
+        <ReviewCard
+          title="Duration"
+          rows={[
+            ["Length", duration.length || "Unspecified"],
+            [
+              duration.length === "endless" ? "Arc sessions" : "Estimated sessions",
+              duration.estimatedSessions || "Unspecified",
+            ],
+            [
+              "Level targets",
+              `${duration.startLevel || "Unspecified"} → ${duration.endLevel || "Unspecified"}`,
+            ],
+            [
+              duration.length === "endless" ? "Arc ending target" : "Ending target",
+              duration.endingTarget || "Unspecified",
+            ],
+          ]}
+        />
         <ReviewCard title="World" rows={[["Template", worldTemplate], ["Generation", worldMode === "seeded" ? "Seeded" : "Generated"], ["Planar", multiPlanar ? "Multi-planar" : "Primary plane"]]} />
         <ReviewCard title="Rules" rows={[["System", "D&D 3.5"], ["Advancement", levelingMode], ["Progression", characterProgression]]} />
         <ReviewCard title="Table" rows={[["Players", playMode === "solo" ? "Solo" : `Up to ${maxPlayers}`], ["DM", gameMasterMode], ["Difficulty", difficulty], ["Content", contentPolicy]]} />
@@ -1526,7 +1573,7 @@ function PreviewRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-4">
       <dt className="text-muted-foreground">{label}</dt>
-      <dd className="text-right font-medium capitalize">{value}</dd>
+      <dd className="min-w-0 text-right font-medium capitalize [overflow-wrap:anywhere]">{value}</dd>
     </div>
   );
 }

@@ -307,14 +307,6 @@ function pendingArguments(
   };
 }
 
-function initiativeArguments(request: PendingInitiativeRequest) {
-  return {
-    type: "check.initiative" as const,
-    participantIds: Array.from(request.participantIds),
-    reason: request.reason,
-  };
-}
-
 function scheduleIfEvent(
   c: { env: Bindings; executionCtx: { waitUntil(promise: Promise<unknown>): void } },
   campaignId: string,
@@ -479,7 +471,11 @@ export const campaignDmActionRoutes = new Hono<Env>()
 
             let nextArguments: CampaignDmActionArguments;
             if (pendingInitiative) {
-              nextArguments = initiativeArguments(pendingInitiative);
+              nextArguments = {
+                type: "check.initiative",
+                participantIds: [...pendingInitiative.participantIds],
+                reason: pendingInitiative.reason,
+              };
             } else if (finalDecision?.kind === "check") {
               nextArguments = pendingArguments(finalDecision, context);
             } else {

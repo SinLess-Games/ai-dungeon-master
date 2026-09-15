@@ -9,6 +9,7 @@ import {
 import { evaluateAlignmentAction } from "./alignmentEvaluator";
 import { loadCampaignPlaySchemaReadiness } from "./campaignPlaySchemaReadiness";
 import { CAMPAIGN_DM_NARRATION_POLICY } from "./dmCampaignChatPolicy";
+import { isRepeatedAuthoritativeCheck } from "./dmCheckDedup";
 import { recordNarratedCampaignNpcs } from "./dmNpcRegistry";
 import { loadDmSystemReferences, serializeDmSystemReferences } from "./dmSystemReferencePlanner";
 import { executeDmPlannerCommand } from "./dmToolExecution";
@@ -159,7 +160,11 @@ export async function runStructuredDmTurn(input: {
     maxCommands: 8,
     plan: async (executions) => {
       input.signal?.throwIfAborted();
-      return planDmTurn(input.env, {
+      const authoritativeToolResults = [
+        ...seedResults,
+        ...executions.map((entry) => entry.result),
+      ];
+      const plannerInput = {
         ...(input.signal ? { signal: input.signal } : {}),
         campaignName: input.campaign.name,
         campaignDescription: input.campaign.description,
@@ -169,8 +174,26 @@ export async function runStructuredDmTurn(input: {
         recentEvents,
         conversation,
         context: context!,
-        authoritativeToolResults: [...seedResults, ...executions.map((entry) => entry.result)],
+        authoritativeToolResults,
+      };
+      const decision = await planDmTurn(input.env, plannerInput);
+      if (!isRepeatedAuthoritativeCheck(decision, authoritativeToolResults)) return decision;
+
+      const corrected = await planDmTurn(input.env, {
+        ...plannerInput,
+        conversation: [
+          conversation,
+          "Planner correction: that exact skill check or saving throw already has an authoritative result for this continuation. Do not ask the player to roll it again. Continue from the existing result with narration, an immediate command, or a genuinely different unresolved check.",
+        ].join("\n\n"),
       });
+      if (!isRepeatedAuthoritativeCheck(corrected, authoritativeToolResults)) return corrected;
+
+      return {
+        kind: "narration" as const,
+        text: "The previous authoritative roll stands; no second roll is required. Continue the scene from that result.",
+        npcs: [],
+        itemAwards: [],
+      };
     },
     execute: async (command) => {
       input.signal?.throwIfAborted();

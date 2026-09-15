@@ -106,7 +106,7 @@ async function requireCampaignAccess(
   if (!membership || membership.status !== "active") {
     throw new ForbiddenError("You do not have access to this campaign.");
   }
-  return { role: membership.role, status: membership.status };
+  return { role: membership.role, status: campaign.status };
 }
 
 async function loadCharacterAccess(

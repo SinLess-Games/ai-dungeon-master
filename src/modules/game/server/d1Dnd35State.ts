@@ -29,6 +29,7 @@ import {
   calculateEncumbranceState,
   combineArmorCheckPenalty,
   combineMaximumDexterityBonus,
+  combineMovementRestriction,
   encumberedLandSpeed,
   encumbrancePenaltyProfile,
   effectiveAbilityScore,
@@ -377,11 +378,14 @@ export async function loadEncumbranceSnapshot(input: {
     enabled: extension.encumbranceEnabled,
   });
   const equipmentLandSpeed = equipmentAdjustedLandSpeed(raceData.baseSpeedFeet, defense);
+  const equipmentMovement =
+    equipmentLandSpeed < raceData.baseSpeedFeet ? ("reduced" as const) : ("normal" as const);
 
   return {
     ...encumbrance,
     landSpeedFeet: Math.min(encumbrance.landSpeedFeet, equipmentLandSpeed),
     runMultiplier: Math.min(encumbrance.runMultiplier, defense.runMultiplier),
+    movement: combineMovementRestriction(encumbrance.movement, equipmentMovement),
     weightComplete: unknownWeightItems === 0,
     unknownWeightItems,
   };

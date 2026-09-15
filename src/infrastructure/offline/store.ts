@@ -33,7 +33,7 @@ function versionKey(userId: string, resource: OfflineResourceRef): string {
 
 function openDatabase(): Promise<IDBDatabase | null> {
   if (!hasIndexedDb()) return Promise.resolve(null);
-  databasePromise ??= new Promise((resolve, reject) => {
+  databasePromise ??= new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onerror = () => reject(request.error ?? new Error("Unable to open offline save database."));
     request.onupgradeneeded = () => {

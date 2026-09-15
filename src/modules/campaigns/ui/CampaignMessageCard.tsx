@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bot, Check, Pencil, Trash2, UserRound, X } from "lucide-react";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { toast } from "sonner";
 import {
   deleteCampaignPlayMessage,
@@ -21,6 +23,84 @@ function messageTime(value: number) {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "The message could not be changed.";
+}
+
+function CampaignMessageMarkdown({ content }: { content: string }) {
+  return (
+    <div className="mt-2 min-w-0 break-words text-sm leading-6 text-foreground/90">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        skipHtml
+        urlTransform={defaultUrlTransform}
+        components={{
+          p: ({ children }) => <p className="my-2 first:mt-0 last:mb-0">{children}</p>,
+          h1: ({ children }) => (
+            <h1 className="mb-2 mt-4 text-lg font-bold text-foreground first:mt-0">{children}</h1>
+          ),
+          h2: ({ children }) => (
+            <h2 className="mb-2 mt-4 text-base font-bold text-foreground first:mt-0">{children}</h2>
+          ),
+          h3: ({ children }) => (
+            <h3 className="mb-1.5 mt-3 text-sm font-bold text-foreground first:mt-0">{children}</h3>
+          ),
+          ul: ({ children }) => <ul className="my-2 list-disc space-y-1 pl-5">{children}</ul>,
+          ol: ({ children }) => <ol className="my-2 list-decimal space-y-1 pl-5">{children}</ol>,
+          li: ({ children }) => <li className="pl-0.5">{children}</li>,
+          strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+          em: ({ children }) => <em className="italic">{children}</em>,
+          blockquote: ({ children }) => (
+            <blockquote className="my-2 border-l-2 border-gold/40 pl-3 italic text-muted-foreground">
+              {children}
+            </blockquote>
+          ),
+          a: ({ children, href }) => (
+            <a
+              href={href}
+              target="_blank"
+              rel="nofollow noopener noreferrer"
+              className="text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary"
+            >
+              {children}
+            </a>
+          ),
+          code: ({ children }) => (
+            <code className="rounded bg-muted/70 px-1 py-0.5 font-mono text-[0.9em] text-foreground">
+              {children}
+            </code>
+          ),
+          pre: ({ children }) => (
+            <pre className="my-2 max-w-full overflow-x-auto rounded-lg border border-border bg-background/70 p-3 font-mono text-xs leading-5 text-foreground">
+              {children}
+            </pre>
+          ),
+          hr: () => <hr className="my-3 border-border" />,
+          table: ({ children }) => (
+            <div className="my-2 max-w-full overflow-x-auto rounded-lg border border-border">
+              <table className="w-full border-collapse text-left text-xs">{children}</table>
+            </div>
+          ),
+          th: ({ children }) => (
+            <th className="border-b border-border bg-muted/40 px-2 py-1.5 font-semibold text-foreground">
+              {children}
+            </th>
+          ),
+          td: ({ children }) => <td className="border-t border-border px-2 py-1.5">{children}</td>,
+          img: ({ src, alt }) =>
+            src ? (
+              <img
+                src={src}
+                alt={alt || ""}
+                loading="lazy"
+                referrerPolicy="no-referrer"
+                className="my-2 max-h-96 max-w-full rounded-lg border border-border object-contain"
+              />
+            ) : null,
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
 }
 
 export function CampaignMessageCard({
@@ -178,9 +258,7 @@ export function CampaignMessageCard({
           </div>
         </div>
       ) : (
-        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground/90">
-          {message.content}
-        </p>
+        <CampaignMessageMarkdown content={message.content} />
       )}
     </article>
   );

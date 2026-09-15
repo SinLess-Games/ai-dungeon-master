@@ -71,5 +71,8 @@ describe("AI DM conversation context", () => {
     expect(context).toContain("begin before the academy is founded");
     expect(context).toContain("path to godhood");
     expect(context).not.toContain("Secret preference belonging only to player two.");
+    expect(context.indexOf("Private OOC · DM context for this player")).toBeLessThan(
+      context.indexOf("Shared campaign table:"),
+    );
   });
 });

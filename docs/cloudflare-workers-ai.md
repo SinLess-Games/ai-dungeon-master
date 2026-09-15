@@ -29,6 +29,13 @@ The application calls the binding through `src/infrastructure/ai/openaiCompatibl
 
 Campaign narration and turn planning include explicit [campaign length and pacing guidance](campaign-duration.md) from saved campaign settings.
 
+## Editing AI prompts
+
+AI prompt text and dynamic templates live in [`src/prompts`](../src/prompts/README.md),
+with individual modules for system messages, user messages, and shared instructions.
+Campaign and devblog services import these templates and retain provider calls,
+authorization, data loading, and response validation.
+
 ## One-time Cloudflare setup
 
 1. Sign in to the Cloudflare account that owns `the-endless-codex`.

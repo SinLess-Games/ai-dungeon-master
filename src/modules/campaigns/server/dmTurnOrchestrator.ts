@@ -1,5 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { DM_REPEATED_CHECK_CORRECTION } from "@/prompts/dmRepeatedCheckCorrection";
+import { withSystemReferences } from "@/prompts/dmTurnContext";
 import type { OpenAICompatibleEnv } from "@/infrastructure/ai/openaiCompatible";
 import { createDatabase } from "@/infrastructure/database/client";
 import {
@@ -8,7 +10,6 @@ import {
 } from "@/modules/game/server/gameCommandService";
 import { evaluateAlignmentAction } from "./alignmentEvaluator";
 import { loadCampaignPlaySchemaReadiness } from "./campaignPlaySchemaReadiness";
-import { CAMPAIGN_DM_NARRATION_POLICY } from "./dmCampaignChatPolicy";
 import { isRepeatedAuthoritativeCheck } from "./dmCheckDedup";
 import { recordNarratedCampaignNpcs } from "./dmNpcRegistry";
 import { loadDmSystemReferences, serializeDmSystemReferences } from "./dmSystemReferencePlanner";
@@ -30,25 +31,6 @@ export interface StructuredDmTurnResult {
   decision: Extract<DmTurnDecision, { kind: "narration" | "check" }>;
   commandResults: GameCommandResult[];
   alignmentResult: GameCommandResult | null;
-}
-
-function withCampaignChatPolicy(conversation: string): string {
-  return [
-    `Campaign chat output policy: ${CAMPAIGN_DM_NARRATION_POLICY}`,
-    conversation || "(No previous campaign or private OOC messages.)",
-  ].join("\n\n");
-}
-
-function withSystemReferences(conversation: string, systemReferenceText: string): string {
-  if (!systemReferenceText) return withCampaignChatPolicy(conversation);
-  return withCampaignChatPolicy(
-    [
-      conversation,
-      "Source-backed system database references for this turn:",
-      "Use these rows as canonical reference knowledge for the active ruleset. They do not by themselves mutate game state; authoritative mechanics still require validated game commands.",
-      systemReferenceText,
-    ].join("\n\n"),
-  );
 }
 
 /**
@@ -160,10 +142,7 @@ export async function runStructuredDmTurn(input: {
     maxCommands: 8,
     plan: async (executions) => {
       input.signal?.throwIfAborted();
-      const authoritativeToolResults = [
-        ...seedResults,
-        ...executions.map((entry) => entry.result),
-      ];
+      const authoritativeToolResults = [...seedResults, ...executions.map((entry) => entry.result)];
       const plannerInput = {
         ...(input.signal ? { signal: input.signal } : {}),
         campaignName: input.campaign.name,
@@ -181,10 +160,7 @@ export async function runStructuredDmTurn(input: {
 
       const corrected = await planDmTurn(input.env, {
         ...plannerInput,
-        conversation: [
-          conversation,
-          "Planner correction: that exact skill check or saving throw already has an authoritative result for this continuation. Do not ask the player to roll it again. Continue from the existing result with narration, an immediate command, or a genuinely different unresolved check.",
-        ].join("\n\n"),
+        conversation: [conversation, DM_REPEATED_CHECK_CORRECTION].join("\n\n"),
       });
       if (!isRepeatedAuthoritativeCheck(corrected, authoritativeToolResults)) return corrected;
 

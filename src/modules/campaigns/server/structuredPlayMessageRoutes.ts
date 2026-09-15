@@ -1,8 +1,10 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import { dmNarrationRetryPrompt } from "@/prompts/dmNarrationRetry";
+import { dmReplyUserPrompt } from "@/prompts/dmReplyUser";
+import { dmReplySystemPrompt } from "@/prompts/dmReplySystem";
 import { Hono } from "hono";
 import { z } from "zod";
-import { campaignPacingContext } from "../domain/duration";
 import {
   generateOpenAICompatibleText,
   streamOpenAICompatibleText,
@@ -32,11 +34,7 @@ import {
   loadDmCharacterContext,
   type PublicCampaignDmAction,
 } from "./dmActionService";
-import {
-  assertCampaignDmNarration,
-  CAMPAIGN_DM_NARRATION_POLICY,
-  campaignDmNarrationViolation,
-} from "./dmCampaignChatPolicy";
+import { assertCampaignDmNarration, campaignDmNarrationViolation } from "./dmCampaignChatPolicy";
 import { loadDmSystemReferences, serializeDmSystemReferences } from "./dmSystemReferencePlanner";
 import { runStructuredDmTurn } from "./dmTurnOrchestrator";
 import { loadDmConversationText, loadRecentDmEvents } from "./dmTurnRuntime";
@@ -294,41 +292,15 @@ async function basicDmReply(
     });
   }
 
-  const system =
-    channel === "ooc_dm"
-      ? [
-          `You are the private Dungeon Master assistant for an ${campaign.rulesetId} ${campaign.rulesetVersion} campaign.`,
-          "Answer rules, table, intent, world, and clarification questions directly.",
-          "When source-backed system database references are supplied, prefer them over model memory for rules, items, spells, powers, feats, classes, races, conditions, monsters, and other catalog facts. Do not invent a database entry or source citation when none was retrieved.",
-          "Catalog text is reference knowledge, not proof that a mechanic is implemented by the deterministic engine. Be explicit when the database describes a rule that the available engine tools cannot currently execute.",
-          "You can see both the shared campaign table and this player's private OOC · DM thread, so keep them consistent with each other.",
-          "Treat private OOC as DM-only preferences, plans, boundaries, and table direction. It is not character speech and is not automatically known by NPCs or other players.",
-          "Never invent a roll or claim authoritative state changed unless the supplied game context records it.",
-        ].join(" ")
-      : [
-          `You are the Dungeon Master running an ${campaign.rulesetId} ${campaign.rulesetVersion} campaign.`,
-          "When source-backed system database references are supplied, prefer them over model memory for rules and catalog facts. Never invent a source-backed rule or entity that was not retrieved.",
-          "Catalog knowledge never authorizes hidden state mutation; only the authoritative rules-engine command path may change game state.",
-          "You can see the acting player's private OOC · DM context as well as the shared campaign table. Use that private context to honor campaign goals and player direction without revealing it as character speech or public knowledge.",
-          campaign.status === "paused"
-            ? "The campaign is paused: narrate or answer table talk, but do not imply authoritative mechanics changed."
-            : "Narrate the table faithfully without inventing unrecorded mechanical results.",
-          CAMPAIGN_DM_NARRATION_POLICY,
-        ].join(" ");
-  const basePrompt = [
-    `Campaign: ${campaign.name}`,
-    `Description: ${campaign.description || "No campaign description provided."}`,
-    campaignPacingContext(parseSettings(campaign.settings)),
-    `Recent events: ${JSON.stringify(await loadRecentDmEvents(db, campaign.id)).slice(0, 7000)}`,
-    ...(systemReferenceText
-      ? ["Source-backed system database references for this response:", systemReferenceText]
-      : []),
-    "Shared DM context:",
-    conversation || "(No previous campaign or private OOC messages.)",
-    channel === "ooc_dm"
-      ? "Respond to the most recent private OOC player message while staying consistent with the campaign table."
-      : "Respond to the most recent campaign player message while honoring relevant private OOC direction.",
-  ].join("\n\n");
+  const system = dmReplySystemPrompt(campaign, channel);
+  const basePrompt = dmReplyUserPrompt(
+    campaign,
+    channel,
+    parseSettings(campaign.settings),
+    await loadRecentDmEvents(db, campaign.id),
+    systemReferenceText,
+    conversation,
+  );
 
   let retryInstruction = "";
   const attempts = channel === "campaign" ? 2 : 1;
@@ -350,10 +322,7 @@ async function basicDmReply(
 
     const violation = campaignDmNarrationViolation(response);
     if (!violation) return response;
-    retryInstruction = [
-      `Your previous campaign-chat draft was rejected because ${violation}.`,
-      "Write a new live-play response from scratch. Do not repeat character-sheet metadata or ask setup/onboarding questions.",
-    ].join(" ");
+    retryInstruction = dmNarrationRetryPrompt(violation);
   }
 
   throw new Error(

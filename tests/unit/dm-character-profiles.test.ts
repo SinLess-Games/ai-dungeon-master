@@ -7,7 +7,7 @@ import {
   serializeDmCampaignCharacterProfiles,
   type DmCampaignCharacterProfile,
 } from "@/modules/campaigns/server/dmCharacterProfiles";
-import { composeDmConversationContext } from "@/modules/campaigns/server/dmTurnRuntime";
+import { composeDmConversationContext } from "@/prompts/dmConversationContext";
 
 const migrationDirectory = fileURLToPath(new URL("../../drizzle/", import.meta.url));
 const migrationFiles = readdirSync(migrationDirectory)

@@ -1,9 +1,11 @@
+import { alignmentUserPrompt } from "@/prompts/alignmentUser";
+import { alignmentSystemPrompt } from "@/prompts/alignmentSystem";
 import { z } from "zod";
 import {
   generateOpenAICompatibleText,
   type OpenAICompatibleEnv,
 } from "@/infrastructure/ai/openaiCompatible";
-import type { DmToolAlignmentContext } from "./dmToolContext";
+import type { AlignmentPromptInput } from "@/prompts/alignmentTypes";
 
 const alignmentEvaluationSchema = z.discriminatedUnion("record", [
   z.object({ record: z.literal(false) }),
@@ -42,37 +44,11 @@ export function parseAlignmentEvaluation(value: string): AlignmentEvaluation {
  */
 export async function evaluateAlignmentAction(
   env: OpenAICompatibleEnv,
-  input: {
-    signal?: AbortSignal;
-    rulesetId: string;
-    rulesetVersion: string;
-    characterName: string;
-    current: DmToolAlignmentContext;
-    playerAction: string;
-    authoritativeResults: unknown[];
-    recentEvents: unknown[];
-  },
+  input: AlignmentPromptInput,
 ): Promise<AlignmentEvaluation> {
-  const system = [
-    `You adjudicate ongoing alignment drift for an ${input.rulesetId} ${input.rulesetVersion} character.`,
-    "Return exactly one JSON object and no markdown.",
-    'Most ordinary actions are not alignment events. Return {"record":false} unless the player\'s completed choice meaningfully demonstrates lawful/chaotic or good/evil conduct.',
-    "Judge the player's actual choice and authoritative outcome, not hypothetical consequences.",
-    "Positive lawChaosDelta means lawful; negative means chaotic. Positive goodEvilDelta means good; negative means evil.",
-    "Use small magnitudes for ordinary but meaningful conduct (1-5), medium for strong conduct (6-10), and 11-20 only for extraordinary defining acts.",
-    "Do not change alignment directly. Do not compensate one axis merely to preserve the current alignment.",
-    "When recording, explain the concrete action in the reason without moralizing beyond the established facts.",
-    'Forms: {"record":false} OR {"record":true,"lawChaosDelta":0,"goodEvilDelta":-4,"reason":"..."}.',
-  ].join(" ");
+  const system = alignmentSystemPrompt(input);
 
-  const prompt = [
-    `Character: ${input.characterName}`,
-    `Current alignment state: ${JSON.stringify(input.current)}`,
-    `Player action: ${input.playerAction}`,
-    `Authoritative results from this turn: ${JSON.stringify(input.authoritativeResults).slice(0, 8000)}`,
-    `Recent authoritative events: ${JSON.stringify(input.recentEvents).slice(0, 6000)}`,
-    "Assess only this completed player turn.",
-  ].join("\n\n");
+  const prompt = alignmentUserPrompt(input);
 
   const response = await generateOpenAICompatibleText(env, {
     ...(input.signal ? { signal: input.signal } : {}),

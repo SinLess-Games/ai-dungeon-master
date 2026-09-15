@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  campaignDurationSchema,
-  campaignPacingContext,
-  readCampaignDuration,
-} from "@/modules/campaigns/domain/duration";
+import { campaignDurationSchema, readCampaignDuration } from "@/modules/campaigns/domain/duration";
+import { campaignPacingContext } from "@/prompts/campaignPacing";
 import {
   durationDraftFromSettings,
   parseDurationDraft,

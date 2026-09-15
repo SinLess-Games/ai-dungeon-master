@@ -298,12 +298,15 @@ function scheduleIfEvent(
 }
 
 function translateResolutionError(error: unknown): never {
+  if (error instanceof RangeError) throw new ValidationError(error.message);
   if (!(error instanceof Error)) throw error;
   switch (error.message) {
     case "AI_DM_ACTION_NOT_FOUND":
       throw new NotFoundError("The requested Dungeon Master action no longer exists.");
     case "AI_DM_ACTION_NOT_PENDING":
       throw new ConflictError("This Dungeon Master action has already been resolved or is resolving.");
+    case "AI_DM_ACTION_SKILL_NOT_ALLOWED":
+      throw new ValidationError("That skill can no longer be used for this requested check.");
     case "CAMPAIGN_GAME_NOT_ACTIVE":
       throw new ConflictError("This campaign does not currently have an active game session.");
     case "GAME_ACTOR_OR_SKILL_NOT_FOUND":

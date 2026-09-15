@@ -3,6 +3,7 @@ import {
   calculateEncumbranceState,
   combineArmorCheckPenalty,
   combineMaximumDexterityBonus,
+  combineMovementRestriction,
   encumbrancePenaltyProfile,
   encumberedLandSpeed,
 } from "@/rulesets/dnd35";
@@ -101,6 +102,13 @@ describe("live character sheet encumbrance", () => {
     expect(encumberedLandSpeed(40, profile)).toBe(30);
     expect(encumberedLandSpeed(50, profile)).toBe(35);
     expect(encumberedLandSpeed(60, profile)).toBe(40);
+  });
+
+  it("uses the worse movement restriction when armor and carried load both apply", () => {
+    expect(combineMovementRestriction("normal", "reduced")).toBe("reduced");
+    expect(combineMovementRestriction("reduced", "normal")).toBe("reduced");
+    expect(combineMovementRestriction("reduced", "stagger")).toBe("stagger");
+    expect(combineMovementRestriction("immobile", "reduced")).toBe("immobile");
   });
 
   it("uses the worse armor and encumbrance restriction rather than adding them", () => {

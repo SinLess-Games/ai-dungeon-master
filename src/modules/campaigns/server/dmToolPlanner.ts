@@ -47,9 +47,12 @@ const dmCommandSchema = z.discriminatedUnion("type", [
   }),
   z.object({
     type: z.literal("combat.attack"),
+    /** Omit for the acting player character; specify an exposed non-character actor for DM-run attacks. */
+    attackerId: id.optional(),
     targetId: id,
     kind: z.enum(["melee", "ranged"]),
     weaponInventoryId: id.optional(),
+    monsterAttackId: id.optional(),
   }),
   z.object({
     type: z.literal("spell.cast.prepared"),
@@ -153,12 +156,23 @@ export interface DmPlannerSkillOption {
   trainedOnly: boolean;
 }
 
+export interface DmPlannerMonsterAttackOption {
+  id: string;
+  name: string;
+  attackMode: "melee" | "ranged" | "melee_touch" | "ranged_touch";
+  canUseAsStandard: boolean;
+  attackCount: number;
+  routineKey: string;
+  sequence: number;
+}
+
 export interface DmPlannerActor {
   id: string;
   characterId: string | null;
   name: string;
   kind: string;
   status: string;
+  attacks?: DmPlannerMonsterAttackOption[];
 }
 
 export interface DmPlannerContext {
@@ -183,7 +197,7 @@ export interface StructuredDmTurnInput extends CommonDmTurnInput {
   authoritativeToolResults?: unknown[];
 }
 
-/** Compatibility shape used by the first check-only route while the structured route is registered ahead of it. */
+/** Compatibility shape used by the original check-only route. */
 export interface LegacyDmTurnInput extends CommonDmTurnInput {
   actors: unknown[];
   character: { id: string; name: string; actorId: string };
@@ -226,6 +240,12 @@ function requireTargets(context: DmPlannerContext, ids: readonly string[] | unde
   }
 }
 
+function monsterAttackKind(
+  attackMode: DmPlannerMonsterAttackOption["attackMode"],
+): "melee" | "ranged" {
+  return attackMode === "ranged" || attackMode === "ranged_touch" ? "ranged" : "melee";
+}
+
 export function validateDmTurnDecision(
   decision: DmTurnDecision,
   context: DmPlannerContext,
@@ -252,30 +272,45 @@ export function validateDmTurnDecision(
       }
       break;
     case "encounter.end_turn":
-      if (
-        !context.encounter ||
-        context.encounter.currentActorId !== context.character.character.actorId
-      ) {
-        throw new Error("AI_DM_END_TURN_NOT_AVAILABLE");
-      }
+      if (!context.encounter?.currentActorId) throw new Error("AI_DM_END_TURN_NOT_AVAILABLE");
       break;
     case "encounter.finish":
       if (!context.encounter) throw new Error("AI_DM_ENCOUNTER_NOT_ACTIVE");
       break;
     case "combat.attack": {
-      if (
-        !allowedActors.has(command.targetId) ||
-        command.targetId === context.character.character.actorId
-      ) {
+      const attackerId = command.attackerId ?? context.character.character.actorId;
+      const attacker = context.actors.find((actor) => actor.id === attackerId);
+      const target = context.actors.find((actor) => actor.id === command.targetId);
+      if (!attacker || attacker.status !== "active" || !target || target.status !== "active") {
         throw new Error("AI_DM_REQUESTED_UNKNOWN_TARGET");
       }
-      if (command.weaponInventoryId) {
-        const weapon = context.character.weapons.find(
-          (option) => option.inventoryId === command.weaponInventoryId,
-        );
-        if (!weapon || (weapon.attackKind !== "both" && weapon.attackKind !== command.kind)) {
-          throw new Error("AI_DM_REQUESTED_UNAVAILABLE_WEAPON");
+      if (attackerId === command.targetId) throw new Error("AI_DM_REQUESTED_UNKNOWN_TARGET");
+      if (context.encounter && context.encounter.currentActorId !== attackerId) {
+        throw new Error("AI_DM_ATTACKER_NOT_CURRENT_TURN");
+      }
+
+      if (attacker.kind === "character") {
+        if (attackerId !== context.character.character.actorId || command.monsterAttackId) {
+          throw new Error("AI_DM_REQUESTED_UNAVAILABLE_ATTACKER");
         }
+        if (command.weaponInventoryId) {
+          const weapon = context.character.weapons.find(
+            (option) => option.inventoryId === command.weaponInventoryId,
+          );
+          if (!weapon || (weapon.attackKind !== "both" && weapon.attackKind !== command.kind)) {
+            throw new Error("AI_DM_REQUESTED_UNAVAILABLE_WEAPON");
+          }
+        }
+      } else if (attacker.kind === "monster") {
+        if (command.weaponInventoryId || !command.monsterAttackId) {
+          throw new Error("AI_DM_REQUESTED_UNAVAILABLE_MONSTER_ATTACK");
+        }
+        const attack = attacker.attacks?.find((option) => option.id === command.monsterAttackId);
+        if (!attack || !attack.canUseAsStandard || monsterAttackKind(attack.attackMode) !== command.kind) {
+          throw new Error("AI_DM_REQUESTED_UNAVAILABLE_MONSTER_ATTACK");
+        }
+      } else {
+        throw new Error("AI_DM_REQUESTED_UNAVAILABLE_ATTACKER");
       }
       break;
     }
@@ -409,7 +444,9 @@ export async function planDmTurn(
     "Choose command for an authoritative action the engine can resolve immediately.",
     "Never invent a roll, HP result, item id, inventory id, spell id, power id, condition instance id, actor id, encounter id, or mechanical outcome.",
     "Use only ids present in the supplied tool context. Item and condition grants are the exception: itemRef/conditionRef may be an exact common catalog name or slug and will be resolved server-side.",
-    "Use combat.attack for weapon attacks rather than health.damage. Use spell/power commands for casting rather than manually applying their damage or conditions.",
+    "For the player's own attack omit attackerId; for a DM-run monster turn use its exact actor id plus one exact monsterAttackId exposed on that actor. Never control another player's character.",
+    "In an active encounter, only the current-turn actor may attack. End each completed actor turn with encounter.end_turn before moving to the next participant.",
+    "Use combat.attack for weapon or monster attacks rather than health.damage. Use spell/power commands for casting rather than manually applying their damage or conditions.",
     "Use health.damage/heal only for already-determined direct effects such as environmental damage, a trap whose outcome no longer needs a roll, or explicit narrative healing.",
     "Use inventory.grant and progression.xp.grant only when the fiction has actually awarded treasure or XP. Do not award XP merely for attempting an action.",
     "Use condition.apply/remove only when the condition is an authoritative consequence, not as flavor text.",
@@ -421,9 +458,11 @@ export async function planDmTurn(
     '{"kind":"check","preface":"...","check":{"type":"check.skill","skillId":"...","dc":15,"reason":"..."}}',
     '{"kind":"check","preface":"...","check":{"type":"check.save","save":"fort|ref|will","dc":15,"reason":"..."}}',
     '{"kind":"command","command":{"type":"combat.attack","targetId":"...","kind":"melee","weaponInventoryId":"..."}}',
+    '{"kind":"command","command":{"type":"combat.attack","attackerId":"monster-actor-id","targetId":"...","kind":"melee","monsterAttackId":"exact-attack-id"}}',
     '{"kind":"command","command":{"type":"spell.cast.prepared","castingTrackId":"...","spellId":"...","preparationId":"...","targetIds":["..."]}}',
     '{"kind":"command","command":{"type":"power.manifest","castingTrackId":"...","powerId":"...","targetIds":["..."]}}',
     '{"kind":"command","command":{"type":"encounter.start","participantIds":["..."]}}',
+    '{"kind":"command","command":{"type":"encounter.end_turn"}}',
     '{"kind":"command","command":{"type":"health.damage","targetId":"...","amount":4,"reason":"..."}}',
     '{"kind":"command","command":{"type":"condition.apply","targetId":"...","conditionRef":"prone","durationKind":"special","reason":"..."}}',
     '{"kind":"command","command":{"type":"inventory.grant","itemRef":"longsword","quantity":1,"reason":"..."}}',
@@ -447,7 +486,7 @@ export async function planDmTurn(
       `Campaign: ${input.campaignName}`,
       `Description: ${input.campaignDescription || "No campaign description provided."}`,
       `Campaign settings: ${JSON.stringify(input.settings).slice(0, 5000)}`,
-      `Tool context: ${JSON.stringify(toolContext).slice(0, 18000)}`,
+      `Tool context: ${JSON.stringify(toolContext).slice(0, 20000)}`,
       `Recent authoritative events: ${JSON.stringify(input.recentEvents).slice(0, 7000)}`,
       `Authoritative results from this turn: ${JSON.stringify(input.authoritativeToolResults ?? []).slice(0, 9000)}`,
       "Recent conversation:",

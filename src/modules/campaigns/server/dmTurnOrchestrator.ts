@@ -8,6 +8,7 @@ import {
 } from "@/modules/game/server/gameCommandService";
 import { evaluateAlignmentAction } from "./alignmentEvaluator";
 import { loadCampaignPlaySchemaReadiness } from "./campaignPlaySchemaReadiness";
+import { CAMPAIGN_DM_NARRATION_POLICY } from "./dmCampaignChatPolicy";
 import { executeDmPlannerCommand } from "./dmToolExecution";
 import { runDmToolLoop } from "./dmToolLoop";
 import { planDmTurn, type DmTurnDecision } from "./dmToolPlanner";
@@ -30,6 +31,13 @@ export interface StructuredDmTurnResult {
   decision: Extract<DmTurnDecision, { kind: "narration" | "check" }>;
   commandResults: GameCommandResult[];
   alignmentResult: GameCommandResult | null;
+}
+
+function withCampaignChatPolicy(conversation: string): string {
+  return [
+    `Campaign chat output policy: ${CAMPAIGN_DM_NARRATION_POLICY}`,
+    conversation || "(No previous campaign or private OOC messages.)",
+  ].join("\n\n");
 }
 
 /**
@@ -71,11 +79,13 @@ export async function runStructuredDmTurn(input: {
   if (!context) return null;
 
   let recentEvents = await loadRecentDmEvents(input.binding, input.campaign.id);
-  let conversation = await loadDmConversationText({
-    binding: input.binding,
-    campaignId: input.campaign.id,
-    userId: input.userId,
-  });
+  let conversation = withCampaignChatPolicy(
+    await loadDmConversationText({
+      binding: input.binding,
+      campaignId: input.campaign.id,
+      userId: input.userId,
+    }),
+  );
   const seedResults = [...(input.seedAuthoritativeResults ?? [])];
   const commandResults: GameCommandResult[] = [];
 
@@ -114,7 +124,7 @@ export async function runStructuredDmTurn(input: {
       });
       if (!refreshed) throw new Error("AI_DM_CHARACTER_CONTEXT_LOST");
       context = refreshed;
-      [recentEvents, conversation] = await Promise.all([
+      const [nextEvents, nextConversation] = await Promise.all([
         loadRecentDmEvents(input.binding, input.campaign.id),
         loadDmConversationText({
           binding: input.binding,
@@ -122,6 +132,8 @@ export async function runStructuredDmTurn(input: {
           userId: input.userId,
         }),
       ]);
+      recentEvents = nextEvents;
+      conversation = withCampaignChatPolicy(nextConversation);
       return result;
     },
   });

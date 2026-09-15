@@ -1,8 +1,10 @@
+import { resolveOfflinePathAliases, resolveOfflineResource } from "./aliases";
 import {
   cacheJsonResponse,
   getActiveOfflineUserId,
   getResourceVersion,
   queueOfflineMutation,
+  readCachedJson,
   setResourceVersion,
 } from "./store";
 import type { OfflineResourceRef } from "./types";
@@ -49,7 +51,10 @@ function pathFor(input: RequestInfo | URL): string {
   if (input instanceof URL) return `${input.pathname}${input.search}`;
   if (typeof input === "string") {
     try {
-      const url = new URL(input, typeof location === "undefined" ? "https://offline.invalid" : location.origin);
+      const url = new URL(
+        input,
+        typeof location === "undefined" ? "https://offline.invalid" : location.origin,
+      );
       return `${url.pathname}${url.search}`;
     } catch {
       return input;
@@ -75,11 +80,19 @@ function parseJsonBody(body: BodyInit | null | undefined): Record<string, unknow
   }
 }
 
-function inferResource(path: string, method: string, body: BodyInit | null | undefined): OfflineResourceRef | null {
+function inferResource(
+  path: string,
+  method: string,
+  body: BodyInit | null | undefined,
+): OfflineResourceRef | null {
   const pathname = path.split("?", 1)[0] ?? path;
   const parsed = parseJsonBody(body);
 
-  if (method === "POST" && pathname === "/api/campaigns" && typeof parsed?.["id"] === "string") {
+  if (
+    method === "POST" &&
+    pathname === "/api/campaigns" &&
+    typeof parsed?.["id"] === "string"
+  ) {
     return { kind: "campaign", id: parsed["id"] };
   }
 
@@ -148,51 +161,72 @@ function replayableBody(body: BodyInit | null | undefined): string | null {
   return body;
 }
 
+function requestInputWithResolvedPath(input: RequestInfo | URL, resolvedPath: string): RequestInfo | URL {
+  return typeof input === "string" ? resolvedPath : input;
+}
+
 export async function offlineRequestJson<T>(
   input: RequestInfo | URL,
   init: RequestInit = {},
   options: OfflineRequestOptions<T> = {},
 ): Promise<T> {
   const method = (init.method ?? "GET").toUpperCase();
-  const path = pathFor(input);
+  const requestedPath = pathFor(input);
+  const userId = getActiveOfflineUserId();
+  const resolvedPath = resolveOfflinePathAliases(userId, requestedPath);
+  const resolvedInput = requestInputWithResolvedPath(input, resolvedPath);
   const cacheGet = options.cacheGet !== false;
 
   if (method === "GET") {
     if (networkAvailable()) {
       try {
-        const response = await fetch(input, {
+        const response = await fetch(resolvedInput, {
           credentials: "same-origin",
           headers: { "Content-Type": "application/json", ...init.headers },
           ...init,
         });
         const value = await parseResponse<T>(response);
-        if (cacheGet && getActiveOfflineUserId()) await cacheJsonResponse(path, value);
+        if (cacheGet && userId) {
+          await cacheJsonResponse(requestedPath, value);
+          if (resolvedPath !== requestedPath) await cacheJsonResponse(resolvedPath, value);
+        }
         return value;
       } catch (error) {
         if (error instanceof OfflineHttpError) throw error;
       }
     }
 
-    if (getActiveOfflineUserId()) {
-      const { readCachedJson } = await import("./store");
-      const cached = await readCachedJson<T>(path);
+    if (userId) {
+      const cached = await readCachedJson<T>(requestedPath);
       if (cached !== undefined) return cached;
+      if (resolvedPath !== requestedPath) {
+        const resolvedCached = await readCachedJson<T>(resolvedPath);
+        if (resolvedCached !== undefined) return resolvedCached;
+      }
     }
     throw new OfflineUnavailableError("This data has not been saved on this device yet.");
   }
 
-  const resource = options.resource === undefined ? inferResource(path, method, init.body) : options.resource;
+  const inferred = options.resource === undefined
+    ? inferResource(requestedPath, method, init.body)
+    : options.resource;
+  const resource = resolveOfflineResource(userId, inferred);
   const mutationId = crypto.randomUUID();
   const baseVersion = resource ? await getResourceVersion(resource) : null;
   const syncHeaders: Record<string, string> = {
     "X-Endless-Codex-Mutation-Id": mutationId,
-    ...(resource ? { "X-Endless-Codex-Resource-Kind": resource.kind, "X-Endless-Codex-Resource-Id": resource.id } : {}),
+    ...(resource
+      ? {
+          "X-Endless-Codex-Resource-Kind": resource.kind,
+          "X-Endless-Codex-Resource-Id": resource.id,
+        }
+      : {}),
     ...(baseVersion === null ? {} : { "X-Endless-Codex-Base-Version": String(baseVersion) }),
   };
 
   if (networkAvailable()) {
     try {
-      const response = await fetch(input, {
+      const response = await fetch(resolvedInput, {
         credentials: "same-origin",
         ...init,
         headers: {
@@ -218,21 +252,23 @@ export async function offlineRequestJson<T>(
   if (!options.queueWhenOffline) {
     throw new OfflineUnavailableError(options.onlineOnlyMessage);
   }
-  if (!getActiveOfflineUserId()) {
+  if (!userId) {
     throw new OfflineUnavailableError("Sign in once on this device before using offline saves.");
   }
 
   await queueOfflineMutation({
     id: mutationId,
     method: method as "POST" | "PUT" | "PATCH" | "DELETE",
-    url: path,
+    url: requestedPath,
     body: replayableBody(init.body),
-    resource,
-    baseVersion,
+    resource: inferred,
+    baseVersion: inferred ? await getResourceVersion(resolveOfflineResource(userId, inferred)!) : null,
     forceLocal: false,
   });
   const value = await optimisticValue(options);
   await options.onQueued?.(value);
-  if (typeof window !== "undefined") window.dispatchEvent(new Event("endless-codex:offline-sync-changed"));
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("endless-codex:offline-sync-changed"));
+  }
   return value;
 }

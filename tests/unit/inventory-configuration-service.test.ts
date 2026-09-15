@@ -162,6 +162,32 @@ describe("authoritative inventory configuration", () => {
     });
   });
 
+  it("keeps inventory arrangement auditable while campaign play is paused", async () => {
+    const { sqlite, binding, db } = harness();
+    sqlite.exec("UPDATE campaigns SET status = 'paused' WHERE id = 'campaign-1'");
+
+    const result = await configureCharacterInventory(
+      { db, binding, createId: () => "event-paused", now: () => new Date("2026-09-15T02:02:00Z") },
+      {
+        campaignId: "campaign-1",
+        actorId: "hero-1",
+        inventoryId: "longsword-stack",
+        equippedSlot: "main_hand",
+        reason: "The player organizes equipment between sessions.",
+      },
+    );
+
+    expect(result).toMatchObject({
+      changed: true,
+      eventId: "event-paused",
+      sessionId: "session-1",
+      after: { equipped: true, equippedSlot: "main_hand" },
+    });
+    expect(
+      sqlite.prepare("SELECT event_type AS eventType FROM game_events WHERE id = ?").get("event-paused"),
+    ).toEqual({ eventType: "inventory.item.configured" });
+  });
+
   it("rejects item categories placed into impossible equipment slots", async () => {
     const { binding, db } = harness();
     await expect(

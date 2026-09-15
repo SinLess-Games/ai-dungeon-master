@@ -325,6 +325,24 @@ function commandForAction(
   };
 }
 
+function isTerminalResolutionError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return new Set([
+    "AI_DM_ACTION_ARGUMENTS_INVALID",
+    "AI_DM_ACTION_SKILL_NOT_ALLOWED",
+    "CAMPAIGN_GAME_NOT_ACTIVE",
+    "CAMPAIGN_RULESET_UNSUPPORTED",
+    "GAME_ACTOR_NOT_FOUND",
+    "GAME_ACTOR_OR_SKILL_NOT_FOUND",
+  ]).has(error.message);
+}
+
+function resultIsDisallowed(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const allowed = (value as Record<string, unknown>)["allowed"];
+  return allowed === false;
+}
+
 export async function resolvePendingDmAction(
   binding: D1Database,
   input: {
@@ -334,6 +352,10 @@ export async function resolvePendingDmAction(
     roll: number;
   },
 ): Promise<{ action: PublicCampaignDmAction; result: GameCommandResult }> {
+  if (!Number.isSafeInteger(input.roll) || input.roll < 1 || input.roll > 20) {
+    throw new RangeError("A natural d20 roll must be an integer from 1 to 20.");
+  }
+
   const row = await readAction(binding, input.campaignId, input.actionId, input.userId);
   if (!row) throw new Error("AI_DM_ACTION_NOT_FOUND");
   if (row.status !== "pending") throw new Error("AI_DM_ACTION_NOT_PENDING");
@@ -355,6 +377,9 @@ export async function resolvePendingDmAction(
       input.campaignId,
       commandForAction(row, args, input.roll),
     );
+    if (resultIsDisallowed(result.value)) {
+      throw new Error("AI_DM_ACTION_SKILL_NOT_ALLOWED");
+    }
 
     await binding
       .prepare(
@@ -370,11 +395,16 @@ export async function resolvePendingDmAction(
     return { action: publicAction(updated), result };
   } catch (error) {
     const message = error instanceof Error ? error.message : "AI DM action resolution failed.";
+    const terminal = isTerminalResolutionError(error);
     await binding
       .prepare(
-        `UPDATE campaign_dm_actions
-         SET status = 'pending', error = ?
-         WHERE id = ? AND status = 'resolving'`,
+        terminal
+          ? `UPDATE campaign_dm_actions
+             SET status = 'failed', error = ?, resolved_at = unixepoch()
+             WHERE id = ? AND status = 'resolving'`
+          : `UPDATE campaign_dm_actions
+             SET status = 'pending', error = ?
+             WHERE id = ? AND status = 'resolving'`,
       )
       .bind(message.slice(0, 1000), input.actionId)
       .run();

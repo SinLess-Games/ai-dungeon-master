@@ -1,8 +1,13 @@
 /// <reference types="@cloudflare/workers-types" />
 
-import { and, asc, eq, ne } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
+import {
+  enqueueGameEventPostprocess,
+  publishCommittedGameEvent,
+  type BackgroundJob,
+} from "@/infrastructure/cloudflare/backgroundJobs";
 import { createDatabase } from "@/infrastructure/database/client";
 import {
   campaignMemberships,
@@ -26,10 +31,12 @@ import {
 import { equipmentSlots } from "@/infrastructure/database/schema/dnd35/primitives";
 import { createAuth, type AuthEnv } from "@/modules/auth/server/auth";
 import { requireUser } from "@/modules/auth/server/requireAuth";
+import type { CampaignRoom } from "@/modules/game/live/CampaignRoom";
 import {
   loadCharacterSheetSnapshot,
   type AbilityKey,
 } from "@/modules/game/server/d1Dnd35State";
+import { executeGameCommand } from "@/modules/game/server/gameCommandService";
 import {
   ConflictError,
   ForbiddenError,
@@ -38,7 +45,13 @@ import {
   ValidationError,
 } from "@/server/middleware/errors";
 
-type Env = { Bindings: AuthEnv & { DB?: D1Database } };
+interface Bindings extends AuthEnv {
+  DB?: D1Database;
+  BACKGROUND_QUEUE?: Queue<BackgroundJob>;
+  CAMPAIGN_ROOM?: DurableObjectNamespace<CampaignRoom>;
+}
+
+type Env = { Bindings: Bindings };
 type Database = ReturnType<typeof createDatabase>;
 type CampaignRole = "owner" | "gm" | "player" | "observer";
 
@@ -160,8 +173,57 @@ function publicClassLevels(
     }
   }
   return [...grouped.values()].sort(
-    (a, b) => a.track - b.track || a.lastCharacterLevel - b.lastCharacterLevel || a.name.localeCompare(b.name),
+    (a, b) =>
+      a.track - b.track ||
+      a.lastCharacterLevel - b.lastCharacterLevel ||
+      a.name.localeCompare(b.name),
   );
+}
+
+function scheduleIfEvent(
+  c: { env: Bindings; executionCtx: { waitUntil(promise: Promise<unknown>): void } },
+  campaignId: string,
+  value: unknown,
+): void {
+  if (typeof value !== "object" || value === null) return;
+  const candidate = value as { eventId?: unknown; sessionId?: unknown };
+  if (typeof candidate.eventId !== "string" || typeof candidate.sessionId !== "string") return;
+
+  const event = { campaignId, eventId: candidate.eventId, sessionId: candidate.sessionId };
+  c.executionCtx.waitUntil(
+    Promise.all([
+      publishCommittedGameEvent(c.env, event).catch((error) => {
+        console.error("Unable to publish character-sheet inventory event", { ...event, error });
+      }),
+      enqueueGameEventPostprocess(c.env.BACKGROUND_QUEUE, event).catch((error) => {
+        console.error("Unable to enqueue character-sheet inventory event", { ...event, error });
+      }),
+    ]).then(() => undefined),
+  );
+}
+
+function translateInventoryConfigurationError(error: unknown): never {
+  if (error instanceof RangeError) throw new ValidationError(error.message);
+  if (!(error instanceof Error)) throw error;
+
+  switch (error.message) {
+    case "CAMPAIGN_GAME_NOT_ACTIVE":
+      throw new ConflictError("This campaign does not currently have a playable game session.");
+    case "GAME_STATE_CONFLICT":
+      throw new ConflictError("The inventory changed while this edit was being applied. Try again.");
+    case "GAME_INVENTORY_SLOT_OCCUPIED":
+      throw new ConflictError("Another equipped item already occupies or conflicts with that slot.");
+    case "GAME_CHARACTER_ACTOR_NOT_FOUND":
+      throw new NotFoundError("The live character actor is unavailable.");
+    case "GAME_INVENTORY_ITEM_NOT_FOUND":
+      throw new NotFoundError("Inventory item not found for this character.");
+    case "CAMPAIGN_RULESET_UNSUPPORTED":
+      throw new ValidationError("Live inventory configuration is unavailable for this ruleset.");
+    case "GAME_INVENTORY_SLOT_INVALID":
+      throw new ValidationError("That item cannot be equipped in the selected slot.");
+    default:
+      throw error;
+  }
 }
 
 export const campaignCharacterSheetRoutes = new Hono<Env>()
@@ -385,75 +447,43 @@ export const campaignCharacterSheetRoutes = new Hono<Env>()
     "/api/campaigns/:campaignId/play/characters/:characterId/inventory/:inventoryId",
     async (c) => {
       const session = await requireUser(createAuth(c.env), c.req.raw.headers);
-      const db = createDatabase(requireBinding(c.env.DB));
+      const binding = requireBinding(c.env.DB);
+      const db = createDatabase(binding);
       const campaignId = c.req.param("campaignId");
       const characterId = c.req.param("characterId");
       const access = await loadCharacterAccess(db, campaignId, characterId, session.user.id);
-      if (!access.canEdit) throw new ForbiddenError("You cannot arrange this character's inventory.");
+      if (!access.canEdit) {
+        throw new ForbiddenError("You cannot arrange this character's inventory.");
+      }
+      if (!access.actorId) {
+        throw new ConflictError("This character does not have an active runtime actor yet.");
+      }
 
       const parsed = inventoryPatchSchema.safeParse(await c.req.json().catch(() => null));
       if (!parsed.success) throw new ValidationError("The inventory update is invalid.");
       const input = parsed.data;
-      const inventoryId = c.req.param("inventoryId");
-      const existing = await db
-        .select()
-        .from(characterInventory)
-        .where(
-          and(
-            eq(characterInventory.id, inventoryId),
-            eq(characterInventory.characterId, characterId),
-          ),
-        )
-        .get();
-      if (!existing) throw new NotFoundError("Inventory item not found for this character.");
 
-      const location = input.location ?? existing.location;
-      let equippedSlot =
-        input.equippedSlot === undefined ? existing.equippedSlot : input.equippedSlot;
-      if (location !== "carried") equippedSlot = null;
-      const equipped = equippedSlot !== null;
-
-      if (equippedSlot && equippedSlot !== "slotless" && equippedSlot !== "other") {
-        const conflict = await db
-          .select({ id: characterInventory.id })
-          .from(characterInventory)
-          .where(
-            and(
-              eq(characterInventory.characterId, characterId),
-              eq(characterInventory.equipped, true),
-              eq(characterInventory.equippedSlot, equippedSlot),
-              ne(characterInventory.id, inventoryId),
-            ),
-          )
-          .get();
-        if (conflict) {
-          throw new ConflictError(`Another item already occupies the ${equippedSlot} slot.`);
-        }
+      try {
+        const result = await executeGameCommand(
+          { db, binding },
+          campaignId,
+          {
+            type: "inventory.configure",
+            actorId: access.actorId,
+            inventoryId: c.req.param("inventoryId"),
+            reason: "Manual live character sheet inventory edit.",
+            ...(input.location === undefined ? {} : { location: input.location }),
+            ...(input.equippedSlot === undefined
+              ? {}
+              : { equippedSlot: input.equippedSlot }),
+            ...(input.notes === undefined ? {} : { notes: input.notes }),
+          },
+        );
+        scheduleIfEvent(c, campaignId, result.value);
+        return c.json(result);
+      } catch (error) {
+        translateInventoryConfigurationError(error);
       }
-
-      await db
-        .update(characterInventory)
-        .set({
-          location,
-          equipped,
-          equippedSlot,
-          ...(input.notes === undefined ? {} : { notes: input.notes }),
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(characterInventory.id, inventoryId),
-            eq(characterInventory.characterId, characterId),
-          ),
-        )
-        .run();
-
-      const updated = await db
-        .select()
-        .from(characterInventory)
-        .where(eq(characterInventory.id, inventoryId))
-        .get();
-      return c.json({ item: updated });
     },
   )
   .get(

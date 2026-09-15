@@ -1,6 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import type { Database } from "@/infrastructure/database/client";
+import type { EquipmentSlot } from "@/infrastructure/database/schema/dnd35/primitives";
 import { performActorAttack } from "./actorCombatService";
 import { startActorEncounter } from "./actorEncounterService";
 import { endEncounterTurn, finishEncounter } from "./encounterService";
@@ -15,6 +16,7 @@ import {
   removeActorCondition,
   removeCharacterItem,
 } from "./dmStateMutationService";
+import { configureCharacterInventory } from "./inventoryConfigurationService";
 import {
   castPreparedSpellResolved,
   castSpontaneousSpellResolved,
@@ -130,6 +132,15 @@ export type GameCommand =
       reason: string;
     }
   | {
+      type: "inventory.configure";
+      actorId: string;
+      inventoryId: string;
+      location?: "carried" | "stored" | "party";
+      equippedSlot?: EquipmentSlot | null;
+      notes?: string | null;
+      reason: string;
+    }
+  | {
       type: "progression.xp.grant";
       actorId: string;
       amount: number;
@@ -161,6 +172,7 @@ export interface GameCommandHandlers {
   removeCondition: typeof removeActorCondition;
   grantItem: typeof grantCharacterItem;
   removeItem: typeof removeCharacterItem;
+  configureInventory: typeof configureCharacterInventory;
   grantXp: typeof grantCharacterExperience;
   recordAlignment: typeof recordCharacterAlignmentAction;
 }
@@ -181,6 +193,7 @@ export const defaultGameCommandHandlers: GameCommandHandlers = {
   removeCondition: removeActorCondition,
   grantItem: grantCharacterItem,
   removeItem: removeCharacterItem,
+  configureInventory: configureCharacterInventory,
   grantXp: grantCharacterExperience,
   recordAlignment: recordCharacterAlignmentAction,
 };
@@ -377,6 +390,21 @@ export async function executeGameCommand(
           inventoryId: command.inventoryId,
           quantity: command.quantity,
           reason: command.reason,
+        }),
+      };
+    case "inventory.configure":
+      return {
+        type: command.type,
+        value: await handlers.configureInventory(deps, {
+          campaignId,
+          actorId: command.actorId,
+          inventoryId: command.inventoryId,
+          reason: command.reason,
+          ...(command.location === undefined ? {} : { location: command.location }),
+          ...(command.equippedSlot === undefined
+            ? {}
+            : { equippedSlot: command.equippedSlot }),
+          ...(command.notes === undefined ? {} : { notes: command.notes }),
         }),
       };
     case "progression.xp.grant":

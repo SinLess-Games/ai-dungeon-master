@@ -103,4 +103,47 @@ describe("public game command schema", () => {
       dc: 17,
     });
   });
+
+  it("accepts bounded live-sheet inventory arrangement commands", () => {
+    expect(
+      gameCommandSchema.parse({
+        type: "inventory.configure",
+        actorId: "hero-1",
+        inventoryId: "longsword-stack",
+        location: "carried",
+        equippedSlot: "main_hand",
+        notes: "Primary weapon",
+        reason: "The player equips the longsword.",
+      }),
+    ).toEqual({
+      type: "inventory.configure",
+      actorId: "hero-1",
+      inventoryId: "longsword-stack",
+      location: "carried",
+      equippedSlot: "main_hand",
+      notes: "Primary weapon",
+      reason: "The player equips the longsword.",
+    });
+  });
+
+  it("rejects invalid or empty inventory arrangement commands", () => {
+    expect(() =>
+      gameCommandSchema.parse({
+        type: "inventory.configure",
+        actorId: "hero-1",
+        inventoryId: "longsword-stack",
+        reason: "Nothing changed.",
+      }),
+    ).toThrow();
+
+    expect(() =>
+      gameCommandSchema.parse({
+        type: "inventory.configure",
+        actorId: "hero-1",
+        inventoryId: "longsword-stack",
+        equippedSlot: "backpack_strap",
+        reason: "Invalid slot.",
+      }),
+    ).toThrow();
+  });
 });

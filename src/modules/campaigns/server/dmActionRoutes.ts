@@ -306,9 +306,9 @@ function scheduleIfEvent(
 function scheduleResult(
   c: { env: Bindings; executionCtx: { waitUntil(promise: Promise<unknown>): void } },
   campaignId: string,
-  result: GameCommandResult | null,
+  result: GameCommandResult,
 ): void {
-  if (result) scheduleIfEvent(c, campaignId, result.value);
+  scheduleIfEvent(c, campaignId, result.value);
 }
 
 function translateResolutionError(error: unknown): never {
@@ -392,11 +392,10 @@ export const campaignDmActionRoutes = new Hono<Env>()
             characterId: origin.characterId,
             playerAction: playerMessage.content,
             seedAuthoritativeResults: [resolved.result.value],
+            onCommittedResult: (result) => scheduleResult(c, campaignId, result),
           });
           if (turn) {
             finalDecision = turn.decision;
-            for (const result of turn.commandResults) scheduleResult(c, campaignId, result);
-            scheduleResult(c, campaignId, turn.alignmentResult);
             content = turn.decision.kind === "check" ? turn.decision.preface : turn.decision.text;
           }
         } catch (error) {

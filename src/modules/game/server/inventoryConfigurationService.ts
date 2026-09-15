@@ -2,7 +2,7 @@
 
 import type { Database } from "@/infrastructure/database/client";
 import type { EquipmentSlot } from "@/infrastructure/database/schema/dnd35/primitives";
-import { loadActiveGameContext } from "./d1Dnd35State";
+import { loadPlayableGameContext } from "./playableGameContext";
 
 export interface InventoryConfigurationDependencies {
   db: Database;
@@ -70,7 +70,11 @@ export async function configureCharacterInventory(
   deps: InventoryConfigurationDependencies,
   input: ConfigureCharacterInventoryInput,
 ) {
-  const context = await loadActiveGameContext(deps.db, input.campaignId);
+  // Inventory arrangement is a sheet-management operation rather than an
+  // in-turn rules action. Preserve the existing ability to organize gear while
+  // a campaign is paused, but still require a started campaign with its live
+  // session/world so every change remains event-sourced and auditable.
+  const context = await loadPlayableGameContext(deps.db, input.campaignId);
   if (!context) throw new Error("CAMPAIGN_GAME_NOT_ACTIVE");
   if (context.rulesetId !== "dnd35" || context.rulesetVersion !== "3.5") {
     throw new Error("CAMPAIGN_RULESET_UNSUPPORTED");

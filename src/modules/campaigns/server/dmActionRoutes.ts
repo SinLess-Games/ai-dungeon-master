@@ -259,17 +259,18 @@ function pendingArguments(
   decision: Extract<DmTurnDecision, { kind: "check" }>,
   context: Awaited<ReturnType<typeof loadDmCharacterContext>>,
 ): CampaignDmActionArguments {
-  if (decision.check.type === "check.save") {
+  const check = decision.check;
+  if (check.type === "check.save") {
     return {
       type: "check.save",
-      save: decision.check.save,
-      dc: decision.check.dc,
-      reason: decision.check.reason,
+      save: check.save,
+      dc: check.dc,
+      reason: check.reason,
     };
   }
-  const specialization = decision.check.specialization ?? "";
+  const specialization = check.specialization ?? "";
   const skill = context?.skills.find(
-    (option) => option.id === decision.check.skillId && option.specialization === specialization,
+    (option) => option.id === check.skillId && option.specialization === specialization,
   );
   if (!skill) throw new Error("AI_DM_REQUESTED_UNAVAILABLE_SKILL");
   return {
@@ -277,8 +278,8 @@ function pendingArguments(
     skillId: skill.id,
     skillName: skill.name,
     ...(skill.specialization ? { specialization: skill.specialization } : {}),
-    dc: decision.check.dc,
-    reason: decision.check.reason,
+    dc: check.dc,
+    reason: check.reason,
   };
 }
 

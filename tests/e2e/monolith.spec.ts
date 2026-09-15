@@ -55,20 +55,29 @@ test("service status handles an outage and can recover from a failed request", a
   await page.route("**/api/health", (route) =>
     route.fulfill({
       status: 503,
-      json: { status: "unhealthy", timestamp: new Date().toISOString() },
+      json: { status: "unhealthy", timestamp: "2026-09-15T01:00:00.000Z" },
     }),
   );
   await page.goto("/status");
   await expect(
     page.getByText("The service is temporarily unavailable", { exact: true }),
   ).toBeVisible();
+
   await page.unroute("**/api/health");
   await page.route("**/api/health", (route) =>
     route.fulfill({ status: 500, json: { error: "Test failure" } }),
   );
   await page.getByRole("button", { name: "Check again" }).click();
   await expect(page.getByText("We couldn’t check the service. Please try again.")).toBeVisible();
+
   await page.unroute("**/api/health");
+  await page.route("**/api/health", (route) =>
+    route.fulfill({
+      status: 200,
+      json: { status: "healthy", timestamp: "2026-09-15T01:01:00.000Z" },
+    }),
+  );
   await page.getByRole("button", { name: "Check again" }).click();
+  await expect(page.getByText("All systems operational", { exact: true })).toBeVisible();
   await expect(page.getByText("Last checked", { exact: false })).toBeVisible();
 });

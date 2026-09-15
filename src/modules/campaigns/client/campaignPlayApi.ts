@@ -382,7 +382,10 @@ export interface SendCampaignPlayMessageResult {
 
 export interface ResolveCampaignDmActionResult {
   action: CampaignDmAction;
-  result: { type: "check.skill" | "check.save" | "encounter.start"; value: unknown };
+  result: {
+    type: "check.skill" | "check.save" | "check.initiative" | "encounter.start";
+    value: unknown;
+  };
   dmMessage: CampaignPlayMessage;
   /** A resolved check may immediately lead to another player-supplied check. */
   pendingAction: CampaignDmAction | null;

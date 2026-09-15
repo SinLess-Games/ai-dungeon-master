@@ -64,31 +64,33 @@ export function CampaignDmCheckRequest({
   }
 
   return (
-    <section className="border-t border-gold/25 bg-gold/5 px-4 py-4">
-      <div className="mx-auto max-w-3xl rounded-xl border border-gold/35 bg-card/95 p-4 shadow-lg shadow-black/10">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-sm font-semibold text-gold">
-              <ShieldQuestion className="h-4 w-4" /> Dungeon Master requests a roll
+    <section className="border-t border-gold/20 bg-gold/5 px-3 py-2">
+      <div className="mx-auto max-w-2xl rounded-lg border border-gold/30 bg-card/95 px-3 py-2.5 shadow-sm shadow-black/10">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-gold">
+              <ShieldQuestion className="h-3.5 w-3.5" /> DM check
             </div>
-            <h3 className="mt-1 font-display text-xl">{actionLabel(action)}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{action.reason}</p>
+            <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <h3 className="font-display text-base leading-tight">{actionLabel(action)}</h3>
+              <p className="min-w-0 text-xs leading-4 text-muted-foreground">{action.reason}</p>
+            </div>
           </div>
-          <span className="shrink-0 rounded-lg border border-gold/30 bg-gold/10 px-3 py-1.5 text-sm font-bold text-gold">
+          <span className="shrink-0 rounded-md border border-gold/30 bg-gold/10 px-2 py-1 text-xs font-bold text-gold">
             DC {action.dc}
           </span>
         </div>
 
         {action.error ? (
-          <p className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          <p className="mt-2 rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1.5 text-[11px] text-destructive">
             The last resolution attempt failed: {action.error}
           </p>
         ) : null}
 
-        <div className="mt-4 flex flex-wrap items-end gap-2">
-          <label className="min-w-28 flex-1 sm:max-w-36">
-            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Natural d20
+        <div className="mt-2 flex flex-wrap items-end gap-1.5">
+          <label className="w-20 shrink-0">
+            <span className="mb-0.5 block text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
+              d20
             </span>
             <input
               type="number"
@@ -98,7 +100,7 @@ export function CampaignDmCheckRequest({
               value={rollText}
               disabled={rollInputLocked}
               onChange={(event) => setRollText(event.target.value)}
-              className="h-10 w-full rounded-lg border border-border bg-background px-3 text-center text-lg font-bold outline-none transition focus:border-gold/50 disabled:opacity-50"
+              className="h-8 w-full rounded-md border border-border bg-background px-2 text-center text-sm font-bold outline-none transition focus:border-gold/50 disabled:opacity-50"
               aria-label="Natural d20 roll"
             />
           </label>
@@ -106,28 +108,27 @@ export function CampaignDmCheckRequest({
             type="button"
             disabled={resolving || rolledWithButton || lockedRoll !== null}
             onClick={rollD20}
-            className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-semibold transition hover:border-gold/40 hover:text-gold disabled:opacity-50"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-semibold transition hover:border-gold/40 hover:text-gold disabled:opacity-50"
           >
-            <Dice5 className="h-4 w-4" /> {rolledWithButton ? "Rolled" : "Roll d20"}
+            <Dice5 className="h-3.5 w-3.5" /> {rolledWithButton ? "Rolled" : "Roll"}
           </button>
           <button
             type="button"
             disabled={resolving || !validRoll}
             onClick={submitRoll}
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {resolving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Dice5 className="h-4 w-4" />}
+            {resolving ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Dice5 className="h-3.5 w-3.5" />}
             {resolving
               ? "Resolving…"
               : action.error && lockedRoll !== null
                 ? "Retry same roll"
-                : "Submit roll"}
+                : "Submit"}
           </button>
+          <p className="min-w-48 flex-1 text-[10px] leading-4 text-muted-foreground">
+            One natural d20 per requested check. Modifiers and success are resolved by the rules engine.
+          </p>
         </div>
-
-        <p className="mt-3 text-[11px] leading-5 text-muted-foreground">
-          The number you submit is the natural d20. Your character modifiers, DC, and success or failure are resolved by the authoritative rules engine. Each requested check gets one roll; retries reuse that same natural result.
-        </p>
       </div>
     </section>
   );

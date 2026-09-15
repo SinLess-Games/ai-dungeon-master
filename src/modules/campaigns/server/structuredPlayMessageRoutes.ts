@@ -38,7 +38,10 @@ import {
   campaignDmNarrationViolation,
 } from "./dmCampaignChatPolicy";
 import { loadDmSystemReferences, serializeDmSystemReferences } from "./dmSystemReferencePlanner";
-import { runStructuredDmTurn } from "./dmTurnOrchestrator";
+import {
+  runStructuredDmTurn,
+  type PendingInitiativeRequest,
+} from "./dmTurnOrchestrator";
 import { loadDmConversationText, loadRecentDmEvents } from "./dmTurnRuntime";
 import type { DmTurnDecision } from "./dmToolPlanner";
 
@@ -389,6 +392,14 @@ function pendingArguments(
   };
 }
 
+function initiativeArguments(request: PendingInitiativeRequest): CampaignDmActionArguments {
+  return {
+    type: "check.initiative",
+    participantIds: [...request.participantIds],
+    reason: request.reason,
+  };
+}
+
 function scheduleResult(
   c: { env: Bindings; executionCtx: { waitUntil(promise: Promise<unknown>): void } },
   campaignId: string,
@@ -489,6 +500,7 @@ export const structuredPlayMessageRoutes = new Hono<Env>().post(
           try {
             let reply: string;
             let decision: Extract<DmTurnDecision, { kind: "narration" | "check" }> | null = null;
+            let pendingInitiative: PendingInitiativeRequest | null = null;
             if (input.channel === "campaign" && input.characterId && campaign.status === "active") {
               const structured = await runStructuredDmTurn({
                 env: c.env,
@@ -503,12 +515,14 @@ export const structuredPlayMessageRoutes = new Hono<Env>().post(
                 },
                 userId: session.user.id,
                 characterId: input.characterId,
+                playerMessageId: playerId,
                 playerAction: messageContent,
                 ...(stream ? { signal: stream.signal } : {}),
                 onCommittedResult: (result) => scheduleResult(c, campaignId, result),
               });
               if (structured) {
                 decision = structured.decision;
+                pendingInitiative = structured.pendingInitiative;
                 reply = decision.kind === "check" ? decision.preface : decision.text;
                 if (stream && decision.kind === "narration") {
                   reply = await streamDmNarration(c.env, reply, stream);
@@ -552,7 +566,7 @@ export const structuredPlayMessageRoutes = new Hono<Env>().post(
             });
             dmMessage = await getMessage(db, dmId);
 
-            if (decision?.kind === "check" && input.characterId) {
+            if ((pendingInitiative || decision?.kind === "check") && input.characterId) {
               const context = await loadDmCharacterContext(
                 db,
                 campaignId,
@@ -567,7 +581,9 @@ export const structuredPlayMessageRoutes = new Hono<Env>().post(
                 requestedUserId: session.user.id,
                 characterId: input.characterId,
                 actorId: context.character.actorId,
-                arguments: pendingArguments(decision, context),
+                arguments: pendingInitiative
+                  ? initiativeArguments(pendingInitiative)
+                  : pendingArguments(decision!, context),
               });
             }
           } catch (error) {

@@ -94,10 +94,13 @@ describe("live character sheet encumbrance", () => {
     expect(state.runMultiplier).toBe(4);
   });
 
-  it("generalizes the armor movement progression to 20-foot base speeds", () => {
+  it("matches the armor movement progression across common racial base speeds", () => {
     const profile = encumbrancePenaltyProfile("medium");
     expect(encumberedLandSpeed(20, profile)).toBe(15);
     expect(encumberedLandSpeed(30, profile)).toBe(20);
+    expect(encumberedLandSpeed(40, profile)).toBe(30);
+    expect(encumberedLandSpeed(50, profile)).toBe(35);
+    expect(encumberedLandSpeed(60, profile)).toBe(40);
   });
 
   it("uses the worse armor and encumbrance restriction rather than adding them", () => {

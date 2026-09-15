@@ -1,3 +1,5 @@
+import { offlineRequestJson } from "@/infrastructure/offline";
+
 export type AbilityKey = "str" | "dex" | "con" | "int" | "wis" | "cha";
 export type Alignment = "LG" | "NG" | "CG" | "LN" | "N" | "CN" | "LE" | "NE" | "CE";
 export type ProgressionMode = "standard" | "gestalt";
@@ -305,22 +307,8 @@ export interface CharacterLibraryItem {
   classes: Array<{ track: number; characterLevel: number; className: string }>;
 }
 
-interface ErrorEnvelope { error?: string | { message?: string }; message?: string }
-
 export async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
-  const response = await fetch(input, { credentials: "same-origin", headers: { "Content-Type": "application/json", ...init?.headers }, ...init });
-  if (!response.ok) {
-    let message = `Request failed (${response.status}).`;
-    try {
-      const body = (await response.json()) as ErrorEnvelope;
-      if (typeof body.error === "string") message = body.error;
-      else if (body.error?.message) message = body.error.message;
-      else if (body.message) message = body.message;
-    } catch { /* Preserve the HTTP fallback. */ }
-    throw new Error(message);
-  }
-  const text = await response.text();
-  return (text ? JSON.parse(text) : null) as T;
+  return offlineRequestJson<T>(input, init);
 }
 
 const characterPath = (characterId: string, suffix = "") => `/api/characters/${encodeURIComponent(characterId)}${suffix}`;
@@ -339,7 +327,7 @@ export function createSoloCampaign(name: string): Promise<CampaignSummary> {
 }
 export function getCharacterCreationOptions(): Promise<CharacterCreationOptions> { return requestJson<CharacterCreationOptions>("/api/dnd35/character-creation-options"); }
 export function rollAbilityScores(method: "roll-4d6-drop-lowest" | "roll-4d6-reroll-1-2") {
-  return requestJson<{ method: string; scores: number[]; rolls: number[][] }>("/api/dnd35/ability-generation/roll", { method: "POST", body: JSON.stringify({ method }) });
+  return offlineRequestJson<{ method: string; scores: number[]; rolls: number[][] }>("/api/dnd35/ability-generation/roll", { method: "POST", body: JSON.stringify({ method }) }, { queueWhenOffline: false, onlineOnlyMessage: "Reconnect before rolling ability scores so the authoritative dice result can be recorded." });
 }
 
 export async function createCharacterFoundation(input: {
@@ -398,7 +386,7 @@ export async function getFeats(id: string): Promise<FeatPage> {
 export const saveFeats = (id: string, input: { levelFeats: FeatSelection[]; racialBonusFeats: FeatSelection[]; classBonusFeats: ClassFeatSelection[] }) => requestJson(characterPath(id, "/feats"), { method: "PUT", body: JSON.stringify(input) });
 
 export const getEquipment = (id: string) => requestJson<EquipmentPage>(characterPath(id, "/creation/equipment"));
-export const rollStartingWealth = (id: string) => requestJson<{ startingWealthCopper?: number; startingGoldPieces?: number; wealth?: WealthRow; alreadyRolled?: boolean }>(characterPath(id, "/starting-wealth/roll"), { method: "POST" });
+export const rollStartingWealth = (id: string) => offlineRequestJson<{ startingWealthCopper?: number; startingGoldPieces?: number; wealth?: WealthRow; alreadyRolled?: boolean }>(characterPath(id, "/starting-wealth/roll"), { method: "POST" }, { queueWhenOffline: false, onlineOnlyMessage: "Reconnect before rolling starting wealth so the authoritative roll can be recorded." });
 export const saveEquipment = (id: string, selections: Array<{ itemId: string; quantity: number }>) => requestJson<{ spentCopper: number; remainingCopper: number }>(characterPath(id, "/equipment"), { method: "PUT", body: JSON.stringify({ selections }) });
 
 export const getSpells = (id: string) => requestJson<SpellPage>(characterPath(id, "/creation/spells"));
@@ -431,5 +419,5 @@ export const saveDivine = (id: string, deityId: string | null, domainIds: string
 export const getCompanions = (id: string) => requestJson<CompanionPage>(characterPath(id, "/creation/companions"));
 export const saveCompanion = (id: string, creatureName: string | null, name?: string, selections?: Array<{ track: 1 | 2; creatureName: string | null; name?: string }>) => requestJson(characterPath(id, "/companions"), { method: "PUT", body: JSON.stringify(selections ? { selections } : { creatureName, ...(name?.trim() ? { name: name.trim() } : {}) }) });
 export const getReadiness = (id: string) => requestJson<ReadinessPage>(characterPath(id, "/creation/readiness"));
-export const finalizeCharacter = (id: string) => requestJson<ReadyResult>(characterPath(id, "/ready"), { method: "POST" });
+export const finalizeCharacter = (id: string) => offlineRequestJson<ReadyResult>(characterPath(id, "/ready"), { method: "POST" }, { queueWhenOffline: false, onlineOnlyMessage: "Reconnect before finalizing the character so readiness and hit points are validated authoritatively." });
 export const listCharacters = async () => (await requestJson<{ items: CharacterLibraryItem[] }>("/api/characters")).items;

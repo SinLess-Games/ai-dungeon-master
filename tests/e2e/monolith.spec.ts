@@ -6,7 +6,7 @@ test("React navigation and Hono requests share one origin, including a deep-link
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
-  await expect(page).toHaveTitle("Endless Codex");
+  await expect(page).toHaveTitle("The Endless Codex — AI-Powered D&D 3.5 Adventures");
   await expect(
     page.getByRole("heading", { name: "Infinite Stories Always Within Reach", exact: true }),
   ).toBeVisible();

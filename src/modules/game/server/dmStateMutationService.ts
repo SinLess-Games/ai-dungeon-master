@@ -33,33 +33,33 @@ interface AlignmentStateRow {
   goodEvilScore: number;
 }
 
-function id(deps: DmStateMutationDependencies): string {
+function createId(deps: DmStateMutationDependencies): string {
   return deps.createId?.() ?? crypto.randomUUID();
 }
 
-function now(deps: DmStateMutationDependencies): Date {
+function currentTime(deps: DmStateMutationDependencies): Date {
   return deps.now?.() ?? new Date();
 }
 
-function changes(result: D1Result<unknown> | undefined): number {
+function changed(result: D1Result<unknown> | undefined): number {
   return result?.meta?.changes ?? 0;
 }
 
-function shouldRetry(error: unknown): boolean {
+function sequenceConflict(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return /game_events_campaign_sequence_uidx|UNIQUE constraint failed: game_events\.campaign_id, game_events\.sequence/i.test(
     message,
   );
 }
 
-function eventStatement(
-  db: D1Database,
+function gameEventStatement(
+  binding: D1Database,
   event: GameEventWrite,
   guardSql = "1 = 1",
   guardBindings: readonly unknown[] = [],
 ): D1PreparedStatement {
   const timestamp = Math.floor(event.occurredAt.getTime() / 1000);
-  return db
+  return binding
     .prepare(
       `INSERT INTO game_events (
         id, campaign_id, session_id, sequence, event_type, occurred_at,
@@ -87,6 +87,23 @@ function eventStatement(
     );
 }
 
+async function commitGuarded(
+  binding: D1Database,
+  statements: readonly D1PreparedStatement[],
+  requiredChangedIndexes: readonly number[],
+): Promise<boolean> {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const results = await binding.batch([...statements]);
+      return requiredChangedIndexes.every((index) => changed(results[index]) === 1);
+    } catch (error) {
+      if (attempt === 0 && sequenceConflict(error)) continue;
+      throw error;
+    }
+  }
+  return false;
+}
+
 async function requireContext(deps: DmStateMutationDependencies, campaignId: string) {
   const context = await loadActiveGameContext(deps.db, campaignId);
   if (!context) throw new Error("CAMPAIGN_GAME_NOT_ACTIVE");
@@ -103,13 +120,13 @@ async function requireCharacterActor(
 ): Promise<CharacterActorRow> {
   const row = await deps.binding
     .prepare(
-      `SELECT a.id AS actorId, a.character_id AS characterId, a.name
-       FROM game_actors a
-       WHERE a.id = ?
-         AND a.campaign_id = ?
-         AND a.kind = 'character'
-         AND a.character_id IS NOT NULL
-         AND a.status = 'active'
+      `SELECT id AS actorId, character_id AS characterId, name
+       FROM game_actors
+       WHERE id = ?
+         AND campaign_id = ?
+         AND kind = 'character'
+         AND character_id IS NOT NULL
+         AND status = 'active'
        LIMIT 1`,
     )
     .bind(actorId, campaignId)
@@ -118,24 +135,7 @@ async function requireCharacterActor(
   return row;
 }
 
-async function commitBatch(
-  binding: D1Database,
-  statements: D1PreparedStatement[],
-  expectedChangedIndexes: readonly number[],
-): Promise<boolean> {
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      const results = await binding.batch(statements);
-      return expectedChangedIndexes.every((index) => changes(results[index]) === 1);
-    } catch (error) {
-      if (attempt === 0 && shouldRetry(error)) continue;
-      throw error;
-    }
-  }
-  return false;
-}
-
-export async function applyDirectActorDamage(
+async function applyActorHealthChange(
   deps: DmStateMutationDependencies,
   input: {
     campaignId: string;
@@ -143,10 +143,11 @@ export async function applyDirectActorDamage(
     amount: number;
     sourceActorId?: string;
     reason: string;
+    mode: "damage" | "heal";
   },
 ) {
   if (!Number.isSafeInteger(input.amount) || input.amount < 0) {
-    throw new RangeError("Damage must be a non-negative safe integer.");
+    throw new RangeError(`${input.mode === "damage" ? "Damage" : "Healing"} must be a non-negative safe integer.`);
   }
   const context = await requireContext(deps, input.campaignId);
   const defense = await loadActorDefenseSnapshot({
@@ -155,125 +156,70 @@ export async function applyDirectActorDamage(
     actorId: input.targetId,
   });
   if (!defense) throw new Error("GAME_TARGET_HEALTH_UNAVAILABLE");
-  const application = applyLethalDamage(defense.health, input.amount);
-  const eventId = id(deps);
-  const event: GameEventWrite = {
-    id: eventId,
-    campaignId: context.campaignId,
-    sessionId: context.sessionId,
-    eventType: "health.damage",
-    occurredAt: now(deps),
-    actorId: input.sourceActorId ?? null,
-    targetIds: [input.targetId],
-    payload: {
-      amount: input.amount,
-      reason: input.reason,
-      absorbedByTemporaryHitPoints: application.absorbedByTemporaryHitPoints,
-      hitPointDamage: application.hitPointDamage,
-      healthState: consciousnessState(application.after),
-    },
-    deltas: [
-      {
-        id: `${eventId}:hp`,
-        entityId: input.targetId,
-        path: ["dnd35", "currentHitPoints"],
-        before: defense.health.currentHitPoints,
-        after: application.after.currentHitPoints,
-        reason: input.reason,
-      },
-      {
-        id: `${eventId}:temp-hp`,
-        entityId: input.targetId,
-        path: ["dnd35", "temporaryHitPoints"],
-        before: defense.health.temporaryHitPoints,
-        after: application.after.temporaryHitPoints,
-        reason: input.reason,
-      },
-    ],
-  };
-  const persisted = await new D1ActorHealthStore(deps.binding).commit({
-    event,
-    health: {
-      actorId: input.targetId,
-      kind: defense.healthKind,
-      expected: {
-        currentHitPoints: defense.health.currentHitPoints,
-        temporaryHitPoints: defense.health.temporaryHitPoints,
-        nonlethalDamage: defense.health.nonlethalDamage,
-        stable: defense.health.stable,
-      },
-      next: {
-        currentHitPoints: application.after.currentHitPoints,
-        temporaryHitPoints: application.after.temporaryHitPoints,
-        nonlethalDamage: application.after.nonlethalDamage,
-        stable: application.after.stable,
-      },
-    },
-  });
-  if (!persisted) throw new Error("GAME_STATE_CONFLICT");
-  return {
-    eventId,
-    sessionId: context.sessionId,
-    amount: input.amount,
-    before: defense.health,
-    after: application.after,
-  };
-}
 
-export async function applyDirectActorHealing(
-  deps: DmStateMutationDependencies,
-  input: {
-    campaignId: string;
-    targetId: string;
-    amount: number;
-    sourceActorId?: string;
-    reason: string;
-  },
-) {
-  if (!Number.isSafeInteger(input.amount) || input.amount < 0) {
-    throw new RangeError("Healing must be a non-negative safe integer.");
-  }
-  const context = await requireContext(deps, input.campaignId);
-  const defense = await loadActorDefenseSnapshot({
-    db: deps.db,
-    campaignId: input.campaignId,
-    actorId: input.targetId,
-  });
-  if (!defense) throw new Error("GAME_TARGET_HEALTH_UNAVAILABLE");
-  const after = applyHealing(defense.health, input.amount);
-  const eventId = id(deps);
+  const application =
+    input.mode === "damage" ? applyLethalDamage(defense.health, input.amount) : null;
+  const after = application ? application.after : applyHealing(defense.health, input.amount);
+  const eventId = createId(deps);
   const event: GameEventWrite = {
     id: eventId,
     campaignId: context.campaignId,
     sessionId: context.sessionId,
-    eventType: "health.healing",
-    occurredAt: now(deps),
+    eventType: input.mode === "damage" ? "health.damage" : "health.healing",
+    occurredAt: currentTime(deps),
     actorId: input.sourceActorId ?? null,
     targetIds: [input.targetId],
     payload: {
       amount: input.amount,
       reason: input.reason,
       healthState: consciousnessState(after),
+      ...(application
+        ? {
+            absorbedByTemporaryHitPoints: application.absorbedByTemporaryHitPoints,
+            hitPointDamage: application.hitPointDamage,
+          }
+        : {}),
     },
     deltas: [
-      {
-        id: `${eventId}:hp`,
-        entityId: input.targetId,
-        path: ["dnd35", "currentHitPoints"],
-        before: defense.health.currentHitPoints,
-        after: after.currentHitPoints,
-        reason: input.reason,
-      },
-      {
-        id: `${eventId}:nonlethal`,
-        entityId: input.targetId,
-        path: ["dnd35", "nonlethalDamage"],
-        before: defense.health.nonlethalDamage,
-        after: after.nonlethalDamage,
-        reason: input.reason,
-      },
+      ...(defense.health.currentHitPoints === after.currentHitPoints
+        ? []
+        : [
+            {
+              id: `${eventId}:hp`,
+              entityId: input.targetId,
+              path: ["dnd35", "currentHitPoints"],
+              before: defense.health.currentHitPoints,
+              after: after.currentHitPoints,
+              reason: input.reason,
+            },
+          ]),
+      ...(defense.health.temporaryHitPoints === after.temporaryHitPoints
+        ? []
+        : [
+            {
+              id: `${eventId}:temp-hp`,
+              entityId: input.targetId,
+              path: ["dnd35", "temporaryHitPoints"],
+              before: defense.health.temporaryHitPoints,
+              after: after.temporaryHitPoints,
+              reason: input.reason,
+            },
+          ]),
+      ...(defense.health.nonlethalDamage === after.nonlethalDamage
+        ? []
+        : [
+            {
+              id: `${eventId}:nonlethal`,
+              entityId: input.targetId,
+              path: ["dnd35", "nonlethalDamage"],
+              before: defense.health.nonlethalDamage,
+              after: after.nonlethalDamage,
+              reason: input.reason,
+            },
+          ]),
     ],
   };
+
   const persisted = await new D1ActorHealthStore(deps.binding).commit({
     event,
     health: {
@@ -294,7 +240,39 @@ export async function applyDirectActorHealing(
     },
   });
   if (!persisted) throw new Error("GAME_STATE_CONFLICT");
-  return { eventId, sessionId: context.sessionId, amount: input.amount, before: defense.health, after };
+  return {
+    eventId,
+    sessionId: context.sessionId,
+    amount: input.amount,
+    before: defense.health,
+    after,
+  };
+}
+
+export function applyDirectActorDamage(
+  deps: DmStateMutationDependencies,
+  input: {
+    campaignId: string;
+    targetId: string;
+    amount: number;
+    sourceActorId?: string;
+    reason: string;
+  },
+) {
+  return applyActorHealthChange(deps, { ...input, mode: "damage" });
+}
+
+export function applyDirectActorHealing(
+  deps: DmStateMutationDependencies,
+  input: {
+    campaignId: string;
+    targetId: string;
+    amount: number;
+    sourceActorId?: string;
+    reason: string;
+  },
+) {
+  return applyActorHealthChange(deps, { ...input, mode: "heal" });
 }
 
 export async function applyActorCondition(
@@ -322,11 +300,15 @@ export async function applyActorCondition(
   if (input.durationKind === "until_time" && !input.expiresAt) {
     throw new RangeError("Time-based conditions require an expiration time.");
   }
+  if (input.durationKind !== "until_time" && input.expiresAt) {
+    throw new RangeError("expiresAt is only valid for time-based conditions.");
+  }
 
   const [actor, condition] = await Promise.all([
     deps.binding
       .prepare(
-        `SELECT id FROM game_actors
+        `SELECT id
+         FROM game_actors
          WHERE id = ? AND campaign_id = ? AND status = 'active'
          LIMIT 1`,
       )
@@ -334,8 +316,9 @@ export async function applyActorCondition(
       .first<{ id: string }>(),
     deps.binding
       .prepare(
-        `SELECT id, stacking FROM dnd35_conditions
-         WHERE id = ? AND is_enabled = 1
+        `SELECT id, stacking
+         FROM dnd35_conditions
+         WHERE id = ? AND is_enabled = 1 AND owner_user_id IS NULL
          LIMIT 1`,
       )
       .bind(input.conditionId)
@@ -350,14 +333,17 @@ export async function applyActorCondition(
   if (input.durationKind === "rounds" && input.remainingRounds !== undefined) {
     const encounter = await deps.binding
       .prepare(
-        `SELECT e.id, e.round_number AS roundNumber, e.active_turn_index AS activeTurnIndex
-         FROM game_encounters e
-         JOIN game_encounter_participants p ON p.encounter_id = e.id
-         WHERE e.campaign_id = ?
-           AND e.session_id = ?
-           AND e.status = 'active'
-           AND p.actor_id = ?
-           AND p.status = 'active'
+        `SELECT encounter.id,
+                encounter.round_number AS roundNumber,
+                encounter.active_turn_index AS activeTurnIndex
+         FROM game_encounters encounter
+         JOIN game_encounter_participants participant
+           ON participant.encounter_id = encounter.id
+         WHERE encounter.campaign_id = ?
+           AND encounter.session_id = ?
+           AND encounter.status = 'active'
+           AND participant.actor_id = ?
+           AND participant.status = 'active'
          LIMIT 1`,
       )
       .bind(input.campaignId, context.sessionId, input.targetId)
@@ -374,9 +360,9 @@ export async function applyActorCondition(
     }
   }
 
-  const eventId = id(deps);
-  const conditionRuntimeId = id(deps);
-  const occurredAt = now(deps);
+  const eventId = createId(deps);
+  const conditionRuntimeId = createId(deps);
+  const occurredAt = currentTime(deps);
   const timestamp = Math.floor(occurredAt.getTime() / 1000);
   const event: GameEventWrite = {
     id: eventId,
@@ -399,10 +385,14 @@ export async function applyActorCondition(
       reason: input.reason,
     },
   };
-  const guardSql =
-    "EXISTS (SELECT 1 FROM game_actors WHERE id = ? AND campaign_id = ? AND status = 'active') AND EXISTS (SELECT 1 FROM dnd35_conditions WHERE id = ? AND is_enabled = 1)";
+  const eventGuard =
+    "EXISTS (SELECT 1 FROM game_actors WHERE id = ? AND campaign_id = ? AND status = 'active') AND EXISTS (SELECT 1 FROM dnd35_conditions WHERE id = ? AND is_enabled = 1 AND owner_user_id IS NULL)";
   const statements: D1PreparedStatement[] = [
-    eventStatement(deps.binding, event, guardSql, [input.targetId, input.campaignId, input.conditionId]),
+    gameEventStatement(deps.binding, event, eventGuard, [
+      input.targetId,
+      input.campaignId,
+      input.conditionId,
+    ]),
   ];
   if (condition.stacking === "replace") {
     statements.push(
@@ -415,6 +405,7 @@ export async function applyActorCondition(
         .bind(input.targetId, input.conditionId, eventId),
     );
   }
+  const insertIndex = statements.length;
   statements.push(
     deps.binding
       .prepare(
@@ -443,8 +434,7 @@ export async function applyActorCondition(
         eventId,
       ),
   );
-  const expected = condition.stacking === "replace" ? [0, 2] : [0, 1];
-  const persisted = await commitBatch(deps.binding, statements, expected);
+  const persisted = await commitGuarded(deps.binding, statements, [0, insertIndex]);
   if (!persisted) throw new Error("GAME_STATE_CONFLICT");
   return {
     eventId,
@@ -457,7 +447,12 @@ export async function applyActorCondition(
 
 export async function removeActorCondition(
   deps: DmStateMutationDependencies,
-  input: { campaignId: string; runtimeConditionId: string; reason: string; sourceActorId?: string },
+  input: {
+    campaignId: string;
+    runtimeConditionId: string;
+    reason: string;
+    sourceActorId?: string;
+  },
 ) {
   const context = await requireContext(deps, input.campaignId);
   const condition = await deps.binding
@@ -474,13 +469,13 @@ export async function removeActorCondition(
     .first<{ id: string; actorId: string; conditionId: string }>();
   if (!condition) throw new Error("GAME_CONDITION_INSTANCE_NOT_FOUND");
 
-  const eventId = id(deps);
+  const eventId = createId(deps);
   const event: GameEventWrite = {
     id: eventId,
     campaignId: context.campaignId,
     sessionId: context.sessionId,
     eventType: "condition.removed",
-    occurredAt: now(deps),
+    occurredAt: currentTime(deps),
     actorId: input.sourceActorId ?? null,
     sourceId: condition.conditionId,
     targetIds: [condition.actorId],
@@ -490,12 +485,15 @@ export async function removeActorCondition(
       reason: input.reason,
     },
   };
-  const guardSql =
-    "EXISTS (SELECT 1 FROM runtime_dnd35_actor_conditions WHERE id = ? AND actor_id = ?)";
-  const persisted = await commitBatch(
+  const persisted = await commitGuarded(
     deps.binding,
     [
-      eventStatement(deps.binding, event, guardSql, [condition.id, condition.actorId]),
+      gameEventStatement(
+        deps.binding,
+        event,
+        "EXISTS (SELECT 1 FROM runtime_dnd35_actor_conditions WHERE id = ? AND actor_id = ?)",
+        [condition.id, condition.actorId],
+      ),
       deps.binding
         .prepare(
           `DELETE FROM runtime_dnd35_actor_conditions
@@ -530,18 +528,26 @@ export async function grantCharacterExperience(
     .first<{ experiencePoints: number }>();
   if (!state) throw new Error("GAME_CHARACTER_STATE_NOT_FOUND");
   const next = state.experiencePoints + input.amount;
-  if (!Number.isSafeInteger(next)) throw new RangeError("Experience total exceeds the safe integer range.");
+  if (!Number.isSafeInteger(next)) {
+    throw new RangeError("Experience total exceeds the safe integer range.");
+  }
 
-  const eventId = id(deps);
+  const eventId = createId(deps);
+  const occurredAt = currentTime(deps);
   const event: GameEventWrite = {
     id: eventId,
     campaignId: context.campaignId,
     sessionId: context.sessionId,
     eventType: "progression.xp.granted",
-    occurredAt: now(deps),
+    occurredAt,
     actorId: input.actorId,
     targetIds: [input.actorId],
-    payload: { amount: input.amount, before: state.experiencePoints, after: next, reason: input.reason },
+    payload: {
+      amount: input.amount,
+      before: state.experiencePoints,
+      after: next,
+      reason: input.reason,
+    },
     deltas: [
       {
         id: `${eventId}:xp`,
@@ -553,12 +559,15 @@ export async function grantCharacterExperience(
       },
     ],
   };
-  const guardSql =
-    "EXISTS (SELECT 1 FROM dnd35_characters WHERE character_id = ? AND experience_points = ?)";
-  const persisted = await commitBatch(
+  const persisted = await commitGuarded(
     deps.binding,
     [
-      eventStatement(deps.binding, event, guardSql, [actor.characterId, state.experiencePoints]),
+      gameEventStatement(
+        deps.binding,
+        event,
+        "EXISTS (SELECT 1 FROM dnd35_characters WHERE character_id = ? AND experience_points = ?)",
+        [actor.characterId, state.experiencePoints],
+      ),
       deps.binding
         .prepare(
           `UPDATE dnd35_characters
@@ -566,12 +575,25 @@ export async function grantCharacterExperience(
            WHERE character_id = ? AND experience_points = ?
              AND EXISTS (SELECT 1 FROM game_events WHERE id = ?)`,
         )
-        .bind(next, Math.floor(event.occurredAt.getTime() / 1000), actor.characterId, state.experiencePoints, eventId),
+        .bind(
+          next,
+          Math.floor(occurredAt.getTime() / 1000),
+          actor.characterId,
+          state.experiencePoints,
+          eventId,
+        ),
     ],
     [0, 1],
   );
   if (!persisted) throw new Error("GAME_STATE_CONFLICT");
-  return { eventId, sessionId: context.sessionId, characterId: actor.characterId, before: state.experiencePoints, after: next, amount: input.amount };
+  return {
+    eventId,
+    sessionId: context.sessionId,
+    characterId: actor.characterId,
+    before: state.experiencePoints,
+    after: next,
+    amount: input.amount,
+  };
 }
 
 export async function grantCharacterItem(
@@ -601,9 +623,9 @@ export async function grantCharacterItem(
     .first<{ id: string; name: string }>();
   if (!item) throw new Error("GAME_ITEM_NOT_FOUND");
 
-  const eventId = id(deps);
-  const inventoryId = id(deps);
-  const occurredAt = now(deps);
+  const eventId = createId(deps);
+  const inventoryId = createId(deps);
+  const occurredAt = currentTime(deps);
   const timestamp = Math.floor(occurredAt.getTime() / 1000);
   const location = input.location ?? "carried";
   const event: GameEventWrite = {
@@ -615,14 +637,24 @@ export async function grantCharacterItem(
     actorId: input.actorId,
     sourceId: item.id,
     targetIds: [input.actorId],
-    payload: { inventoryId, itemId: item.id, itemName: item.name, quantity: input.quantity, location, reason: input.reason },
+    payload: {
+      inventoryId,
+      itemId: item.id,
+      itemName: item.name,
+      quantity: input.quantity,
+      location,
+      reason: input.reason,
+    },
   };
-  const guardSql =
-    "EXISTS (SELECT 1 FROM dnd35_characters WHERE character_id = ?) AND EXISTS (SELECT 1 FROM dnd35_items WHERE id = ? AND is_enabled = 1 AND owner_user_id IS NULL)";
-  const persisted = await commitBatch(
+  const persisted = await commitGuarded(
     deps.binding,
     [
-      eventStatement(deps.binding, event, guardSql, [actor.characterId, item.id]),
+      gameEventStatement(
+        deps.binding,
+        event,
+        "EXISTS (SELECT 1 FROM dnd35_characters WHERE character_id = ?) AND EXISTS (SELECT 1 FROM dnd35_items WHERE id = ? AND is_enabled = 1 AND owner_user_id IS NULL)",
+        [actor.characterId, item.id],
+      ),
       deps.binding
         .prepare(
           `INSERT INTO dnd35_character_inventory
@@ -631,17 +663,41 @@ export async function grantCharacterItem(
            SELECT ?, ?, ?, ?, 0, NULL, NULL, ?, NULL, ?, ?, ?
            WHERE EXISTS (SELECT 1 FROM game_events WHERE id = ?)`,
         )
-        .bind(inventoryId, actor.characterId, item.id, input.quantity, location, input.reason, timestamp, timestamp, eventId),
+        .bind(
+          inventoryId,
+          actor.characterId,
+          item.id,
+          input.quantity,
+          location,
+          input.reason,
+          timestamp,
+          timestamp,
+          eventId,
+        ),
     ],
     [0, 1],
   );
   if (!persisted) throw new Error("GAME_STATE_CONFLICT");
-  return { eventId, sessionId: context.sessionId, inventoryId, itemId: item.id, itemName: item.name, quantity: input.quantity, location };
+  return {
+    eventId,
+    sessionId: context.sessionId,
+    inventoryId,
+    itemId: item.id,
+    itemName: item.name,
+    quantity: input.quantity,
+    location,
+  };
 }
 
 export async function removeCharacterItem(
   deps: DmStateMutationDependencies,
-  input: { campaignId: string; actorId: string; inventoryId: string; quantity: number; reason: string },
+  input: {
+    campaignId: string;
+    actorId: string;
+    inventoryId: string;
+    quantity: number;
+    reason: string;
+  },
 ) {
   if (!Number.isSafeInteger(input.quantity) || input.quantity <= 0) {
     throw new RangeError("Item quantity must be a positive safe integer.");
@@ -661,25 +717,41 @@ export async function removeCharacterItem(
        LIMIT 1`,
     )
     .bind(input.inventoryId, actor.characterId)
-    .first<{ id: string; itemId: string; quantity: number; equipped: number; itemName: string }>();
+    .first<{
+      id: string;
+      itemId: string;
+      quantity: number;
+      equipped: number;
+      itemName: string;
+    }>();
   if (!row) throw new Error("GAME_INVENTORY_ITEM_NOT_FOUND");
   if (row.equipped) throw new Error("GAME_INVENTORY_ITEM_EQUIPPED");
-  if (input.quantity > row.quantity) throw new RangeError("Cannot remove more items than the character owns in this stack.");
+  if (input.quantity > row.quantity) {
+    throw new RangeError("Cannot remove more items than the character owns in this stack.");
+  }
   const nextQuantity = row.quantity - input.quantity;
-
-  const eventId = id(deps);
+  const eventId = createId(deps);
+  const occurredAt = currentTime(deps);
   const event: GameEventWrite = {
     id: eventId,
     campaignId: context.campaignId,
     sessionId: context.sessionId,
     eventType: "inventory.item.removed",
-    occurredAt: now(deps),
+    occurredAt,
     actorId: input.actorId,
     sourceId: row.itemId,
     targetIds: [input.actorId],
-    payload: { inventoryId: row.id, itemId: row.itemId, itemName: row.itemName, quantity: input.quantity, before: row.quantity, after: nextQuantity, reason: input.reason },
+    payload: {
+      inventoryId: row.id,
+      itemId: row.itemId,
+      itemName: row.itemName,
+      quantity: input.quantity,
+      before: row.quantity,
+      after: nextQuantity,
+      reason: input.reason,
+    },
   };
-  const guardSql =
+  const guard =
     "EXISTS (SELECT 1 FROM dnd35_character_inventory WHERE id = ? AND character_id = ? AND quantity = ? AND equipped = 0)";
   const mutation =
     nextQuantity === 0
@@ -697,14 +769,81 @@ export async function removeCharacterItem(
              WHERE id = ? AND character_id = ? AND quantity = ? AND equipped = 0
                AND EXISTS (SELECT 1 FROM game_events WHERE id = ?)`,
           )
-          .bind(nextQuantity, Math.floor(event.occurredAt.getTime() / 1000), row.id, actor.characterId, row.quantity, eventId);
-  const persisted = await commitBatch(
+          .bind(
+            nextQuantity,
+            Math.floor(occurredAt.getTime() / 1000),
+            row.id,
+            actor.characterId,
+            row.quantity,
+            eventId,
+          );
+  const persisted = await commitGuarded(
     deps.binding,
-    [eventStatement(deps.binding, event, guardSql, [row.id, actor.characterId, row.quantity]), mutation],
+    [
+      gameEventStatement(deps.binding, event, guard, [
+        row.id,
+        actor.characterId,
+        row.quantity,
+      ]),
+      mutation,
+    ],
     [0, 1],
   );
   if (!persisted) throw new Error("GAME_STATE_CONFLICT");
-  return { eventId, sessionId: context.sessionId, inventoryId: row.id, itemId: row.itemId, itemName: row.itemName, removed: input.quantity, remaining: nextQuantity };
+  return {
+    eventId,
+    sessionId: context.sessionId,
+    inventoryId: row.id,
+    itemId: row.itemId,
+    itemName: row.itemName,
+    removed: input.quantity,
+    remaining: nextQuantity,
+  };
+}
+
+async function loadOrInitializeAlignmentState(
+  deps: DmStateMutationDependencies,
+  characterId: string,
+  alignment: Dnd35Alignment,
+): Promise<AlignmentStateRow> {
+  let state = await deps.binding
+    .prepare(
+      `SELECT law_chaos_score AS lawChaosScore,
+              good_evil_score AS goodEvilScore
+       FROM runtime_dnd35_alignment_states
+       WHERE character_id = ?
+       LIMIT 1`,
+    )
+    .bind(characterId)
+    .first<AlignmentStateRow>();
+  if (state) return state;
+
+  const seeded = alignmentToScores(alignment);
+  await deps.binding
+    .prepare(
+      `INSERT OR IGNORE INTO runtime_dnd35_alignment_states
+         (character_id, law_chaos_score, good_evil_score, last_reason)
+       VALUES (?, ?, ?, ?)`,
+    )
+    .bind(
+      characterId,
+      seeded.lawChaos,
+      seeded.goodEvil,
+      "Initialized from character alignment",
+    )
+    .run();
+  state = await deps.binding
+    .prepare(
+      `SELECT law_chaos_score AS lawChaosScore,
+              good_evil_score AS goodEvilScore
+       FROM runtime_dnd35_alignment_states
+       WHERE character_id = ?
+       LIMIT 1`,
+    )
+    .bind(characterId)
+    .first<AlignmentStateRow>();
+  if (!state) throw new Error("GAME_ALIGNMENT_STATE_UNAVAILABLE");
+  return state;
 }
 
 export async function recordCharacterAlignmentAction(
@@ -730,46 +869,18 @@ export async function recordCharacterAlignmentAction(
     .bind(actor.characterId)
     .first<{ alignment: Dnd35Alignment }>();
   if (!character) throw new Error("GAME_CHARACTER_STATE_NOT_FOUND");
-
-  let state = await deps.binding
-    .prepare(
-      `SELECT law_chaos_score AS lawChaosScore,
-              good_evil_score AS goodEvilScore
-       FROM runtime_dnd35_alignment_states
-       WHERE character_id = ?
-       LIMIT 1`,
-    )
-    .bind(actor.characterId)
-    .first<AlignmentStateRow>();
-  if (!state) {
-    const seeded = alignmentToScores(character.alignment);
-    await deps.binding
-      .prepare(
-        `INSERT OR IGNORE INTO runtime_dnd35_alignment_states
-           (character_id, law_chaos_score, good_evil_score, last_reason)
-         VALUES (?, ?, ?, ?)`,
-      )
-      .bind(actor.characterId, seeded.lawChaos, seeded.goodEvil, "Initialized from character alignment")
-      .run();
-    state =
-      (await deps.binding
-        .prepare(
-          `SELECT law_chaos_score AS lawChaosScore,
-                  good_evil_score AS goodEvilScore
-           FROM runtime_dnd35_alignment_states
-           WHERE character_id = ?
-           LIMIT 1`,
-        )
-        .bind(actor.characterId)
-        .first<AlignmentStateRow>()) ?? seeded;
-  }
-
+  const state = await loadOrInitializeAlignmentState(
+    deps,
+    actor.characterId,
+    character.alignment,
+  );
   const next = applyAlignmentDrift(
     { lawChaos: state.lawChaosScore, goodEvil: state.goodEvilScore },
     { lawChaosDelta: input.lawChaosDelta, goodEvilDelta: input.goodEvilDelta },
   );
-  const eventId = id(deps);
-  const occurredAt = now(deps);
+
+  const eventId = createId(deps);
+  const occurredAt = currentTime(deps);
   const timestamp = Math.floor(occurredAt.getTime() / 1000);
   const event: GameEventWrite = {
     id: eventId,
@@ -783,29 +894,42 @@ export async function recordCharacterAlignmentAction(
       reason: input.reason,
       lawChaosDelta: input.lawChaosDelta,
       goodEvilDelta: input.goodEvilDelta,
-      beforeScores: { lawChaos: state.lawChaosScore, goodEvil: state.goodEvilScore },
+      beforeScores: {
+        lawChaos: state.lawChaosScore,
+        goodEvil: state.goodEvilScore,
+      },
       afterScores: next.scores,
       beforeAlignment: character.alignment,
       afterAlignment: next.alignment,
       alignmentChanged: character.alignment !== next.alignment,
     },
     deltas: [
-      {
-        id: `${eventId}:alignment`,
-        entityId: actor.characterId,
-        path: ["dnd35", "alignment"],
-        before: character.alignment,
-        after: next.alignment,
-        reason: input.reason,
-      },
+      ...(character.alignment === next.alignment
+        ? []
+        : [
+            {
+              id: `${eventId}:alignment`,
+              entityId: actor.characterId,
+              path: ["dnd35", "alignment"],
+              before: character.alignment,
+              after: next.alignment,
+              reason: input.reason,
+            },
+          ]),
     ],
   };
-  const guardSql =
+  const guard =
     "EXISTS (SELECT 1 FROM runtime_dnd35_alignment_states WHERE character_id = ? AND law_chaos_score = ? AND good_evil_score = ?) AND EXISTS (SELECT 1 FROM dnd35_characters WHERE character_id = ? AND alignment = ?)";
-  const persisted = await commitBatch(
+  const persisted = await commitGuarded(
     deps.binding,
     [
-      eventStatement(deps.binding, event, guardSql, [actor.characterId, state.lawChaosScore, state.goodEvilScore, actor.characterId, character.alignment]),
+      gameEventStatement(deps.binding, event, guard, [
+        actor.characterId,
+        state.lawChaosScore,
+        state.goodEvilScore,
+        actor.characterId,
+        character.alignment,
+      ]),
       deps.binding
         .prepare(
           `UPDATE runtime_dnd35_alignment_states
@@ -813,7 +937,16 @@ export async function recordCharacterAlignmentAction(
            WHERE character_id = ? AND law_chaos_score = ? AND good_evil_score = ?
              AND EXISTS (SELECT 1 FROM game_events WHERE id = ?)`,
         )
-        .bind(next.scores.lawChaos, next.scores.goodEvil, input.reason, timestamp, actor.characterId, state.lawChaosScore, state.goodEvilScore, eventId),
+        .bind(
+          next.scores.lawChaos,
+          next.scores.goodEvil,
+          input.reason,
+          timestamp,
+          actor.characterId,
+          state.lawChaosScore,
+          state.goodEvilScore,
+          eventId,
+        ),
       deps.binding
         .prepare(
           `UPDATE dnd35_characters
@@ -830,8 +963,16 @@ export async function recordCharacterAlignmentAction(
     eventId,
     sessionId: context.sessionId,
     characterId: actor.characterId,
-    before: { alignment: character.alignment, lawChaos: state.lawChaosScore, goodEvil: state.goodEvilScore },
-    after: { alignment: next.alignment, lawChaos: next.scores.lawChaos, goodEvil: next.scores.goodEvil },
+    before: {
+      alignment: character.alignment,
+      lawChaos: state.lawChaosScore,
+      goodEvil: state.goodEvilScore,
+    },
+    after: {
+      alignment: next.alignment,
+      lawChaos: next.scores.lawChaos,
+      goodEvil: next.scores.goodEvil,
+    },
     changed: character.alignment !== next.alignment,
   };
 }

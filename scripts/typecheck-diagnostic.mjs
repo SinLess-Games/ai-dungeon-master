@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 
-const probe = /src\/infrastructure\/offline\//;
+const probe = /src\/modules\/sync\/server\/routes\.ts/;
 const result = spawnSync("npm", ["run", "typecheck"], {
   encoding: "utf8",
   shell: false,

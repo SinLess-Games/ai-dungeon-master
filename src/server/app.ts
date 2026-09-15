@@ -17,6 +17,7 @@ import type { AuthEnv } from "@/modules/auth/server/auth";
 import { campaignCharacterSheetRoutes } from "@/modules/campaigns/server/characterSheetRoutes";
 import { campaignDeleteRoutes } from "@/modules/campaigns/server/deleteRoutes";
 import { campaignDmActionRoutes } from "@/modules/campaigns/server/dmActionRoutes";
+import { campaignMessageMutationRoutes } from "@/modules/campaigns/server/messageMutationRoutes";
 import { campaignPlayCharacterRoutes } from "@/modules/campaigns/server/playCharacterRoutes";
 import { campaignPlayMessageRoutes } from "@/modules/campaigns/server/playMessageRoutes";
 import { campaignRoutes } from "@/modules/campaigns/server/routes";
@@ -212,6 +213,7 @@ const routes = app
   // message module. The latter still owns message GETs and remains a safe
   // fallback for non-structured paths.
   .route("/", structuredPlayMessageRoutes)
+  .route("/", campaignMessageMutationRoutes)
   .route("/", campaignPlayMessageRoutes)
   .route("/", campaignDmActionRoutes)
   .route("/", characterCreationRoutes)

@@ -19,6 +19,7 @@ import { campaignDmActionRoutes } from "@/modules/campaigns/server/dmActionRoute
 import { campaignPlayCharacterRoutes } from "@/modules/campaigns/server/playCharacterRoutes";
 import { campaignPlayMessageRoutes } from "@/modules/campaigns/server/playMessageRoutes";
 import { campaignRoutes } from "@/modules/campaigns/server/routes";
+import { structuredPlayMessageRoutes } from "@/modules/campaigns/server/structuredPlayMessageRoutes";
 import { characterRoutes } from "@/modules/characters/server/routes";
 import { characterCreationRoutes } from "@/modules/characters/server/creationRoutes";
 import type { CampaignRoom } from "@/modules/game/live/CampaignRoom";
@@ -205,6 +206,10 @@ const routes = app
   .route("/", campaignRoutes)
   .route("/", campaignDeleteRoutes)
   .route("/", campaignPlayCharacterRoutes)
+  // The structured POST route must be registered before the legacy campaign
+  // message module. The latter still owns message GETs and remains a safe
+  // fallback for non-structured paths.
+  .route("/", structuredPlayMessageRoutes)
   .route("/", campaignPlayMessageRoutes)
   .route("/", campaignDmActionRoutes)
   .route("/", characterCreationRoutes)

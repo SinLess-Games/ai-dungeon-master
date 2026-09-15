@@ -476,6 +476,16 @@ export const campaignDmActionRoutes = new Hono<Env>()
               session.user.id,
             );
             if (!context) throw new Error("AI_DM_CHARACTER_CONTEXT_LOST");
+
+            let nextArguments: CampaignDmActionArguments;
+            if (pendingInitiative) {
+              nextArguments = initiativeArguments(pendingInitiative);
+            } else if (finalDecision?.kind === "check") {
+              nextArguments = pendingArguments(finalDecision, context);
+            } else {
+              throw new Error("AI_DM_FOLLOWUP_ACTION_MISSING");
+            }
+
             nextPendingAction = await createPendingDmAction(db, {
               campaignId,
               requestedByMessageId: origin.requestedByMessageId,
@@ -483,9 +493,7 @@ export const campaignDmActionRoutes = new Hono<Env>()
               requestedUserId: session.user.id,
               characterId: origin.characterId,
               actorId: context.character.actorId,
-              arguments: pendingInitiative
-                ? initiativeArguments(pendingInitiative)
-                : pendingArguments(finalDecision!, context),
+              arguments: nextArguments,
             });
           } catch (error) {
             console.error("Unable to persist chained AI DM check", {

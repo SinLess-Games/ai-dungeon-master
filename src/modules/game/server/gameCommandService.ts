@@ -6,6 +6,16 @@ import { startActorEncounter } from "./actorEncounterService";
 import { endEncounterTurn, finishEncounter } from "./encounterService";
 import { performSavingThrow, performSkillCheck } from "./gameActionService";
 import {
+  applyActorCondition,
+  applyDirectActorDamage,
+  applyDirectActorHealing,
+  grantCharacterExperience,
+  grantCharacterItem,
+  recordCharacterAlignmentAction,
+  removeActorCondition,
+  removeCharacterItem,
+} from "./dmStateMutationService";
+import {
   castPreparedSpellResolved,
   castSpontaneousSpellResolved,
   manifestPowerResolved,
@@ -28,6 +38,9 @@ export type GameCommand =
       kind: "melee" | "ranged";
       weaponInventoryId?: string;
       monsterAttackId?: string;
+      attackRoll?: number;
+      confirmationRoll?: number;
+      damageRolls?: readonly number[];
     }
   | {
       type: "check.skill";
@@ -70,6 +83,64 @@ export type GameCommand =
       powerId: string;
       augmentations?: readonly RequestedResolvedPowerAugmentation[];
       targetIds?: readonly string[];
+    }
+  | {
+      type: "health.damage";
+      targetId: string;
+      amount: number;
+      sourceActorId?: string;
+      reason: string;
+    }
+  | {
+      type: "health.heal";
+      targetId: string;
+      amount: number;
+      sourceActorId?: string;
+      reason: string;
+    }
+  | {
+      type: "condition.apply";
+      targetId: string;
+      conditionId: string;
+      sourceActorId?: string;
+      sourceDescription?: string;
+      durationKind: "rounds" | "permanent" | "special";
+      remainingRounds?: number;
+      reason: string;
+    }
+  | {
+      type: "condition.remove";
+      runtimeConditionId: string;
+      sourceActorId?: string;
+      reason: string;
+    }
+  | {
+      type: "inventory.grant";
+      actorId: string;
+      itemId: string;
+      quantity: number;
+      location?: "carried" | "stored" | "party";
+      reason: string;
+    }
+  | {
+      type: "inventory.remove";
+      actorId: string;
+      inventoryId: string;
+      quantity: number;
+      reason: string;
+    }
+  | {
+      type: "progression.xp.grant";
+      actorId: string;
+      amount: number;
+      reason: string;
+    }
+  | {
+      type: "alignment.record";
+      actorId: string;
+      lawChaosDelta: number;
+      goodEvilDelta: number;
+      reason: string;
     };
 
 export type GameCommandResult = { type: GameCommand["type"]; value: unknown };
@@ -84,6 +155,14 @@ export interface GameCommandHandlers {
   castPrepared: typeof castPreparedSpellResolved;
   castSpontaneous: typeof castSpontaneousSpellResolved;
   manifestPower: typeof manifestPowerResolved;
+  damage: typeof applyDirectActorDamage;
+  heal: typeof applyDirectActorHealing;
+  applyCondition: typeof applyActorCondition;
+  removeCondition: typeof removeActorCondition;
+  grantItem: typeof grantCharacterItem;
+  removeItem: typeof removeCharacterItem;
+  grantXp: typeof grantCharacterExperience;
+  recordAlignment: typeof recordCharacterAlignmentAction;
 }
 
 export const defaultGameCommandHandlers: GameCommandHandlers = {
@@ -96,6 +175,14 @@ export const defaultGameCommandHandlers: GameCommandHandlers = {
   castPrepared: castPreparedSpellResolved,
   castSpontaneous: castSpontaneousSpellResolved,
   manifestPower: manifestPowerResolved,
+  damage: applyDirectActorDamage,
+  heal: applyDirectActorHealing,
+  applyCondition: applyActorCondition,
+  removeCondition: removeActorCondition,
+  grantItem: grantCharacterItem,
+  removeItem: removeCharacterItem,
+  grantXp: grantCharacterExperience,
+  recordAlignment: recordCharacterAlignmentAction,
 };
 
 /**
@@ -150,6 +237,11 @@ export async function executeGameCommand(
           ...(command.monsterAttackId === undefined
             ? {}
             : { monsterAttackId: command.monsterAttackId }),
+          ...(command.attackRoll === undefined ? {} : { attackRoll: command.attackRoll }),
+          ...(command.confirmationRoll === undefined
+            ? {}
+            : { confirmationRoll: command.confirmationRoll }),
+          ...(command.damageRolls === undefined ? {} : { damageRolls: command.damageRolls }),
         }),
       };
     case "check.skill":
@@ -212,6 +304,100 @@ export async function executeGameCommand(
           powerId: command.powerId,
           ...(command.augmentations === undefined ? {} : { augmentations: command.augmentations }),
           ...(command.targetIds === undefined ? {} : { targetIds: command.targetIds }),
+        }),
+      };
+    case "health.damage":
+      return {
+        type: command.type,
+        value: await handlers.damage(deps, {
+          campaignId,
+          targetId: command.targetId,
+          amount: command.amount,
+          reason: command.reason,
+          ...(command.sourceActorId === undefined ? {} : { sourceActorId: command.sourceActorId }),
+        }),
+      };
+    case "health.heal":
+      return {
+        type: command.type,
+        value: await handlers.heal(deps, {
+          campaignId,
+          targetId: command.targetId,
+          amount: command.amount,
+          reason: command.reason,
+          ...(command.sourceActorId === undefined ? {} : { sourceActorId: command.sourceActorId }),
+        }),
+      };
+    case "condition.apply":
+      return {
+        type: command.type,
+        value: await handlers.applyCondition(deps, {
+          campaignId,
+          targetId: command.targetId,
+          conditionId: command.conditionId,
+          durationKind: command.durationKind,
+          reason: command.reason,
+          ...(command.sourceActorId === undefined ? {} : { sourceActorId: command.sourceActorId }),
+          ...(command.sourceDescription === undefined
+            ? {}
+            : { sourceDescription: command.sourceDescription }),
+          ...(command.remainingRounds === undefined
+            ? {}
+            : { remainingRounds: command.remainingRounds }),
+        }),
+      };
+    case "condition.remove":
+      return {
+        type: command.type,
+        value: await handlers.removeCondition(deps, {
+          campaignId,
+          runtimeConditionId: command.runtimeConditionId,
+          reason: command.reason,
+          ...(command.sourceActorId === undefined ? {} : { sourceActorId: command.sourceActorId }),
+        }),
+      };
+    case "inventory.grant":
+      return {
+        type: command.type,
+        value: await handlers.grantItem(deps, {
+          campaignId,
+          actorId: command.actorId,
+          itemId: command.itemId,
+          quantity: command.quantity,
+          reason: command.reason,
+          ...(command.location === undefined ? {} : { location: command.location }),
+        }),
+      };
+    case "inventory.remove":
+      return {
+        type: command.type,
+        value: await handlers.removeItem(deps, {
+          campaignId,
+          actorId: command.actorId,
+          inventoryId: command.inventoryId,
+          quantity: command.quantity,
+          reason: command.reason,
+        }),
+      };
+    case "progression.xp.grant":
+      return {
+        type: command.type,
+        value: await handlers.grantXp(deps, {
+          campaignId,
+          actorId: command.actorId,
+          amount: command.amount,
+          reason: command.reason,
+        }),
+      };
+    case "alignment.record":
+      return {
+        type: command.type,
+        value: await handlers.recordAlignment(deps, {
+          campaignId,
+          actorId: command.actorId,
+          lawChaosDelta: command.lawChaosDelta,
+          goodEvilDelta: command.goodEvilDelta,
+          reason: command.reason,
         }),
       };
   }

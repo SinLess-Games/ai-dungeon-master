@@ -15,6 +15,7 @@ on:
       - "src/modules/auth/**"
       - "src/server/**"
       - "tests/e2e/campaign-play.e2e.mjs"
+      - "tests/e2e/ai-dm-state-tools.e2e.mjs"
   workflow_dispatch:
 
 permissions:
@@ -28,7 +29,7 @@ jobs:
   campaign-play-e2e:
     name: campaign-play-e2e
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -52,10 +53,18 @@ jobs:
           set -o pipefail
           npm run test:e2e:campaign-play 2>&1 | tee campaign-play-e2e.log
 
-      - name: Upload failing E2E log
+      - name: Structured AI DM state-tool E2E
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:e2e:ai-dm-tools 2>&1 | tee ai-dm-state-tools-e2e.log
+
+      - name: Upload failing E2E logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: campaign-play-e2e-log
-          path: campaign-play-e2e.log
+          name: campaign-play-e2e-logs
+          path: |
+            campaign-play-e2e.log
+            ai-dm-state-tools-e2e.log
           if-no-files-found: warn

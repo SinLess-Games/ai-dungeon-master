@@ -101,7 +101,7 @@ describe("AI DM monster turns", () => {
   });
 
   it("never lets the AI DM commandeer another player character", () => {
-    const ctx = context("hero-1");
+    const ctx = context("other-player");
     ctx.actors.push({
       id: "other-player",
       characterId: "character-2",
@@ -109,6 +109,7 @@ describe("AI DM monster turns", () => {
       kind: "character",
       status: "active",
     });
+    ctx.encounter!.participantIds.push("other-player");
     const decision = parseDmTurnDecision(
       JSON.stringify({
         kind: "command",
@@ -121,7 +122,7 @@ describe("AI DM monster turns", () => {
       }),
     );
     expect(() => validateDmTurnDecision(decision, ctx)).toThrow(
-      "AI_DM_ATTACKER_NOT_CURRENT_TURN",
+      "AI_DM_REQUESTED_UNAVAILABLE_ATTACKER",
     );
   });
 });

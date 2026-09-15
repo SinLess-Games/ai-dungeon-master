@@ -238,7 +238,9 @@ export async function listOfflineMutations(): Promise<OfflineMutation[]> {
 
 export async function updateOfflineMutation(
   id: string,
-  patch: Partial<Pick<OfflineMutation, "attempts" | "state" | "forceLocal" | "lastError">>,
+  patch: Partial<
+    Pick<OfflineMutation, "attempts" | "state" | "forceLocal" | "lastError" | "baseVersion">
+  >,
 ): Promise<OfflineMutation | null> {
   const existing = memoryMutations.get(id) ?? (await get<OfflineMutation>("mutations", id));
   if (!existing || existing.userId !== activeUserId) return null;

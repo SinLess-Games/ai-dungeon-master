@@ -30,7 +30,7 @@ function context(): DmPlannerContext {
 const unusedBinding = {} as D1Database;
 
 describe("AI DM planner command translation", () => {
-  it("injects the acting actor id server-side for attacks", async () => {
+  it("injects the acting actor id server-side for player attacks", async () => {
     await expect(
       plannerCommandToGameCommand(unusedBinding, context(), {
         type: "combat.attack",
@@ -42,6 +42,24 @@ describe("AI DM planner command translation", () => {
       attackerId: "hero-actor",
       targetId: "goblin-actor",
       kind: "melee",
+    });
+  });
+
+  it("preserves an already-validated DM-run monster attacker and attack id", async () => {
+    await expect(
+      plannerCommandToGameCommand(unusedBinding, context(), {
+        type: "combat.attack",
+        attackerId: "goblin-actor",
+        targetId: "hero-actor",
+        kind: "melee",
+        monsterAttackId: "goblin-spear",
+      }),
+    ).resolves.toEqual({
+      type: "combat.attack",
+      attackerId: "goblin-actor",
+      targetId: "hero-actor",
+      kind: "melee",
+      monsterAttackId: "goblin-spear",
     });
   });
 

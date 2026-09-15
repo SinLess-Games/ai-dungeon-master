@@ -10,13 +10,56 @@
   }
 
   main:has(textarea[aria-label="Campaign play message"]) > div {
+    position: relative;
     display: flex;
     height: 100%;
     min-height: 0;
     flex-direction: column;
   }
 
-  main:has(textarea[aria-label="Campaign play message"]) > div > header,
+  /* Remove the full-width campaign header from above the table. Keep its useful
+   * back / pause-resume / refresh controls as a compact utility row in the left
+   * rail so no campaign functionality is lost. */
+  main:has(textarea[aria-label="Campaign play message"]) > div > header {
+    position: absolute;
+    top: 0.75rem;
+    left: 0.75rem;
+    z-index: 20;
+    display: flex;
+    width: 12.25rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    border: 0;
+    background: transparent;
+    padding: 0;
+  }
+
+  main:has(textarea[aria-label="Campaign play message"]) > div > header > div:first-child {
+    min-width: 0;
+  }
+
+  main:has(textarea[aria-label="Campaign play message"])
+    > div
+    > header
+    > div:first-child
+    > div:last-child {
+    display: none;
+  }
+
+  main:has(textarea[aria-label="Campaign play message"]) > div > header > div:last-child {
+    margin-left: auto;
+    gap: 0.35rem;
+  }
+
+  main:has(textarea[aria-label="Campaign play message"])
+    > div
+    > header
+    > div:last-child
+    > span {
+    display: none;
+  }
+
   main:has(textarea[aria-label="Campaign play message"]) > div > header + div:not(.grid) {
     flex: 0 0 auto;
   }
@@ -30,6 +73,10 @@
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
+  }
+
+  main:has(textarea[aria-label="Campaign play message"]) > div > .grid > aside:first-child {
+    padding-top: 4rem;
   }
 
   main:has(textarea[aria-label="Campaign play message"]) section:has(textarea[aria-label="Campaign play message"]) {

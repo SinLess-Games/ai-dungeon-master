@@ -81,6 +81,15 @@ export interface EncumbrancePenaltyProfile {
   movement: "normal" | "reduced" | "stagger" | "immobile";
 }
 
+export type MovementRestriction = EncumbrancePenaltyProfile["movement"];
+
+const MOVEMENT_RESTRICTION_SEVERITY: Record<MovementRestriction, number> = {
+  normal: 0,
+  reduced: 1,
+  stagger: 2,
+  immobile: 3,
+};
+
 export interface EncumbranceState extends EncumbrancePenaltyProfile {
   enabled: boolean;
   carriedWeight: number;
@@ -190,6 +199,19 @@ export function encumbrancePenaltyProfile(
         movement: options.overloadedCanLift === false ? "immobile" : "stagger",
       };
   }
+}
+
+/** Return the most restrictive movement state from load, armor, and other effects. */
+export function combineMovementRestriction(
+  ...restrictions: readonly MovementRestriction[]
+): MovementRestriction {
+  let result: MovementRestriction = "normal";
+  for (const restriction of restrictions) {
+    if (MOVEMENT_RESTRICTION_SEVERITY[restriction] > MOVEMENT_RESTRICTION_SEVERITY[result]) {
+      result = restriction;
+    }
+  }
+  return result;
 }
 
 function reducedLandSpeed(baseSpeedFeet: number): number {

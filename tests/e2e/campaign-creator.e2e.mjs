@@ -126,7 +126,12 @@ try {
   await page.getByRole("button", { name: /Exploration/ }).click();
   await page.getByRole("button", { name: /Epic/ }).click();
   await page.getByRole("button", { name: /Slow/ }).click();
-  await page.locator("select").selectOption("west-marches");
+  await page.getByLabel("Campaign length", { exact: true }).selectOption("long");
+  await page.getByLabel("Estimated sessions (optional)", { exact: true }).fill("40");
+  await page.getByLabel("Starting level target (optional)", { exact: true }).fill("1");
+  await page.getByLabel("Ending level target (optional)", { exact: true }).fill("21");
+  await page.getByLabel("Ending target (optional)", { exact: true }).fill("Reunite the northern kingdoms.");
+  await page.locator("select").filter({ has: page.locator('option[value="west-marches"]') }).selectOption("west-marches");
   await page.getByRole("button", { name: "Next", exact: true }).click();
 
   await page.getByRole("button", { name: /Wild Magic/ }).click();
@@ -162,6 +167,10 @@ try {
   const detail = await api(page, "GET", `/api/campaigns/${campaign.id}`);
   const settings = detail.campaign.settings;
   assert.equal(settings.creatorVersion, 2);
+  assert.deepEqual(settings.duration, {
+    length: "long", estimatedSessions: 40, startLevel: 1, endLevel: 21,
+    endingTarget: "Reunite the northern kingdoms.",
+  });
   assert.deepEqual(settings.genres, ["grimdark", "exploration"]);
   assert.equal(settings.scale, "epic");
   assert.equal(settings.pace, "slow");
@@ -189,6 +198,10 @@ try {
   await page.getByRole("heading", { name: "Ashes of the North" }).waitFor();
   await page.getByRole("button", { name: /Continue setup/ }).click();
   await page.getByRole("heading", { name: "Ashes of the North" }).waitFor();
+  assert.equal(await page.getByLabel("Campaign length", { exact: true }).inputValue(), "long");
+  assert.equal(await page.getByLabel("Estimated sessions (optional)", { exact: true }).inputValue(), "40");
+  await page.getByLabel("Campaign length", { exact: true }).selectOption("endless");
+  await page.getByLabel("Estimated arc sessions (optional)", { exact: true }).fill("12");
   await page.getByLabel("Short description").fill("The north is breaking, and the old powers are awake.");
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await page.getByText("Campaign setup updated.").waitFor();
@@ -198,6 +211,18 @@ try {
     "The north is breaking, and the old powers are awake.",
   );
   assert.equal(resumed.campaign.settings.creatorVersion, 2);
+  assert.deepEqual(resumed.campaign.settings.duration, { ...settings.duration, length: "endless", estimatedSessions: 12 });
+  for (const duration of [
+    { length: "invalid" }, { length: "short", estimatedSessions: 0 },
+    { length: "short", estimatedSessions: 1.5 }, { length: "long", startLevel: 10, endLevel: 2 },
+    { length: "short", endingTarget: "x".repeat(1001) },
+  ]) {
+    await api(page, "PATCH", `/api/campaigns/${campaign.id}`, { settings: { ...settings, duration } }, 400);
+    await api(page, "POST", "/api/campaigns", { name: "Invalid duration", settings: { duration } }, 400);
+  }
+  const unchanged = await api(page, "GET", `/api/campaigns/${campaign.id}`);
+  assert.deepEqual(unchanged.campaign.settings.duration, resumed.campaign.settings.duration);
+  console.log("✓ campaign E2E: duration persists through editing and invalid API writes leave it unchanged");
   console.log("✓ campaign E2E: campaign library resumes and updates the same saved draft");
 
   const tooManyGenres = [

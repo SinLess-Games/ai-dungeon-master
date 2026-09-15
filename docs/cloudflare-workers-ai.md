@@ -27,6 +27,8 @@ The default models are also configured in `wrangler.jsonc`:
 
 The application calls the binding through `src/infrastructure/ai/openaiCompatible.ts`. Cloudflare Workers AI is preferred when `env.AI` is present. The optional OpenAI-compatible API variables are only a fallback.
 
+Campaign narration and turn planning include explicit [campaign length and pacing guidance](campaign-duration.md) from saved campaign settings.
+
 ## One-time Cloudflare setup
 
 1. Sign in to the Cloudflare account that owns `the-endless-codex`.

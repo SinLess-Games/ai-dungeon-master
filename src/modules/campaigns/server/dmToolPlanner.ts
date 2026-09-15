@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { campaignPacingContext } from "../domain/duration";
 import {
   generateOpenAICompatibleText,
   type OpenAICompatibleEnv,
@@ -432,6 +433,7 @@ export async function planDmTurn(
       prompt: [
         `Campaign: ${input.campaignName}`,
         `Description: ${input.campaignDescription || "No campaign description provided."}`,
+        campaignPacingContext(input.settings),
         `Campaign settings: ${JSON.stringify(input.settings).slice(0, 5000)}`,
         `Current actors: ${JSON.stringify(input.actors).slice(0, 5000)}`,
         `Recent authoritative events: ${JSON.stringify(input.recentEvents).slice(0, 7000)}`,
@@ -499,6 +501,7 @@ export async function planDmTurn(
     prompt: [
       `Campaign: ${input.campaignName}`,
       `Description: ${input.campaignDescription || "No campaign description provided."}`,
+      campaignPacingContext(input.settings),
       `Campaign settings: ${JSON.stringify(input.settings).slice(0, 5000)}`,
       `Tool context: ${JSON.stringify(toolContext).slice(0, 20000)}`,
       `Recent authoritative events: ${JSON.stringify(input.recentEvents).slice(0, 7000)}`,

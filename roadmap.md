@@ -20,9 +20,9 @@ feature. This audit does not certify production deployment or live provider setu
 - [x] Dashboard — implemented as the [campaign management hub](src/modules/campaigns/ui/CampaignsHub.tsx) and [character library](src/modules/characters/ui/CharacterLibrary.tsx), with saved records, campaign setup, start/resume, and deletion. There is no separate unified `/dashboard` page.
 - [x] Character creator with inline explanations — [multi-step creator](src/modules/characters/ui/AdvancedCharacterCreator.tsx), persisted selections, explanatory content, and server readiness/finalization are implemented for supported starting characters. Later-level advancement remains separate work.
 - [ ] Character sheet (live, editable) — [campaign play](src/modules/campaigns/ui/CampaignPlayScreen.tsx) exposes live character state, checks, combat, and casting controls. A full editable sheet and ongoing inventory editor remain unfinished.
-- [ ] Campaign setup wizard (style, type, length, pace, DM temperament, world notes, house rules)
+- [x] Campaign setup wizard (style, type, length, pace, DM temperament, world notes, house rules)
   - [x] [Persistent seven-stage wizard](src/modules/campaigns/ui/CampaignCreator.tsx): style, structure, scale, pace, world profile, descriptions, rules, player permissions, DM behavior, and house-rule notes.
-  - [ ] Explicit campaign length/duration setting. Heroic/paragon/epic scale describes levels rather than campaign length. Saved settings also do not prove every chosen behavior is enforced during play.
+  - [x] [Campaign length/duration](docs/campaign-duration.md): short/medium/long/endless, optional session/level/ending targets, draft persistence/editing, and explicit AI DM pacing context. Targets guide narration without forcing mechanical outcomes.
 - [ ] Streaming AI DM with state tools, player rolls, grants, alignment tracking
   - [x] [Persistent campaign/private DM conversations](src/modules/campaigns/server/playMessageRoutes.ts) and generated AI replies.
   - [x] [Validated game commands](src/modules/game/server/gameCommandRoutes.ts) for encounters, attacks, checks, casting, and psionics, with player controls in campaign play.

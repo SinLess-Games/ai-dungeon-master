@@ -175,7 +175,10 @@ try {
       gameMasterMode: "ai",
       visibility: "private",
       maxPlayers: 1,
-      settings: {},
+      settings: {
+        pace: "fast",
+        duration: { length: "short", estimatedSessions: 4, startLevel: 1, endLevel: 5, endingTarget: "Silence the standing stone." },
+      },
     },
     201,
   );
@@ -233,6 +236,11 @@ try {
   await page.getByText("I place my hand against the black standing stone and listen.", { exact: true }).waitFor();
   await page.getByText("The old stones answer with a low hum. What do you do next?", { exact: true }).waitFor();
   assert.equal(ai.requests.length, 1);
+  const pacingPrompt = ai.requests[0].messages.find((entry) => entry.role === "user").content;
+  assert.match(pacingPrompt, /Campaign length: short/);
+  assert.match(pacingPrompt, /limit unrelated detours/);
+  assert.match(pacingPrompt, /Scene pace: fast/);
+  assert.match(pacingPrompt, /Silence the standing stone/);
   console.log("✓ campaign play E2E: Campaign chat persists a player turn and AI DM reply");
 
   await page.getByRole("button", { name: /OOC · DM/ }).click();
@@ -243,6 +251,10 @@ try {
     .getByText("The rule is clear: resolve uncertain outcomes through the rules engine.", { exact: true })
     .waitFor();
   assert.equal(ai.requests.length, 2);
+  assert.match(
+    ai.requests[1].messages.find((entry) => entry.role === "user").content,
+    /Campaign length: short/,
+  );
   await page.getByRole("button", { name: /^Campaign/ }).click();
   assert.equal(
     await page.getByText("OOC: should an uncertain action change HP before a rules check?", { exact: true }).count(),

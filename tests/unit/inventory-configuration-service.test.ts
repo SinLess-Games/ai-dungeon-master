@@ -38,6 +38,7 @@ function harness() {
     );
     CREATE TABLE dnd35_items (
       id TEXT PRIMARY KEY,
+      slug TEXT NOT NULL,
       name TEXT NOT NULL,
       category TEXT NOT NULL
     );
@@ -77,18 +78,24 @@ function harness() {
     VALUES ('session-1', 'campaign-1', 'world-1', 'active', 1);
     INSERT INTO game_actors (id, campaign_id, kind, character_id, status)
     VALUES ('hero-1', 'campaign-1', 'character', 'hero-1', 'active');
-    INSERT INTO dnd35_items (id, name, category)
-    VALUES ('longsword', 'Longsword', 'weapon'),
-           ('chain-shirt', 'Chain Shirt', 'armor'),
-           ('cloak', 'Cloak of Resistance', 'magic');
+    INSERT INTO dnd35_items (id, slug, name, category)
+    VALUES ('longsword', 'longsword', 'Longsword', 'weapon'),
+           ('chain-shirt', 'chain-shirt', 'Chain Shirt', 'armor'),
+           ('cloak', 'cloak-of-resistance', 'Cloak of Resistance', 'magic'),
+           ('ring-protection', 'ring-of-protection-1', 'Ring of Protection +1', 'magic'),
+           ('ring-invisibility', 'ring-of-invisibility', 'Ring of Invisibility', 'magic');
     INSERT INTO dnd35_magic_items (item_id, slot)
-    VALUES ('cloak', 'shoulders');
+    VALUES ('cloak', 'shoulders'),
+           ('ring-protection', 'other'),
+           ('ring-invisibility', 'other');
     INSERT INTO dnd35_character_inventory
       (id, character_id, item_id, location, equipped, equipped_slot, notes)
     VALUES
       ('longsword-stack', 'hero-1', 'longsword', 'carried', 0, NULL, NULL),
       ('armor-stack', 'hero-1', 'chain-shirt', 'carried', 0, NULL, NULL),
-      ('cloak-stack', 'hero-1', 'cloak', 'carried', 0, NULL, NULL);
+      ('cloak-stack', 'hero-1', 'cloak', 'carried', 0, NULL, NULL),
+      ('ring-protection-stack', 'hero-1', 'ring-protection', 'carried', 0, NULL, NULL),
+      ('ring-invisibility-stack', 'hero-1', 'ring-invisibility', 'carried', 0, NULL, NULL);
   `);
   const binding = createSqliteD1(sqlite);
   return { sqlite, binding, db: createDatabase(binding) };
@@ -188,6 +195,47 @@ describe("authoritative inventory configuration", () => {
     ).toEqual({ eventType: "inventory.item.configured" });
   });
 
+  it("maps standard ring catalog entries to the two exclusive ring slots", async () => {
+    const { binding, db } = harness();
+
+    const first = await configureCharacterInventory(
+      { db, binding, createId: () => "event-ring-left" },
+      {
+        campaignId: "campaign-1",
+        actorId: "hero-1",
+        inventoryId: "ring-protection-stack",
+        equippedSlot: "ring_left",
+        reason: "The player equips a ring.",
+      },
+    );
+    expect(first.after.equippedSlot).toBe("ring_left");
+
+    await expect(
+      configureCharacterInventory(
+        { db, binding, createId: () => "event-ring-conflict" },
+        {
+          campaignId: "campaign-1",
+          actorId: "hero-1",
+          inventoryId: "ring-invisibility-stack",
+          equippedSlot: "ring_left",
+          reason: "The player tries to reuse the occupied ring slot.",
+        },
+      ),
+    ).rejects.toThrow("GAME_INVENTORY_SLOT_OCCUPIED");
+
+    const second = await configureCharacterInventory(
+      { db, binding, createId: () => "event-ring-right" },
+      {
+        campaignId: "campaign-1",
+        actorId: "hero-1",
+        inventoryId: "ring-invisibility-stack",
+        equippedSlot: "ring_right",
+        reason: "The player equips a second ring.",
+      },
+    );
+    expect(second.after.equippedSlot).toBe("ring_right");
+  });
+
   it("rejects item categories placed into impossible equipment slots", async () => {
     const { binding, db } = harness();
     await expect(
@@ -223,7 +271,8 @@ describe("authoritative inventory configuration", () => {
       "UPDATE dnd35_character_inventory SET equipped = 1, equipped_slot = 'both_hands' WHERE id = 'longsword-stack'",
     );
     sqlite.exec(`
-      INSERT INTO dnd35_items (id, name, category) VALUES ('dagger', 'Dagger', 'weapon');
+      INSERT INTO dnd35_items (id, slug, name, category)
+      VALUES ('dagger', 'dagger', 'Dagger', 'weapon');
       INSERT INTO dnd35_character_inventory
         (id, character_id, item_id, location, equipped, equipped_slot, notes)
       VALUES ('dagger-stack', 'hero-1', 'dagger', 'carried', 0, NULL, NULL);

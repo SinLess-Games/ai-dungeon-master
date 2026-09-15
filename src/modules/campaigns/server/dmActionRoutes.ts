@@ -371,6 +371,7 @@ export const campaignDmActionRoutes = new Hono<Env>()
       scheduleIfEvent(c, campaignId, resolved.result.value);
 
       let content = authoritativeSummary(resolved.action, resolved.result.value);
+      let finalDecision: Extract<DmTurnDecision, { kind: "narration" | "check" }> | null = null;
       let nextPendingAction: PublicCampaignDmAction | null = null;
       let structuredError: string | null = null;
 
@@ -393,21 +394,10 @@ export const campaignDmActionRoutes = new Hono<Env>()
             seedAuthoritativeResults: [resolved.result.value],
           });
           if (turn) {
+            finalDecision = turn.decision;
             for (const result of turn.commandResults) scheduleResult(c, campaignId, result);
             scheduleResult(c, campaignId, turn.alignmentResult);
             content = turn.decision.kind === "check" ? turn.decision.preface : turn.decision.text;
-
-            if (turn.decision.kind === "check") {
-              const context = await loadDmCharacterContext(
-                db,
-                campaignId,
-                origin.characterId,
-                session.user.id,
-              );
-              if (!context) throw new Error("AI_DM_CHARACTER_CONTEXT_LOST");
-              // The new action is created after this DM message so the persisted
-              // request can link to the exact preface shown to the player.
-            }
           }
         } catch (error) {
           console.error("AI DM post-check tool loop failed", {
@@ -424,24 +414,34 @@ export const campaignDmActionRoutes = new Hono<Env>()
       const message = await insertDmMessage(db, campaignId, content);
       await attachDmResolutionMessage(db, resolved.action.id, message.id);
 
-      // Re-run only enough context work to persist a newly requested check after
-      // its visible DM preface exists. This leaves the original resolved action
-      // immutable while chaining the next player roll safely.
-      if (!structuredError && playerMessage && playerMessage.authorUserId === session.user.id) {
+      if (finalDecision?.kind === "check") {
         try {
-          // If the completed tool loop left another check, its preface is the
-          // message we just inserted. Replan from the unchanged player action is
-          // intentionally avoided: look at the latest pending row first. No row
-          // means the turn ended in narration.
-          const existing = await findPendingDmAction(db, campaignId, session.user.id);
-          if (!existing) {
-            // There is no hidden planner state to persist. A chained check is
-            // created only by the explicit branch below when content represents
-            // a check decision; see the second structured call result captured by
-            // `chainedDecision` in the local block.
-          }
+          const context = await loadDmCharacterContext(
+            db,
+            campaignId,
+            origin.characterId,
+            session.user.id,
+          );
+          if (!context) throw new Error("AI_DM_CHARACTER_CONTEXT_LOST");
+          nextPendingAction = await createPendingDmAction(db, {
+            campaignId,
+            requestedByMessageId: origin.requestedByMessageId,
+            requestMessageId: message.id,
+            requestedUserId: session.user.id,
+            characterId: origin.characterId,
+            actorId: context.character.actorId,
+            arguments: pendingArguments(finalDecision, context),
+          });
         } catch (error) {
-          console.error("Unable to verify chained AI DM action state", { campaignId, error });
+          console.error("Unable to persist chained AI DM check", {
+            campaignId,
+            actionId,
+            userId: session.user.id,
+            error,
+          });
+          structuredError =
+            structuredError ??
+            "The previous check was resolved, but the next requested check could not be persisted.";
         }
       }
 

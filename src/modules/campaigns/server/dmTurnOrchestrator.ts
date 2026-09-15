@@ -37,6 +37,10 @@ export interface StructuredDmTurnResult {
  * player-supplied d20 check is required. Eight commands is enough for a normal
  * player action followed by one or more DM-run creature turns while remaining
  * strictly bounded against runaway model output.
+ *
+ * `onCommittedResult` fires immediately after each successful authoritative
+ * command. Routes use it to publish/enqueue already-committed events even if a
+ * later model call in the same turn fails.
  */
 export async function runStructuredDmTurn(input: {
   env: OpenAICompatibleEnv;
@@ -46,6 +50,7 @@ export async function runStructuredDmTurn(input: {
   characterId: string;
   playerAction: string;
   seedAuthoritativeResults?: readonly unknown[];
+  onCommittedResult?: (result: GameCommandResult) => void;
 }): Promise<StructuredDmTurnResult | null> {
   let context = await loadDmPlannerContext({
     binding: input.binding,
@@ -90,6 +95,7 @@ export async function runStructuredDmTurn(input: {
         command,
       });
       commandResults.push(result);
+      input.onCommittedResult?.(result);
       const refreshed = await loadDmPlannerContext({
         binding: input.binding,
         campaignId: input.campaign.id,
@@ -131,6 +137,7 @@ export async function runStructuredDmTurn(input: {
             reason: evaluation.reason,
           },
         );
+        input.onCommittedResult?.(alignmentResult);
       }
     } catch (error) {
       // Alignment tracking is important but should never make a completed turn

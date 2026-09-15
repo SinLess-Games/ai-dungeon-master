@@ -37,6 +37,7 @@ import {
 } from "../client/campaignPlayApi";
 import { CampaignCastingPanel } from "./CampaignCastingPanel";
 import { CampaignDmCheckRequest } from "./CampaignDmCheckRequest";
+import { CampaignMessageCard } from "./CampaignMessageCard";
 import { CampaignResolutionPanel } from "./CampaignResolutionPanel";
 
 type PlayChannel = "campaign" | "ooc" | "character";
@@ -77,6 +78,16 @@ function errorMessage(error: unknown) {
 
 function apiChannel(channel: PlayChannel): CampaignPlayMessageChannel {
   return channel === "ooc" ? "ooc_dm" : "campaign";
+}
+
+function canManageMessage(
+  message: CampaignPlayMessage,
+  currentUserId: string | null,
+  hasGameMasterControl: boolean,
+) {
+  if (!currentUserId || message.authorKind === "system") return false;
+  if (message.authorKind === "player" && message.authorUserId === currentUserId) return true;
+  return hasGameMasterControl;
 }
 
 export function CampaignPlayScreen({
@@ -564,6 +575,9 @@ export function CampaignPlayScreen({
           <section className="flex min-w-0 flex-col bg-background/15">
             {channel === "campaign" ? (
               <ConversationChannel
+                campaignId={campaignId}
+                currentUserId={currentUserId}
+                hasGameMasterControl={hasGameMasterControl}
                 title="The Table"
                 eyebrow="Campaign channel"
                 description="In-character actions, dialogue, DM narration, and authoritative game events share one timeline."
@@ -577,6 +591,9 @@ export function CampaignPlayScreen({
 
             {channel === "ooc" ? (
               <ConversationChannel
+                campaignId={campaignId}
+                currentUserId={currentUserId}
+                hasGameMasterControl={hasGameMasterControl}
                 title="OOC with the Dungeon Master"
                 eyebrow="Private channel"
                 description="Rules questions and table talk here are private to you and the Dungeon Master."
@@ -703,6 +720,9 @@ export function CampaignPlayScreen({
 }
 
 function ConversationChannel({
+  campaignId,
+  currentUserId,
+  hasGameMasterControl,
   title,
   eyebrow,
   description,
@@ -712,6 +732,9 @@ function ConversationChannel({
   loading,
   error,
 }: {
+  campaignId: string;
+  currentUserId: string | null;
+  hasGameMasterControl: boolean;
   title: string;
   eyebrow: string;
   description: string;
@@ -754,7 +777,16 @@ function ConversationChannel({
         ) : timeline.length ? (
           timeline.map((entry) =>
             entry.kind === "message" ? (
-              <MessageCard key={entry.id} message={entry.message} />
+              <CampaignMessageCard
+                key={entry.id}
+                campaignId={campaignId}
+                message={entry.message}
+                canManage={canManageMessage(
+                  entry.message,
+                  currentUserId,
+                  hasGameMasterControl,
+                )}
+              />
             ) : (
               <EventCard
                 key={entry.id}
@@ -772,42 +804,6 @@ function ConversationChannel({
         )}
       </div>
     </>
-  );
-}
-
-function MessageCard({ message }: { message: CampaignPlayMessage }) {
-  const dm = message.authorKind === "dm";
-  const system = message.authorKind === "system";
-  return (
-    <article
-      className={`rounded-xl border p-4 ${
-        dm
-          ? "border-gold/30 bg-gold/5"
-          : system
-            ? "border-border bg-muted/20"
-            : "border-border bg-card/75"
-      }`}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <span
-          className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
-            dm ? "text-gold" : "text-foreground"
-          }`}
-        >
-          {dm ? <Bot className="h-3.5 w-3.5" /> : <UserRound className="h-3.5 w-3.5" />}
-          {message.authorName}
-          {dm ? (
-            <span className="rounded bg-gold/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wider">
-              DM
-            </span>
-          ) : null}
-        </span>
-        <span className="text-[11px] text-muted-foreground">{eventTime(message.createdAt)}</span>
-      </div>
-      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground/90">
-        {message.content}
-      </p>
-    </article>
   );
 }
 

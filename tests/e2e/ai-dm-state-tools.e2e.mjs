@@ -26,6 +26,7 @@ const characterId = "ai-dm-tools-e2e-character";
 const sourceId = "ai-dm-tools-e2e-source";
 const conditionId = "ai-dm-tools-e2e-blessed";
 const itemId = "ai-dm-tools-e2e-potion";
+const skillId = "ai-dm-tools-e2e-search";
 const persistPath = join(directory, "v3");
 
 let proxy;
@@ -34,6 +35,7 @@ let browser;
 let aiServer;
 let actorId = null;
 let plannerStep = 0;
+let alignmentCalls = 0;
 
 async function applyMigrations(db) {
   for (const file of (await readdir("drizzle")).filter((name) => name.endsWith(".sql")).sort()) {
@@ -98,6 +100,7 @@ async function startAiMock() {
     const body = JSON.parse(raw);
     requests.push(body);
     const system = body.messages?.find((entry) => entry.role === "system")?.content ?? "";
+    const prompt = body.messages?.find((entry) => entry.role === "user")?.content ?? "";
 
     let content;
     if (system.includes("Dungeon Master turn planner")) {
@@ -133,13 +136,55 @@ async function startAiMock() {
             reason: "The character completed the shrine trial.",
           },
         });
-      } else {
+      } else if (plannerStep === 4) {
         content = JSON.stringify({
           kind: "narration",
           text: "The shrine falls quiet as its gifts settle into your keeping.",
         });
+      } else if (plannerStep === 5) {
+        content = JSON.stringify({
+          kind: "check",
+          preface: "The inner runes are tightly interlocked. Give me a Search check.",
+          check: {
+            type: "check.skill",
+            skillId,
+            dc: 12,
+            reason: "Find the hidden latch behind the shrine's inner runes.",
+          },
+        });
+      } else if (plannerStep === 6) {
+        content = JSON.stringify({
+          kind: "check",
+          preface: "You find the seam, but the release is concealed. Make one more Search check.",
+          check: {
+            type: "check.skill",
+            skillId,
+            dc: 14,
+            reason: "Locate the concealed release without disturbing the ward.",
+          },
+        });
+      } else if (plannerStep === 7) {
+        const inventoryMatch = prompt.match(
+          /"inventoryId":"([^"]+)","itemId":"ai-dm-tools-e2e-potion"/,
+        );
+        assert.ok(inventoryMatch, "Expected the planner tool context to expose the granted potion stack.");
+        content = JSON.stringify({
+          kind: "command",
+          command: {
+            type: "inventory.remove",
+            inventoryId: inventoryMatch[1],
+            quantity: 1,
+            reason: "One draught is consumed to safely neutralize the revealed ward.",
+          },
+        });
+      } else {
+        content = JSON.stringify({
+          kind: "narration",
+          text: "The hidden release clicks free, and the ward fades without a flash.",
+        });
       }
     } else if (system.includes("ongoing alignment drift")) {
+      alignmentCalls += 1;
       content = JSON.stringify({
         record: true,
         lawChaosDelta: 0,
@@ -281,6 +326,25 @@ try {
     .bind(itemId, sourceId)
     .run();
   await proxy.env.DB.prepare(
+    `INSERT INTO dnd35_skills (
+       id, source_id, slug, name, ability, trained_only, armor_check_multiplier, requires_specialization
+     ) VALUES (?, ?, 'test-search', 'Test Search', 'int', 0, 0, 0)`,
+  )
+    .bind(skillId, sourceId)
+    .run();
+  await proxy.env.DB.prepare(
+    `INSERT INTO dnd35_character_ability_scores (character_id, ability, base_score)
+     VALUES (?, 'int', 14)`,
+  )
+    .bind(characterId)
+    .run();
+  await proxy.env.DB.prepare(
+    `INSERT INTO dnd35_character_skills (character_id, skill_id, specialization, ranks)
+     VALUES (?, ?, '', 4)`,
+  )
+    .bind(characterId, skillId)
+    .run();
+  await proxy.env.DB.prepare(
     "UPDATE campaigns SET status = 'ready', ready_at = unixepoch(), updated_at = unixepoch() WHERE id = ?",
   )
     .bind(campaign.id)
@@ -317,15 +381,80 @@ try {
     "The shrine falls quiet as its gifts settle into your keeping.",
   );
   assert.equal(plannerStep, 4);
+  assert.equal(alignmentCalls, 1);
   assert.ok(ai.requests.length >= 5, "Expected planner calls plus alignment adjudication.");
   console.log("✓ AI DM tools E2E: bounded planner executed three authoritative commands then narrated");
+
+  const checkRequest = await api(
+    page,
+    "POST",
+    `/api/campaigns/${campaign.id}/play/messages`,
+    {
+      channel: "campaign",
+      characterId,
+      content: "I study the shrine's inner runes and search for the hidden release.",
+    },
+    201,
+  );
+  assert.equal(checkRequest.aiError, null);
+  assert.equal(checkRequest.pendingAction?.kind, "check.skill");
+  assert.equal(checkRequest.pendingAction?.skill?.name, "Test Search");
+  assert.equal(checkRequest.pendingAction?.dc, 12);
+  assert.equal(plannerStep, 5);
+
+  const blocked = await api(
+    page,
+    "POST",
+    `/api/campaigns/${campaign.id}/play/messages`,
+    {
+      channel: "campaign",
+      characterId,
+      content: "I try to act again before resolving the requested roll.",
+    },
+    409,
+  );
+  assert.ok(blocked, "Expected an outstanding DM check to block another in-character action.");
+  assert.equal(plannerStep, 5);
+  console.log("✓ AI DM tools E2E: outstanding player roll blocks additional in-character actions");
+
+  const firstResolution = await api(
+    page,
+    "POST",
+    `/api/campaigns/${campaign.id}/play/dm-actions/${checkRequest.pendingAction.id}/resolve`,
+    { roll: 10 },
+  );
+  assert.equal(firstResolution.result.type, "check.skill");
+  assert.equal(firstResolution.pendingAction?.kind, "check.skill");
+  assert.equal(firstResolution.pendingAction?.dc, 14);
+  assert.equal(firstResolution.aiError, null);
+  assert.equal(plannerStep, 6);
+  console.log("✓ AI DM tools E2E: first authoritative check can chain a second requested roll");
+
+  const secondResolution = await api(
+    page,
+    "POST",
+    `/api/campaigns/${campaign.id}/play/dm-actions/${firstResolution.pendingAction.id}/resolve`,
+    { roll: 12 },
+  );
+  assert.equal(secondResolution.result.type, "check.skill");
+  assert.equal(secondResolution.pendingAction, null);
+  assert.equal(secondResolution.aiError, null);
+  assert.equal(
+    secondResolution.dmMessage?.content,
+    "The hidden release clicks free, and the ward fades without a flash.",
+  );
+  assert.equal(plannerStep, 8);
+  assert.equal(alignmentCalls, 2);
+  console.log("✓ AI DM tools E2E: resolved checks re-enter the tool loop and continue authoritative state changes");
 
   const state = await api(page, "GET", `/api/campaigns/${campaign.id}/game/state?eventLimit=100`);
   const eventTypes = state.events.map((event) => event.type);
   assert.ok(eventTypes.includes("condition.applied"));
   assert.ok(eventTypes.includes("inventory.item.granted"));
+  assert.ok(eventTypes.includes("inventory.item.removed"));
   assert.ok(eventTypes.includes("progression.xp.granted"));
-  assert.ok(eventTypes.includes("alignment.drift"));
+  assert.equal(eventTypes.filter((type) => type === "check.skill").length, 2);
+  assert.equal(eventTypes.filter((type) => type === "alignment.drift").length, 2);
   console.log("✓ AI DM tools E2E: authoritative events are visible in the campaign read model");
 
   await server.close();
@@ -354,7 +483,7 @@ try {
     characterId,
     itemId,
   );
-  assert.deepEqual(inventory, { itemId, quantity: 2, location: "carried" });
+  assert.deepEqual(inventory, { itemId, quantity: 1, location: "carried" });
 
   const character = await one(
     proxy.env.DB,
@@ -375,9 +504,9 @@ try {
     characterId,
   );
   assert.equal(alignment.lawChaosScore, 0);
-  assert.equal(alignment.goodEvilScore, 6);
+  assert.equal(alignment.goodEvilScore, 12);
   assert.match(alignment.lastReason, /protect travelers/i);
-  console.log("✓ AI DM tools E2E: condition, inventory, XP, and alignment state persisted in D1");
+  console.log("✓ AI DM tools E2E: condition, inventory, XP, checks, and alignment state persisted in D1");
 
   console.log("\n✓ Structured AI DM state-tool end-to-end verification passed.");
 } finally {

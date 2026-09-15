@@ -574,6 +574,16 @@ export const structuredPlayMessageRoutes = new Hono<Env>().post(
                 session.user.id,
               );
               if (!context) throw new Error("AI_DM_CHARACTER_CONTEXT_LOST");
+
+              let nextArguments: CampaignDmActionArguments;
+              if (pendingInitiative) {
+                nextArguments = initiativeArguments(pendingInitiative);
+              } else if (decision?.kind === "check") {
+                nextArguments = pendingArguments(decision, context);
+              } else {
+                throw new Error("AI_DM_FOLLOWUP_ACTION_MISSING");
+              }
+
               pendingAction = await createPendingDmAction(db, {
                 campaignId,
                 requestedByMessageId: playerId,
@@ -581,9 +591,7 @@ export const structuredPlayMessageRoutes = new Hono<Env>().post(
                 requestedUserId: session.user.id,
                 characterId: input.characterId,
                 actorId: context.character.actorId,
-                arguments: pendingInitiative
-                  ? initiativeArguments(pendingInitiative)
-                  : pendingArguments(decision!, context),
+                arguments: nextArguments,
               });
             }
           } catch (error) {

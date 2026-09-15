@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 
-const probe = /src\/modules\/sync\/server\/offlineMutationMiddleware\.ts/;
+const probe = /src\/(?:infrastructure\/offline\/|modules\/sync\/(?:server\/routes|ui\/))/;
 const result = spawnSync("npm", ["run", "typecheck"], {
   encoding: "utf8",
   shell: false,

@@ -197,10 +197,9 @@ function reducedLandSpeed(baseSpeedFeet: number): number {
     throw new RangeError("Base land speed must be a non-negative safe integer.");
   }
   if (baseSpeedFeet === 0) return 0;
-  // Medium/heavy armor tables reduce 30 -> 20 and 20 -> 15. Rounding the
-  // two-thirds progression to the nearest five-foot square generalizes that
-  // progression to unusual racial speeds without introducing fractional grids.
-  return Math.max(5, Math.round((baseSpeedFeet * 2) / 3 / 5) * 5);
+  // The medium/heavy armor progression is two-thirds speed rounded up to the
+  // next five-foot square: 20 -> 15, 30 -> 20, 40 -> 30, 50 -> 35, and so on.
+  return Math.max(5, Math.ceil(((baseSpeedFeet * 2) / 3) / 5) * 5);
 }
 
 export function encumberedLandSpeed(

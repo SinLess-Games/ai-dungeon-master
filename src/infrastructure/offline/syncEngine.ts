@@ -14,9 +14,15 @@ import {
   setResourceVersion,
   updateOfflineMutation,
 } from "./store";
-import type { OfflineMutation, SyncBootstrapResponse } from "./types";
+import type { OfflineMutation, OfflineResourceRef, SyncBootstrapResponse } from "./types";
 
 let flushPromise: Promise<void> | null = null;
+
+interface ReplayResult {
+  outcome: "done" | "stop";
+  resource: OfflineResourceRef | null;
+  resourceVersion: number | null;
+}
 
 function emitChanged(): void {
   if (typeof window !== "undefined") {
@@ -26,6 +32,10 @@ function emitChanged(): void {
 
 function isOnline(): boolean {
   return typeof navigator === "undefined" || navigator.onLine !== false;
+}
+
+function sameResource(left: OfflineResourceRef | null, right: OfflineResourceRef | null): boolean {
+  return Boolean(left && right && left.kind === right.kind && left.id === right.id);
 }
 
 async function cacheNetworkJson(url: string): Promise<unknown | undefined> {
@@ -114,7 +124,7 @@ async function recordCreatedResourceAlias(
   }
 }
 
-async function replayMutation(row: OfflineMutation): Promise<"done" | "stop"> {
+async function replayMutation(row: OfflineMutation): Promise<ReplayResult> {
   const userId = getActiveOfflineUserId();
   const resource = resolveOfflineResource(userId, row.resource);
   const resolvedUrl = resolveOfflinePathAliases(userId, row.url);
@@ -145,10 +155,12 @@ async function replayMutation(row: OfflineMutation): Promise<"done" | "stop"> {
       state: "pending",
       lastError: error instanceof Error ? error.message : "Network unavailable.",
     });
-    return "stop";
+    return { outcome: "stop", resource: null, resourceVersion: null };
   }
 
-  if (response.status === 401) return "stop";
+  if (response.status === 401) {
+    return { outcome: "stop", resource: null, resourceVersion: null };
+  }
   if (response.status === 409) {
     let message = "The cloud copy changed while this device was offline.";
     try {
@@ -162,15 +174,18 @@ async function replayMutation(row: OfflineMutation): Promise<"done" | "stop"> {
       state: "conflict",
       lastError: message,
     });
-    return "done";
+    return { outcome: "done", resource: null, resourceVersion: null };
   }
-  if (response.status >= 500) {
+  if (response.status === 425 || response.status >= 500) {
     await updateOfflineMutation(row.id, {
       attempts: row.attempts + 1,
       state: "pending",
-      lastError: `Cloud save failed (${response.status}).`,
+      lastError:
+        response.status === 425
+          ? "This save is already being synchronized by another tab."
+          : `Cloud save failed (${response.status}).`,
     });
-    return "stop";
+    return { outcome: "stop", resource: null, resourceVersion: null };
   }
   if (!response.ok) {
     let message = `Queued save was rejected (${response.status}).`;
@@ -190,21 +205,23 @@ async function replayMutation(row: OfflineMutation): Promise<"done" | "stop"> {
       state: "error",
       lastError: message,
     });
-    return "done";
+    return { outcome: "done", resource: null, resourceVersion: null };
   }
 
   await recordCreatedResourceAlias(row, response);
   const resourceVersion = Number(response.headers.get("X-Endless-Codex-Resource-Version"));
   const resolvedResourceAfterCreate = resolveOfflineResource(userId, row.resource);
-  if (
-    resolvedResourceAfterCreate &&
-    Number.isSafeInteger(resourceVersion) &&
-    resourceVersion >= 0
-  ) {
-    await setResourceVersion(resolvedResourceAfterCreate, resourceVersion);
+  const validResourceVersion =
+    Number.isSafeInteger(resourceVersion) && resourceVersion >= 0 ? resourceVersion : null;
+  if (resolvedResourceAfterCreate && validResourceVersion !== null) {
+    await setResourceVersion(resolvedResourceAfterCreate, validResourceVersion);
   }
   await deleteOfflineMutation(row.id);
-  return "done";
+  return {
+    outcome: "done",
+    resource: resolvedResourceAfterCreate,
+    resourceVersion: validResourceVersion,
+  };
 }
 
 export async function flushOfflineMutations(): Promise<void> {
@@ -214,12 +231,24 @@ export async function flushOfflineMutations(): Promise<void> {
   flushPromise = (async () => {
     emitChanged();
     const rows = await listOfflineMutations();
-    for (const row of rows) {
-      if (row.state !== "pending") continue;
+    for (let index = 0; index < rows.length; index += 1) {
+      const row = rows[index];
+      if (!row || row.state !== "pending") continue;
       if (!isOnline()) break;
       const result = await replayMutation(row);
+      if (result.resource && result.resourceVersion !== null) {
+        const userId = getActiveOfflineUserId();
+        for (let nextIndex = index + 1; nextIndex < rows.length; nextIndex += 1) {
+          const nextRow = rows[nextIndex];
+          if (!nextRow || nextRow.state !== "pending") continue;
+          const nextResource = resolveOfflineResource(userId, nextRow.resource);
+          if (!sameResource(result.resource, nextResource)) continue;
+          nextRow.baseVersion = result.resourceVersion;
+          await updateOfflineMutation(nextRow.id, { baseVersion: result.resourceVersion });
+        }
+      }
       emitChanged();
-      if (result === "stop") break;
+      if (result.outcome === "stop") break;
     }
     if (isOnline()) {
       try {

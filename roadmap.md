@@ -82,5 +82,5 @@ game commands, live coordination, and book-rule seeds: **112 tests passed** at t
 September 14 audit point. Later AI-DM, campaign-duration, and live-sheet/encumbrance
 work adds focused unit coverage, but this environment cannot execute the repository
 test suite and current GitHub Actions jobs fail before their workflow steps begin.
-Browser E2E, live Google/AI calls, remote migrations, and deployment were not run for
-this roadmap audit.
+Browser E2E, live Google/AI calls, remote migrations, and production deployment were
+not run as part of this roadmap audit.

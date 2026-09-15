@@ -131,9 +131,9 @@ export interface CampaignDmAction {
   campaignId: string;
   characterId: string;
   actorId: string;
-  kind: "check.skill" | "check.save";
+  kind: "check.skill" | "check.save" | "check.initiative";
   status: "pending" | "resolving" | "resolved" | "failed" | "cancelled";
-  dc: number;
+  dc: number | null;
   reason: string;
   skill: { id: string; name: string; specialization: string } | null;
   save: CampaignSaveKind | null;
@@ -382,7 +382,10 @@ export interface SendCampaignPlayMessageResult {
 
 export interface ResolveCampaignDmActionResult {
   action: CampaignDmAction;
-  result: { type: "check.skill" | "check.save"; value: unknown };
+  result: {
+    type: "check.skill" | "check.save" | "check.initiative" | "encounter.start";
+    value: unknown;
+  };
   dmMessage: CampaignPlayMessage;
   /** A resolved check may immediately lead to another player-supplied check. */
   pendingAction: CampaignDmAction | null;

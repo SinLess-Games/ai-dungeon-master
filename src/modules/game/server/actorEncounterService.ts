@@ -63,7 +63,11 @@ async function initiativeModifierForActor(
 
 export async function startActorEncounter(
   deps: EncounterServiceDependencies,
-  input: { campaignId: string; participantIds: readonly string[] },
+  input: {
+    campaignId: string;
+    participantIds: readonly string[];
+    initiativeRolls?: Readonly<Record<string, number>>;
+  },
 ): Promise<ActiveEncounterView & { eventId: string }> {
   if (input.participantIds.length === 0) {
     throw new RangeError("An encounter requires participants.");
@@ -75,6 +79,17 @@ export async function startActorEncounter(
     participantIds.length !== input.participantIds.length
   ) {
     throw new RangeError("Encounter participants must be unique, non-empty actor ids.");
+  }
+
+  if (input.initiativeRolls) {
+    for (const [actorId, roll] of Object.entries(input.initiativeRolls)) {
+      if (!participantIds.includes(actorId)) {
+        throw new RangeError("An initiative override must belong to an encounter participant.");
+      }
+      if (!Number.isSafeInteger(roll) || roll < 1 || roll > 20) {
+        throw new RangeError("Initiative rolls must be integers from 1 through 20.");
+      }
+    }
   }
 
   const context = await requireContext(deps, input.campaignId);
@@ -109,7 +124,7 @@ export async function startActorEncounter(
     participantIds.map(async (actorId) => {
       const actor = byId.get(actorId);
       if (!actor) throw new Error("ENCOUNTER_PARTICIPANT_INVALID");
-      const initiativeRoll = initiativeRoller();
+      const initiativeRoll = input.initiativeRolls?.[actorId] ?? initiativeRoller();
       if (!Number.isSafeInteger(initiativeRoll) || initiativeRoll < 1 || initiativeRoll > 20) {
         throw new RangeError("Initiative roller must return an integer from 1 through 20.");
       }

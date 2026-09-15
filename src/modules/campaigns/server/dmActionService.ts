@@ -7,6 +7,8 @@ import {
   type GameCommand,
   type GameCommandResult,
 } from "@/modules/game/server/gameCommandService";
+import { startActorEncounter } from "@/modules/game/server/actorEncounterService";
+import { getActiveEncounter } from "@/modules/game/server/encounterService";
 import { loadCampaignPlaySchemaReadiness } from "./campaignPlaySchemaReadiness";
 import type { DmPlannerSkillOption } from "./dmToolPlanner";
 
@@ -19,7 +21,7 @@ interface DmActionRow {
   requestedUserId: string;
   characterId: string;
   actorId: string;
-  kind: "check.skill" | "check.save";
+  kind: "check.skill" | "check.save" | "check.initiative";
   arguments: string;
   status: "pending" | "resolving" | "resolved" | "failed" | "cancelled";
   result: string | null;
@@ -46,6 +48,12 @@ interface UntrainedSkillRow {
   trainedOnly: number;
 }
 
+interface ControlledInitiativeActor {
+  actorId: string;
+  characterId: string;
+  controllerUserId: string;
+}
+
 export interface DmCharacterContext {
   character: { id: string; name: string; actorId: string };
   skills: DmPlannerSkillOption[];
@@ -56,9 +64,9 @@ export interface PublicCampaignDmAction {
   campaignId: string;
   characterId: string;
   actorId: string;
-  kind: "check.skill" | "check.save";
+  kind: "check.skill" | "check.save" | "check.initiative";
   status: "pending" | "resolving" | "resolved" | "failed" | "cancelled";
-  dc: number;
+  dc: number | null;
   reason: string;
   skill: { id: string; name: string; specialization: string } | null;
   save: "fort" | "ref" | "will" | null;
@@ -67,10 +75,33 @@ export interface PublicCampaignDmAction {
   resolvedAt: number | null;
 }
 
+export interface InitiativeSubmissionResult {
+  type: "check.initiative";
+  value: {
+    actorId: string;
+    naturalRoll: number;
+    awaitingOthers: true;
+  };
+}
+
+export type DmActionResolutionResult = GameCommandResult | InitiativeSubmissionResult;
+
 function parseArguments(value: string): CampaignDmActionArguments {
   const parsed = JSON.parse(value) as CampaignDmActionArguments;
   if (!parsed || typeof parsed !== "object") throw new Error("AI_DM_ACTION_ARGUMENTS_INVALID");
-  if (parsed.type !== "check.skill" && parsed.type !== "check.save") {
+  if (
+    parsed.type !== "check.skill" &&
+    parsed.type !== "check.save" &&
+    parsed.type !== "check.initiative"
+  ) {
+    throw new Error("AI_DM_ACTION_ARGUMENTS_INVALID");
+  }
+  if (
+    parsed.type === "check.initiative" &&
+    (!Array.isArray(parsed.participantIds) ||
+      parsed.participantIds.length === 0 ||
+      parsed.participantIds.some((id) => typeof id !== "string" || id.trim().length === 0))
+  ) {
     throw new Error("AI_DM_ACTION_ARGUMENTS_INVALID");
   }
   return parsed;
@@ -83,9 +114,9 @@ function publicAction(row: DmActionRow): PublicCampaignDmAction {
     campaignId: row.campaignId,
     characterId: row.characterId,
     actorId: row.actorId,
-    kind: row.kind,
+    kind: args.type,
     status: row.status,
-    dc: args.dc,
+    dc: args.type === "check.initiative" ? null : args.dc,
     reason: args.reason,
     skill:
       args.type === "check.skill"
@@ -131,6 +162,80 @@ async function readAction(
     )
     .bind(actionId, campaignId, userId)
     .first<DmActionRow>();
+}
+
+async function readInitiativeGroup(
+  binding: D1Database,
+  campaignId: string,
+  requestMessageId: string,
+): Promise<DmActionRow[]> {
+  const result = await binding
+    .prepare(
+      `SELECT id,
+              campaign_id AS campaignId,
+              requested_by_message_id AS requestedByMessageId,
+              request_message_id AS requestMessageId,
+              resolution_message_id AS resolutionMessageId,
+              requested_user_id AS requestedUserId,
+              character_id AS characterId,
+              actor_id AS actorId,
+              kind,
+              arguments,
+              status,
+              result,
+              error,
+              created_at AS createdAt,
+              resolved_at AS resolvedAt
+       FROM campaign_dm_actions
+       WHERE campaign_id = ?
+         AND request_message_id = ?
+         AND kind = 'check.initiative'
+       ORDER BY created_at, rowid`,
+    )
+    .bind(campaignId, requestMessageId)
+    .all<DmActionRow>();
+  return result.results;
+}
+
+function normalizeParticipantIds(participantIds: readonly string[]): string[] {
+  const normalized = participantIds.map((id) => id.trim());
+  if (
+    normalized.length === 0 ||
+    normalized.some((id) => id.length === 0) ||
+    new Set(normalized).size !== normalized.length
+  ) {
+    throw new Error("AI_DM_ACTION_ARGUMENTS_INVALID");
+  }
+  return normalized;
+}
+
+async function loadControlledInitiativeActors(
+  binding: D1Database,
+  campaignId: string,
+  participantIds: readonly string[],
+): Promise<ControlledInitiativeActor[]> {
+  const normalized = normalizeParticipantIds(participantIds);
+  const placeholders = normalized.map(() => "?").join(", ");
+  const result = await binding
+    .prepare(
+      `SELECT id AS actorId,
+              character_id AS characterId,
+              controller_user_id AS controllerUserId
+       FROM game_actors
+       WHERE campaign_id = ?
+         AND id IN (${placeholders})
+         AND kind = 'character'
+         AND status = 'active'
+         AND character_id IS NOT NULL
+         AND controller_user_id IS NOT NULL`,
+    )
+    .bind(campaignId, ...normalized)
+    .all<ControlledInitiativeActor>();
+  const byId = new Map(result.results.map((actor) => [actor.actorId, actor]));
+  return normalized.flatMap((actorId) => {
+    const actor = byId.get(actorId);
+    return actor ? [actor] : [];
+  });
 }
 
 export async function findPendingDmAction(
@@ -267,20 +372,22 @@ export async function loadDmCharacterContext(
   };
 }
 
-export async function createPendingDmAction(
+type PendingActionInput = {
+  campaignId: string;
+  requestedByMessageId: string;
+  requestMessageId: string | null;
+  requestedUserId: string;
+  characterId: string;
+  actorId: string;
+  arguments: CampaignDmActionArguments;
+};
+
+function pendingActionInsert(
   binding: D1Database,
-  input: {
-    campaignId: string;
-    requestedByMessageId: string;
-    requestMessageId: string | null;
-    requestedUserId: string;
-    characterId: string;
-    actorId: string;
-    arguments: CampaignDmActionArguments;
-  },
-): Promise<PublicCampaignDmAction> {
-  const id = crypto.randomUUID();
-  await binding
+  id: string,
+  input: PendingActionInput,
+): D1PreparedStatement {
+  return binding
     .prepare(
       `INSERT INTO campaign_dm_actions
          (id, campaign_id, requested_by_message_id, request_message_id, requested_user_id,
@@ -297,17 +404,86 @@ export async function createPendingDmAction(
       input.actorId,
       input.arguments.type,
       JSON.stringify(input.arguments),
-    )
-    .run();
+    );
+}
 
+async function insertPendingDmAction(
+  binding: D1Database,
+  input: PendingActionInput,
+): Promise<PublicCampaignDmAction> {
+  const id = crypto.randomUUID();
+  await pendingActionInsert(binding, id, input).run();
   const row = await readAction(binding, input.campaignId, id, input.requestedUserId);
   if (!row) throw new Error("AI_DM_ACTION_CREATE_FAILED");
   return publicAction(row);
 }
 
+async function createInitialInitiativeActions(
+  binding: D1Database,
+  input: PendingActionInput & { arguments: Extract<CampaignDmActionArguments, { type: "check.initiative" }> },
+): Promise<PublicCampaignDmAction> {
+  if (!input.requestMessageId) throw new Error("AI_DM_ACTION_ARGUMENTS_INVALID");
+  const controlled = await loadControlledInitiativeActors(
+    binding,
+    input.campaignId,
+    input.arguments.participantIds,
+  );
+  const initiating = controlled.find(
+    (actor) =>
+      actor.actorId === input.actorId && actor.controllerUserId === input.requestedUserId,
+  );
+  if (!initiating) throw new Error("ENCOUNTER_PARTICIPANT_INVALID");
+
+  const firstByUser = new Map<string, ControlledInitiativeActor>();
+  firstByUser.set(input.requestedUserId, initiating);
+  for (const actor of controlled) {
+    if (!firstByUser.has(actor.controllerUserId)) {
+      firstByUser.set(actor.controllerUserId, actor);
+    }
+  }
+
+  const entries = [...firstByUser.entries()].map(([requestedUserId, actor]) => ({
+    id: crypto.randomUUID(),
+    requestedUserId,
+    actor,
+  }));
+  await binding.batch(
+    entries.map((entry) =>
+      pendingActionInsert(binding, entry.id, {
+        campaignId: input.campaignId,
+        requestedByMessageId: input.requestedByMessageId,
+        requestMessageId: input.requestMessageId,
+        requestedUserId: entry.requestedUserId,
+        characterId: entry.actor.characterId,
+        actorId: entry.actor.actorId,
+        arguments: input.arguments,
+      }),
+    ),
+  );
+
+  const current = entries.find((entry) => entry.requestedUserId === input.requestedUserId);
+  if (!current) throw new Error("AI_DM_ACTION_CREATE_FAILED");
+  const row = await readAction(binding, input.campaignId, current.id, current.requestedUserId);
+  if (!row) throw new Error("AI_DM_ACTION_CREATE_FAILED");
+  return publicAction(row);
+}
+
+export async function createPendingDmAction(
+  binding: D1Database,
+  input: PendingActionInput,
+): Promise<PublicCampaignDmAction> {
+  if (input.arguments.type === "check.initiative") {
+    return createInitialInitiativeActions(binding, {
+      ...input,
+      arguments: input.arguments,
+    });
+  }
+  return insertPendingDmAction(binding, input);
+}
+
 function commandForAction(
   row: DmActionRow,
-  args: CampaignDmActionArguments,
+  args: Exclude<CampaignDmActionArguments, { type: "check.initiative" }>,
   roll: number,
 ): GameCommand {
   if (args.type === "check.skill") {
@@ -338,6 +514,9 @@ function isTerminalResolutionError(error: unknown): boolean {
     "CAMPAIGN_RULESET_UNSUPPORTED",
     "GAME_ACTOR_NOT_FOUND",
     "GAME_ACTOR_OR_SKILL_NOT_FOUND",
+    "ENCOUNTER_ALREADY_ACTIVE",
+    "ENCOUNTER_PARTICIPANT_INVALID",
+    "ENCOUNTER_PLAYER_INITIATIVE_REQUIRED",
   ]).has(error.message);
 }
 
@@ -345,6 +524,144 @@ function resultIsDisallowed(value: unknown): boolean {
   if (!value || typeof value !== "object") return false;
   const allowed = (value as Record<string, unknown>)["allowed"];
   return allowed === false;
+}
+
+function initiativeSubmission(row: DmActionRow, roll: number): InitiativeSubmissionResult {
+  return {
+    type: "check.initiative",
+    value: { actorId: row.actorId, naturalRoll: roll, awaitingOthers: true },
+  };
+}
+
+function initiativeRoll(row: DmActionRow): number | null {
+  if (!row.result) return null;
+  try {
+    const parsed = JSON.parse(row.result) as {
+      type?: unknown;
+      value?: { actorId?: unknown; naturalRoll?: unknown };
+    };
+    if (parsed.type !== "check.initiative") return null;
+    if (parsed.value?.actorId !== row.actorId) return null;
+    const roll = parsed.value.naturalRoll;
+    return typeof roll === "number" && Number.isSafeInteger(roll) && roll >= 1 && roll <= 20
+      ? roll
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function isEncounterAlreadyActiveRace(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message === "ENCOUNTER_ALREADY_ACTIVE" ||
+    /game_encounters_one_active_per_session_uidx|UNIQUE constraint failed: game_encounters\.session_id/i.test(
+      message,
+    )
+  );
+}
+
+async function resolveInitiativeAction(
+  binding: D1Database,
+  row: DmActionRow,
+  args: Extract<CampaignDmActionArguments, { type: "check.initiative" }>,
+  roll: number,
+): Promise<{
+  action: PublicCampaignDmAction;
+  result: DmActionResolutionResult;
+  nextPendingAction: PublicCampaignDmAction | null;
+}> {
+  if (!row.requestMessageId) throw new Error("AI_DM_ACTION_ARGUMENTS_INVALID");
+  const submission = initiativeSubmission(row, roll);
+  await binding
+    .prepare(
+      `UPDATE campaign_dm_actions
+       SET result = ?, error = NULL
+       WHERE id = ? AND status = 'resolving'`,
+    )
+    .bind(JSON.stringify(submission), row.id)
+    .run();
+
+  const controlled = await loadControlledInitiativeActors(binding, row.campaignId, args.participantIds);
+  const currentActor = controlled.find(
+    (actor) => actor.actorId === row.actorId && actor.controllerUserId === row.requestedUserId,
+  );
+  if (!currentActor) throw new Error("ENCOUNTER_PARTICIPANT_INVALID");
+
+  const group = await readInitiativeGroup(binding, row.campaignId, row.requestMessageId);
+  const rolls = new Map<string, number>();
+  for (const action of group) {
+    const natural = initiativeRoll(action);
+    if (natural !== null) rolls.set(action.actorId, natural);
+  }
+  const missing = controlled.filter((actor) => !rolls.has(actor.actorId));
+  const nextForCurrentUser = missing.find(
+    (actor) => actor.controllerUserId === row.requestedUserId,
+  );
+
+  if (nextForCurrentUser) {
+    await binding
+      .prepare(
+        `UPDATE campaign_dm_actions
+         SET status = 'resolved', error = NULL, resolved_at = unixepoch()
+         WHERE id = ? AND status = 'resolving'`,
+      )
+      .bind(row.id)
+      .run();
+    const nextPendingAction = await insertPendingDmAction(binding, {
+      campaignId: row.campaignId,
+      requestedByMessageId: row.requestedByMessageId,
+      requestMessageId: row.requestMessageId,
+      requestedUserId: row.requestedUserId,
+      characterId: nextForCurrentUser.characterId,
+      actorId: nextForCurrentUser.actorId,
+      arguments: args,
+    });
+    const updated = await readAction(binding, row.campaignId, row.id, row.requestedUserId);
+    if (!updated) throw new Error("AI_DM_ACTION_NOT_FOUND");
+    return { action: publicAction(updated), result: submission, nextPendingAction };
+  }
+
+  if (missing.length > 0) {
+    const updated = await readAction(binding, row.campaignId, row.id, row.requestedUserId);
+    if (!updated) throw new Error("AI_DM_ACTION_NOT_FOUND");
+    return { action: publicAction(updated), result: submission, nextPendingAction: null };
+  }
+
+  const initiativeRolls = Object.fromEntries(
+    controlled.map((actor) => [actor.actorId, rolls.get(actor.actorId)!]),
+  );
+  const deps = { db: createDatabase(binding), binding };
+  let encounter: Awaited<ReturnType<typeof startActorEncounter>> | Awaited<ReturnType<typeof getActiveEncounter>>;
+  try {
+    encounter = await startActorEncounter(deps, {
+      campaignId: row.campaignId,
+      participantIds: args.participantIds,
+      initiativeRolls,
+    });
+  } catch (error) {
+    if (!isEncounterAlreadyActiveRace(error)) throw error;
+    encounter = await getActiveEncounter(deps, row.campaignId);
+    if (!encounter) throw error;
+  }
+
+  const finalResult: GameCommandResult = { type: "encounter.start", value: encounter };
+  await binding
+    .prepare(
+      `UPDATE campaign_dm_actions
+       SET status = 'resolved', result = ?, error = NULL,
+           resolved_at = COALESCE(resolved_at, unixepoch())
+       WHERE campaign_id = ?
+         AND request_message_id = ?
+         AND kind = 'check.initiative'
+         AND status IN ('pending', 'resolving', 'resolved')`,
+    )
+    .bind(JSON.stringify(finalResult), row.campaignId, row.requestMessageId)
+    .run();
+
+  const updated = await readAction(binding, row.campaignId, row.id, row.requestedUserId);
+  if (!updated) throw new Error("AI_DM_ACTION_NOT_FOUND");
+  return { action: publicAction(updated), result: finalResult, nextPendingAction: null };
 }
 
 export async function resolvePendingDmAction(
@@ -355,7 +672,11 @@ export async function resolvePendingDmAction(
     userId: string;
     roll: number;
   },
-): Promise<{ action: PublicCampaignDmAction; result: GameCommandResult }> {
+): Promise<{
+  action: PublicCampaignDmAction;
+  result: DmActionResolutionResult;
+  nextPendingAction: PublicCampaignDmAction | null;
+}> {
   if (!Number.isSafeInteger(input.roll) || input.roll < 1 || input.roll > 20) {
     throw new RangeError("A natural d20 roll must be an integer from 1 to 20.");
   }
@@ -374,8 +695,12 @@ export async function resolvePendingDmAction(
     .run();
   if ((claim.meta.changes ?? 0) !== 1) throw new Error("AI_DM_ACTION_NOT_PENDING");
 
-  const args = parseArguments(row.arguments);
   try {
+    const args = parseArguments(row.arguments);
+    if (args.type === "check.initiative") {
+      return await resolveInitiativeAction(binding, row, args, input.roll);
+    }
+
     const result = await executeGameCommand(
       { db: createDatabase(binding), binding },
       input.campaignId,
@@ -396,22 +721,36 @@ export async function resolvePendingDmAction(
 
     const updated = await readAction(binding, input.campaignId, input.actionId, input.userId);
     if (!updated) throw new Error("AI_DM_ACTION_NOT_FOUND");
-    return { action: publicAction(updated), result };
+    return { action: publicAction(updated), result, nextPendingAction: null };
   } catch (error) {
     const message = error instanceof Error ? error.message : "AI DM action resolution failed.";
     const terminal = isTerminalResolutionError(error);
-    await binding
-      .prepare(
-        terminal
-          ? `UPDATE campaign_dm_actions
-             SET status = 'failed', error = ?, resolved_at = unixepoch()
-             WHERE id = ? AND status = 'resolving'`
-          : `UPDATE campaign_dm_actions
-             SET status = 'pending', error = ?
-             WHERE id = ? AND status = 'resolving'`,
-      )
-      .bind(message.slice(0, 1000), input.actionId)
-      .run();
+    if (row.kind === "check.initiative" && row.requestMessageId && terminal) {
+      await binding
+        .prepare(
+          `UPDATE campaign_dm_actions
+           SET status = 'failed', error = ?, resolved_at = unixepoch()
+           WHERE campaign_id = ?
+             AND request_message_id = ?
+             AND kind = 'check.initiative'
+             AND status IN ('pending', 'resolving')`,
+        )
+        .bind(message.slice(0, 1000), row.campaignId, row.requestMessageId)
+        .run();
+    } else {
+      await binding
+        .prepare(
+          terminal
+            ? `UPDATE campaign_dm_actions
+               SET status = 'failed', error = ?, resolved_at = unixepoch()
+               WHERE id = ? AND status = 'resolving'`
+            : `UPDATE campaign_dm_actions
+               SET status = 'pending', error = ?
+               WHERE id = ? AND status = 'resolving'`,
+        )
+        .bind(message.slice(0, 1000), input.actionId)
+        .run();
+    }
     throw error;
   }
 }
@@ -425,7 +764,7 @@ export async function attachDmResolutionMessage(
     .prepare(
       `UPDATE campaign_dm_actions
        SET resolution_message_id = ?
-       WHERE id = ? AND status = 'resolved'`,
+       WHERE id = ? AND status IN ('resolved', 'resolving')`,
     )
     .bind(messageId, actionId)
     .run();

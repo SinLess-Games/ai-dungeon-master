@@ -7,6 +7,7 @@ const REQUIRED_STRUCTURED_DM_TABLES = [
 
 export interface CampaignPlaySchemaReadiness {
   dmActions: boolean;
+  initiativeActions: boolean;
   alignmentTracking: boolean;
   structuredDm: boolean;
   missingTables: string[];
@@ -25,16 +26,19 @@ export async function loadCampaignPlaySchemaReadiness(
 ): Promise<CampaignPlaySchemaReadiness> {
   const result = await binding
     .prepare(
-      `SELECT name
+      `SELECT name, sql
        FROM sqlite_master
        WHERE type = 'table'
          AND name IN (?, ?)`,
     )
     .bind(...REQUIRED_STRUCTURED_DM_TABLES)
-    .all<{ name: string }>();
+    .all<{ name: string; sql: string | null }>();
 
-  const available = new Set(result.results.map((row) => row.name));
+  const available = new Map(result.results.map((row) => [row.name, row.sql]));
   const dmActions = available.has("campaign_dm_actions");
+  const dmActionSql = available.get("campaign_dm_actions") ?? "";
+  const initiativeActions =
+    dmActions && typeof dmActionSql === "string" && dmActionSql.includes("'check.initiative'");
   const alignmentTracking = available.has("runtime_dnd35_alignment_states");
   const missingTables = REQUIRED_STRUCTURED_DM_TABLES.filter(
     (table) => !available.has(table),
@@ -42,8 +46,9 @@ export async function loadCampaignPlaySchemaReadiness(
 
   return {
     dmActions,
+    initiativeActions,
     alignmentTracking,
-    structuredDm: dmActions && alignmentTracking,
+    structuredDm: dmActions && initiativeActions && alignmentTracking,
     missingTables: [...missingTables],
   };
 }

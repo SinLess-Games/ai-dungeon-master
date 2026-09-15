@@ -2,7 +2,12 @@ import { useEffect, useState } from "react";
 import { Dice5, LoaderCircle, ShieldQuestion } from "lucide-react";
 import type { CampaignDmAction } from "../client/campaignPlayApi";
 
+function isInitiativeAction(action: CampaignDmAction): boolean {
+  return action.kind === "check.initiative";
+}
+
 function actionLabel(action: CampaignDmAction): string {
+  if (isInitiativeAction(action)) return "Initiative";
   if (action.kind === "check.skill" && action.skill) {
     return `${action.skill.name}${action.skill.specialization ? ` (${action.skill.specialization})` : ""}`;
   }
@@ -48,6 +53,7 @@ export function CampaignDmCheckRequest({
   const validRoll = Number.isInteger(roll) && roll >= 1 && roll <= 20;
   const resolving = disabled || submitted || action.status === "resolving";
   const rollInputLocked = resolving || rolledWithButton || lockedRoll !== null;
+  const initiative = isInitiativeAction(action);
 
   function rollD20() {
     if (resolving || rolledWithButton || lockedRoll !== null) return;
@@ -69,16 +75,18 @@ export function CampaignDmCheckRequest({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-gold">
-              <ShieldQuestion className="h-3.5 w-3.5" /> DM check
+              <ShieldQuestion className="h-3.5 w-3.5" /> {initiative ? "Combat" : "DM check"}
             </div>
             <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
               <h3 className="font-display text-base leading-tight">{actionLabel(action)}</h3>
               <p className="min-w-0 text-xs leading-4 text-muted-foreground">{action.reason}</p>
             </div>
           </div>
-          <span className="shrink-0 rounded-md border border-gold/30 bg-gold/10 px-2 py-1 text-xs font-bold text-gold">
-            DC {action.dc}
-          </span>
+          {!initiative ? (
+            <span className="shrink-0 rounded-md border border-gold/30 bg-gold/10 px-2 py-1 text-xs font-bold text-gold">
+              DC {action.dc}
+            </span>
+          ) : null}
         </div>
 
         {action.error ? (
@@ -101,7 +109,7 @@ export function CampaignDmCheckRequest({
               disabled={rollInputLocked}
               onChange={(event) => setRollText(event.target.value)}
               className="h-8 w-full rounded-md border border-border bg-background px-2 text-center text-sm font-bold outline-none transition focus:border-gold/50 disabled:opacity-50"
-              aria-label="Natural d20 roll"
+              aria-label={initiative ? "Natural initiative roll" : "Natural d20 roll"}
             />
           </label>
           <button
@@ -126,7 +134,9 @@ export function CampaignDmCheckRequest({
                 : "Submit"}
           </button>
           <p className="min-w-48 flex-1 text-[10px] leading-4 text-muted-foreground">
-            One natural d20 per requested check. Modifiers and success are resolved by the rules engine.
+            {initiative
+              ? "One natural d20. Your initiative modifier and turn order are resolved by the rules engine."
+              : "One natural d20 per requested check. Modifiers and success are resolved by the rules engine."}
           </p>
         </div>
       </div>

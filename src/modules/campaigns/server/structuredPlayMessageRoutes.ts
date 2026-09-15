@@ -1,8 +1,8 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import { dmNarrationRetryPrompt } from "@/prompts/dmNarrationRetry";
-import { dmReplyUserPrompt } from "@/prompts/dmReplyUser";
 import { dmReplySystemPrompt } from "@/prompts/dmReplySystem";
+import { dmReplyUserPrompt } from "@/prompts/dmReplyUser";
 import { Hono } from "hono";
 import { z } from "zod";
 import {
@@ -36,10 +36,12 @@ import {
 } from "./dmActionService";
 import { assertCampaignDmNarration, campaignDmNarrationViolation } from "./dmCampaignChatPolicy";
 import { loadDmSystemReferences, serializeDmSystemReferences } from "./dmSystemReferencePlanner";
-import { runStructuredDmTurn } from "./dmTurnOrchestrator";
+import {
+  runStructuredDmTurn,
+  type PendingInitiativeRequest,
+} from "./dmTurnOrchestrator";
 import { loadDmConversationText, loadRecentDmEvents } from "./dmTurnRuntime";
 import type { DmTurnDecision } from "./dmToolPlanner";
-
 import { respondWithDmStream, type DmResponseStream } from "./dmResponseStream";
 import { streamDmNarration } from "./dmNarrationStream";
 
@@ -358,6 +360,14 @@ function pendingArguments(
   };
 }
 
+function initiativeArguments(request: PendingInitiativeRequest): CampaignDmActionArguments {
+  return {
+    type: "check.initiative",
+    participantIds: [...request.participantIds],
+    reason: request.reason,
+  };
+}
+
 function scheduleResult(
   c: { env: Bindings; executionCtx: { waitUntil(promise: Promise<unknown>): void } },
   campaignId: string,
@@ -458,6 +468,7 @@ export const structuredPlayMessageRoutes = new Hono<Env>().post(
           try {
             let reply: string;
             let decision: Extract<DmTurnDecision, { kind: "narration" | "check" }> | null = null;
+            let pendingInitiative: PendingInitiativeRequest | null = null;
             if (input.channel === "campaign" && input.characterId && campaign.status === "active") {
               const structured = await runStructuredDmTurn({
                 env: c.env,
@@ -472,12 +483,14 @@ export const structuredPlayMessageRoutes = new Hono<Env>().post(
                 },
                 userId: session.user.id,
                 characterId: input.characterId,
+                playerMessageId: playerId,
                 playerAction: messageContent,
                 ...(stream ? { signal: stream.signal } : {}),
                 onCommittedResult: (result) => scheduleResult(c, campaignId, result),
               });
               if (structured) {
                 decision = structured.decision;
+                pendingInitiative = structured.pendingInitiative;
                 reply = decision.kind === "check" ? decision.preface : decision.text;
                 if (stream && decision.kind === "narration") {
                   reply = await streamDmNarration(c.env, reply, stream);
@@ -521,7 +534,7 @@ export const structuredPlayMessageRoutes = new Hono<Env>().post(
             });
             dmMessage = await getMessage(db, dmId);
 
-            if (decision?.kind === "check" && input.characterId) {
+            if ((pendingInitiative || decision?.kind === "check") && input.characterId) {
               const context = await loadDmCharacterContext(
                 db,
                 campaignId,
@@ -529,6 +542,16 @@ export const structuredPlayMessageRoutes = new Hono<Env>().post(
                 session.user.id,
               );
               if (!context) throw new Error("AI_DM_CHARACTER_CONTEXT_LOST");
+
+              let nextArguments: CampaignDmActionArguments;
+              if (pendingInitiative) {
+                nextArguments = initiativeArguments(pendingInitiative);
+              } else if (decision?.kind === "check") {
+                nextArguments = pendingArguments(decision, context);
+              } else {
+                throw new Error("AI_DM_FOLLOWUP_ACTION_MISSING");
+              }
+
               pendingAction = await createPendingDmAction(db, {
                 campaignId,
                 requestedByMessageId: playerId,
@@ -536,7 +559,7 @@ export const structuredPlayMessageRoutes = new Hono<Env>().post(
                 requestedUserId: session.user.id,
                 characterId: input.characterId,
                 actorId: context.character.actorId,
-                arguments: pendingArguments(decision, context),
+                arguments: nextArguments,
               });
             }
           } catch (error) {

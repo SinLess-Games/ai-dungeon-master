@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   loadDmPlannerContext: vi.fn(),
   loadRecentDmEvents: vi.fn(),
   loadDmConversationText: vi.fn(),
+  loadResolvedDmActionHistory: vi.fn(),
   executeDmPlannerCommand: vi.fn(),
   planDmTurn: vi.fn(),
   evaluateAlignmentAction: vi.fn(),
@@ -24,6 +25,11 @@ vi.mock("@/modules/campaigns/server/dmTurnRuntime", () => ({
   loadDmPlannerContext: mocks.loadDmPlannerContext,
   loadRecentDmEvents: mocks.loadRecentDmEvents,
   loadDmConversationText: mocks.loadDmConversationText,
+}));
+
+vi.mock("@/modules/campaigns/server/dmActionHistory", () => ({
+  loadResolvedDmActionHistory: mocks.loadResolvedDmActionHistory,
+  serializeDmActionProgress: vi.fn(() => "(No resolved DM-requested checks yet.)"),
 }));
 
 vi.mock("@/modules/campaigns/server/dmToolExecution", () => ({
@@ -81,6 +87,7 @@ const input = {
   },
   userId: "user-1",
   characterId: "character-1",
+  playerMessageId: "player-message-1",
   playerAction: "I finish the objective.",
 };
 
@@ -89,6 +96,7 @@ describe("structured AI DM turn orchestration", () => {
     vi.clearAllMocks();
     mocks.loadCampaignPlaySchemaReadiness.mockResolvedValue({
       dmActions: true,
+      initiativeActions: true,
       alignmentTracking: true,
       structuredDm: true,
       missingTables: [],
@@ -96,6 +104,7 @@ describe("structured AI DM turn orchestration", () => {
     mocks.loadDmPlannerContext.mockResolvedValue(context());
     mocks.loadRecentDmEvents.mockResolvedValue([]);
     mocks.loadDmConversationText.mockResolvedValue("Ari: I finish the objective.");
+    mocks.loadResolvedDmActionHistory.mockResolvedValue([]);
     mocks.evaluateAlignmentAction.mockResolvedValue({
       record: false,
       lawChaosDelta: 0,
@@ -107,6 +116,7 @@ describe("structured AI DM turn orchestration", () => {
   it("falls back before loading structured state when its D1 migrations are unavailable", async () => {
     mocks.loadCampaignPlaySchemaReadiness.mockResolvedValueOnce({
       dmActions: false,
+      initiativeActions: false,
       alignmentTracking: false,
       structuredDm: false,
       missingTables: ["campaign_dm_actions", "runtime_dnd35_alignment_states"],
@@ -114,6 +124,7 @@ describe("structured AI DM turn orchestration", () => {
 
     await expect(runStructuredDmTurn(input)).resolves.toBeNull();
     expect(mocks.loadDmPlannerContext).not.toHaveBeenCalled();
+    expect(mocks.loadResolvedDmActionHistory).not.toHaveBeenCalled();
     expect(mocks.planDmTurn).not.toHaveBeenCalled();
   });
 

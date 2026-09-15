@@ -220,15 +220,23 @@ function actionLabel(action: PublicCampaignDmAction): string {
 
 function initiativeSummary(action: PublicCampaignDmAction, value: Record<string, unknown>): string {
   const rawParticipants = value["participants"];
-  const participants: unknown[] = Array.isArray(rawParticipants) ? rawParticipants : [];
-  const participant = participants.find((candidate: unknown) => {
-    if (!candidate || typeof candidate !== "object") return false;
-    return (candidate as Record<string, unknown>)["characterId"] === action.actorId;
-  });
-  if (!participant || typeof participant !== "object") return "Initiative resolved. Combat begins.";
-  const record = participant as Record<string, unknown>;
-  const natural = typeof record["initiativeRoll"] === "number" ? record["initiativeRoll"] : null;
-  const total = typeof record["initiativeTotal"] === "number" ? record["initiativeTotal"] : null;
+  if (!Array.isArray(rawParticipants)) return "Initiative resolved. Combat begins.";
+
+  let participant: Record<string, unknown> | null = null;
+  for (const candidate of rawParticipants as unknown[]) {
+    if (!candidate || typeof candidate !== "object") continue;
+    const record = candidate as Record<string, unknown>;
+    if (record["characterId"] === action.actorId) {
+      participant = record;
+      break;
+    }
+  }
+
+  if (!participant) return "Initiative resolved. Combat begins.";
+  const naturalValue = participant["initiativeRoll"];
+  const totalValue = participant["initiativeTotal"];
+  const natural = typeof naturalValue === "number" ? naturalValue : null;
+  const total = typeof totalValue === "number" ? totalValue : null;
   if (natural === null) return "Initiative resolved. Combat begins.";
   return total === null
     ? `Initiative: natural ${natural}. Combat begins.`

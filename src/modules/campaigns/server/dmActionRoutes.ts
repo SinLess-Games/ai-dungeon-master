@@ -397,7 +397,7 @@ export const campaignDmActionRoutes = new Hono<Env>()
             const campaignDescriptor: Parameters<typeof runStructuredDmTurn>[0]["campaign"] = {
               id: campaign.id,
               name: campaign.name,
-              description: campaign.description,
+              description: campaign.description ?? "",
               rulesetId: campaign.rulesetId,
               rulesetVersion: campaign.rulesetVersion,
               settings: parseSettings(campaign.settings),

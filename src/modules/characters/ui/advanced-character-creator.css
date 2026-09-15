@@ -260,6 +260,47 @@
 .character-library-empty h2 { margin: .75rem 0 .35rem; font-family: var(--font-display); }
 .character-library-empty p { margin: 0 0 1rem; color: var(--muted-foreground); }
 
+/* Keep the skill-point table usable instead of letting its columns collapse or drift. */
+.creator-table-wrap {
+  max-width: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable both-edges;
+}
+.creator-table {
+  min-width: 760px;
+  table-layout: fixed;
+}
+.creator-table th:first-child,
+.creator-table td:first-child { width: 42%; }
+.creator-table th:nth-child(2),
+.creator-table td:nth-child(2) { width: 82px; }
+.creator-table th:nth-child(3),
+.creator-table td:nth-child(3) { width: 150px; }
+.creator-table th:nth-child(4),
+.creator-table td:nth-child(4) { width: 72px; }
+.creator-table th:nth-child(5),
+.creator-table td:nth-child(5) { width: 104px; }
+.creator-table th:first-child {
+  left: 0;
+  z-index: 4;
+}
+.creator-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: color-mix(in oklch, var(--card) 97%, var(--background));
+  box-shadow: 1px 0 0 var(--border);
+}
+.creator-table input[type="number"] {
+  min-width: 76px;
+  max-width: 100%;
+}
+.creator-table .creator-inline-input {
+  width: 100%;
+  max-width: 100%;
+}
+
 @media (max-width: 900px) {
   .creator-feat-grid,
   .creator-language-grid,

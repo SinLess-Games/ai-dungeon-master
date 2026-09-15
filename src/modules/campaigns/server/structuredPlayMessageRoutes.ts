@@ -30,6 +30,11 @@ import {
   loadDmCharacterContext,
   type PublicCampaignDmAction,
 } from "./dmActionService";
+import {
+  assertCampaignDmNarration,
+  CAMPAIGN_DM_NARRATION_POLICY,
+  campaignDmNarrationViolation,
+} from "./dmCampaignChatPolicy";
 import { runStructuredDmTurn } from "./dmTurnOrchestrator";
 import { loadDmConversationText, loadRecentDmEvents } from "./dmTurnRuntime";
 import type { DmTurnDecision } from "./dmToolPlanner";
@@ -271,24 +276,41 @@ async function basicDmReply(
           campaign.status === "paused"
             ? "The campaign is paused: narrate or answer table talk, but do not imply authoritative mechanics changed."
             : "Narrate the table faithfully without inventing unrecorded mechanical results.",
+          CAMPAIGN_DM_NARRATION_POLICY,
         ].join(" ");
-  return generateOpenAICompatibleText(env, {
-    system,
-    prompt: [
-      `Campaign: ${campaign.name}`,
-      `Description: ${campaign.description || "No campaign description provided."}`,
-      campaignPacingContext(parseSettings(campaign.settings)),
-      `Recent events: ${JSON.stringify(await loadRecentDmEvents(db, campaign.id)).slice(0, 7000)}`,
-      "Shared DM context:",
-      conversation || "(No previous campaign or private OOC messages.)",
-      channel === "ooc_dm"
-        ? "Respond to the most recent private OOC player message while staying consistent with the campaign table."
-        : "Respond to the most recent campaign player message while honoring relevant private OOC direction.",
-    ].join("\n\n"),
-    temperature: channel === "campaign" ? 0.7 : 0.3,
-    maxTokens: channel === "campaign" ? 900 : 700,
-    ...(env.AI && env.AI_GAME_MODEL ? { model: env.AI_GAME_MODEL } : {}),
-  });
+  const basePrompt = [
+    `Campaign: ${campaign.name}`,
+    `Description: ${campaign.description || "No campaign description provided."}`,
+    campaignPacingContext(parseSettings(campaign.settings)),
+    `Recent events: ${JSON.stringify(await loadRecentDmEvents(db, campaign.id)).slice(0, 7000)}`,
+    "Shared DM context:",
+    conversation || "(No previous campaign or private OOC messages.)",
+    channel === "ooc_dm"
+      ? "Respond to the most recent private OOC player message while staying consistent with the campaign table."
+      : "Respond to the most recent campaign player message while honoring relevant private OOC direction.",
+  ].join("\n\n");
+
+  let retryInstruction = "";
+  const attempts = channel === "campaign" ? 2 : 1;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const response = await generateOpenAICompatibleText(env, {
+      system,
+      prompt: retryInstruction ? `${basePrompt}\n\n${retryInstruction}` : basePrompt,
+      temperature: channel === "campaign" ? 0.7 : 0.3,
+      maxTokens: channel === "campaign" ? 900 : 700,
+      ...(env.AI && env.AI_GAME_MODEL ? { model: env.AI_GAME_MODEL } : {}),
+    });
+    if (channel === "ooc_dm") return response;
+
+    const violation = campaignDmNarrationViolation(response);
+    if (!violation) return response;
+    retryInstruction = [
+      `Your previous campaign-chat draft was rejected because ${violation}.`,
+      "Write a new live-play response from scratch. Do not repeat character-sheet metadata or ask setup/onboarding questions.",
+    ].join(" ");
+  }
+
+  throw new Error("AI_DM_CAMPAIGN_NARRATION_POLICY: model repeated a rejected campaign-chat format");
 }
 
 function pendingArguments(
@@ -420,6 +442,10 @@ export const structuredPlayMessageRoutes = new Hono<Env>().post(
           }
         } else {
           reply = await basicDmReply(c.env, db, campaign, input.channel, session.user.id);
+        }
+
+        if (input.channel === "campaign") {
+          reply = assertCampaignDmNarration(reply);
         }
 
         const dmId = await insertMessage(db, {

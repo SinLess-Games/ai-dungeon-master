@@ -67,7 +67,7 @@ export async function plannerCommandToGameCommand(
       return { type: command.type, participantIds: command.participantIds };
     case "encounter.end_turn": {
       const encounter = context.encounter;
-      if (!encounter || !encounter.currentActorId) throw new Error("AI_DM_ENCOUNTER_NOT_ACTIVE");
+      if (!encounter?.currentActorId) throw new Error("AI_DM_ENCOUNTER_NOT_ACTIVE");
       return { type: command.type, encounterId: encounter.id, actorId: encounter.currentActorId };
     }
     case "encounter.finish": {
@@ -82,12 +82,15 @@ export async function plannerCommandToGameCommand(
     case "combat.attack":
       return {
         type: command.type,
-        attackerId: actorId,
+        attackerId: command.attackerId ?? actorId,
         targetId: command.targetId,
         kind: command.kind,
         ...(command.weaponInventoryId === undefined
           ? {}
           : { weaponInventoryId: command.weaponInventoryId }),
+        ...(command.monsterAttackId === undefined
+          ? {}
+          : { monsterAttackId: command.monsterAttackId }),
       };
     case "spell.cast.prepared":
       return {
@@ -180,7 +183,11 @@ export async function executeDmPlannerCommand(input: {
   context: DmPlannerContext;
   command: DmPlannerCommand;
 }): Promise<GameCommandResult> {
-  const gameCommand = await plannerCommandToGameCommand(input.binding, input.context, input.command);
+  const gameCommand = await plannerCommandToGameCommand(
+    input.binding,
+    input.context,
+    input.command,
+  );
   return executeGameCommand(
     { db: createDatabase(input.binding), binding: input.binding },
     input.campaignId,

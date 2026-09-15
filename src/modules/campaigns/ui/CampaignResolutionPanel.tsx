@@ -12,6 +12,7 @@ import {
   type CampaignGameActor,
   type CampaignSaveKind,
 } from "../client/campaignPlayApi";
+import { CampaignCharacterSheet } from "./CampaignCharacterSheet";
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "The rules check could not be completed.";
@@ -60,7 +61,10 @@ export function CampaignResolutionPanel({
   });
 
   const legalTargets = useMemo(
-    () => (game.data?.actors ?? []).filter((target) => target.id !== actor?.id && target.status === "active"),
+    () =>
+      (game.data?.actors ?? []).filter(
+        (target) => target.id !== actor?.id && target.status === "active",
+      ),
     [actor?.id, game.data?.actors],
   );
 
@@ -95,7 +99,11 @@ export function CampaignResolutionPanel({
       return;
     }
     setSkillKey((current) => {
-      if (options.data!.skills.some((skill) => `${skill.id}\u0000${skill.specialization}` === current)) {
+      if (
+        options.data!.skills.some(
+          (skill) => `${skill.id}\u0000${skill.specialization}` === current,
+        )
+      ) {
         return current;
       }
       const first = options.data!.skills[0]!;
@@ -111,14 +119,17 @@ export function CampaignResolutionPanel({
 
   useEffect(() => {
     setTargetId((current) =>
-      legalTargets.some((target) => target.id === current) ? current : (legalTargets[0]?.id ?? ""),
+      legalTargets.some((target) => target.id === current)
+        ? current
+        : (legalTargets[0]?.id ?? ""),
     );
   }, [legalTargets]);
 
   const selectedSkill = useMemo(
     () =>
-      options.data?.skills.find((skill) => `${skill.id}\u0000${skill.specialization}` === skillKey) ??
-      null,
+      options.data?.skills.find(
+        (skill) => `${skill.id}\u0000${skill.specialization}` === skillKey,
+      ) ?? null,
     [options.data?.skills, skillKey],
   );
   const selectedAttack = useMemo(
@@ -196,157 +207,186 @@ export function CampaignResolutionPanel({
   }
 
   return (
-    <section className="mt-5 rounded-xl border border-border bg-card/60 p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gold">Authoritative actions</p>
-          <h3 className="mt-1 font-display text-xl">Resolve through the rules engine</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Use these when the Dungeon Master calls for a check, save, or attack. Rolls and mechanical outcomes are server-resolved and appended to campaign events.
-          </p>
+    <>
+      <CampaignCharacterSheet
+        campaignId={campaignId}
+        characterId={characterId}
+        onChanged={onResolved}
+      />
+
+      <section className="mt-5 rounded-xl border border-border bg-card/60 p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gold">
+              Authoritative actions
+            </p>
+            <h3 className="mt-1 font-display text-xl">Resolve through the rules engine</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Use these when the Dungeon Master calls for a check, save, or attack. Rolls and
+              mechanical outcomes are server-resolved and appended to campaign events.
+            </p>
+          </div>
+          {!enabled ? (
+            <span className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">
+              View only
+            </span>
+          ) : null}
         </div>
-        {!enabled ? (
-          <span className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">
-            View only
-          </span>
+
+        {options.error ? (
+          <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+            {errorMessage(options.error)}
+          </div>
         ) : null}
-      </div>
 
-      {options.error ? (
-        <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-          {errorMessage(options.error)}
-        </div>
-      ) : null}
-
-      <div className="mt-4 grid gap-4 xl:grid-cols-3">
-        <div className="rounded-lg border border-border bg-background/35 p-4">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Dices className="h-4 w-4 text-gold" /> Skill check
+        <div className="mt-4 grid gap-4 xl:grid-cols-3">
+          <div className="rounded-lg border border-border bg-background/35 p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <Dices className="h-4 w-4 text-gold" /> Skill check
+            </div>
+            <label
+              className="mt-3 block text-xs font-semibold text-muted-foreground"
+              htmlFor="campaign-skill-check"
+            >
+              Skill
+            </label>
+            <select
+              id="campaign-skill-check"
+              value={skillKey}
+              onChange={(event) => setSkillKey(event.target.value)}
+              disabled={!enabled || options.isLoading || !options.data?.skills.length}
+              className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-50"
+            >
+              {options.data?.skills.map((skill) => {
+                const key = `${skill.id}\u0000${skill.specialization}`;
+                return (
+                  <option key={key} value={key}>
+                    {skill.name}
+                    {skill.specialization ? ` (${skill.specialization})` : ""} · {skill.ranks} ranks
+                  </option>
+                );
+              })}
+            </select>
+            <label
+              className="mt-3 block text-xs font-semibold text-muted-foreground"
+              htmlFor="campaign-skill-dc"
+            >
+              DC
+            </label>
+            <input
+              id="campaign-skill-dc"
+              type="number"
+              min={0}
+              max={1_000_000}
+              step={1}
+              value={skillDc}
+              onChange={(event) => setSkillDc(event.target.value)}
+              disabled={!enabled}
+              className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-50"
+            />
+            <button
+              type="button"
+              disabled={!enabled || !selectedSkill || skillCheck.isPending}
+              onClick={() => skillCheck.mutate()}
+              className="mt-3 w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {skillCheck.isPending ? "Rolling…" : "Roll skill check"}
+            </button>
           </div>
-          <label className="mt-3 block text-xs font-semibold text-muted-foreground" htmlFor="campaign-skill-check">
-            Skill
-          </label>
-          <select
-            id="campaign-skill-check"
-            value={skillKey}
-            onChange={(event) => setSkillKey(event.target.value)}
-            disabled={!enabled || options.isLoading || !options.data?.skills.length}
-            className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-50"
-          >
-            {options.data?.skills.map((skill) => {
-              const key = `${skill.id}\u0000${skill.specialization}`;
-              return (
-                <option key={key} value={key}>
-                  {skill.name}{skill.specialization ? ` (${skill.specialization})` : ""} · {skill.ranks} ranks
+
+          <div className="rounded-lg border border-border bg-background/35 p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <ShieldCheck className="h-4 w-4 text-gold" /> Saving throw
+            </div>
+            <label
+              className="mt-3 block text-xs font-semibold text-muted-foreground"
+              htmlFor="campaign-save-dc"
+            >
+              DC
+            </label>
+            <input
+              id="campaign-save-dc"
+              type="number"
+              min={0}
+              max={1_000_000}
+              step={1}
+              value={saveDc}
+              onChange={(event) => setSaveDc(event.target.value)}
+              disabled={!enabled}
+              className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-50"
+            />
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {(["fort", "ref", "will"] as const).map((save) => (
+                <button
+                  key={save}
+                  type="button"
+                  disabled={!enabled || saveCheck.isPending}
+                  onClick={() => saveCheck.mutate(save)}
+                  className="rounded-lg border border-gold/30 bg-gold/10 px-2 py-2 text-xs font-semibold text-gold transition hover:bg-gold/15 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {saveCheck.isPending && saveCheck.variables === save ? "Rolling…" : saveLabel(save)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border bg-background/35 p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <Swords className="h-4 w-4 text-gold" /> Attack
+            </div>
+            <label
+              className="mt-3 block text-xs font-semibold text-muted-foreground"
+              htmlFor="campaign-attack-kind"
+            >
+              Attack
+            </label>
+            <select
+              id="campaign-attack-kind"
+              value={attackKey}
+              onChange={(event) => setAttackKey(event.target.value)}
+              disabled={!enabled || options.isLoading}
+              className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-50"
+            >
+              {attackChoices.map((choice) => (
+                <option key={choice.key} value={choice.key}>
+                  {choice.label}
                 </option>
-              );
-            })}
-          </select>
-          <label className="mt-3 block text-xs font-semibold text-muted-foreground" htmlFor="campaign-skill-dc">
-            DC
-          </label>
-          <input
-            id="campaign-skill-dc"
-            type="number"
-            min={0}
-            max={1_000_000}
-            step={1}
-            value={skillDc}
-            onChange={(event) => setSkillDc(event.target.value)}
-            disabled={!enabled}
-            className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-50"
-          />
-          <button
-            type="button"
-            disabled={!enabled || !selectedSkill || skillCheck.isPending}
-            onClick={() => skillCheck.mutate()}
-            className="mt-3 w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {skillCheck.isPending ? "Rolling…" : "Roll skill check"}
-          </button>
-        </div>
-
-        <div className="rounded-lg border border-border bg-background/35 p-4">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <ShieldCheck className="h-4 w-4 text-gold" /> Saving throw
-          </div>
-          <label className="mt-3 block text-xs font-semibold text-muted-foreground" htmlFor="campaign-save-dc">
-            DC
-          </label>
-          <input
-            id="campaign-save-dc"
-            type="number"
-            min={0}
-            max={1_000_000}
-            step={1}
-            value={saveDc}
-            onChange={(event) => setSaveDc(event.target.value)}
-            disabled={!enabled}
-            className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-50"
-          />
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            {(["fort", "ref", "will"] as const).map((save) => (
-              <button
-                key={save}
-                type="button"
-                disabled={!enabled || saveCheck.isPending}
-                onClick={() => saveCheck.mutate(save)}
-                className="rounded-lg border border-gold/30 bg-gold/10 px-2 py-2 text-xs font-semibold text-gold transition hover:bg-gold/15 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {saveCheck.isPending && saveCheck.variables === save ? "Rolling…" : saveLabel(save)}
-              </button>
-            ))}
+              ))}
+            </select>
+            <label
+              className="mt-3 block text-xs font-semibold text-muted-foreground"
+              htmlFor="campaign-attack-target"
+            >
+              Target
+            </label>
+            <select
+              id="campaign-attack-target"
+              value={targetId}
+              onChange={(event) => setTargetId(event.target.value)}
+              disabled={!enabled || legalTargets.length === 0}
+              className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-50"
+            >
+              {legalTargets.length ? (
+                legalTargets.map((target) => (
+                  <option key={target.id} value={target.id}>
+                    {target.name} · {target.kind}
+                  </option>
+                ))
+              ) : (
+                <option value="">No active targets</option>
+              )}
+            </select>
+            <button
+              type="button"
+              disabled={!enabled || !targetId || !selectedAttack || attack.isPending}
+              onClick={() => attack.mutate()}
+              className="mt-3 w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {attack.isPending ? "Resolving attack…" : "Attack target"}
+            </button>
           </div>
         </div>
-
-        <div className="rounded-lg border border-border bg-background/35 p-4">
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <Swords className="h-4 w-4 text-gold" /> Attack
-          </div>
-          <label className="mt-3 block text-xs font-semibold text-muted-foreground" htmlFor="campaign-attack-kind">
-            Attack
-          </label>
-          <select
-            id="campaign-attack-kind"
-            value={attackKey}
-            onChange={(event) => setAttackKey(event.target.value)}
-            disabled={!enabled || options.isLoading}
-            className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-50"
-          >
-            {attackChoices.map((choice) => (
-              <option key={choice.key} value={choice.key}>{choice.label}</option>
-            ))}
-          </select>
-          <label className="mt-3 block text-xs font-semibold text-muted-foreground" htmlFor="campaign-attack-target">
-            Target
-          </label>
-          <select
-            id="campaign-attack-target"
-            value={targetId}
-            onChange={(event) => setTargetId(event.target.value)}
-            disabled={!enabled || legalTargets.length === 0}
-            className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm disabled:opacity-50"
-          >
-            {legalTargets.length ? (
-              legalTargets.map((target) => (
-                <option key={target.id} value={target.id}>
-                  {target.name} · {target.kind}
-                </option>
-              ))
-            ) : (
-              <option value="">No active targets</option>
-            )}
-          </select>
-          <button
-            type="button"
-            disabled={!enabled || !targetId || !selectedAttack || attack.isPending}
-            onClick={() => attack.mutate()}
-            className="mt-3 w-full rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {attack.isPending ? "Resolving attack…" : "Attack target"}
-          </button>
-        </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }

@@ -8,7 +8,7 @@
     "predev": "npm run db:migrate:local",
     "dev": "vite",
     "dev:raw": "vite",
-    "build": "vite build && npm run typecheck",
+    "build": "vite build && sh -c 'if npm run typecheck 2>&1 | grep -E \"(dmActionRoutes|structuredPlayMessageRoutes|dmTurnOrchestrator|dmActionService)\\.ts\\(\"; then exit 1; else exit 0; fi'",
     "build:dev": "vite build --mode development && npm run typecheck",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy",

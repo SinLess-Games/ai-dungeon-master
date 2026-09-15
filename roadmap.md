@@ -63,7 +63,7 @@ feature. This audit does not certify production deployment or live provider setu
 ## Phase 5 — Advanced systems
 
 - [ ] Prestige classes + psionics
-  - [x] Prestige-class content/schema and [read-only creator catalog cards](src/modules/characters/server/supplementClassOptionRoutes.ts) with first-level eligibility restrictions.
+  - [x] Prestige-class content/schema is seeded for later advancement, while prestige classes are intentionally excluded from level-one character creation.
   - [x] Psionic character choices, power catalogs, power-point/focus mechanics, and [persistent manifestation services](src/modules/game/server/resolvedCastingService.ts) for supported effects.
   - [ ] Playable advancement into prestige classes and remaining class/power-specific mechanics. Catalog entries do not establish complete class or power support.
 - [ ] Epic levels 21+ and expanded sourcebooks

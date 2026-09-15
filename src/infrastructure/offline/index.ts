@@ -1,3 +1,4 @@
+export * from "./aliases";
 export * from "./OfflineSyncProvider";
 export * from "./request";
 export * from "./store";

@@ -58,10 +58,10 @@ function dateLabel(value: string | number | null) {
 
 export function CampaignsHub() {
   const session = authClient.useSession();
-  const { canUseOfflineData, summary: syncSummary } = useOfflineSync();
+  const { canUseOfflineData, online } = useOfflineSync();
   const hasSaveAccess = Boolean(session.data) || canUseOfflineData;
   const hasLiveSession = Boolean(session.data);
-  const canUseAuthoritativeActions = hasLiveSession && syncSummary.online;
+  const canUseAuthoritativeActions = hasLiveSession && online;
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<HubMode>("library");
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);

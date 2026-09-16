@@ -1,12 +1,12 @@
 import { eq } from "drizzle-orm";
+import type { OpenAICompatibleEnv } from "@/infrastructure/ai/openaiCompatible";
 import type { Database } from "@/infrastructure/database/client";
 import {
   campaigns,
   worldMaps,
   type WorldMapData,
 } from "@/infrastructure/database/schema";
-import { enforceCoastalAtlasIntegrity } from "@/modules/worlds/domain/coastalAtlasIntegrity";
-import { generateStrictRealisticCampaignWorldAtlas } from "@/modules/worlds/domain/strictRealisticCampaignAtlas";
+import { generateAICampaignWorldAtlas } from "@/modules/worlds/server/aiOnlyCampaignAtlas";
 import type { WorldGenerator } from "./startCampaign";
 
 function missingWorldMapTable(error: unknown): boolean {
@@ -15,19 +15,18 @@ function missingWorldMapTable(error: unknown): boolean {
 }
 
 /**
- * Deterministic full-world generator used by campaign start.
+ * AI-authoritative full-world generator used by campaign start.
  *
- * Every campaign receives its own original planet-scale atlas. The canonical
- * interactive document is persisted in D1 through `world_maps`; R2 rendering,
- * KV manifests, and Vectorize indexing are performed asynchronously by the
- * atlas background jobs when the map is first opened.
- *
- * Deployments that have not applied the existing world-map/offline migration
- * still retain the previous world-root behavior instead of breaking campaign
- * start. Once `world_maps` exists, atlas creation is authoritative.
+ * The AI creates all physical geography, settlements, routes, names, and exact
+ * map coordinates. Application code only validates the returned structured map,
+ * assigns internal IDs, persists it, and later queues the AI satellite render.
+ * There is intentionally no procedural atlas fallback in this production path.
  */
 export class BootstrapWorldGenerator implements WorldGenerator {
-  constructor(private readonly db: Database) {}
+  constructor(
+    private readonly db: Database,
+    private readonly aiEnv: OpenAICompatibleEnv,
+  ) {}
 
   async generate(input: Parameters<WorldGenerator["generate"]>[0]) {
     const campaign = await this.db
@@ -43,16 +42,18 @@ export class BootstrapWorldGenerator implements WorldGenerator {
 
     if (!campaign) throw new Error("Campaign disappeared during world generation.");
 
-    const atlas = enforceCoastalAtlasIntegrity(
-      generateStrictRealisticCampaignWorldAtlas({
+    const atlas = await generateAICampaignWorldAtlas({
+      env: this.aiEnv,
+      request: {
         campaign: {
           name: campaign.name,
           description: campaign.description,
           settings: campaign.settings,
         },
         seed: input.generationSeed,
-      }),
-    );
+        generatedAt: new Date().toISOString(),
+      },
+    });
     const mapId = `world-atlas-${input.worldId}`;
     let atlasPersisted = false;
 

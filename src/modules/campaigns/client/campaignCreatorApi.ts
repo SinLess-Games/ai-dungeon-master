@@ -5,6 +5,10 @@ import {
   removeCachedJson,
   updateCachedJson,
 } from "@/infrastructure/offline";
+import {
+  getCampaignWorldState,
+  regenerateCampaignWorld,
+} from "@/modules/worlds/client/worldBuilderApi";
 import type { CampaignDuration } from "../domain/duration";
 import type {
   CampaignDifficulty,
@@ -320,16 +324,38 @@ export function getCampaign(campaignId: string): Promise<CampaignDetailResponse>
   );
 }
 
-export function startCampaign(campaignId: string): Promise<{
+export async function startCampaign(campaignId: string): Promise<{
   campaignId: string;
   worldId: string;
   status: string;
 }> {
-  return offlineRequestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/start`, {
-    method: "POST",
-  }, {
-    onlineOnlyMessage: "Reconnect before starting a campaign so world generation remains authoritative.",
-  });
+  const result = await offlineRequestJson<{
+    campaignId: string;
+    worldId: string;
+    status: string;
+  }>(
+    `/api/campaigns/${encodeURIComponent(campaignId)}/start`,
+    { method: "POST" },
+    {
+      onlineOnlyMessage: "Reconnect before starting a campaign so world generation remains authoritative.",
+    },
+  );
+
+  // Campaign start establishes the authoritative world root first. Immediately
+  // run the same-seed hybrid refinement so normal UI starts receive the AI
+  // planning pass before the player enters the map. If refinement is ever
+  // unavailable, the already-created deterministic world remains playable.
+  try {
+    const state = await getCampaignWorldState(campaignId);
+    await regenerateCampaignWorld(campaignId, state.revision, "same");
+  } catch (error) {
+    console.warn("Hybrid AI world refinement did not complete after campaign start", {
+      campaignId,
+      error,
+    });
+  }
+
+  return result;
 }
 
 export function pauseCampaign(

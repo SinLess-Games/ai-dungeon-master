@@ -86,7 +86,7 @@ npm run typecheck
 npm run lint
 npm run db:generate
 npm run test:unit
-npm run build
+npm run build:web
 npm run test:auth:integration
 npm run test:auth:browser
 ```

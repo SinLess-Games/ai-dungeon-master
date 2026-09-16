@@ -20,7 +20,7 @@ const config: CapacitorConfig = {
    * Only the client bundle belongs in the native application.
    * Cloudflare Worker/server output must remain deployed separately.
    */
-  webDir: "dist/client",
+  webDir: "dist/web/client",
 
   /**
    * Only emit Capacitor/native logs from debug builds.

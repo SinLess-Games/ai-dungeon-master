@@ -11,6 +11,7 @@ test-results/
 old/
 
 android/
+ios/
 src-tauri/
 
 drizzle/meta/

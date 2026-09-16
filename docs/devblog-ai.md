@@ -151,7 +151,7 @@ Before deploying:
 npm run typecheck
 npm run lint
 npm run test:unit
-npm run build
+npm run build:web
 ```
 
 Then deploy:

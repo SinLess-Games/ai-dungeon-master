@@ -132,3 +132,7 @@ Desktop.ini
 *.swo
 
 .prod.vars
+
+# iOS / Xcode generated output
+ios/**/.build/
+ios/**/xcuserdata/

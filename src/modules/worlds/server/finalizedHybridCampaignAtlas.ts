@@ -1,4 +1,5 @@
 import type { OpenAICompatibleEnv } from "@/infrastructure/ai/openaiCompatible";
+import { ServiceUnavailableError } from "@/server/middleware/errors";
 import type { WorldAtlasDocument } from "../domain/atlas";
 import type { CampaignAtlasRequest } from "../domain/campaignAtlas";
 import {
@@ -40,16 +41,25 @@ export async function generateHybridCampaignWorldAtlas(input: {
         }
       : context;
 
-  return generateStableDenseAICampaignWorldAtlas({
-    env: input.env,
-    request: {
-      ...request,
-      campaign: {
-        ...request.campaign,
-        ...(productionContext ? { context: productionContext } : {}),
+  try {
+    return await generateStableDenseAICampaignWorldAtlas({
+      env: input.env,
+      request: {
+        ...request,
+        campaign: {
+          ...request.campaign,
+          ...(productionContext ? { context: productionContext } : {}),
+        },
       },
-    },
-  });
+    });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    console.error("AI world regeneration failed", { reason, error });
+    throw new ServiceUnavailableError(
+      `AI world regeneration could not complete: ${reason.slice(0, 320)}`,
+      { stage: "ai-world-regeneration" },
+    );
+  }
 }
 
 // Kept for API compatibility with same-seed callers. AI-only generation no

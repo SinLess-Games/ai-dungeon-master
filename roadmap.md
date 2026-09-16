@@ -1,6 +1,6 @@
 # Roadmap — D&D 3.5 AI Dungeon Master
 
-Repository audit: September 15, 2026. Checked items have implementations in the
+Repository audit: September 16, 2026. Checked items have implementations in the
 current source tree. Unchecked parent items may have completed parts listed below
 them; schemas, content seeds, and configuration alone do not complete a playable
 feature. This audit does not certify production deployment or live provider setup.
@@ -34,7 +34,12 @@ feature. This audit does not certify production deployment or live provider setu
   - [x] Item and XP grant workflows: AI DM grants/removals resolve catalog/inventory references server-side and persist auditable inventory/XP game events instead of mutating state in narration.
   - [x] Ongoing alignment tracking: meaningful completed choices may produce bounded two-axis drift proposals; deterministic thresholds, persisted axis state, and `alignment.drift` events decide whether the public D&D alignment actually changes.
   - [x] [AI DM token streaming](docs/ai-dm-streaming.md): progressive campaign/private narration and post-roll replies, temporary drafts, completion-only persistence, cancellation, and JSON API compatibility. Structured commands remain validated before narration streams.
-- [ ] Standalone world builder + world map — [campaign start](src/modules/campaigns/server/bootstrapWorldGenerator.ts) creates a minimal persistent world root and generation metadata, and the offline-first layer now includes cloud-backed world-map save documents. Standalone editing, generation, travel, and map display are still absent.
+- [ ] World builder + generated campaign atlas
+  - [x] [Generated campaign world atlas](docs/campaign-world-atlas.md): every campaign start now creates its own deterministic original planet-scale atlas from the campaign seed and creator decisions, including multiple landmasses, regions/biomes, mountains, rivers, campaign-biased settlements/adventure sites, roads/trails/sea routes, physical mile dimensions, and a generated legend. The canonical document is stored through the existing D1 `world_maps` layer when migration `0026_offline_first_cloud_sync.sql` is present.
+  - [x] Campaign Map tab: campaign play exposes a fourth Map channel beside Campaign, OOC, and Character with pan/zoom, zoom-dependent labels, clickable places, a real dynamic mile scale, decorative compass rose, generated legend, and illustrated high-fantasy atlas rendering.
+  - [x] Cloudflare atlas post-processing foundation: Queues render/index persisted atlas state, R2 stores rendered SVG atlas assets, KV stores rebuildable manifests, and optional Vectorize integration can index/search generated regions and locations after `WORLD_VECTOR_INDEX` is provisioned.
+  - [ ] Standalone/manual GM editing: place/region/path creation, movement, editing, regeneration, and world-builder inspector tools are still absent.
+  - [ ] Player discovery/fog, party position, travel route selection, D&D 3.5 overland travel timing, weather/terrain modifiers, and travel encounter integration remain unfinished.
 
 ## Phase 2 — Reference, loot, export
 
@@ -45,7 +50,7 @@ feature. This audit does not certify production deployment or live provider setu
 
 ## Phase 3 — Maps & atmosphere
 
-- [ ] World map with travel + exploration
+- [ ] World map travel + exploration — the generated interactive campaign atlas is implemented; authoritative party travel, discovery/fog, terrain/weather timing, exploration state, and encounter integration remain.
 - [ ] Isometric 2.5D tactical map: elevation, multi-level, props, traps, fog, tokens
 - [ ] Traps, hazards, location builder
 - [ ] Bestiary + encounter builder — monster data, [runtime monster actors](src/modules/game/server/actorRoutes.ts), and encounter start/turn/finish services exist. A searchable bestiary and encounter-composition UI remain unfinished.
@@ -78,16 +83,19 @@ feature. This audit does not certify production deployment or live provider setu
 
 ## Audit validation
 
-The September 15 source audit includes the merged offline-first synchronization work,
+The September 16 source audit includes the merged offline-first synchronization work,
 single-roll/duplicate-check protections, current-turn campaign progression anchoring,
-and player-authoritative Initiative flow. The previous September 14 focused audit ran
-12 unit-test files covering authentication/schema, dice, D&D rules and derived stats,
-character creation rules, campaign options/start, game commands, live coordination,
-and book-rule seeds: **112 tests passed** at that point. The newer features add focused
-unit coverage for offline sync, DM action history, Initiative resolution, repeated-check
-suppression, and turn orchestration. This environment did not independently execute
-the full repository test suite; current GitHub Actions jobs have also been failing very
-early in the runner/workflow path rather than providing reliable application-test
-results. Browser E2E, live Google/AI calls, and remote D1 migrations were not run as
-part of this roadmap update. Migrations `0026` and `0027` remain deployment steps for
-the corresponding live database features.
+player-authoritative Initiative flow, and the generated campaign atlas/Map-tab slice.
+The previous September 14 focused audit ran 12 unit-test files covering
+authentication/schema, dice, D&D rules and derived stats, character creation rules,
+campaign options/start, game commands, live coordination, and book-rule seeds:
+**112 tests passed** at that point. Newer features add focused unit coverage for
+offline sync, DM action history, Initiative resolution, repeated-check suppression,
+turn orchestration, and deterministic atlas generation. The campaign-atlas branch was
+validated through the real production `vite build && npm run typecheck` Cloudflare
+build and that gate passed. This environment did not independently execute the full
+repository test suite; current GitHub Actions jobs have also been failing very early
+in the runner/workflow path rather than providing reliable application-test results.
+Browser E2E, live Google/AI calls, Vectorize provisioning, and remote D1 migrations
+were not run as part of this roadmap update. Migrations `0026` and `0027` remain
+deployment steps for the corresponding live database features.

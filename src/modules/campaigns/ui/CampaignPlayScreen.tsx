@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { authClient } from "@/modules/auth/client/authClient";
+import { CampaignWorldMap } from "@/modules/worlds/ui/CampaignWorldMap";
 import { getCampaign, pauseCampaign, resumeCampaign } from "../client/campaignCreatorApi";
 import {
   endCampaignTurn,
@@ -40,7 +41,7 @@ import { CampaignDmCheckRequest } from "./CampaignDmCheckRequest";
 import { CampaignMessageCard } from "./CampaignMessageCard";
 import { CampaignResolutionPanel } from "./CampaignResolutionPanel";
 
-type PlayChannel = "campaign" | "ooc" | "character";
+type PlayChannel = "campaign" | "ooc" | "character" | "map";
 
 type TimelineEntry =
   | { kind: "message"; id: string; at: number; message: CampaignPlayMessage }
@@ -160,7 +161,7 @@ export function CampaignPlayScreen({
   const messages = useQuery({
     queryKey: ["campaigns", "play", campaignId, "messages", messageChannel],
     queryFn: () => listCampaignPlayMessages(campaignId, messageChannel),
-    enabled: playable && channel !== "character",
+    enabled: playable && channel !== "character" && channel !== "map",
     refetchInterval: 4_000,
   });
 
@@ -381,6 +382,7 @@ export function CampaignPlayScreen({
       send.isPending ||
       resolveDmAction.isPending ||
       channel === "character" ||
+      channel === "map" ||
       campaignComposerBlocked
     ) {
       return;
@@ -393,7 +395,10 @@ export function CampaignPlayScreen({
       detail.refetch(),
       game.refetch(),
       pendingDmAction.refetch(),
-      channel === "character" ? Promise.resolve() : messages.refetch(),
+      channel === "character" || channel === "map" ? Promise.resolve() : messages.refetch(),
+      channel === "map"
+        ? queryClient.invalidateQueries({ queryKey: ["campaigns", "play", campaignId, "atlas"] })
+        : Promise.resolve(),
     ]);
   }
 
@@ -526,7 +531,7 @@ export function CampaignPlayScreen({
 
         {campaign.status === "paused" ? (
           <div className="border-b border-amber-500/20 bg-amber-500/5 px-4 py-2 text-center text-xs text-amber-700 dark:text-amber-300">
-            Campaign play is paused. Chat, OOC DM, character state, and history remain available;
+            Campaign play is paused. Chat, OOC DM, character state, map, and history remain available;
             rules-engine actions are read-only until play resumes.
           </div>
         ) : null}
@@ -564,6 +569,16 @@ export function CampaignPlayScreen({
                 detail="Sheet & live state"
                 onClick={() => {
                   setChannel("character");
+                  setComposer("");
+                }}
+              />
+              <ChannelButton
+                active={channel === "map"}
+                icon={<Map className="h-4 w-4" />}
+                label="Map"
+                detail="Interactive world atlas"
+                onClick={() => {
+                  setChannel("map");
                   setComposer("");
                 }}
               />
@@ -665,6 +680,8 @@ export function CampaignPlayScreen({
               />
             ) : null}
 
+            {channel === "map" ? <CampaignWorldMap campaignId={campaignId} /> : null}
+
             {channel === "campaign" && pendingDmAction.data ? (
               <CampaignDmCheckRequest
                 action={pendingDmAction.data}
@@ -675,7 +692,7 @@ export function CampaignPlayScreen({
               />
             ) : null}
 
-            {channel !== "character" ? (
+            {channel === "campaign" || channel === "ooc" ? (
               <Composer
                 value={composer}
                 onChange={setComposer}
@@ -753,9 +770,9 @@ export function CampaignPlayScreen({
                 <Sparkles className="h-4 w-4" /> Campaign play MVP
               </div>
               <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                Persistent campaign/OOC chat, structured AI DM check requests, authoritative player
-                rolls, combat, saves, spells, powers, encounter turns, and runtime character state
-                now share the campaign table.
+                Persistent campaign/OOC chat, interactive world atlas, structured AI DM check
+                requests, authoritative player rolls, combat, saves, spells, powers, encounter
+                turns, and runtime character state now share the campaign table.
               </p>
             </div>
           </aside>

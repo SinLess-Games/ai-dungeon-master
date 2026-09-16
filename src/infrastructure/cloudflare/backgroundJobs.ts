@@ -1,6 +1,11 @@
 /// <reference types="@cloudflare/workers-types" />
 
 import type { CampaignRoom } from "@/modules/game/live/CampaignRoom";
+import {
+  processWorldAtlasJob,
+  type WorldAtlasJob,
+  type WorldAtlasJobBindings,
+} from "@/modules/worlds/server/worldAtlasJobs";
 
 export interface GameEventPostprocessJob {
   type: "game.event.postprocess";
@@ -10,11 +15,9 @@ export interface GameEventPostprocessJob {
   enqueuedAt: string;
 }
 
-export type BackgroundJob = GameEventPostprocessJob;
+export type BackgroundJob = GameEventPostprocessJob | WorldAtlasJob;
 
-export interface BackgroundJobBindings {
-  DB?: D1Database;
-  RUNTIME_CACHE?: KVNamespace;
+export interface BackgroundJobBindings extends WorldAtlasJobBindings {
   CAMPAIGN_ROOM?: DurableObjectNamespace<CampaignRoom>;
 }
 
@@ -169,6 +172,10 @@ export async function processBackgroundJobBatch(
         switch (message.body.type) {
           case "game.event.postprocess":
             await processGameEventPostprocess(env, message.body);
+            break;
+          case "world.atlas.render":
+          case "world.atlas.vectorize":
+            await processWorldAtlasJob(env, message.body);
             break;
         }
         message.ack();

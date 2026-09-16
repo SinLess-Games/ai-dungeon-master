@@ -36,6 +36,7 @@ import { resolvedCastingRoutes } from "@/modules/game/server/resolvedCastingRout
 import { gameRoutes } from "@/modules/game/server/routes";
 import { offlineMutationMiddleware } from "@/modules/sync/server/offlineMutationMiddleware";
 import { syncRoutes } from "@/modules/sync/server/routes";
+import { worldAtlasRoutes } from "@/modules/worlds/server/worldAtlasRoutes";
 
 const isolateStartedAt = Date.now();
 
@@ -45,6 +46,7 @@ interface Bindings extends AuthEnv {
   CAMPAIGN_ROOM?: DurableObjectNamespace<CampaignRoom>;
   BACKGROUND_QUEUE?: Queue<unknown>;
   RUNTIME_CACHE?: KVNamespace;
+  WORLD_VECTOR_INDEX?: VectorizeIndex;
   AI?: OpenAICompatibleEnv["AI"];
   AI_API_KEY?: string;
   AI_BASE_URL?: string;
@@ -213,6 +215,7 @@ const routes = app
   .route("/", devblogAdminRoutes)
   .route("/", devblogAIRoutes)
   .route("/", syncRoutes)
+  .route("/", worldAtlasRoutes)
   .route("/", campaignRoutes)
   .route("/", campaignDeleteRoutes)
   .route("/", campaignPlayCharacterRoutes)
@@ -249,6 +252,9 @@ const routes = app
         campaignPlayChecks: "/api/campaigns/:campaignId/play/characters/:characterId/checks",
         campaignCharacterSheet: "/api/campaigns/:campaignId/play/characters/:characterId/sheet",
         campaignDmAction: "/api/campaigns/:campaignId/play/dm-actions/pending",
+        campaignAtlas: "/api/campaigns/:campaignId/atlas",
+        campaignAtlasRender: "/api/campaigns/:campaignId/atlas/render",
+        campaignAtlasSearch: "/api/campaigns/:campaignId/atlas/search",
         game: "/api/campaigns/:campaignId/game",
         gameState: "/api/campaigns/:campaignId/game/state",
         gameCommands: "/api/campaigns/:campaignId/game/commands",

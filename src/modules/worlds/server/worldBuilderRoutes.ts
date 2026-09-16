@@ -4,7 +4,7 @@ import { zValidator } from "@hono/zod-validator";
 import { and, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
-import { createDatabase, type Database } from "@/infrastructure/database/client";
+import { createDatabase } from "@/infrastructure/database/client";
 import { campaignMemberships, campaigns, gameActors, worldMaps } from "@/infrastructure/database/schema";
 import { createAuth, type AuthEnv } from "@/modules/auth/server/auth";
 import { requireUser } from "@/modules/auth/server/requireAuth";
@@ -39,9 +39,9 @@ import {
   planAtlasTravel,
   withExplorationState,
   type AtlasExplorationState,
+  type AtlasPathPatch,
   type AtlasPlacePatch,
   type AtlasRegionPatch,
-  type AtlasPathPatch,
   type AtlasTravelRouteMode,
   type WorldAtlasEditOperation,
 } from "../domain/worldBuilder";
@@ -149,7 +149,7 @@ function requireDatabase(binding: D1Database | undefined): D1Database {
 }
 
 async function requireCampaignAccess(input: {
-  db: Database;
+  binding: D1Database;
   campaignId: string;
   userId: string;
 }): Promise<{
@@ -164,7 +164,8 @@ async function requireCampaignAccess(input: {
   };
   role: CampaignRole;
 }> {
-  const campaign = await input.db
+  const db = createDatabase(input.binding);
+  const campaign = await db
     .select({
       id: campaigns.id,
       ownerUserId: campaigns.ownerUserId,
@@ -180,7 +181,7 @@ async function requireCampaignAccess(input: {
   if (!campaign) throw new NotFoundError("Campaign not found.");
   if (campaign.ownerUserId === input.userId) return { campaign, role: "owner" };
 
-  const membership = await input.db
+  const membership = await db
     .select({ role: campaignMemberships.role, status: campaignMemberships.status })
     .from(campaignMemberships)
     .where(
@@ -208,7 +209,8 @@ function requireTraveler(role: CampaignRole): void {
   }
 }
 
-async function loadAtlas(db: Database, worldId: string) {
+async function loadAtlas(binding: D1Database, worldId: string) {
+  const db = createDatabase(binding);
   const map = await db
     .select()
     .from(worldMaps)
@@ -256,7 +258,11 @@ function nearestLandmass(atlas: WorldAtlasDocument, point: { x: number; y: numbe
   return selected;
 }
 
-function nearestRegion(atlas: WorldAtlasDocument, landmassId: string, point: { x: number; y: number }) {
+function nearestRegion(
+  atlas: WorldAtlasDocument,
+  landmassId: string,
+  point: { x: number; y: number },
+) {
   let selected: AtlasRegion | null = null;
   let selectedDistance = Number.POSITIVE_INFINITY;
   for (const region of atlas.regions) {
@@ -337,7 +343,9 @@ function parseOperation(atlas: WorldAtlasDocument, raw: unknown): WorldAtlasEdit
       };
     }
     case "place.delete": {
-      const operation = z.object({ type: z.literal("place.delete"), id: z.string().min(1) }).parse(raw);
+      const operation = z
+        .object({ type: z.literal("place.delete"), id: z.string().min(1) })
+        .parse(raw);
       return { type: "place.delete", id: operation.id };
     }
     case "region.create": {
@@ -378,7 +386,9 @@ function parseOperation(atlas: WorldAtlasDocument, raw: unknown): WorldAtlasEdit
       };
     }
     case "region.delete": {
-      const operation = z.object({ type: z.literal("region.delete"), id: z.string().min(1) }).parse(raw);
+      const operation = z
+        .object({ type: z.literal("region.delete"), id: z.string().min(1) })
+        .parse(raw);
       return { type: "region.delete", id: operation.id };
     }
     case "path.create": {
@@ -422,7 +432,9 @@ function parseOperation(atlas: WorldAtlasDocument, raw: unknown): WorldAtlasEdit
       };
     }
     case "path.delete": {
-      const operation = z.object({ type: z.literal("path.delete"), id: z.string().min(1) }).parse(raw);
+      const operation = z
+        .object({ type: z.literal("path.delete"), id: z.string().min(1) })
+        .parse(raw);
       return { type: "path.delete", id: operation.id };
     }
     default:
@@ -430,7 +442,8 @@ function parseOperation(atlas: WorldAtlasDocument, raw: unknown): WorldAtlasEdit
   }
 }
 
-async function partyLandSpeed(db: Database, campaignId: string): Promise<number> {
+async function partyLandSpeed(binding: D1Database, campaignId: string): Promise<number> {
+  const db = createDatabase(binding);
   const actors = await db
     .select({ characterId: gameActors.characterId })
     .from(gameActors)
@@ -494,22 +507,21 @@ function worldContext(c: { env: Bindings; req: { raw: Request; param(name: strin
   return async () => {
     const session = await requireUser(createAuth(c.env), c.req.raw.headers);
     const binding = requireDatabase(c.env.DB);
-    const db = createDatabase(binding);
     const access = await requireCampaignAccess({
-      db,
+      binding,
       campaignId: c.req.param("campaignId"),
       userId: session.user.id,
     });
     if (!access.campaign.worldId) throw new NotFoundError("Campaign world not found.");
-    return { binding, db, access, worldId: access.campaign.worldId };
+    return { binding, access, worldId: access.campaign.worldId };
   };
 }
 
 export const worldBuilderRoutes = new Hono<Env>();
 
 worldBuilderRoutes.get("/api/campaigns/:campaignId/world/state", async (c) => {
-  const { db, access, worldId } = await worldContext(c)();
-  const { map, atlas } = await loadAtlas(db, worldId);
+  const { binding, access, worldId } = await worldContext(c)();
+  const { map, atlas } = await loadAtlas(binding, worldId);
   const state = explorationState(atlas);
   return c.json({
     campaignId: access.campaign.id,
@@ -527,10 +539,10 @@ worldBuilderRoutes.post(
   "/api/campaigns/:campaignId/world/edit",
   zValidator("json", editEnvelopeSchema),
   async (c) => {
-    const { binding, db, access, worldId } = await worldContext(c)();
+    const { binding, access, worldId } = await worldContext(c)();
     requireGm(access.role);
     const body = c.req.valid("json");
-    const { map, atlas } = await loadAtlas(db, worldId);
+    const { map, atlas } = await loadAtlas(binding, worldId);
     if (map.revision !== body.revision) {
       throw new ConflictError("The world has changed. Refresh before editing.");
     }
@@ -558,10 +570,10 @@ worldBuilderRoutes.post(
   "/api/campaigns/:campaignId/world/regenerate",
   zValidator("json", regenerateSchema),
   async (c) => {
-    const { binding, db, access, worldId } = await worldContext(c)();
+    const { binding, access, worldId } = await worldContext(c)();
     requireGm(access.role);
     const body = c.req.valid("json");
-    const { map, atlas } = await loadAtlas(db, worldId);
+    const { map, atlas } = await loadAtlas(binding, worldId);
     if (map.revision !== body.revision) {
       throw new ConflictError("The world has changed. Refresh before regenerating.");
     }
@@ -599,10 +611,10 @@ worldBuilderRoutes.post(
   "/api/campaigns/:campaignId/world/weather",
   zValidator("json", weatherSchema),
   async (c) => {
-    const { binding, db, access, worldId } = await worldContext(c)();
+    const { binding, access, worldId } = await worldContext(c)();
     requireGm(access.role);
     const body = c.req.valid("json");
-    const { map, atlas } = await loadAtlas(db, worldId);
+    const { map, atlas } = await loadAtlas(binding, worldId);
     if (map.revision !== body.revision) {
       throw new ConflictError("The world has changed. Refresh before changing weather.");
     }
@@ -625,10 +637,10 @@ worldBuilderRoutes.post(
   "/api/campaigns/:campaignId/world/party-position",
   zValidator("json", positionSchema),
   async (c) => {
-    const { binding, db, access, worldId } = await worldContext(c)();
+    const { binding, access, worldId } = await worldContext(c)();
     requireGm(access.role);
     const body = c.req.valid("json");
-    const { map, atlas } = await loadAtlas(db, worldId);
+    const { map, atlas } = await loadAtlas(binding, worldId);
     if (map.revision !== body.revision) {
       throw new ConflictError("The world has changed. Refresh before moving the party.");
     }
@@ -648,18 +660,18 @@ worldBuilderRoutes.post(
   "/api/campaigns/:campaignId/world/travel/plan",
   zValidator("json", travelSchema),
   async (c) => {
-    const { db, access, worldId } = await worldContext(c)();
+    const { binding, access, worldId } = await worldContext(c)();
     requireTraveler(access.role);
     if (access.campaign.rulesetId !== "dnd35") {
       throw new BadRequestError("Overland travel currently requires the D&D 3.5 ruleset.");
     }
     const body = c.req.valid("json");
-    const { map, atlas } = await loadAtlas(db, worldId);
+    const { map, atlas } = await loadAtlas(binding, worldId);
     const state = explorationState(atlas);
     if (state.pendingEncounter) {
       throw new ConflictError("Resolve the pending travel encounter before planning another journey.");
     }
-    const speedFeet = await partyLandSpeed(db, access.campaign.id);
+    const speedFeet = await partyLandSpeed(binding, access.campaign.id);
     try {
       const plan = planAtlasTravel({
         atlas,
@@ -680,13 +692,13 @@ worldBuilderRoutes.post(
   "/api/campaigns/:campaignId/world/travel/commit",
   zValidator("json", travelCommitSchema),
   async (c) => {
-    const { binding, db, access, worldId } = await worldContext(c)();
+    const { binding, access, worldId } = await worldContext(c)();
     requireTraveler(access.role);
     if (access.campaign.rulesetId !== "dnd35") {
       throw new BadRequestError("Overland travel currently requires the D&D 3.5 ruleset.");
     }
     const body = c.req.valid("json");
-    const { map, atlas } = await loadAtlas(db, worldId);
+    const { map, atlas } = await loadAtlas(binding, worldId);
     if (map.revision !== body.revision) {
       throw new ConflictError("The world has changed. Re-plan this journey.");
     }
@@ -694,7 +706,7 @@ worldBuilderRoutes.post(
     if (state.pendingEncounter) {
       throw new ConflictError("Resolve the pending travel encounter before travelling again.");
     }
-    const speedFeet = await partyLandSpeed(db, access.campaign.id);
+    const speedFeet = await partyLandSpeed(binding, access.campaign.id);
     let plan;
     try {
       plan = planAtlasTravel({
@@ -720,6 +732,7 @@ worldBuilderRoutes.post(
       atlas: next,
     });
 
+    const db = createDatabase(binding);
     const context = await loadActiveGameContext(db, access.campaign.id);
     if (context) {
       const store = new D1GameEventStore(binding);
@@ -774,10 +787,10 @@ worldBuilderRoutes.post(
   "/api/campaigns/:campaignId/world/travel/encounter/clear",
   zValidator("json", clearEncounterSchema),
   async (c) => {
-    const { binding, db, access, worldId } = await worldContext(c)();
+    const { binding, access, worldId } = await worldContext(c)();
     requireGm(access.role);
     const body = c.req.valid("json");
-    const { map, atlas } = await loadAtlas(db, worldId);
+    const { map, atlas } = await loadAtlas(binding, worldId);
     if (map.revision !== body.revision) {
       throw new ConflictError("The world has changed. Refresh and try again.");
     }

@@ -5,6 +5,7 @@ import {
   EyeOff,
   Footprints,
   Layers3,
+  Map as MapIcon,
   MapPin,
   Minus,
   Plus,
@@ -42,6 +43,7 @@ import {
 } from "../client/worldBuilderApi";
 import type {
   AtlasBiome,
+  AtlasLandmass,
   AtlasPath,
   AtlasPathKind,
   AtlasPlace,
@@ -84,16 +86,16 @@ const PLACE_LABELS: Record<AtlasPlaceKind, string> = {
 };
 
 const BIOME_COLORS: Record<AtlasBiome, string> = {
-  temperate: "#82966a",
-  forest: "#4f765a",
-  tundra: "#a8b4ae",
-  desert: "#c5a46c",
-  steppe: "#a6a16b",
-  swamp: "#65775c",
-  jungle: "#4d7654",
-  highlands: "#8a8069",
-  badlands: "#aa7759",
-  enchanted: "#70856e",
+  temperate: "#70875e",
+  forest: "#365f43",
+  tundra: "#b7c3bd",
+  desert: "#c5a36a",
+  steppe: "#9f9a62",
+  swamp: "#536b53",
+  jungle: "#32633f",
+  highlands: "#817766",
+  badlands: "#a5674e",
+  enchanted: "#58765f",
 };
 
 const WEATHER_LABELS: Record<AtlasTravelWeather, string> = {
@@ -108,6 +110,10 @@ const WEATHER_LABELS: Record<AtlasTravelWeather, string> = {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+function distance(a: AtlasPoint, b: AtlasPoint): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 function svgPoints(points: readonly AtlasPoint[]): string {
@@ -173,9 +179,73 @@ function placeGlyph(kind: AtlasPlaceKind): string {
 }
 
 function pathStyle(kind: AtlasPathKind) {
-  if (kind === "road") return { stroke: "#65462d", width: 9, dash: "24 12" };
-  if (kind === "trail") return { stroke: "#705b43", width: 6, dash: "10 15" };
-  return { stroke: "#365f75", width: 6, dash: "20 20" };
+  if (kind === "road") return { stroke: "#5c432d", width: 4, dash: "16 8" };
+  if (kind === "trail") return { stroke: "#695943", width: 3, dash: "7 11" };
+  return { stroke: "#315f77", width: 3, dash: "15 12" };
+}
+
+function shadeHex(hex: string, amount: number): string {
+  const value = hex.replace("#", "");
+  if (value.length !== 6) return hex;
+  const number = Number.parseInt(value, 16);
+  const r = clamp((number >> 16) + amount, 0, 255);
+  const g = clamp(((number >> 8) & 255) + amount, 0, 255);
+  const b = clamp((number & 255) + amount, 0, 255);
+  return `#${[r, g, b]
+    .map((channel) => Math.round(channel).toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
+function hash32(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function mulberry32(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state += 0x6d2b79f5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function terrainPatches(landmass: AtlasLandmass): Array<{
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+  rotation: number;
+}> {
+  const random = mulberry32(hash32(`${landmass.id}:${landmass.name}:terrain`));
+  return Array.from({ length: 18 }, () => {
+    const angle = random() * Math.PI * 2;
+    const radius = Math.sqrt(random()) * 0.72;
+    return {
+      x: landmass.center.x + Math.cos(angle) * landmass.radiusX * radius,
+      y: landmass.center.y + Math.sin(angle) * landmass.radiusY * radius,
+      rx: landmass.radiusX * (0.035 + random() * 0.08),
+      ry: landmass.radiusY * (0.025 + random() * 0.065),
+      rotation: random() * 180,
+    };
+  });
+}
+
+function regionDisplayRadius(atlas: WorldAtlasDocument, region: AtlasRegion): number {
+  const landmass = atlas.landmasses.find((candidate) => candidate.id === region.landmassId);
+  const maximum = landmass ? Math.min(landmass.radiusX, landmass.radiusY) * 0.28 : atlas.widthMiles * 0.025;
+  const neighbors = atlas.regions.filter(
+    (candidate) => candidate.landmassId === region.landmassId && candidate.id !== region.id,
+  );
+  if (!neighbors.length) return maximum;
+  const nearest = Math.min(...neighbors.map((candidate) => distance(region.center, candidate.center)));
+  return Math.max(1, Math.min(maximum, nearest * 0.4));
 }
 
 function errorMessage(error: unknown): string {
@@ -286,14 +356,13 @@ function WorldWorkspace({
   const [builderOpen, setBuilderOpen] = useState(state.canEdit);
   const [moveMode, setMoveMode] = useState<MoveMode>(null);
   const [showFog, setShowFog] = useState(!state.canEdit);
+  const [showLegend, setShowLegend] = useState(true);
   const [search, setSearch] = useState("");
   const [travelPlan, setTravelPlan] = useState<AtlasTravelPlan | null>(null);
   const [regenerateConfirmation, setRegenerateConfirmation] = useState<RegenerateMode | null>(null);
 
   useEffect(() => {
-    setView((current) =>
-      current.width > atlas.widthMiles ? fullView(atlas) : current,
-    );
+    setView((current) => (current.width > atlas.widthMiles ? fullView(atlas) : current));
   }, [atlas]);
 
   const discoveredPlaces = useMemo(
@@ -310,6 +379,11 @@ function WorldWorkspace({
   const selectedPlace = atlas.places.find((place) => place.id === selectedPlaceId) ?? null;
   const selectedRegion = atlas.regions.find((region) => region.id === selectedRegionId) ?? null;
   const selectedPath = atlas.paths.find((path) => path.id === selectedPathId) ?? null;
+
+  const regionRadii = useMemo(
+    () => new Map(atlas.regions.map((region) => [region.id, regionDisplayRadius(atlas, region)] as const)),
+    [atlas],
+  );
 
   const adjacentUndiscovered = useMemo(() => {
     const values = new Set<string>();
@@ -434,8 +508,24 @@ function WorldWorkspace({
     setView((current) => zoomView(atlas, current, anchor, factor));
   }
 
+  function centerOnParty() {
+    const width = Math.max(atlas.widthMiles / 5, atlas.widthMiles / 14);
+    const height = width * (atlas.heightMiles / atlas.widthMiles);
+    setView({
+      x: clamp(state.exploration.partyPosition.x - width / 2, 0, atlas.widthMiles - width),
+      y: clamp(state.exploration.partyPosition.y - height / 2, 0, atlas.heightMiles - height),
+      width,
+      height,
+    });
+  }
+
   const revealRadius = Math.max(180, atlas.widthMiles * 0.025);
   const maskId = `fog-mask-${campaignId}`;
+  const oceanGradientId = `ocean-${campaignId}`;
+  const oceanPatternId = `ocean-detail-${campaignId}`;
+  const terrainPatternId = `terrain-grain-${campaignId}`;
+  const partyMarkerRadius = Math.max(45, view.width * 0.007);
+  const partyLabelSize = Math.max(24, view.width * 0.0038);
 
   return (
     <div className="flex min-h-[680px] flex-1 overflow-hidden bg-[#10140f] text-[#e8dcb7]">
@@ -450,8 +540,16 @@ function WorldWorkspace({
           <div className="flex items-center gap-2">
             <div className="relative hidden md:block">
               <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-[#9e8f70]" />
-              <input className={`${fieldClass} w-52 pl-8`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find discovered place…" />
+              <input
+                className={`${fieldClass} w-52 pl-8`}
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Find discovered place…"
+              />
             </div>
+            <button type="button" className={buttonClass} onClick={() => setShowLegend((value) => !value)}>
+              <MapIcon className="mr-1 inline h-4 w-4" /> Legend
+            </button>
             <button type="button" className={buttonClass} onClick={() => setShowFog((value) => !value)}>
               {showFog ? <Eye className="mr-1 inline h-4 w-4" /> : <EyeOff className="mr-1 inline h-4 w-4" />}
               Fog
@@ -485,7 +583,7 @@ function WorldWorkspace({
           </div>
         ) : null}
 
-        <div className="relative min-h-[560px] flex-1 overflow-hidden bg-[#6c9297]">
+        <div className="relative min-h-[560px] flex-1 overflow-hidden bg-[#416e78]">
           <svg
             ref={svg}
             viewBox={`${view.x} ${view.y} ${view.width} ${view.height}`}
@@ -501,10 +599,36 @@ function WorldWorkspace({
             aria-label={`${atlas.title} world map`}
           >
             <defs>
-              <linearGradient id={`ocean-${campaignId}`} x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0" stopColor="#95b9ba" />
-                <stop offset="1" stopColor="#547f89" />
+              <linearGradient id={oceanGradientId} x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0" stopColor="#79a7ad" />
+                <stop offset="0.48" stopColor="#527f8b" />
+                <stop offset="1" stopColor="#315d6b" />
               </linearGradient>
+              <pattern id={oceanPatternId} width="180" height="180" patternUnits="userSpaceOnUse">
+                <path d="M0 38 Q45 15 90 38 T180 38" fill="none" stroke="#d8ece7" strokeWidth="5" opacity="0.08" />
+                <path d="M-45 118 Q0 95 45 118 T135 118 T225 118" fill="none" stroke="#173f4d" strokeWidth="6" opacity="0.07" />
+              </pattern>
+              <pattern id={terrainPatternId} width="120" height="120" patternUnits="userSpaceOnUse">
+                <circle cx="18" cy="22" r="7" fill="#ffffff" opacity="0.035" />
+                <circle cx="82" cy="42" r="11" fill="#08140d" opacity="0.035" />
+                <circle cx="48" cy="92" r="6" fill="#ffffff" opacity="0.025" />
+                <path d="M4 70 Q30 55 58 68 T116 64" fill="none" stroke="#ffffff" strokeWidth="4" opacity="0.025" />
+              </pattern>
+              {atlas.landmasses.map((landmass) => {
+                const base = BIOME_COLORS[landmass.biome];
+                return (
+                  <g key={`defs:${landmass.id}`}>
+                    <radialGradient id={`land-gradient-${campaignId}-${landmass.id}`} cx="42%" cy="38%" r="72%">
+                      <stop offset="0" stopColor={shadeHex(base, 24)} />
+                      <stop offset="0.52" stopColor={base} />
+                      <stop offset="1" stopColor={shadeHex(base, -30)} />
+                    </radialGradient>
+                    <clipPath id={`land-clip-${campaignId}-${landmass.id}`}>
+                      <polygon points={svgPoints(landmass.points)} />
+                    </clipPath>
+                  </g>
+                );
+              })}
               <mask id={maskId}>
                 <rect width={atlas.widthMiles} height={atlas.heightMiles} fill="white" />
                 {state.exploration.discoveredPlaceIds.map((placeId) => {
@@ -514,48 +638,163 @@ function WorldWorkspace({
               </mask>
             </defs>
 
-            <rect width={atlas.widthMiles} height={atlas.heightMiles} fill={`url(#ocean-${campaignId})`} />
-            {atlas.landmasses.map((landmass) => (
-              <polygon
-                key={landmass.id}
-                points={svgPoints(landmass.points)}
-                fill={BIOME_COLORS[landmass.biome]}
-                stroke="#564a38"
-                strokeWidth={10}
-                strokeLinejoin="round"
-              />
-            ))}
+            <rect width={atlas.widthMiles} height={atlas.heightMiles} fill={`url(#${oceanGradientId})`} />
+            <rect width={atlas.widthMiles} height={atlas.heightMiles} fill={`url(#${oceanPatternId})`} />
 
-            {atlas.regions.map((region) => (
-              <g
-                key={region.id}
-                onPointerDown={(event) => event.stopPropagation()}
-                onClick={(event) => {
-                  if (!state.canEdit) return;
-                  event.stopPropagation();
-                  setSelectedRegionId(region.id);
-                  setSelectedPlaceId(null);
-                  setSelectedPathId(null);
-                  setBuilderMode("region");
-                }}
-              >
-                <ellipse
-                  cx={region.center.x}
-                  cy={region.center.y}
-                  rx={Math.max(160, atlas.widthMiles * 0.018)}
-                  ry={Math.max(120, atlas.heightMiles * 0.02)}
-                  fill={BIOME_COLORS[region.biome]}
-                  opacity={state.canEdit && selectedRegionId === region.id ? 0.6 : 0.25}
-                  stroke={state.canEdit && selectedRegionId === region.id ? "#f0ce78" : "none"}
-                  strokeWidth={8}
+            {atlas.landmasses.map((landmass) => {
+              const base = BIOME_COLORS[landmass.biome];
+              const clipId = `land-clip-${campaignId}-${landmass.id}`;
+              return (
+                <g key={landmass.id}>
+                  <polygon
+                    points={svgPoints(landmass.points)}
+                    fill="none"
+                    stroke="#b8d2c4"
+                    strokeWidth={24}
+                    opacity={0.25}
+                    strokeLinejoin="round"
+                  />
+                  <polygon
+                    points={svgPoints(landmass.points)}
+                    fill={`url(#land-gradient-${campaignId}-${landmass.id})`}
+                    stroke="#3f4338"
+                    strokeWidth={8}
+                    strokeLinejoin="round"
+                  />
+                  <g clipPath={`url(#${clipId})`}>
+                    <rect
+                      x={landmass.center.x - landmass.radiusX}
+                      y={landmass.center.y - landmass.radiusY}
+                      width={landmass.radiusX * 2}
+                      height={landmass.radiusY * 2}
+                      fill={`url(#${terrainPatternId})`}
+                    />
+                    {terrainPatches(landmass).map((patch, index) => (
+                      <ellipse
+                        key={`${landmass.id}:patch:${index}`}
+                        cx={patch.x}
+                        cy={patch.y}
+                        rx={patch.rx}
+                        ry={patch.ry}
+                        transform={`rotate(${patch.rotation} ${patch.x} ${patch.y})`}
+                        fill={index % 3 === 0 ? shadeHex(base, 22) : shadeHex(base, -24)}
+                        opacity={0.11 + (index % 4) * 0.018}
+                      />
+                    ))}
+                    {[0.32, 0.5, 0.68].map((ratio) => (
+                      <ellipse
+                        key={`${landmass.id}:contour:${ratio}`}
+                        cx={landmass.center.x}
+                        cy={landmass.center.y}
+                        rx={landmass.radiusX * ratio}
+                        ry={landmass.radiusY * ratio}
+                        fill="none"
+                        stroke={shadeHex(base, -32)}
+                        strokeWidth={3}
+                        strokeDasharray="14 18"
+                        opacity={0.14}
+                      />
+                    ))}
+                  </g>
+                </g>
+              );
+            })}
+
+            {atlas.regions.map((region) => {
+              const visible = state.canEdit || discoveredRegions.has(region.id);
+              if (!visible) return null;
+              const radius = regionRadii.get(region.id) ?? 1;
+              const selected = state.canEdit && selectedRegionId === region.id;
+              return (
+                <g
+                  key={region.id}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    if (!state.canEdit) return;
+                    event.stopPropagation();
+                    setSelectedRegionId(region.id);
+                    setSelectedPlaceId(null);
+                    setSelectedPathId(null);
+                    setBuilderMode("region");
+                  }}
+                >
+                  <circle
+                    cx={region.center.x}
+                    cy={region.center.y}
+                    r={radius}
+                    fill={BIOME_COLORS[region.biome]}
+                    opacity={selected ? 0.28 : 0.08}
+                    stroke={selected ? "#f0ce78" : shadeHex(BIOME_COLORS[region.biome], -38)}
+                    strokeWidth={selected ? 5 : 2}
+                    strokeDasharray={selected ? undefined : "12 12"}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  {view.width < atlas.widthMiles * 0.68 ? (
+                    <text
+                      x={region.center.x}
+                      y={region.center.y}
+                      textAnchor="middle"
+                      fontFamily="Georgia, serif"
+                      fontWeight="700"
+                      fontSize={28}
+                      fill="#332b22"
+                      stroke="#e4d8b9"
+                      strokeWidth={5}
+                      paintOrder="stroke"
+                    >
+                      {region.name}
+                    </text>
+                  ) : null}
+                </g>
+              );
+            })}
+
+            {atlas.rivers.map((river) => (
+              <g key={river.id}>
+                <polyline
+                  points={svgPoints(river.points)}
+                  fill="none"
+                  stroke="#264e63"
+                  strokeWidth={7}
+                  opacity=".72"
+                  strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke"
                 />
-                {(state.canEdit || discoveredRegions.has(region.id)) && view.width < atlas.widthMiles * 0.72 ? (
-                  <text x={region.center.x} y={region.center.y} textAnchor="middle" fontFamily="Georgia, serif" fontWeight="700" fontSize={34} fill="#5e3127" stroke="#dfd0a5" strokeWidth={6} paintOrder="stroke">
-                    {region.name}
-                  </text>
-                ) : null}
+                <polyline
+                  points={svgPoints(river.points)}
+                  fill="none"
+                  stroke="#65a4bb"
+                  strokeWidth={3.5}
+                  opacity=".9"
+                  strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke"
+                />
               </g>
             ))}
+
+            {atlas.mountainRanges.flatMap((range) =>
+              range.points.map((point, index) => (
+                <g key={`${range.id}:${index}`}>
+                  <path
+                    d={`M${point.x - 42} ${point.y + 34} L${point.x + 8} ${point.y - 48} L${point.x + 47} ${point.y + 34} Z`}
+                    fill="#514b43"
+                    opacity=".38"
+                  />
+                  <path
+                    d={`M${point.x - 38} ${point.y + 30} L${point.x} ${point.y - 42} L${point.x + 38} ${point.y + 30} Z`}
+                    fill="#776f63"
+                    stroke="#443e37"
+                    strokeWidth={3}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <path
+                    d={`M${point.x - 8} ${point.y - 26} L${point.x} ${point.y - 42} L${point.x + 10} ${point.y - 22} Z`}
+                    fill="#d4d1c7"
+                    opacity=".78"
+                  />
+                </g>
+              )),
+            )}
 
             {atlas.paths.map((path) => {
               const style = pathStyle(path.kind);
@@ -566,10 +805,10 @@ function WorldWorkspace({
                   key={path.id}
                   points={svgPoints(path.points)}
                   fill="none"
-                  stroke={selectedPathId === path.id ? "#f0ce78" : style.stroke}
-                  strokeWidth={selectedPathId === path.id ? style.width + 5 : style.width}
+                  stroke={selectedPathId === path.id ? "#f4d47e" : style.stroke}
+                  strokeWidth={selectedPathId === path.id ? style.width + 2 : style.width}
                   strokeDasharray={style.dash}
-                  opacity={0.72}
+                  opacity={path.kind === "sea-route" ? 0.68 : 0.62}
                   strokeLinecap="round"
                   vectorEffect="non-scaling-stroke"
                   onPointerDown={(event) => event.stopPropagation()}
@@ -585,19 +824,10 @@ function WorldWorkspace({
               );
             })}
 
-            {atlas.rivers.map((river) => (
-              <polyline key={river.id} points={svgPoints(river.points)} fill="none" stroke="#4b8399" strokeWidth={10} opacity=".82" vectorEffect="non-scaling-stroke" />
-            ))}
-
-            {atlas.mountainRanges.flatMap((range) =>
-              range.points.map((point, index) => (
-                <path key={`${range.id}:${index}`} d={`M${point.x - 38} ${point.y + 30} L${point.x} ${point.y - 42} L${point.x + 38} ${point.y + 30} Z`} fill="#807667" stroke="#4b4338" strokeWidth={5} vectorEffect="non-scaling-stroke" />
-              )),
-            )}
-
             {filteredPlaces.map((place) => {
               const discovered = state.canEdit || discoveredPlaces.has(place.id);
               const selected = selectedPlaceId === place.id;
+              const showLabel = view.width < atlas.widthMiles * 0.74 || place.importance >= 0.82;
               return (
                 <g
                   key={place.id}
@@ -612,20 +842,32 @@ function WorldWorkspace({
                     if (state.canEdit) setBuilderMode("place");
                   }}
                 >
-                  {selected ? <circle r={46} fill="none" stroke="#f0ce78" strokeWidth={5} vectorEffect="non-scaling-stroke" /> : null}
-                  <circle r={30} fill="#eadcaf" stroke="#4c3727" strokeWidth={4} vectorEffect="non-scaling-stroke" />
-                  <text textAnchor="middle" dominantBaseline="middle" fontFamily="Georgia, serif" fontSize={34} fill="#4b2f25">
+                  {selected ? <circle r={40} fill="none" stroke="#f0ce78" strokeWidth={4} vectorEffect="non-scaling-stroke" /> : null}
+                  <circle r={21} fill="#e7ddbd" stroke="#3c3128" strokeWidth={3} vectorEffect="non-scaling-stroke" />
+                  <text textAnchor="middle" dominantBaseline="middle" fontFamily="Georgia, serif" fontSize={26} fill="#352820">
                     {discovered ? placeGlyph(place.kind) : "?"}
                   </text>
-                  <text y={58} textAnchor="middle" fontFamily="Georgia, serif" fontWeight="700" fontSize={23} fill="#35271d" stroke="#eadcaf" strokeWidth={5} paintOrder="stroke">
-                    {discovered ? place.name : "Uncharted"}
-                  </text>
+                  {showLabel ? (
+                    <text
+                      y={48}
+                      textAnchor="middle"
+                      fontFamily="Georgia, serif"
+                      fontWeight="700"
+                      fontSize={20}
+                      fill="#2f281f"
+                      stroke="#e8dfc5"
+                      strokeWidth={4}
+                      paintOrder="stroke"
+                    >
+                      {discovered ? place.name : "Uncharted"}
+                    </text>
+                  ) : null}
                 </g>
               );
             })}
 
             {showFog && !state.canEdit ? (
-              <rect width={atlas.widthMiles} height={atlas.heightMiles} fill="#11150f" opacity={0.88} mask={`url(#${maskId})`} pointerEvents="none" />
+              <rect width={atlas.widthMiles} height={atlas.heightMiles} fill="#0b100d" opacity={0.87} mask={`url(#${maskId})`} pointerEvents="none" />
             ) : null}
 
             {!state.canEdit
@@ -633,16 +875,45 @@ function WorldWorkspace({
                   const place = atlas.places.find((candidate) => candidate.id === placeId);
                   return place ? (
                     <g key={`unknown:${place.id}`} transform={`translate(${place.x} ${place.y})`} pointerEvents="none">
-                      <circle r={24} fill="#2a241b" stroke="#d4b36a" strokeWidth={4} vectorEffect="non-scaling-stroke" />
-                      <text textAnchor="middle" dominantBaseline="middle" fontSize={26} fill="#f0d28b">?</text>
+                      <circle r={22} fill="#242018" stroke="#d4b36a" strokeWidth={3} vectorEffect="non-scaling-stroke" />
+                      <text textAnchor="middle" dominantBaseline="middle" fontSize={24} fill="#f0d28b">?</text>
                     </g>
                   ) : null;
                 })
               : null}
 
-            <g transform={`translate(${state.exploration.partyPosition.x} ${state.exploration.partyPosition.y})`} pointerEvents="none">
-              <circle r={42} fill="#3d291c" stroke="#ffd879" strokeWidth={7} vectorEffect="non-scaling-stroke" />
-              <text textAnchor="middle" dominantBaseline="middle" fontSize={31} fill="#ffe5a1">◆</text>
+            <g
+              transform={`translate(${state.exploration.partyPosition.x} ${state.exploration.partyPosition.y})`}
+              pointerEvents="none"
+            >
+              <circle r={partyMarkerRadius * 1.55} fill="#ffe38a" opacity=".13" className="animate-pulse" />
+              <circle
+                r={partyMarkerRadius}
+                fill="#17140e"
+                stroke="#ffe085"
+                strokeWidth={5}
+                vectorEffect="non-scaling-stroke"
+              />
+              <path
+                d={`M0 ${-partyMarkerRadius * 0.62} L${partyMarkerRadius * 0.52} 0 L0 ${partyMarkerRadius * 0.68} L${-partyMarkerRadius * 0.52} 0 Z`}
+                fill="#ffe085"
+                stroke="#573b1d"
+                strokeWidth={3}
+                vectorEffect="non-scaling-stroke"
+              />
+              <text
+                y={partyMarkerRadius + partyLabelSize * 1.15}
+                textAnchor="middle"
+                fontFamily="Georgia, serif"
+                fontWeight="800"
+                fontSize={partyLabelSize}
+                fill="#fff0b5"
+                stroke="#17140e"
+                strokeWidth={5}
+                paintOrder="stroke"
+              >
+                {`YOU • ${currentPlace?.name ?? "Party"}`}
+              </text>
             </g>
           </svg>
 
@@ -654,14 +925,21 @@ function WorldWorkspace({
             </div>
           </div>
 
+          <div className="absolute left-1/2 top-4 -translate-x-1/2 rounded-full border border-[#b58c4d]/70 bg-[#17140e]/90 px-4 py-2 text-xs font-semibold text-[#ffe9a8] shadow-xl backdrop-blur">
+            <MapPin className="mr-1.5 inline h-3.5 w-3.5" /> You are here: {currentPlace?.name ?? "Unknown location"}
+          </div>
+
           <div className="absolute right-4 top-4 flex flex-col gap-2">
             <button type="button" className={buttonClass} onClick={() => zoom(0.8)} aria-label="Zoom in"><Plus className="h-4 w-4" /></button>
             <button type="button" className={buttonClass} onClick={() => zoom(1.25)} aria-label="Zoom out"><Minus className="h-4 w-4" /></button>
+            <button type="button" className={buttonClass} onClick={centerOnParty} aria-label="Center on party"><MapPin className="h-4 w-4" /></button>
             <button type="button" className={buttonClass} onClick={() => setView(fullView(atlas))} aria-label="Reset map"><RefreshCw className="h-4 w-4" /></button>
           </div>
 
+          {showLegend ? <AtlasLegend atlas={atlas} currentPlace={currentPlace ?? null} /> : null}
+
           {moveMode ? (
-            <div className="absolute left-1/2 top-4 -translate-x-1/2 rounded-xl border border-[#c69b52] bg-[#2c2418]/95 px-4 py-2 text-sm text-[#f8e5b5] shadow-xl">
+            <div className="absolute left-1/2 top-16 -translate-x-1/2 rounded-xl border border-[#c69b52] bg-[#2c2418]/95 px-4 py-2 text-sm text-[#f8e5b5] shadow-xl">
               <Crosshair className="mr-2 inline h-4 w-4" /> Click the map to move the selected {moveMode.kind}. <button type="button" className="ml-3 underline" onClick={() => setMoveMode(null)}>Cancel</button>
             </div>
           ) : null}
@@ -734,9 +1012,7 @@ function WorldWorkspace({
                   .then(onRefresh)
                   .catch((error) => toast.error(errorMessage(error)))
               }
-              onDelete={(id) => {
-                if (window.confirm("Delete this place and every path attached to it?")) editMutation.mutate({ type: "place.delete", id });
-              }}
+              onDelete={(id) => editMutation.mutate({ type: "place.delete", id })}
             />
           ) : null}
 
@@ -749,9 +1025,7 @@ function WorldWorkspace({
               onCreate={(operation) => editMutation.mutate(operation)}
               onUpdate={(operation) => editMutation.mutate(operation)}
               onMove={(id) => setMoveMode({ kind: "region", id })}
-              onDelete={(id) => {
-                if (window.confirm("Delete this region? Places will remain but become unassigned.")) editMutation.mutate({ type: "region.delete", id });
-              }}
+              onDelete={(id) => editMutation.mutate({ type: "region.delete", id })}
             />
           ) : null}
 
@@ -762,13 +1036,56 @@ function WorldWorkspace({
               busy={editMutation.isPending}
               onCreate={(operation) => editMutation.mutate(operation)}
               onUpdate={(operation) => editMutation.mutate(operation)}
-              onDelete={(id) => {
-                if (window.confirm("Delete this travel path?")) editMutation.mutate({ type: "path.delete", id });
-              }}
+              onDelete={(id) => editMutation.mutate({ type: "path.delete", id })}
             />
           ) : null}
         </aside>
       ) : null}
+    </div>
+  );
+}
+
+function AtlasLegend({ atlas, currentPlace }: { atlas: WorldAtlasDocument; currentPlace: AtlasPlace | null }) {
+  const usedBiomes = [...new Set([...atlas.landmasses.map((landmass) => landmass.biome), ...atlas.regions.map((region) => region.biome)])];
+  const usedPlaces = [...new Set(atlas.places.map((place) => place.kind))];
+  const usedPaths = [...new Set(atlas.paths.map((path) => path.kind))];
+
+  return (
+    <div className="absolute bottom-4 left-4 max-h-[300px] w-[320px] overflow-y-auto rounded-xl border border-[#7b6545]/80 bg-[#15160f]/92 p-3 text-[#e8dcb7] shadow-2xl backdrop-blur">
+      <div className="flex items-center justify-between border-b border-[#665238]/60 pb-2">
+        <div className="text-xs font-bold uppercase tracking-[0.18em] text-[#d3ad68]">Map legend</div>
+        <div className="text-[10px] text-[#9d9072]">{currentPlace?.name ?? "Party location"}</div>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px]">
+        <div className="flex items-center gap-2"><span className="inline-block h-3 w-3 rotate-45 border border-[#ffe085] bg-[#ffe085]" /> You / party</div>
+        {usedPaths.map((kind) => {
+          const style = pathStyle(kind);
+          return (
+            <div key={kind} className="flex items-center gap-2">
+              <span className="inline-block w-6 border-t-2" style={{ borderColor: style.stroke, borderTopStyle: "dashed" }} />
+              {kind === "sea-route" ? "Sea route" : kind === "road" ? "Road" : "Trail"}
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9f906d]">Terrain</div>
+      <div className="mt-1 grid grid-cols-2 gap-1 text-[11px]">
+        {usedBiomes.map((biome) => (
+          <div key={biome} className="flex items-center gap-2 capitalize">
+            <span className="h-3 w-4 rounded-sm border border-black/20" style={{ backgroundColor: BIOME_COLORS[biome] }} />
+            {biome.replaceAll("-", " ")}
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9f906d]">Places</div>
+      <div className="mt-1 grid grid-cols-3 gap-x-3 gap-y-1 text-[10px]">
+        {usedPlaces.map((kind) => (
+          <div key={kind} className="flex items-center gap-1.5">
+            <span className="w-4 text-center font-serif text-[#eadcaf]">{placeGlyph(kind)}</span>
+            <span className="truncate">{PLACE_LABELS[kind]}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -805,11 +1122,7 @@ function TravelPanel({
     onSuccess: async (value) => {
       onPlan(null);
       setDestination("");
-      toast.success(
-        value.exploration.pendingEncounter
-          ? "Travel complete — an encounter was triggered."
-          : "Travel complete.",
-      );
+      toast.success(value.exploration.pendingEncounter ? "Travel complete — an encounter was triggered." : "Travel complete.");
       await onRefresh();
     },
     onError: (error) => toast.error(errorMessage(error)),
@@ -930,36 +1243,16 @@ function InspectorPanel({
         </div>
       ) : null}
       <div className="space-y-2">
-        <button
-          type="button"
-          className={`${buttonClass} w-full`}
-          disabled={regenerateBusy}
-          onClick={() => onRegenerate("same")}
-        >
+        <button type="button" className={`${buttonClass} w-full`} disabled={regenerateBusy} onClick={() => onRegenerate("same")}>
           <RefreshCw className={`mr-2 inline h-4 w-4 ${regenerateBusy && confirmingSame ? "animate-spin" : ""}`} />
-          {regenerateBusy && confirmingSame
-            ? "Resetting…"
-            : confirmingSame
-              ? "Confirm reset"
-              : "Reset from same seed"}
+          {regenerateBusy && confirmingSame ? "Resetting…" : confirmingSame ? "Confirm reset" : "Reset from same seed"}
         </button>
-        <button
-          type="button"
-          className={`${primaryButtonClass} w-full`}
-          disabled={regenerateBusy}
-          onClick={() => onRegenerate("new")}
-        >
+        <button type="button" className={`${primaryButtonClass} w-full`} disabled={regenerateBusy} onClick={() => onRegenerate("new")}>
           <WandSparkles className={`mr-2 inline h-4 w-4 ${regenerateBusy && confirmingNew ? "animate-pulse" : ""}`} />
-          {regenerateBusy && confirmingNew
-            ? "Regenerating…"
-            : confirmingNew
-              ? "Confirm regenerate"
-              : "Regenerate new world"}
+          {regenerateBusy && confirmingNew ? "Regenerating…" : confirmingNew ? "Confirm regenerate" : "Regenerate new world"}
         </button>
         {regenerateMode && !regenerateBusy ? (
-          <button type="button" className={`${buttonClass} w-full`} onClick={onCancelRegenerate}>
-            Cancel
-          </button>
+          <button type="button" className={`${buttonClass} w-full`} onClick={onCancelRegenerate}>Cancel</button>
         ) : null}
       </div>
     </div>
@@ -968,6 +1261,41 @@ function InspectorPanel({
 
 function Stat({ label, value }: { label: string; value: number }) {
   return <div className="rounded-lg border border-[#5f4d34] bg-[#201f18] p-3"><div className="text-[10px] uppercase tracking-[0.15em] text-[#95886d]">{label}</div><div className="mt-1 font-display text-xl text-[#eadcaf]">{value}</div></div>;
+}
+
+function ConfirmDeleteButton({
+  label,
+  warning,
+  busy,
+  onDelete,
+}: {
+  label: string;
+  warning: string;
+  busy: boolean;
+  onDelete: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <div className="space-y-2">
+      {confirming ? <div className="rounded-lg border border-[#7c4238] bg-[#321d19] p-2 text-xs text-[#e7aa9d]">{warning}</div> : null}
+      <button
+        type="button"
+        className="w-full rounded-lg border border-[#7c4238] px-3 py-2 text-sm font-semibold text-[#e7aa9d] hover:bg-[#4a241f] disabled:opacity-50"
+        disabled={busy}
+        onClick={() => {
+          if (confirming) {
+            setConfirming(false);
+            onDelete();
+          } else {
+            setConfirming(true);
+          }
+        }}
+      >
+        <Trash2 className="mr-2 inline h-4 w-4" /> {confirming ? `Confirm ${label.toLowerCase()}` : label}
+      </button>
+      {confirming ? <button type="button" className={`${buttonClass} w-full`} onClick={() => setConfirming(false)}>Cancel</button> : null}
+    </div>
+  );
 }
 
 function PlaceBuilder({
@@ -1026,7 +1354,7 @@ function PlaceBuilder({
         <button type="button" className={buttonClass} disabled={busy} onClick={() => onMove(selected.id)}><Crosshair className="mr-1 inline h-4 w-4" /> Move</button>
         <button type="button" className={buttonClass} disabled={busy} onClick={() => onMoveParty(selected.id)}><MapPin className="mr-1 inline h-4 w-4" /> Party here</button>
       </div>
-      <button type="button" className="w-full rounded-lg border border-[#7c4238] px-3 py-2 text-sm font-semibold text-[#e7aa9d] hover:bg-[#4a241f]" disabled={busy} onClick={() => onDelete(selected.id)}><Trash2 className="mr-2 inline h-4 w-4" /> Delete place</button>
+      <ConfirmDeleteButton label="Delete place" warning="This deletes the place and every attached path." busy={busy} onDelete={() => onDelete(selected.id)} />
       <div className="text-xs text-[#8e8269]">Landmass: {atlas.landmasses.find((value) => value.id === selected.landmassId)?.name ?? selected.landmassId}</div>
     </div>
   );
@@ -1038,7 +1366,7 @@ function RegionBuilder({ atlas, selected, mapCenter, busy, onCreate, onUpdate, o
   const [importance, setImportance] = useState(String(selected?.importance ?? 0.6));
   useEffect(() => { setName(selected?.name ?? ""); setBiome(selected?.biome ?? "temperate"); setImportance(String(selected?.importance ?? 0.6)); }, [selected]);
   if (!selected) return <div className="mt-4 space-y-3"><p className="text-sm leading-6 text-[#a99b7d]">Select a region or create one at the center of the current view.</p><button type="button" className={`${primaryButtonClass} w-full`} disabled={busy} onClick={() => onCreate({ type: "region.create", value: { name: "New Region", center: mapCenter, biome: "temperate", importance: 0.6 } })}><Plus className="mr-2 inline h-4 w-4" /> Create region</button></div>;
-  return <div className="mt-4 space-y-3"><div><FieldLabel>Name</FieldLabel><input className={`${fieldClass} mt-1`} value={name} onChange={(event) => setName(event.target.value)} /></div><div><FieldLabel>Biome</FieldLabel><select className={`${fieldClass} mt-1`} value={biome} onChange={(event) => setBiome(event.target.value as AtlasBiome)}>{Object.keys(BIOME_COLORS).map((value) => <option key={value} value={value}>{value}</option>)}</select></div><div><FieldLabel>Importance</FieldLabel><input className={`${fieldClass} mt-1`} type="number" min="0.1" max="1" step="0.05" value={importance} onChange={(event) => setImportance(event.target.value)} /></div><button type="button" className={`${primaryButtonClass} w-full`} disabled={busy || !name.trim()} onClick={() => onUpdate({ type: "region.update", id: selected.id, patch: { name: name.trim(), biome, importance: clamp(Number(importance) || 0.6, 0.1, 1) } })}>Save region</button><button type="button" className={`${buttonClass} w-full`} disabled={busy} onClick={() => onMove(selected.id)}><Crosshair className="mr-2 inline h-4 w-4" /> Move region center</button><button type="button" className="w-full rounded-lg border border-[#7c4238] px-3 py-2 text-sm font-semibold text-[#e7aa9d] hover:bg-[#4a241f]" disabled={busy} onClick={() => onDelete(selected.id)}><Trash2 className="mr-2 inline h-4 w-4" /> Delete region</button><div className="text-xs text-[#8e8269]">Landmass: {atlas.landmasses.find((value) => value.id === selected.landmassId)?.name ?? selected.landmassId}</div></div>;
+  return <div className="mt-4 space-y-3"><div><FieldLabel>Name</FieldLabel><input className={`${fieldClass} mt-1`} value={name} onChange={(event) => setName(event.target.value)} /></div><div><FieldLabel>Biome</FieldLabel><select className={`${fieldClass} mt-1`} value={biome} onChange={(event) => setBiome(event.target.value as AtlasBiome)}>{Object.keys(BIOME_COLORS).map((value) => <option key={value} value={value}>{value}</option>)}</select></div><div><FieldLabel>Importance</FieldLabel><input className={`${fieldClass} mt-1`} type="number" min="0.1" max="1" step="0.05" value={importance} onChange={(event) => setImportance(event.target.value)} /></div><button type="button" className={`${primaryButtonClass} w-full`} disabled={busy || !name.trim()} onClick={() => onUpdate({ type: "region.update", id: selected.id, patch: { name: name.trim(), biome, importance: clamp(Number(importance) || 0.6, 0.1, 1) } })}>Save region</button><button type="button" className={`${buttonClass} w-full`} disabled={busy} onClick={() => onMove(selected.id)}><Crosshair className="mr-2 inline h-4 w-4" /> Move region center</button><ConfirmDeleteButton label="Delete region" warning="Places remain, but they become unassigned from this region." busy={busy} onDelete={() => onDelete(selected.id)} /><div className="text-xs text-[#8e8269]">Landmass: {atlas.landmasses.find((value) => value.id === selected.landmassId)?.name ?? selected.landmassId}</div></div>;
 }
 
 function PathBuilder({ atlas, selected, busy, onCreate, onUpdate, onDelete }: { atlas: WorldAtlasDocument; selected: AtlasPath | null; busy: boolean; onCreate: (operation: CampaignWorldEditOperation) => void; onUpdate: (operation: CampaignWorldEditOperation) => void; onDelete: (id: string) => void }) {
@@ -1047,5 +1375,5 @@ function PathBuilder({ atlas, selected, busy, onCreate, onUpdate, onDelete }: { 
   const [kind, setKind] = useState<AtlasPathKind>(selected?.kind ?? "road");
   useEffect(() => { setFromPlaceId(selected?.fromPlaceId ?? atlas.places[0]?.id ?? ""); setToPlaceId(selected?.toPlaceId ?? atlas.places[1]?.id ?? ""); setKind(selected?.kind ?? "road"); }, [atlas.places, selected]);
   const valid = Boolean(fromPlaceId && toPlaceId && fromPlaceId !== toPlaceId);
-  return <div className="mt-4 space-y-3"><p className="text-sm leading-6 text-[#a99b7d]">{selected ? `Editing ${selected.id}` : "Create a road, trail, or sea route between two places."}</p><div><FieldLabel>From</FieldLabel><select className={`${fieldClass} mt-1`} value={fromPlaceId} onChange={(event) => setFromPlaceId(event.target.value)}>{atlas.places.map((place) => <option key={place.id} value={place.id}>{place.name}</option>)}</select></div><div><FieldLabel>To</FieldLabel><select className={`${fieldClass} mt-1`} value={toPlaceId} onChange={(event) => setToPlaceId(event.target.value)}>{atlas.places.map((place) => <option key={place.id} value={place.id}>{place.name}</option>)}</select></div><div><FieldLabel>Kind</FieldLabel><select className={`${fieldClass} mt-1`} value={kind} onChange={(event) => setKind(event.target.value as AtlasPathKind)}><option value="road">Road</option><option value="trail">Trail</option><option value="sea-route">Sea route</option></select></div>{selected ? <><button type="button" className={`${primaryButtonClass} w-full`} disabled={busy || !valid} onClick={() => onUpdate({ type: "path.update", id: selected.id, patch: { fromPlaceId, toPlaceId, kind } })}>Save path</button><button type="button" className="w-full rounded-lg border border-[#7c4238] px-3 py-2 text-sm font-semibold text-[#e7aa9d] hover:bg-[#4a241f]" disabled={busy} onClick={() => onDelete(selected.id)}><Trash2 className="mr-2 inline h-4 w-4" /> Delete path</button></> : <button type="button" className={`${primaryButtonClass} w-full`} disabled={busy || !valid} onClick={() => onCreate({ type: "path.create", value: { fromPlaceId, toPlaceId, kind } })}><Plus className="mr-2 inline h-4 w-4" /> Create path</button>}</div>;
+  return <div className="mt-4 space-y-3"><p className="text-sm leading-6 text-[#a99b7d]">{selected ? `Editing ${selected.id}` : "Create a road, trail, or sea route between two places."}</p><div><FieldLabel>From</FieldLabel><select className={`${fieldClass} mt-1`} value={fromPlaceId} onChange={(event) => setFromPlaceId(event.target.value)}>{atlas.places.map((place) => <option key={place.id} value={place.id}>{place.name}</option>)}</select></div><div><FieldLabel>To</FieldLabel><select className={`${fieldClass} mt-1`} value={toPlaceId} onChange={(event) => setToPlaceId(event.target.value)}>{atlas.places.map((place) => <option key={place.id} value={place.id}>{place.name}</option>)}</select></div><div><FieldLabel>Kind</FieldLabel><select className={`${fieldClass} mt-1`} value={kind} onChange={(event) => setKind(event.target.value as AtlasPathKind)}><option value="road">Road</option><option value="trail">Trail</option><option value="sea-route">Sea route</option></select></div>{selected ? <><button type="button" className={`${primaryButtonClass} w-full`} disabled={busy || !valid} onClick={() => onUpdate({ type: "path.update", id: selected.id, patch: { fromPlaceId, toPlaceId, kind } })}>Save path</button><ConfirmDeleteButton label="Delete path" warning="This removes the selected travel route." busy={busy} onDelete={() => onDelete(selected.id)} /></> : <button type="button" className={`${primaryButtonClass} w-full`} disabled={busy || !valid} onClick={() => onCreate({ type: "path.create", value: { fromPlaceId, toPlaceId, kind } })}><Plus className="mr-2 inline h-4 w-4" /> Create path</button>}</div>;
 }

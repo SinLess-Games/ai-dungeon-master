@@ -59,6 +59,13 @@ const inhabited = {
       distanceMiles: 900,
       points: [{ x: places[1]!.x, y: places[1]!.y }, { x: places[2]!.x, y: places[2]!.y }],
     },
+    {
+      kind: "trail",
+      fromPlaceIndex: 2,
+      toPlaceIndex: 3,
+      distanceMiles: 180,
+      points: [{ x: places[2]!.x, y: places[2]!.y }],
+    },
   ],
 };
 
@@ -67,11 +74,16 @@ const finalReview = {
   landmassCorrections: [],
   regionCorrections: [],
   placeCorrections: [],
-  pathCorrections: [],
+  pathCorrections: [
+    {
+      pathIndex: 0,
+      points: [{ x: places[0]!.x, y: places[0]!.y }],
+    },
+  ],
 };
 
 describe("AI-only atlas route tolerance", () => {
-  it("drops a malformed sea route instead of failing the entire world", async () => {
+  it("drops malformed routes and ignores malformed path corrections instead of failing the world", async () => {
     const run = vi
       .fn()
       .mockResolvedValueOnce({ response: JSON.stringify(geometry) })
@@ -95,6 +107,7 @@ describe("AI-only atlas route tolerance", () => {
     expect(atlas.places).toHaveLength(12);
     expect(atlas.paths).toHaveLength(1);
     expect(atlas.paths[0]?.kind).toBe("road");
+    expect(atlas.paths[0]?.points).toHaveLength(2);
     expect(atlas.paths.some((path) => path.kind === "sea-route")).toBe(false);
   });
 });

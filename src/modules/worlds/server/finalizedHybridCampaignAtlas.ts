@@ -5,7 +5,7 @@ import {
   AI_ONLY_CAMPAIGN_ATLAS_GENERATOR_VERSION,
   type RichCampaignAtlasRequest,
 } from "./aiOnlyCampaignAtlasV2";
-import { generateDenseAICampaignWorldAtlas } from "./aiDenseCampaignAtlas";
+import { generateStableDenseAICampaignWorldAtlas } from "./aiDenseCampaignAtlasStable";
 import {
   storedAIPlan,
   storedAIRealismAudit,
@@ -40,7 +40,7 @@ export async function generateHybridCampaignWorldAtlas(input: {
         }
       : context;
 
-  return generateDenseAICampaignWorldAtlas({
+  return generateStableDenseAICampaignWorldAtlas({
     env: input.env,
     request: {
       ...request,

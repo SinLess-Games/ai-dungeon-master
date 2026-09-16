@@ -82,9 +82,11 @@ export function CampaignsHub() {
 
   const start = useMutation({
     mutationFn: startCampaign,
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       toast.success("Campaign started. The world is ready.");
       await queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      setSelectedCampaignId(result.campaignId);
+      setMode("play");
     },
     onError: (error) => toast.error(errorMessage(error)),
   });
@@ -344,11 +346,15 @@ export function CampaignsHub() {
                         View setup <ChevronRight className="h-4 w-4" />
                       </button>
                     )}
-                    {campaign.status === "ready" ? (
+                    {["draft", "ready"].includes(campaign.status) ? (
                       <button
                         type="button"
                         disabled={start.isPending || !canUseAuthoritativeActions}
-                        title={canUseAuthoritativeActions ? undefined : "Reconnect before starting the campaign."}
+                        title={
+                          canUseAuthoritativeActions
+                            ? "Requires at least one finalized, rules-valid character."
+                            : "Reconnect before starting the campaign."
+                        }
                         onClick={() => {
                           if (
                             window.confirm(
@@ -360,7 +366,8 @@ export function CampaignsHub() {
                         }}
                         className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <Play className="h-4 w-4" /> Start
+                        <Play className="h-4 w-4" />
+                        {start.isPending && start.variables === campaign.id ? "Starting…" : "Start"}
                       </button>
                     ) : null}
                     {["active", "paused"].includes(campaign.status) ? (

@@ -62,6 +62,7 @@ interface ViewBox {
 
 type BuilderMode = "inspect" | "place" | "region" | "path";
 type MoveMode = { kind: "place" | "region"; id: string } | null;
+type RegenerateMode = "same" | "new";
 
 const PLACE_LABELS: Record<AtlasPlaceKind, string> = {
   capital: "Capital",
@@ -287,6 +288,7 @@ function WorldWorkspace({
   const [showFog, setShowFog] = useState(!state.canEdit);
   const [search, setSearch] = useState("");
   const [travelPlan, setTravelPlan] = useState<AtlasTravelPlan | null>(null);
+  const [regenerateConfirmation, setRegenerateConfirmation] = useState<RegenerateMode | null>(null);
 
   useEffect(() => {
     setView((current) =>
@@ -368,6 +370,25 @@ function WorldWorkspace({
       await onRefresh();
     },
     onError: (error) => toast.error(errorMessage(error)),
+  });
+
+  const regenerateMutation = useMutation({
+    mutationFn: (seedMode: RegenerateMode) =>
+      regenerateCampaignWorld(campaignId, state.revision, seedMode),
+    onSuccess: async (value, seedMode) => {
+      setRegenerateConfirmation(null);
+      setSelectedPlaceId(null);
+      setSelectedRegionId(null);
+      setSelectedPathId(null);
+      setTravelPlan(null);
+      if (value.atlas) setView(fullView(value.atlas));
+      toast.success(seedMode === "same" ? "World reset from the same seed." : "New world generated.");
+      await onRefresh();
+    },
+    onError: (error) => {
+      setRegenerateConfirmation(null);
+      toast.error(errorMessage(error));
+    },
   });
 
   function wheel(event: ReactWheelEvent<SVGSVGElement>) {
@@ -681,22 +702,20 @@ function WorldWorkspace({
             <InspectorPanel
               report={state.inspector}
               weather={state.exploration.weather}
+              regenerateMode={regenerateConfirmation}
+              regenerateBusy={regenerateMutation.isPending}
               onWeather={(weather) =>
                 void setCampaignWorldWeather(campaignId, state.revision, weather)
                   .then(onRefresh)
                   .catch((error) => toast.error(errorMessage(error)))
               }
+              onCancelRegenerate={() => setRegenerateConfirmation(null)}
               onRegenerate={(seedMode) => {
-                if (!window.confirm(seedMode === "new" ? "Regenerate the entire world with a new seed? Existing GM edits and discovery will be replaced." : "Reset the world to its current deterministic seed? Existing GM edits and discovery will be replaced.")) return;
-                void regenerateCampaignWorld(campaignId, state.revision, seedMode)
-                  .then(async () => {
-                    setSelectedPlaceId(null);
-                    setSelectedRegionId(null);
-                    setSelectedPathId(null);
-                    toast.success("World regenerated.");
-                    await onRefresh();
-                  })
-                  .catch((error) => toast.error(errorMessage(error)));
+                if (regenerateConfirmation === seedMode) {
+                  regenerateMutation.mutate(seedMode);
+                  return;
+                }
+                setRegenerateConfirmation(seedMode);
               }}
             />
           ) : null}
@@ -863,14 +882,22 @@ function TravelPanel({
 function InspectorPanel({
   report,
   weather,
+  regenerateMode,
+  regenerateBusy,
   onWeather,
   onRegenerate,
+  onCancelRegenerate,
 }: {
   report: AtlasInspectorReport | null;
   weather: AtlasTravelWeather;
+  regenerateMode: RegenerateMode | null;
+  regenerateBusy: boolean;
   onWeather: (weather: AtlasTravelWeather) => void;
-  onRegenerate: (seedMode: "same" | "new") => void;
+  onRegenerate: (seedMode: RegenerateMode) => void;
+  onCancelRegenerate: () => void;
 }) {
+  const confirmingSame = regenerateMode === "same";
+  const confirmingNew = regenerateMode === "new";
   return (
     <div className="mt-4 space-y-4">
       <div className="grid grid-cols-2 gap-2">
@@ -895,9 +922,45 @@ function InspectorPanel({
           </div>
         ) : <div className="mt-2 text-sm text-[#a99b7d]">No structural atlas issues detected.</div>}
       </div>
+      {regenerateMode ? (
+        <div className="rounded-xl border border-[#8a6237] bg-[#2b2115] p-3 text-xs leading-5 text-[#e7cca0]">
+          {confirmingSame
+            ? "Resetting from the same seed replaces all GM map edits and discovery, but keeps the campaign seed. Click Confirm reset to continue."
+            : "Regenerating creates a new world seed and replaces all GM map edits and discovery. Click Confirm regenerate to continue."}
+        </div>
+      ) : null}
       <div className="space-y-2">
-        <button type="button" className={`${buttonClass} w-full`} onClick={() => onRegenerate("same")}><RefreshCw className="mr-2 inline h-4 w-4" /> Reset from same seed</button>
-        <button type="button" className={`${primaryButtonClass} w-full`} onClick={() => onRegenerate("new")}><WandSparkles className="mr-2 inline h-4 w-4" /> Regenerate new world</button>
+        <button
+          type="button"
+          className={`${buttonClass} w-full`}
+          disabled={regenerateBusy}
+          onClick={() => onRegenerate("same")}
+        >
+          <RefreshCw className={`mr-2 inline h-4 w-4 ${regenerateBusy && confirmingSame ? "animate-spin" : ""}`} />
+          {regenerateBusy && confirmingSame
+            ? "Resetting…"
+            : confirmingSame
+              ? "Confirm reset"
+              : "Reset from same seed"}
+        </button>
+        <button
+          type="button"
+          className={`${primaryButtonClass} w-full`}
+          disabled={regenerateBusy}
+          onClick={() => onRegenerate("new")}
+        >
+          <WandSparkles className={`mr-2 inline h-4 w-4 ${regenerateBusy && confirmingNew ? "animate-pulse" : ""}`} />
+          {regenerateBusy && confirmingNew
+            ? "Regenerating…"
+            : confirmingNew
+              ? "Confirm regenerate"
+              : "Regenerate new world"}
+        </button>
+        {regenerateMode && !regenerateBusy ? (
+          <button type="button" className={`${buttonClass} w-full`} onClick={onCancelRegenerate}>
+            Cancel
+          </button>
+        ) : null}
       </div>
     </div>
   );

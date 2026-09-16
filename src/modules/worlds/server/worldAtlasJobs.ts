@@ -11,14 +11,31 @@ import {
   renderWorldAtlasWithAI,
   WORLD_ATLAS_RENDERER_VERSION,
 } from "./renderAtlasAiSatellite";
+import {
+  renderWorldAtlasDetailWithAI,
+  WORLD_ATLAS_DETAIL_RENDERER_VERSION,
+  type AtlasDetailViewport,
+} from "./renderAtlasAiDetail";
 
 export { WORLD_ATLAS_RENDERER_VERSION } from "./renderAtlasAiSatellite";
+export { WORLD_ATLAS_DETAIL_RENDERER_VERSION } from "./renderAtlasAiDetail";
 
 export interface WorldAtlasRenderJob {
   type: "world.atlas.render";
   worldId: string;
   mapId: string;
   revision: number;
+  enqueuedAt: string;
+}
+
+export interface WorldAtlasDetailRenderJob {
+  type: "world.atlas.detail-render";
+  worldId: string;
+  mapId: string;
+  revision: number;
+  detailKey: string;
+  level: number;
+  viewport: AtlasDetailViewport;
   enqueuedAt: string;
 }
 
@@ -30,7 +47,10 @@ export interface WorldAtlasVectorizeJob {
   enqueuedAt: string;
 }
 
-export type WorldAtlasJob = WorldAtlasRenderJob | WorldAtlasVectorizeJob;
+export type WorldAtlasJob =
+  | WorldAtlasRenderJob
+  | WorldAtlasDetailRenderJob
+  | WorldAtlasVectorizeJob;
 
 export interface WorldAtlasJobBindings {
   DB?: D1Database;
@@ -49,6 +69,16 @@ interface AtlasMapRow {
   revision: number;
 }
 
+export interface WorldAtlasDetailManifest {
+  revision: number;
+  rendererVersion: string;
+  r2Key: string;
+  renderedAt: string;
+  aiImageModel: string;
+  level: number;
+  viewport: AtlasDetailViewport;
+}
+
 export interface WorldAtlasAssetManifest {
   worldId: string;
   mapId: string;
@@ -58,6 +88,7 @@ export interface WorldAtlasAssetManifest {
   r2Key?: string;
   renderedAt?: string;
   vectorizedAt?: string;
+  details?: Record<string, WorldAtlasDetailManifest>;
 }
 
 function manifestKey(worldId: string): string {
@@ -123,6 +154,19 @@ export function isCurrentWorldAtlasRender(
   );
 }
 
+export function currentWorldAtlasDetail(
+  manifest: WorldAtlasAssetManifest | null | undefined,
+  revision: number,
+  detailKey: string,
+): WorldAtlasDetailManifest | null {
+  const detail = manifest?.details?.[detailKey];
+  return detail &&
+    detail.revision === revision &&
+    detail.rendererVersion === WORLD_ATLAS_DETAIL_RENDERER_VERSION
+    ? detail
+    : null;
+}
+
 async function renderAtlas(
   env: WorldAtlasJobBindings,
   job: WorldAtlasRenderJob,
@@ -166,6 +210,65 @@ async function renderAtlas(
     aiImageModel: rendered.model,
     r2Key: key,
     renderedAt: new Date().toISOString(),
+    details: previous?.revision === job.revision ? previous.details : undefined,
+  });
+}
+
+async function renderAtlasDetail(
+  env: WorldAtlasJobBindings,
+  job: WorldAtlasDetailRenderJob,
+): Promise<void> {
+  if (!env.DB) throw new Error("World atlas detail rendering requires D1.");
+  if (!env.R2_BUCKET) throw new Error("World atlas detail rendering requires R2.");
+  if (!env.AI) throw new Error("World atlas detail rendering requires the Workers AI binding.");
+
+  const { atlas } = await loadAtlas(env.DB, job);
+  const rendered = await renderWorldAtlasDetailWithAI(
+    env.AI as unknown as Ai,
+    atlas,
+    job.viewport,
+    job.level,
+    env.AI_MAP_IMAGE_MODEL,
+  );
+  const key = `worlds/${job.worldId}/atlas/details/v${job.revision}/${WORLD_ATLAS_DETAIL_RENDERER_VERSION}/${job.detailKey}.${rendered.extension}`;
+  const renderedAt = new Date().toISOString();
+
+  await env.R2_BUCKET.put(key, rendered.bytes, {
+    httpMetadata: {
+      contentType: rendered.contentType,
+      cacheControl: "public, max-age=31536000, immutable",
+    },
+    customMetadata: {
+      worldId: job.worldId,
+      mapId: job.mapId,
+      revision: String(job.revision),
+      rendererVersion: WORLD_ATLAS_DETAIL_RENDERER_VERSION,
+      aiImageModel: rendered.model,
+      detailKey: job.detailKey,
+      level: String(job.level),
+      viewport: JSON.stringify(job.viewport),
+      width: String(rendered.width),
+      height: String(rendered.height),
+    },
+  });
+
+  const previous = await readManifest(env.RUNTIME_CACHE, job.worldId);
+  const details = previous?.revision === job.revision ? { ...(previous.details ?? {}) } : {};
+  details[job.detailKey] = {
+    revision: job.revision,
+    rendererVersion: WORLD_ATLAS_DETAIL_RENDERER_VERSION,
+    r2Key: key,
+    renderedAt,
+    aiImageModel: rendered.model,
+    level: job.level,
+    viewport: job.viewport,
+  };
+  await writeManifest(env.RUNTIME_CACHE, {
+    ...(previous ?? { worldId: job.worldId, mapId: job.mapId, revision: job.revision }),
+    worldId: job.worldId,
+    mapId: job.mapId,
+    revision: job.revision,
+    details,
   });
 }
 
@@ -212,6 +315,9 @@ export async function processWorldAtlasJob(
     case "world.atlas.render":
       await renderAtlas(env, job);
       return;
+    case "world.atlas.detail-render":
+      await renderAtlasDetail(env, job);
+      return;
     case "world.atlas.vectorize":
       await vectorizeAtlas(env, job);
       return;
@@ -240,6 +346,26 @@ export async function enqueueWorldAtlasBuild(
       },
     },
   ]);
+  return true;
+}
+
+export async function enqueueWorldAtlasDetailBuild(
+  queue: Queue<WorldAtlasJob> | undefined,
+  input: {
+    worldId: string;
+    mapId: string;
+    revision: number;
+    detailKey: string;
+    level: number;
+    viewport: AtlasDetailViewport;
+  },
+): Promise<boolean> {
+  if (!queue) return false;
+  await queue.send({
+    type: "world.atlas.detail-render",
+    ...input,
+    enqueuedAt: new Date().toISOString(),
+  });
   return true;
 }
 

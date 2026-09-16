@@ -36,6 +36,7 @@ import { resolvedCastingRoutes } from "@/modules/game/server/resolvedCastingRout
 import { gameRoutes } from "@/modules/game/server/routes";
 import { offlineMutationMiddleware } from "@/modules/sync/server/offlineMutationMiddleware";
 import { syncRoutes } from "@/modules/sync/server/routes";
+import { worldAtlasDetailRoutes } from "@/modules/worlds/server/worldAtlasDetailRoutes";
 import { worldAtlasRoutes } from "@/modules/worlds/server/worldAtlasRoutes";
 
 const isolateStartedAt = Date.now();
@@ -215,6 +216,7 @@ const routes = app
   .route("/", devblogAdminRoutes)
   .route("/", devblogAIRoutes)
   .route("/", syncRoutes)
+  .route("/", worldAtlasDetailRoutes)
   .route("/", worldAtlasRoutes)
   .route("/", campaignRoutes)
   .route("/", campaignDeleteRoutes)
@@ -254,6 +256,7 @@ const routes = app
         campaignDmAction: "/api/campaigns/:campaignId/play/dm-actions/pending",
         campaignAtlas: "/api/campaigns/:campaignId/atlas",
         campaignAtlasRender: "/api/campaigns/:campaignId/atlas/render",
+        campaignAtlasDetail: "/api/campaigns/:campaignId/atlas/detail",
         campaignAtlasSearch: "/api/campaigns/:campaignId/atlas/search",
         game: "/api/campaigns/:campaignId/game",
         gameState: "/api/campaigns/:campaignId/game/state",

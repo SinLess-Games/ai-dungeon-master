@@ -1,4 +1,5 @@
 import { offlineRequestJson } from "@/infrastructure/offline";
+import { toast } from "sonner";
 import type { AtlasBiome, AtlasPathKind, AtlasPlaceKind, WorldAtlasDocument } from "../domain/atlas";
 import type { AtlasTravelWeather } from "../domain/overlandTravel";
 import type {
@@ -124,6 +125,9 @@ export function regenerateCampaignWorld(
   revision: number,
   seedMode: "same" | "new" = "new",
 ): Promise<CampaignWorldMutationResponse> {
+  toast.info("World generation may take 3–5 minutes while the AI builds and renders the new world.", {
+    duration: 8_000,
+  });
   return offlineRequestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/world/regenerate`, {
     method: "POST",
     body: JSON.stringify({ revision, seedMode }),

@@ -19,7 +19,7 @@ import {
   isWorldAtlasDocument,
   type WorldAtlasDocument,
 } from "../domain/atlas";
-import { generateRealisticCampaignWorldAtlas } from "../domain/realisticCampaignAtlas";
+import { generateStrictRealisticCampaignWorldAtlas } from "../domain/strictRealisticCampaignAtlas";
 import {
   createInitialExplorationState,
   explorationState,
@@ -191,7 +191,7 @@ export const worldAtlasRoutes = new Hono<Env>()
         body.seedMode === "same"
           ? atlas.seed
           : `${atlas.seed}:gm:${crypto.randomUUID()}`;
-      const generated = generateRealisticCampaignWorldAtlas({
+      const generated = generateStrictRealisticCampaignWorldAtlas({
         campaign: {
           name: access.campaign.name,
           description: access.campaign.description,

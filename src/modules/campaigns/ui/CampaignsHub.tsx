@@ -65,6 +65,7 @@ export function CampaignsHub() {
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<HubMode>("library");
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
+  const [startConfirmationId, setStartConfirmationId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CampaignListItem | null>(null);
   const [deleteName, setDeleteName] = useState("");
 
@@ -83,12 +84,16 @@ export function CampaignsHub() {
   const start = useMutation({
     mutationFn: startCampaign,
     onSuccess: async (result) => {
+      setStartConfirmationId(null);
       toast.success("Campaign started. The world is ready.");
       await queryClient.invalidateQueries({ queryKey: ["campaigns"] });
       setSelectedCampaignId(result.campaignId);
       setMode("play");
     },
-    onError: (error) => toast.error(errorMessage(error)),
+    onError: (error) => {
+      setStartConfirmationId(null);
+      toast.error(errorMessage(error));
+    },
   });
 
   const remove = useMutation({
@@ -106,17 +111,20 @@ export function CampaignsHub() {
   function openLibrary() {
     setMode("library");
     setSelectedCampaignId(null);
+    setStartConfirmationId(null);
     void queryClient.invalidateQueries({ queryKey: ["campaigns", "library"] });
   }
 
   function openCampaign(campaign: CampaignListItem) {
     setSelectedCampaignId(campaign.id);
+    setStartConfirmationId(null);
     setMode("edit");
   }
 
   function enterCampaign(campaign: CampaignListItem) {
     if (!canUseAuthoritativeActions) return;
     setSelectedCampaignId(campaign.id);
+    setStartConfirmationId(null);
     setMode("play");
   }
 
@@ -347,28 +355,41 @@ export function CampaignsHub() {
                       </button>
                     )}
                     {["draft", "ready"].includes(campaign.status) ? (
-                      <button
-                        type="button"
-                        disabled={start.isPending || !canUseAuthoritativeActions}
-                        title={
-                          canUseAuthoritativeActions
-                            ? "Requires at least one finalized, rules-valid character."
-                            : "Reconnect before starting the campaign."
-                        }
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              `Start ${campaign.name}? This generates its persistent world and locks creator settings.`,
-                            )
-                          ) {
-                            start.mutate(campaign.id);
+                      <>
+                        <button
+                          type="button"
+                          disabled={start.isPending || !canUseAuthoritativeActions}
+                          title={
+                            canUseAuthoritativeActions
+                              ? "Requires at least one finalized, rules-valid character."
+                              : "Reconnect before starting the campaign."
                           }
-                        }}
-                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <Play className="h-4 w-4" />
-                        {start.isPending && start.variables === campaign.id ? "Starting…" : "Start"}
-                      </button>
+                          onClick={() => {
+                            if (startConfirmationId === campaign.id) {
+                              start.mutate(campaign.id);
+                              return;
+                            }
+                            setStartConfirmationId(campaign.id);
+                          }}
+                          className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Play className="h-4 w-4" />
+                          {start.isPending && start.variables === campaign.id
+                            ? "Starting…"
+                            : startConfirmationId === campaign.id
+                              ? "Confirm start"
+                              : "Start"}
+                        </button>
+                        {startConfirmationId === campaign.id && !start.isPending ? (
+                          <button
+                            type="button"
+                            onClick={() => setStartConfirmationId(null)}
+                            className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2.5 text-sm font-semibold"
+                          >
+                            Cancel
+                          </button>
+                        ) : null}
+                      </>
                     ) : null}
                     {["active", "paused"].includes(campaign.status) ? (
                       <button
@@ -385,6 +406,7 @@ export function CampaignsHub() {
                       type="button"
                       aria-label={`Delete ${campaign.name}`}
                       onClick={() => {
+                        setStartConfirmationId(null);
                         setDeleteTarget(campaign);
                         setDeleteName("");
                       }}

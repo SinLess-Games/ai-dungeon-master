@@ -44,7 +44,7 @@ export interface GenerateTextInput {
   prompt: string;
   temperature?: number;
   /** Optional provider-specific model override for this workflow. */
-  model?: string;
+  model?: string | undefined;
   maxTokens?: number;
   signal?: AbortSignal;
 }

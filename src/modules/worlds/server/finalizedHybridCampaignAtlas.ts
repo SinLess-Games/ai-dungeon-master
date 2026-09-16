@@ -7,6 +7,7 @@ import {
   type RichCampaignAtlasRequest,
 } from "./aiOnlyCampaignAtlasV2";
 import { generateFastDenseAICampaignWorldAtlas } from "./aiFastDenseCampaignAtlas";
+import { ensureAIPortsAreCoastal } from "./aiPortCoastAudit";
 import {
   storedAIPlan,
   storedAIRealismAudit,
@@ -37,17 +38,23 @@ export async function generateHybridCampaignWorldAtlas(input: {
           minimumLocations: 320,
         }
       : context;
+  const productionRequest: RichCampaignAtlasRequest = {
+    ...request,
+    campaign: {
+      ...request.campaign,
+      ...(productionContext ? { context: productionContext } : {}),
+    },
+  };
 
   try {
-    return await generateFastDenseAICampaignWorldAtlas({
+    const atlas = await generateFastDenseAICampaignWorldAtlas({
       env: input.env,
-      request: {
-        ...request,
-        campaign: {
-          ...request.campaign,
-          ...(productionContext ? { context: productionContext } : {}),
-        },
-      },
+      request: productionRequest,
+    });
+    return await ensureAIPortsAreCoastal({
+      env: input.env,
+      request: productionRequest,
+      atlas,
     });
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);

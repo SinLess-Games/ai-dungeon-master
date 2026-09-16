@@ -5,6 +5,7 @@ import type {
   AtlasExplorationState,
   AtlasInspectorReport,
   AtlasTravelPlan,
+  AtlasTravelRouteMode,
 } from "../domain/worldBuilder";
 
 export type CampaignWorldRole = "owner" | "gm" | "player" | "observer";
@@ -157,10 +158,11 @@ export function setCampaignPartyPosition(
 export function planCampaignTravel(
   campaignId: string,
   destinationPlaceId: string,
+  routeMode: AtlasTravelRouteMode,
 ): Promise<{ revision: number; speedFeet: number; plan: AtlasTravelPlan }> {
   return offlineRequestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/world/travel/plan`, {
     method: "POST",
-    body: JSON.stringify({ destinationPlaceId }),
+    body: JSON.stringify({ destinationPlaceId, routeMode }),
   });
 }
 
@@ -168,6 +170,7 @@ export function commitCampaignTravel(
   campaignId: string,
   revision: number,
   destinationPlaceId: string,
+  routeMode: AtlasTravelRouteMode,
 ): Promise<{
   revision: number;
   exploration: AtlasExplorationState;
@@ -176,7 +179,7 @@ export function commitCampaignTravel(
 }> {
   return offlineRequestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/world/travel/commit`, {
     method: "POST",
-    body: JSON.stringify({ revision, destinationPlaceId }),
+    body: JSON.stringify({ revision, destinationPlaceId, routeMode }),
   });
 }
 

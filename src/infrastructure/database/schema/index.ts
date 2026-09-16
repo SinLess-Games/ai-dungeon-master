@@ -1,6 +1,7 @@
 export * from "./feedback";
 export * from "./world";
 export * from "./worldMap";
+export * from "./campaignWorldTravel";
 export * from "./campaign";
 export * from "./campaignMembership";
 export * from "./campaignPlayMessage";

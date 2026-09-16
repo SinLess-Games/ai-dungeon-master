@@ -7,7 +7,7 @@ import {
 const request = {
   campaign: {
     name: "The Vile Academy",
-    description: "A dark inland academy campaign in a believable old world.",
+    description: "A dark inland academy campaign in a believable old fantasy world.",
     settings: {
       creatorVersion: 2,
       genres: ["dark-fantasy", "exploration"],
@@ -23,8 +23,15 @@ const request = {
       rules: { epicLevels: false },
       dm: { difficulty: "challenging", creativity: "inventive" },
     },
+    context: {
+      playMode: "solo",
+      gameMasterMode: "ai",
+      rulesetId: "dnd35",
+      rulesetVersion: "3.5",
+      notes: "The academy sits above older magical ruins.",
+    },
   },
-  seed: "ai-only-seed",
+  seed: "ai-fantasy-seed",
   generatedAt: "2026-09-16T00:00:00.000Z",
 } as const;
 
@@ -36,10 +43,12 @@ const geometry = {
       name: "Edravar",
       points: [
         { x: 400, y: 700 },
+        { x: 1000, y: 470 },
         { x: 1600, y: 350 },
         { x: 3100, y: 300 },
         { x: 4700, y: 500 },
         { x: 6200, y: 900 },
+        { x: 6800, y: 1350 },
         { x: 7100, y: 1900 },
         { x: 6900, y: 3200 },
         { x: 5700, y: 4100 },
@@ -68,24 +77,21 @@ const geometry = {
   ],
 };
 
-const places = {
+const inhabited = {
   places: [
-    { landmassIndex: 0, regionIndex: 2, name: "Vile Academy", kind: "city", x: 2800, y: 2920, importance: 1, population: 38000, description: "An old academy city beside the Veyrflow.", tags: ["academy"] },
+    { landmassIndex: 0, regionIndex: 2, name: "Vile Academy", kind: "city", x: 2800, y: 2920, importance: 1, population: 38000, description: "An old academy city above sealed magical ruins beside the Veyrflow.", tags: ["academy", "arcane"] },
     { landmassIndex: 0, regionIndex: 0, name: "Greywatch", kind: "town", x: 1900, y: 1450, importance: 0.7, population: 7800, description: "A northern market town.", tags: [] },
     { landmassIndex: 0, regionIndex: 1, name: "Stonegate", kind: "fort", x: 4300, y: 1750, importance: 0.65, population: 2200, description: "A mountain-pass fortress.", tags: [] },
     { landmassIndex: 0, regionIndex: 3, name: "Dun Ravel", kind: "town", x: 5100, y: 3300, importance: 0.68, population: 6500, description: "A southern caravan town.", tags: [] },
     { landmassIndex: 0, regionIndex: 2, name: "Alderfall", kind: "village", x: 2100, y: 3300, importance: 0.45, population: 950, description: "A farming village.", tags: [] },
     { landmassIndex: 0, regionIndex: 0, name: "Pinecross", kind: "village", x: 2600, y: 1100, importance: 0.4, population: 700, description: "A woodland village.", tags: [] },
-    { landmassIndex: 0, regionIndex: 1, name: "Black Stair", kind: "ruin", x: 3700, y: 1200, importance: 0.6, description: "Cyclopean ruins in the highlands.", tags: ["ruin"] },
+    { landmassIndex: 0, regionIndex: 1, name: "Black Stair", kind: "ruin", x: 3700, y: 1200, importance: 0.6, description: "Cyclopean ruins in the highlands.", tags: ["ruin", "magical"] },
     { landmassIndex: 0, regionIndex: 3, name: "Ash Well", kind: "landmark", x: 5800, y: 3550, importance: 0.5, description: "A mineral spring in the dry south.", tags: [] },
-    { landmassIndex: 0, regionIndex: 2, name: "Hollow Crown", kind: "dungeon", x: 3400, y: 3500, importance: 0.7, description: "A buried royal complex.", tags: ["dungeon"] },
+    { landmassIndex: 0, regionIndex: 2, name: "Hollow Crown", kind: "dungeon", x: 3400, y: 3500, importance: 0.7, description: "A buried royal complex haunted by old magic.", tags: ["dungeon"] },
     { landmassIndex: 0, regionIndex: 0, name: "Ravenmere", kind: "hamlet", x: 1300, y: 1900, importance: 0.3, population: 180, description: "A remote hamlet.", tags: [] },
     { landmassIndex: 0, regionIndex: 1, name: "Iron Delve", kind: "mine", x: 4700, y: 1200, importance: 0.45, description: "An active iron mine.", tags: [] },
     { landmassIndex: 0, regionIndex: 3, name: "Sunscar", kind: "temple", x: 5400, y: 2850, importance: 0.55, description: "A weathered roadside temple.", tags: [] },
   ],
-};
-
-const paths = {
   paths: [
     { kind: "road", fromPlaceIndex: 0, toPlaceIndex: 1, distanceMiles: 1180, points: [{ x: 2800, y: 2920 }, { x: 2400, y: 2200 }, { x: 1900, y: 1450 }] },
     { kind: "road", fromPlaceIndex: 0, toPlaceIndex: 3, distanceMiles: 2350, points: [{ x: 2800, y: 2920 }, { x: 3900, y: 3050 }, { x: 5100, y: 3300 }] },
@@ -95,20 +101,19 @@ const paths = {
 };
 
 const finalReview = {
-  findings: ["The dominant landmass reads as a continent and settlement spacing is believable."],
+  findings: ["The continent, magical sites, settlement hierarchy, and sparse travel network fit the campaign."],
   landmassCorrections: [],
   regionCorrections: [],
   placeCorrections: [],
   pathCorrections: [],
 };
 
-describe("production AI-only campaign atlas", () => {
-  it("uses AI for geography, places, routes, and the final map pass without procedural generation", async () => {
+describe("production fantasy AI campaign atlas", () => {
+  it("uses three AI passes and includes the fantasy campaign context", async () => {
     const run = vi
       .fn()
       .mockResolvedValueOnce({ response: JSON.stringify(geometry) })
-      .mockResolvedValueOnce({ response: JSON.stringify(places) })
-      .mockResolvedValueOnce({ response: JSON.stringify(paths) })
+      .mockResolvedValueOnce({ response: JSON.stringify(inhabited) })
       .mockResolvedValueOnce({ response: JSON.stringify(finalReview) });
 
     const atlas = await generateHybridCampaignWorldAtlas({
@@ -119,18 +124,21 @@ describe("production AI-only campaign atlas", () => {
       request,
     });
 
-    expect(run).toHaveBeenCalledTimes(4);
+    expect(run).toHaveBeenCalledTimes(3);
     expect(atlas.generatorVersion).toBe(FINALIZED_HYBRID_CAMPAIGN_ATLAS_GENERATOR_VERSION);
-    expect(atlas.generatorVersion).toBe("campaign-atlas-v9-ai-only");
+    expect(atlas.generatorVersion).toBe("campaign-atlas-v10-ai-fantasy");
     expect(atlas.landmasses).toHaveLength(1);
     expect(atlas.landmasses[0]?.name).toBe("Edravar");
     expect(atlas.places[0]?.name).toBe("Vile Academy");
-    expect(atlas.places[0]?.x).toBe(2800);
-    expect(atlas.paths[0]?.points).toEqual(paths.paths[0]?.points);
+    expect(atlas.paths[0]?.points).toEqual(inhabited.paths[0]?.points);
+    const firstPrompt = (run.mock.calls[0]?.[1] as { messages?: Array<{ content?: string }> } | undefined)?.messages?.[1]?.content ?? "";
+    expect(firstPrompt).toContain("FANTASY WORLD");
+    expect(firstPrompt).toContain("Dungeons & Dragons 3.5");
+    expect(firstPrompt).toContain("gameMasterMode");
     expect(
       (atlas.metadata as typeof atlas.metadata & {
-        aiOnlyGeneration?: { findings?: string[] };
-      }).aiOnlyGeneration?.findings?.[0],
-    ).toContain("dominant landmass");
+        aiOnlyGeneration?: { fantasyWorld?: boolean; campaignContextIncluded?: boolean; passes?: number };
+      }).aiOnlyGeneration,
+    ).toMatchObject({ fantasyWorld: true, campaignContextIncluded: true, passes: 3 });
   });
 });

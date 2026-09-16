@@ -1,5 +1,5 @@
 export const WORLD_ATLAS_VERSION = 1;
-export const WORLD_ATLAS_GENERATOR_VERSION = "campaign-atlas-v1";
+export const WORLD_ATLAS_GENERATOR_VERSION = "campaign-atlas-v2";
 
 export type AtlasBiome =
   | "temperate"
@@ -228,6 +228,17 @@ const LEGEND_LABELS: Record<AtlasPlaceKind | AtlasPathKind, string> = {
   "sea-route": "Sea Route",
 };
 
+const SETTLEMENT_KINDS = new Set<AtlasPlaceKind>([
+  "capital",
+  "city",
+  "town",
+  "village",
+  "hamlet",
+  "port",
+  "fort",
+  "castle",
+]);
+
 function hash32(value: string): number {
   let hash = 2166136261;
   for (let index = 0; index < value.length; index += 1) {
@@ -284,6 +295,45 @@ function dimensionsFor(input: WorldAtlasGenerationInput): { width: number; heigh
   return { width: 13_500, height: 7_600 };
 }
 
+function coastlinePoints(input: {
+  seed: string;
+  landmassId: string;
+  center: AtlasPoint;
+  radiusX: number;
+  radiusY: number;
+  width: number;
+  height: number;
+}): AtlasPoint[] {
+  const random = mulberry32(hash32(`${input.seed}:coast:${input.landmassId}`));
+  const rotation = (random() - 0.5) * 0.56;
+  const phase2 = random() * Math.PI * 2;
+  const phase3 = random() * Math.PI * 2;
+  const phase5 = random() * Math.PI * 2;
+  const phase8 = random() * Math.PI * 2;
+  const vertexCount = 64 + Math.floor(random() * 17);
+  const cosRotation = Math.cos(rotation);
+  const sinRotation = Math.sin(rotation);
+
+  return Array.from({ length: vertexCount }, (_, index) => {
+    const angle = (index / vertexCount) * Math.PI * 2;
+    const coast =
+      1 +
+      Math.sin(angle * 2 + phase2) * 0.1 +
+      Math.sin(angle * 3 + phase3) * 0.06 +
+      Math.sin(angle * 5 + phase5) * 0.035 +
+      Math.sin(angle * 8 + phase8) * 0.02;
+    const asymmetry = 1 + Math.sin(angle + phase3) * 0.035;
+    const localX = Math.cos(angle) * input.radiusX * coast * asymmetry;
+    const localY = Math.sin(angle) * input.radiusY * coast;
+    const rotatedX = localX * cosRotation - localY * sinRotation;
+    const rotatedY = localX * sinRotation + localY * cosRotation;
+    return {
+      x: clamp(input.center.x + rotatedX, 80, input.width - 80),
+      y: clamp(input.center.y + rotatedY, 80, input.height - 80),
+    };
+  });
+}
+
 function makeLandmasses(
   input: WorldAtlasGenerationInput,
   width: number,
@@ -293,37 +343,38 @@ function makeLandmasses(
   const styles = new Set(input.styleIds ?? []);
   const maritime = input.templateId === "isles-and-seas" || campaignHas(styles, "seafaring", "pirates");
   const count = maritime
-    ? 7 + Math.floor(random() * 3)
+    ? 6 + Math.floor(random() * 3)
     : input.templateId === "dangerous-frontier"
       ? 4 + Math.floor(random() * 2)
-      : 5 + Math.floor(random() * 3);
-  const rows = Math.ceil(count / 3);
+      : 5 + Math.floor(random() * 2);
+  const columns = 3;
+  const rows = Math.ceil(count / columns);
+  const cellWidth = width / columns;
+  const cellHeight = height / rows;
   const result: AtlasLandmass[] = [];
 
   for (let index = 0; index < count; index += 1) {
-    const cellWidth = width / 3;
-    const cellHeight = height / rows;
-    const column = index % 3;
-    const row = Math.floor(index / 3);
+    const column = index % columns;
+    const row = Math.floor(index / columns);
     const center: AtlasPoint = {
-      x: clamp(column * cellWidth + cellWidth * (0.35 + random() * 0.3), width * 0.08, width * 0.92),
-      y: clamp(row * cellHeight + cellHeight * (0.32 + random() * 0.36), height * 0.1, height * 0.9),
+      x: clamp(
+        column * cellWidth + cellWidth * (0.4 + random() * 0.2),
+        width * 0.08,
+        width * 0.92,
+      ),
+      y: clamp(
+        row * cellHeight + cellHeight * (0.38 + random() * 0.24),
+        height * 0.1,
+        height * 0.9,
+      ),
     };
-    const radiusX = cellWidth * (maritime ? 0.22 + random() * 0.17 : 0.3 + random() * 0.2);
-    const radiusY = cellHeight * (maritime ? 0.28 + random() * 0.2 : 0.36 + random() * 0.22);
-    const vertexCount = 24 + Math.floor(random() * 14);
-    const points = Array.from({ length: vertexCount }, (_, pointIndex): AtlasPoint => {
-      const angle = (pointIndex / vertexCount) * Math.PI * 2;
-      const wobble = 0.72 + random() * 0.36;
-      return {
-        x: clamp(center.x + Math.cos(angle) * radiusX * wobble, 60, width - 60),
-        y: clamp(center.y + Math.sin(angle) * radiusY * wobble, 60, height - 60),
-      };
-    });
+    const radiusX = cellWidth * (maritime ? 0.2 + random() * 0.11 : 0.25 + random() * 0.12);
+    const radiusY = cellHeight * (maritime ? 0.24 + random() * 0.13 : 0.29 + random() * 0.13);
+    const id = `land-${index + 1}`;
     result.push({
-      id: `land-${index + 1}`,
+      id,
       name: nameFor(input.seed, "continent", index),
-      points,
+      points: coastlinePoints({ seed: input.seed, landmassId: id, center, radiusX, radiusY, width, height }),
       center,
       radiusX,
       radiusY,
@@ -333,9 +384,16 @@ function makeLandmasses(
   return result;
 }
 
-function pointOnLand(random: () => number, landmass: AtlasLandmass, edge = 0.68): AtlasPoint {
+function pointOnLand(
+  random: () => number,
+  landmass: AtlasLandmass,
+  maximumRadius = 0.68,
+  minimumRadius = 0,
+): AtlasPoint {
   const angle = random() * Math.PI * 2;
-  const radius = Math.sqrt(random()) * edge;
+  const minimumSquared = minimumRadius * minimumRadius;
+  const maximumSquared = maximumRadius * maximumRadius;
+  const radius = Math.sqrt(minimumSquared + random() * (maximumSquared - minimumSquared));
   return {
     x: landmass.center.x + Math.cos(angle) * landmass.radiusX * radius,
     y: landmass.center.y + Math.sin(angle) * landmass.radiusY * radius,
@@ -349,14 +407,14 @@ function makeRegions(
 ): AtlasRegion[] {
   const regions: AtlasRegion[] = [];
   for (const landmass of landmasses) {
-    const count = 3 + Math.floor(random() * 4);
+    const count = 3 + Math.floor(random() * 3);
     for (let index = 0; index < count; index += 1) {
       regions.push({
         id: `region-${regions.length + 1}`,
         landmassId: landmass.id,
         name: nameFor(input.seed, `region:${landmass.id}`, index),
-        center: pointOnLand(random, landmass, 0.58),
-        biome: random() > 0.55 ? choose(random, BIOMES) : landmass.biome,
+        center: pointOnLand(random, landmass, 0.56),
+        biome: random() > 0.6 ? choose(random, BIOMES) : landmass.biome,
         importance: 0.55 + random() * 0.45,
       });
     }
@@ -371,17 +429,18 @@ function makeMountains(
 ): AtlasMountainRange[] {
   const ranges: AtlasMountainRange[] = [];
   for (const landmass of landmasses) {
-    const count = 1 + Math.floor(random() * 3);
+    const count = 1 + Math.floor(random() * 2);
     for (let index = 0; index < count; index += 1) {
-      const start = pointOnLand(random, landmass, 0.38);
+      const center = pointOnLand(random, landmass, 0.42);
       const angle = random() * Math.PI;
-      const length = Math.min(landmass.radiusX, landmass.radiusY) * (0.45 + random() * 0.5);
-      const nodes = 5 + Math.floor(random() * 5);
+      const length = Math.min(landmass.radiusX, landmass.radiusY) * (0.38 + random() * 0.34);
+      const nodes = 4 + Math.floor(random() * 3);
       const points = Array.from({ length: nodes }, (_, node): AtlasPoint => {
-        const ratio = node / Math.max(1, nodes - 1);
+        const ratio = node / Math.max(1, nodes - 1) - 0.5;
+        const lateral = (random() - 0.5) * Math.min(90, length * 0.12);
         return {
-          x: start.x + Math.cos(angle) * length * (ratio - 0.5) + (random() - 0.5) * 90,
-          y: start.y + Math.sin(angle) * length * (ratio - 0.5) + (random() - 0.5) * 90,
+          x: center.x + Math.cos(angle) * length * ratio - Math.sin(angle) * lateral,
+          y: center.y + Math.sin(angle) * length * ratio + Math.cos(angle) * lateral,
         };
       });
       ranges.push({
@@ -404,22 +463,26 @@ function makeRivers(
   const rivers: AtlasRiver[] = [];
   for (const landmass of landmasses) {
     const localRanges = ranges.filter((range) => range.landmassId === landmass.id);
-    const count = 2 + Math.floor(random() * 4);
+    const count = 2 + Math.floor(random() * 2);
     for (let index = 0; index < count; index += 1) {
       const sourceRange = localRanges.length ? choose(random, localRanges) : null;
       const sourcePoints = sourceRange?.points ?? [];
-      const start = sourcePoints.length ? choose(random, sourcePoints) : landmass.center;
-      const angle = Math.atan2(start.y - landmass.center.y, start.x - landmass.center.x) + (random() - 0.5) * 1.4;
+      const start = sourcePoints.length ? choose(random, sourcePoints) : pointOnLand(random, landmass, 0.2);
+      const angle =
+        Math.atan2(start.y - landmass.center.y, start.x - landmass.center.x) +
+        (random() - 0.5) * 1.1;
       const end: AtlasPoint = {
-        x: landmass.center.x + Math.cos(angle) * landmass.radiusX * 0.82,
-        y: landmass.center.y + Math.sin(angle) * landmass.radiusY * 0.82,
+        x: landmass.center.x + Math.cos(angle) * landmass.radiusX * 0.78,
+        y: landmass.center.y + Math.sin(angle) * landmass.radiusY * 0.78,
       };
-      const nodeCount = 6 + Math.floor(random() * 5);
+      const nodeCount = 7 + Math.floor(random() * 3);
+      const phase = random() * Math.PI * 2;
       const points = Array.from({ length: nodeCount }, (_, node): AtlasPoint => {
         const ratio = node / Math.max(1, nodeCount - 1);
+        const meander = Math.sin(ratio * Math.PI * 3 + phase) * (18 + random() * 22);
         return {
-          x: start.x + (end.x - start.x) * ratio + Math.sin(ratio * Math.PI * 3) * (20 + random() * 35),
-          y: start.y + (end.y - start.y) * ratio + Math.cos(ratio * Math.PI * 2) * (15 + random() * 30),
+          x: start.x + (end.x - start.x) * ratio - Math.sin(angle) * meander,
+          y: start.y + (end.y - start.y) * ratio + Math.cos(angle) * meander,
         };
       });
       rivers.push({
@@ -436,66 +499,75 @@ function makeRivers(
 function placePlan(input: WorldAtlasGenerationInput): Record<AtlasPlaceKind, number> {
   const styles = new Set(input.styleIds ?? []);
   const plan: Record<AtlasPlaceKind, number> = {
-    capital: 5,
-    city: 10,
-    town: 18,
-    village: 18,
-    hamlet: 10,
-    port: 8,
-    fort: 7,
-    castle: 5,
-    dungeon: 10,
-    ruin: 12,
-    temple: 7,
-    tower: 5,
-    mine: 6,
-    cave: 8,
-    landmark: 10,
-    "planar-gate": input.multiPlanar || campaignHas(styles, "planar", "cosmic-horror") ? 4 : 0,
+    capital: 3,
+    city: 5,
+    town: 8,
+    village: 9,
+    hamlet: 4,
+    port: 5,
+    fort: 3,
+    castle: 3,
+    dungeon: 5,
+    ruin: 6,
+    temple: 3,
+    tower: 3,
+    mine: 2,
+    cave: 4,
+    landmark: 5,
+    "planar-gate": input.multiPlanar || campaignHas(styles, "planar", "cosmic-horror") ? 2 : 0,
   };
 
-  if (input.templateId === "dangerous-frontier" || campaignHas(styles, "exploration", "wilderness", "west-marches", "hexcrawl")) {
-    plan.city -= 3;
-    plan.town -= 4;
-    plan.ruin += 8;
-    plan.cave += 7;
-    plan.landmark += 8;
+  if (
+    input.templateId === "dangerous-frontier" ||
+    campaignHas(styles, "exploration", "wilderness", "west-marches", "hexcrawl")
+  ) {
+    plan.city -= 2;
+    plan.town -= 2;
+    plan.ruin += 4;
+    plan.cave += 3;
+    plan.landmark += 3;
   }
-  if (input.templateId === "fractured-kingdoms" || campaignHas(styles, "political-intrigue", "war", "military")) {
-    plan.capital += 2;
-    plan.city += 5;
-    plan.fort += 10;
-    plan.castle += 7;
+  if (
+    input.templateId === "fractured-kingdoms" ||
+    campaignHas(styles, "political-intrigue", "war", "military")
+  ) {
+    plan.capital += 1;
+    plan.city += 3;
+    plan.fort += 4;
+    plan.castle += 3;
   }
-  if (input.templateId === "ancient-ruins" || campaignHas(styles, "dungeon-crawl", "megadungeon", "sword-and-sorcery")) {
-    plan.dungeon += 12;
-    plan.ruin += 14;
-    plan.tower += 5;
+  if (
+    input.templateId === "ancient-ruins" ||
+    campaignHas(styles, "dungeon-crawl", "megadungeon", "sword-and-sorcery")
+  ) {
+    plan.dungeon += 5;
+    plan.ruin += 5;
+    plan.tower += 2;
   }
   if (input.templateId === "wild-magic" || campaignHas(styles, "high-fantasy", "mythic")) {
-    plan.temple += 5;
-    plan.tower += 6;
-    plan.landmark += 7;
+    plan.temple += 2;
+    plan.tower += 2;
+    plan.landmark += 3;
   }
   if (input.templateId === "isles-and-seas" || campaignHas(styles, "seafaring", "pirates")) {
-    plan.port += 16;
-    plan.city += 3;
-    plan.landmark += 4;
+    plan.port += 8;
+    plan.city += 2;
+    plan.landmark += 2;
   }
   if (campaignHas(styles, "urban")) {
-    plan.city += 12;
-    plan.town += 8;
-    plan.village -= 6;
+    plan.city += 6;
+    plan.town += 4;
+    plan.village -= 3;
   }
   if (campaignHas(styles, "gothic-horror", "dark-fantasy", "grimdark")) {
-    plan.ruin += 6;
-    plan.castle += 4;
-    plan.temple += 3;
+    plan.ruin += 3;
+    plan.castle += 2;
+    plan.temple += 1;
   }
   if (input.epic || input.scale === "epic") {
-    plan.landmark += 8;
-    plan.castle += 4;
-    plan["planar-gate"] += 3;
+    plan.landmark += 4;
+    plan.castle += 2;
+    plan["planar-gate"] += 2;
   }
   for (const kind of Object.keys(plan) as AtlasPlaceKind[]) {
     plan[kind] = Math.max(0, plan[kind]);
@@ -503,7 +575,11 @@ function placePlan(input: WorldAtlasGenerationInput): Record<AtlasPlaceKind, num
   return plan;
 }
 
-function nearestRegion(point: AtlasPoint, landmassId: string, regions: readonly AtlasRegion[]): AtlasRegion | null {
+function nearestRegion(
+  point: AtlasPoint,
+  landmassId: string,
+  regions: readonly AtlasRegion[],
+): AtlasRegion | null {
   let selected: AtlasRegion | null = null;
   let selectedDistance = Number.POSITIVE_INFINITY;
   for (const region of regions) {
@@ -564,11 +640,33 @@ function importanceFor(kind: AtlasPlaceKind, random: () => number): number {
 function tagsFor(kind: AtlasPlaceKind, input: WorldAtlasGenerationInput): string[] {
   const styles = new Set(input.styleIds ?? []);
   const tags: string[] = [kind];
-  if (campaignHas(styles, "war", "military") && ["fort", "castle", "city"].includes(kind)) tags.push("contested");
-  if (campaignHas(styles, "mystery", "noir", "espionage") && ["city", "town", "port"].includes(kind)) tags.push("secrets");
-  if (campaignHas(styles, "monster-hunting") && ["cave", "ruin", "dungeon", "landmark"].includes(kind)) tags.push("monster-territory");
-  if (campaignHas(styles, "gothic-horror", "dark-fantasy") && ["ruin", "castle", "temple"].includes(kind)) tags.push("haunted");
-  if (input.templateId === "wild-magic" && ["landmark", "tower", "planar-gate"].includes(kind)) tags.push("wild-magic");
+  if (campaignHas(styles, "war", "military") && ["fort", "castle", "city"].includes(kind)) {
+    tags.push("contested");
+  }
+  if (
+    campaignHas(styles, "mystery", "noir", "espionage") &&
+    ["city", "town", "port"].includes(kind)
+  ) {
+    tags.push("secrets");
+  }
+  if (
+    campaignHas(styles, "monster-hunting") &&
+    ["cave", "ruin", "dungeon", "landmark"].includes(kind)
+  ) {
+    tags.push("monster-territory");
+  }
+  if (
+    campaignHas(styles, "gothic-horror", "dark-fantasy") &&
+    ["ruin", "castle", "temple"].includes(kind)
+  ) {
+    tags.push("haunted");
+  }
+  if (
+    input.templateId === "wild-magic" &&
+    ["landmark", "tower", "planar-gate"].includes(kind)
+  ) {
+    tags.push("wild-magic");
+  }
   return tags;
 }
 
@@ -595,6 +693,38 @@ function descriptionFor(kind: AtlasPlaceKind, regionName: string, tags: readonly
   return `${subject[kind]} in ${regionName}${detail}.`;
 }
 
+function pointForKind(
+  random: () => number,
+  landmass: AtlasLandmass,
+  kind: AtlasPlaceKind,
+): AtlasPoint {
+  if (kind === "port") return pointOnLand(random, landmass, 0.78, 0.69);
+  if (kind === "capital" || kind === "city") return pointOnLand(random, landmass, 0.57, 0.08);
+  if (kind === "town" || kind === "village" || kind === "hamlet") {
+    return pointOnLand(random, landmass, 0.66, 0.08);
+  }
+  return pointOnLand(random, landmass, 0.72, 0.12);
+}
+
+function placeSpacing(landmass: AtlasLandmass, kind: AtlasPlaceKind): number {
+  const base = Math.min(landmass.radiusX, landmass.radiusY);
+  return base * (SETTLEMENT_KINDS.has(kind) ? 0.12 : 0.09);
+}
+
+function shuffledLandmasses(
+  seed: string,
+  kind: AtlasPlaceKind,
+  landmasses: readonly AtlasLandmass[],
+): AtlasLandmass[] {
+  return [...landmasses]
+    .map((landmass) => ({
+      landmass,
+      order: hash32(`${seed}:distribution:${kind}:${landmass.id}`),
+    }))
+    .sort((left, right) => left.order - right.order)
+    .map(({ landmass }) => landmass);
+}
+
 function makePlaces(
   input: WorldAtlasGenerationInput,
   landmasses: readonly AtlasLandmass[],
@@ -603,11 +733,24 @@ function makePlaces(
 ): AtlasPlace[] {
   const places: AtlasPlace[] = [];
   const plan = placePlan(input);
+
   for (const kind of Object.keys(plan) as AtlasPlaceKind[]) {
-    const count = plan[kind];
+    const count = kind === "capital" ? Math.min(plan[kind], landmasses.length) : plan[kind];
+    const distribution = shuffledLandmasses(input.seed, kind, landmasses);
     for (let index = 0; index < count; index += 1) {
-      const landmass = choose(random, landmasses);
-      const point = pointOnLand(random, landmass, kind === "port" ? 0.82 : 0.68);
+      const landmass = distribution[index % distribution.length]!;
+      const minimumSpacing = placeSpacing(landmass, kind);
+      let point = pointForKind(random, landmass, kind);
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        const candidate = pointForKind(random, landmass, kind);
+        const crowded = places.some(
+          (place) =>
+            place.landmassId === landmass.id &&
+            distance(candidate, { x: place.x, y: place.y }) < minimumSpacing,
+        );
+        point = candidate;
+        if (!crowded) break;
+      }
       const region = nearestRegion(point, landmass.id, regions);
       const tags = tagsFor(kind, input);
       const population = populationFor(kind, random);
@@ -629,49 +772,134 @@ function makePlaces(
   return places;
 }
 
-function connectPlaces(kind: AtlasPathKind, candidates: readonly AtlasPlace[], maxConnections: number): AtlasPath[] {
-  const paths: AtlasPath[] = [];
-  const seen = new Set<string>();
-  for (const place of candidates) {
-    const nearby = candidates
-      .filter((candidate) => candidate.id !== place.id)
-      .map((candidate) => ({ candidate, miles: distance(place, candidate) }))
-      .sort((a, b) => a.miles - b.miles)
-      .slice(0, maxConnections);
-    for (const { candidate } of nearby) {
-      const key = [place.id, candidate.id].sort().join(":");
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const points: AtlasPoint[] = [
-        { x: place.x, y: place.y },
-        { x: (place.x + candidate.x) / 2, y: (place.y + candidate.y) / 2 },
-        { x: candidate.x, y: candidate.y },
-      ];
-      paths.push({
-        id: `path-${kind}-${paths.length + 1}`,
-        kind,
-        fromPlaceId: place.id,
-        toPlaceId: candidate.id,
-        distanceMiles: Math.max(1, Math.round(pathDistance(points))),
-        points,
-      });
-    }
-  }
-  return paths;
+function pathKey(leftId: string, rightId: string): string {
+  return [leftId, rightId].sort().join(":");
 }
 
-function makePaths(places: readonly AtlasPlace[]): AtlasPath[] {
-  const settlementKinds = new Set<AtlasPlaceKind>(["capital", "city", "town", "village", "fort", "castle"]);
-  const adventureKinds = new Set<AtlasPlaceKind>(["dungeon", "ruin", "temple", "tower", "mine", "cave"]);
-  const settlementById = new Map(places.map((place) => [place.id, place] as const));
-  const roads = connectPlaces("road", places.filter((place) => settlementKinds.has(place.kind)), 2).filter((path) => {
-    const from = settlementById.get(path.fromPlaceId);
-    const to = settlementById.get(path.toPlaceId);
-    return Boolean(from && to && from.landmassId === to.landmassId);
+function curvedPathPoints(
+  seed: string,
+  kind: AtlasPathKind,
+  from: AtlasPlace,
+  to: AtlasPlace,
+): AtlasPoint[] {
+  const random = mulberry32(hash32(`${seed}:path:${kind}:${pathKey(from.id, to.id)}`));
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.max(1, Math.hypot(dx, dy));
+  const perpendicular = { x: -dy / length, y: dx / length };
+  const bend = (random() - 0.5) * length * (kind === "sea-route" ? 0.22 : 0.12);
+  return [
+    { x: from.x, y: from.y },
+    {
+      x: from.x + dx * 0.34 + perpendicular.x * bend,
+      y: from.y + dy * 0.34 + perpendicular.y * bend,
+    },
+    {
+      x: from.x + dx * 0.68 - perpendicular.x * bend * 0.55,
+      y: from.y + dy * 0.68 - perpendicular.y * bend * 0.55,
+    },
+    { x: to.x, y: to.y },
+  ];
+}
+
+function addPath(
+  paths: AtlasPath[],
+  seen: Set<string>,
+  seed: string,
+  kind: AtlasPathKind,
+  from: AtlasPlace,
+  to: AtlasPlace,
+): void {
+  const key = pathKey(from.id, to.id);
+  if (from.id === to.id || seen.has(key)) return;
+  seen.add(key);
+  const points = curvedPathPoints(seed, kind, from, to);
+  paths.push({
+    id: `path-${kind}-${paths.length + 1}`,
+    kind,
+    fromPlaceId: from.id,
+    toPlaceId: to.id,
+    distanceMiles: Math.max(1, Math.round(pathDistance(points))),
+    points,
   });
-  const trails = connectPlaces("trail", places.filter((place) => adventureKinds.has(place.kind)), 1);
-  const seaRoutes = connectPlaces("sea-route", places.filter((place) => place.kind === "port"), 2);
-  return [...roads, ...trails, ...seaRoutes];
+}
+
+function closestPair(
+  remaining: readonly AtlasPlace[],
+  connected: readonly AtlasPlace[],
+): { from: AtlasPlace; to: AtlasPlace } | null {
+  let best: { from: AtlasPlace; to: AtlasPlace; miles: number } | null = null;
+  for (const from of remaining) {
+    for (const to of connected) {
+      const miles = distance(from, to);
+      if (!best || miles < best.miles) best = { from, to, miles };
+    }
+  }
+  return best ? { from: best.from, to: best.to } : null;
+}
+
+function makePaths(input: WorldAtlasGenerationInput, places: readonly AtlasPlace[]): AtlasPath[] {
+  const paths: AtlasPath[] = [];
+  const seen = new Set<string>();
+  const landmassIds = [...new Set(places.map((place) => place.landmassId))];
+
+  for (const landmassId of landmassIds) {
+    const settlements = places
+      .filter((place) => place.landmassId === landmassId && SETTLEMENT_KINDS.has(place.kind))
+      .sort((left, right) => right.importance - left.importance);
+    if (settlements.length > 1) {
+      const connected: AtlasPlace[] = [settlements[0]!];
+      const remaining = settlements.slice(1);
+      while (remaining.length > 0) {
+        const pair = closestPair(remaining, connected);
+        if (!pair) break;
+        addPath(paths, seen, input.seed, "road", pair.from, pair.to);
+        connected.push(pair.from);
+        remaining.splice(remaining.findIndex((place) => place.id === pair.from.id), 1);
+      }
+
+      const major = settlements.filter((place) => place.importance >= 0.72).slice(0, 4);
+      for (const place of major) {
+        const extra = settlements
+          .filter((candidate) => candidate.id !== place.id && !seen.has(pathKey(place.id, candidate.id)))
+          .sort((left, right) => distance(place, left) - distance(place, right))[0];
+        if (extra) addPath(paths, seen, input.seed, "road", place, extra);
+      }
+    }
+
+    const localSettlements = settlements;
+    const adventureSites = places.filter(
+      (place) => place.landmassId === landmassId && !SETTLEMENT_KINDS.has(place.kind),
+    );
+    for (const site of adventureSites) {
+      const destination = [...localSettlements].sort(
+        (left, right) => distance(site, left) - distance(site, right),
+      )[0];
+      if (destination) addPath(paths, seen, input.seed, "trail", site, destination);
+    }
+  }
+
+  const primaryPorts = landmassIds
+    .map((landmassId) =>
+      places
+        .filter((place) => place.landmassId === landmassId && place.kind === "port")
+        .sort((left, right) => right.importance - left.importance)[0],
+    )
+    .filter((place): place is AtlasPlace => Boolean(place));
+
+  if (primaryPorts.length > 1) {
+    const connected: AtlasPlace[] = [primaryPorts[0]!];
+    const remaining = primaryPorts.slice(1);
+    while (remaining.length > 0) {
+      const pair = closestPair(remaining, connected);
+      if (!pair) break;
+      addPath(paths, seen, input.seed, "sea-route", pair.from, pair.to);
+      connected.push(pair.from);
+      remaining.splice(remaining.findIndex((place) => place.id === pair.from.id), 1);
+    }
+  }
+
+  return paths;
 }
 
 function makeLegend(places: readonly AtlasPlace[], paths: readonly AtlasPath[]): AtlasLegendEntry[] {
@@ -693,7 +921,7 @@ export function generateWorldAtlas(input: WorldAtlasGenerationInput): WorldAtlas
   const mountainRanges = makeMountains(input, landmasses, random);
   const rivers = makeRivers(input, landmasses, mountainRanges, random);
   const places = makePlaces(input, landmasses, regions, random);
-  const paths = makePaths(places);
+  const paths = makePaths(input, places);
 
   return {
     atlasVersion: WORLD_ATLAS_VERSION,

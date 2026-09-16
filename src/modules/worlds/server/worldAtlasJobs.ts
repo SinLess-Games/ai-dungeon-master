@@ -1,5 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 
+import type { OpenAICompatibleEnv } from "@/infrastructure/ai/openaiCompatible";
 import {
   atlasSearchText,
   hashedAtlasEmbedding,
@@ -36,7 +37,7 @@ export interface WorldAtlasJobBindings {
   R2_BUCKET?: R2Bucket;
   RUNTIME_CACHE?: KVNamespace;
   WORLD_VECTOR_INDEX?: VectorizeIndex;
-  AI?: Ai;
+  AI?: OpenAICompatibleEnv["AI"];
   AI_MAP_IMAGE_MODEL?: string;
 }
 
@@ -131,7 +132,11 @@ async function renderAtlas(
   if (!env.AI) throw new Error("World atlas rendering requires the Workers AI binding.");
 
   const { atlas } = await loadAtlas(env.DB, job);
-  const rendered = await renderWorldAtlasWithAI(env.AI, atlas, env.AI_MAP_IMAGE_MODEL);
+  const rendered = await renderWorldAtlasWithAI(
+    env.AI as unknown as Ai,
+    atlas,
+    env.AI_MAP_IMAGE_MODEL,
+  );
   const key = `worlds/${job.worldId}/atlas/world-v${job.revision}-${WORLD_ATLAS_RENDERER_VERSION}.${rendered.extension}`;
 
   await env.R2_BUCKET.put(key, rendered.bytes, {

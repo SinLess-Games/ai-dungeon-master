@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { BookOpen, Plus, Shield, Swords, Trash2, UserRound } from "lucide-react";
@@ -40,6 +41,7 @@ export function CharacterLibrary() {
   const hasSaveAccess = Boolean(session.data) || canUseOfflineData;
   const hasLiveSession = Boolean(session.data);
   const queryClient = useQueryClient();
+  const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
   const characters = useQuery({
     queryKey: ["characters", "library"],
     queryFn: listCharacters,
@@ -53,10 +55,15 @@ export function CharacterLibrary() {
       );
     },
     onSuccess: async (_result, character) => {
+      setDeleteConfirmationId(null);
       await queryClient.invalidateQueries({ queryKey: ["characters"] });
+      await queryClient.invalidateQueries({ queryKey: ["campaigns"] });
       toast.success(`${character.name} deleted.`);
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Character could not be deleted."),
+    onError: (error) => {
+      setDeleteConfirmationId(null);
+      toast.error(error instanceof Error ? error.message : "Character could not be deleted.");
+    },
   });
 
   if (session.isPending && !canUseOfflineData) {
@@ -141,45 +148,66 @@ export function CharacterLibrary() {
           </section>
         ) : (
           <section className="character-library-grid" aria-label="Saved characters">
-            {items.map((character) => (
-              <article className="character-library-card" key={character.id}>
-                <div className="character-library-card-top">
-                  <div>
-                    <h2>{character.name}</h2>
-                    <p>{character.raceName ?? "Race not selected"} · {classSummary(character)}</p>
+            {items.map((character) => {
+              const confirmingDelete = deleteConfirmationId === character.id;
+              const deletingThisCharacter =
+                deleteCharacter.isPending && deleteCharacter.variables?.id === character.id;
+              return (
+                <article className="character-library-card" key={character.id}>
+                  <div className="character-library-card-top">
+                    <div>
+                      <h2>{character.name}</h2>
+                      <p>{character.raceName ?? "Race not selected"} · {classSummary(character)}</p>
+                    </div>
+                    <span className="creator-pill">{readableStatus(character.status)}</span>
                   </div>
-                  <span className="creator-pill">{readableStatus(character.status)}</span>
-                </div>
-                <div className="character-library-badges">
-                  <span>{systemLabel(character)}</span>
-                  <span>LA +{character.levelAdjustment ?? 0}</span>
-                  {character.progressionMode === "gestalt" && <span className="gestalt">Gestalt</span>}
-                  {character.progressionMode !== "gestalt" && <span>Standard</span>}
-                  <span>{readableStatus(character.campaignStatus)} campaign</span>
-                </div>
-                <div className="character-library-meta">
-                  <div><span>System</span><strong>{systemLabel(character)}</strong></div>
-                  <div><span>Campaign</span><strong>{character.campaignName}</strong></div>
-                  <div><span>Classes</span><strong>{classSummary(character)}</strong></div>
-                  <div><span>Character ID</span><strong>{character.id.slice(0, 8)}…</strong></div>
-                  <div><span>Updated</span><strong>{new Date(character.updatedAt).toLocaleDateString()}</strong></div>
-                </div>
-                <div className="creator-step-actions">
-                  <button
-                    type="button"
-                    className="creator-secondary"
-                    disabled={deleteCharacter.isPending}
-                    onClick={() => {
-                      if (window.confirm(`Delete ${character.name}? This permanently removes the character and its creator data.`)) {
-                        deleteCharacter.mutate(character);
-                      }
-                    }}
-                  >
-                    <Trash2 size={16} /> {deleteCharacter.isPending && deleteCharacter.variables?.id === character.id ? "Deleting…" : "Delete character"}
-                  </button>
-                </div>
-              </article>
-            ))}
+                  <div className="character-library-badges">
+                    <span>{systemLabel(character)}</span>
+                    <span>LA +{character.levelAdjustment ?? 0}</span>
+                    {character.progressionMode === "gestalt" && <span className="gestalt">Gestalt</span>}
+                    {character.progressionMode !== "gestalt" && <span>Standard</span>}
+                    <span>{readableStatus(character.campaignStatus)} campaign</span>
+                  </div>
+                  <div className="character-library-meta">
+                    <div><span>System</span><strong>{systemLabel(character)}</strong></div>
+                    <div><span>Campaign</span><strong>{character.campaignName}</strong></div>
+                    <div><span>Classes</span><strong>{classSummary(character)}</strong></div>
+                    <div><span>Character ID</span><strong>{character.id.slice(0, 8)}…</strong></div>
+                    <div><span>Updated</span><strong>{new Date(character.updatedAt).toLocaleDateString()}</strong></div>
+                  </div>
+                  <div className="creator-step-actions">
+                    <button
+                      type="button"
+                      className="creator-secondary"
+                      disabled={deleteCharacter.isPending}
+                      onClick={() => {
+                        if (confirmingDelete) {
+                          deleteCharacter.mutate(character);
+                          return;
+                        }
+                        setDeleteConfirmationId(character.id);
+                      }}
+                    >
+                      <Trash2 size={16} />
+                      {deletingThisCharacter
+                        ? "Deleting…"
+                        : confirmingDelete
+                          ? "Confirm delete"
+                          : "Delete character"}
+                    </button>
+                    {confirmingDelete && !deleteCharacter.isPending ? (
+                      <button
+                        type="button"
+                        className="creator-secondary"
+                        onClick={() => setDeleteConfirmationId(null)}
+                      >
+                        Cancel
+                      </button>
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })}
           </section>
         )}
       </div>

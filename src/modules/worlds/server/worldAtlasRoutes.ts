@@ -29,6 +29,7 @@ import {
 import {
   generateHybridCampaignWorldAtlas,
   storedAIPlan,
+  storedAIRealismAudit,
 } from "./hybridCampaignAtlas";
 import {
   enqueueWorldAtlasBuild,
@@ -207,6 +208,7 @@ export const worldAtlasRoutes = new Hono<Env>()
           generatedAt: new Date().toISOString(),
         },
         existingPlan: body.seedMode === "same" ? storedAIPlan(atlas) : null,
+        existingAudit: body.seedMode === "same" ? storedAIRealismAudit(atlas) : null,
       });
       const next = withExplorationState(generated, createInitialExplorationState(generated));
       const revision = await persistAtlas({

@@ -1,17 +1,26 @@
 import { readServerSentEvents } from "@/shared/serverSentEvents";
 
+export interface WorkersAITextInput {
+  messages: Array<{ role: "system" | "user"; content: string }>;
+  stream?: boolean;
+  temperature?: number;
+  max_tokens?: number;
+  chat_template_kwargs?: {
+    enable_thinking?: boolean;
+  };
+}
+
+export interface WorkersAIMultipartInput {
+  multipart: {
+    body: ReadableStream<Uint8Array> | null;
+    contentType: string;
+  };
+}
+
 export interface WorkersAIBinding {
   run(
     model: string,
-    input: {
-      messages: Array<{ role: "system" | "user"; content: string }>;
-      stream?: boolean;
-      temperature?: number;
-      max_tokens?: number;
-      chat_template_kwargs?: {
-        enable_thinking?: boolean;
-      };
-    },
+    input: WorkersAITextInput | WorkersAIMultipartInput,
   ): Promise<unknown>;
 }
 

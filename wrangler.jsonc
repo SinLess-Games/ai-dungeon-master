@@ -30,7 +30,8 @@
     "DEVBLOG_AI_ENABLED": "true",
     "DEVBLOG_AI_AUTO_PUBLISH": "false",
     "AI_DEVBLOG_MODEL": "@cf/google/gemma-4-26b-a4b-it",
-    "AI_GAME_MODEL": "@cf/google/gemma-4-26b-a4b-it"
+    "AI_GAME_MODEL": "@cf/google/gemma-4-26b-a4b-it",
+    "AI_MAP_IMAGE_MODEL": "@cf/black-forest-labs/flux-2-dev"
   },
 
   "ai": {

@@ -1,9 +1,23 @@
 import type {
-  AtlasPath,
-  AtlasPlace,
+  AtlasBiome,
+  AtlasLandmass,
   AtlasPoint,
+  AtlasRegion,
   WorldAtlasDocument,
 } from "../domain/atlas";
+
+const BIOME_COLORS: Record<AtlasBiome, string> = {
+  temperate: "#61764b",
+  forest: "#244a31",
+  tundra: "#aeb9b3",
+  desert: "#b9965a",
+  steppe: "#8d8952",
+  swamp: "#405c46",
+  jungle: "#1f5230",
+  highlands: "#756c5a",
+  badlands: "#995d43",
+  enchanted: "#436b54",
+};
 
 function escapeXml(value: string): string {
   return value
@@ -14,207 +28,149 @@ function escapeXml(value: string): string {
     .replaceAll("'", "&apos;");
 }
 
-function points(points: readonly AtlasPoint[]): string {
-  return points.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
+function points(values: readonly AtlasPoint[]): string {
+  return values.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
 }
 
-function placeGlyph(place: AtlasPlace): string {
-  switch (place.kind) {
-    case "capital":
-      return "★";
-    case "city":
-      return "◆";
-    case "town":
-      return "●";
-    case "village":
-    case "hamlet":
-      return "•";
-    case "port":
-      return "⚓";
-    case "fort":
-      return "♜";
-    case "castle":
-      return "♛";
-    case "dungeon":
-      return "⚔";
-    case "ruin":
-      return "△";
-    case "temple":
-      return "✦";
-    case "tower":
-      return "♟";
-    case "mine":
-      return "◇";
-    case "cave":
-      return "◒";
-    case "landmark":
-      return "✧";
-    case "planar-gate":
-      return "◉";
+function hash32(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
   }
+  return hash >>> 0;
 }
 
-function pathStyle(path: AtlasPath): string {
-  switch (path.kind) {
-    case "road":
-      return 'stroke="#6e4e2f" stroke-width="9" stroke-dasharray="22 12" opacity="0.62"';
-    case "trail":
-      return 'stroke="#765d43" stroke-width="5" stroke-dasharray="10 14" opacity="0.48"';
-    case "sea-route":
-      return 'stroke="#365f75" stroke-width="5" stroke-dasharray="18 18" opacity="0.56"';
-  }
+function shadeHex(hex: string, amount: number): string {
+  const source = hex.replace("#", "");
+  const value = Number.parseInt(source, 16);
+  const channel = (shift: number) =>
+    Math.max(0, Math.min(255, ((value >> shift) & 255) + amount));
+  return `#${[channel(16), channel(8), channel(0)]
+    .map((part) => Math.round(part).toString(16).padStart(2, "0"))
+    .join("")}`;
 }
 
-function niceScale(widthMiles: number): number {
-  const target = widthMiles / 8;
-  const values = [25, 50, 100, 250, 500, 1000, 2000, 2500, 5000];
-  return values.reduce((best, value) =>
-    Math.abs(value - target) < Math.abs(best - target) ? value : best,
-  );
+function biomeTexture(region: AtlasRegion, index: number): string {
+  const color = BIOME_COLORS[region.biome];
+  const rx = 390 + region.importance * 520;
+  const ry = 260 + region.importance * 400;
+  const rotation = hash32(`${region.id}:rotation`) % 180;
+  const opacity = region.biome === "forest" || region.biome === "jungle" ? 0.64 : 0.48;
+  return `<ellipse cx="${region.center.x.toFixed(1)}" cy="${region.center.y.toFixed(1)}"
+    rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}"
+    transform="rotate(${rotation} ${region.center.x.toFixed(1)} ${region.center.y.toFixed(1)})"
+    fill="${color}" opacity="${opacity}" filter="url(#biomeBlend)" data-region="${index}"/>`;
 }
 
-function renderCompass(atlas: WorldAtlasDocument): string {
-  const x = atlas.widthMiles * 0.08;
-  const y = atlas.heightMiles * 0.15;
-  const radius = Math.min(atlas.widthMiles, atlas.heightMiles) * 0.055;
-  return `<g transform="translate(${x} ${y})" filter="url(#inkShadow)">
-    <circle r="${radius}" fill="rgba(246,233,194,.74)" stroke="#4a3426" stroke-width="10"/>
-    <circle r="${radius * 0.72}" fill="none" stroke="#8b6845" stroke-width="4"/>
-    <path d="M0 ${-radius * 1.05} L${radius * 0.15} 0 L0 ${radius * 1.05} L${-radius * 0.15} 0 Z" fill="#362519"/>
-    <path d="M${-radius * 1.05} 0 L0 ${radius * 0.15} L${radius * 1.05} 0 L0 ${-radius * 0.15} Z" fill="#9b6b35"/>
-    <circle r="${radius * 0.13}" fill="#d4b66c" stroke="#3b291b" stroke-width="4"/>
-    <text x="0" y="${-radius * 1.18}" text-anchor="middle" class="compass">N</text>
-    <text x="0" y="${radius * 1.38}" text-anchor="middle" class="compass">S</text>
-    <text x="${radius * 1.25}" y="${radius * 0.1}" text-anchor="middle" class="compass">E</text>
-    <text x="${-radius * 1.25}" y="${radius * 0.1}" text-anchor="middle" class="compass">W</text>
-  </g>`;
-}
+function renderLandmass(
+  atlas: WorldAtlasDocument,
+  landmass: AtlasLandmass,
+  index: number,
+): string {
+  const base = BIOME_COLORS[landmass.biome];
+  const clipId = `land-${index}`;
+  const localRegions = atlas.regions.filter((region) => region.landmassId === landmass.id);
+  const regions = localRegions.map(biomeTexture).join("\n");
+  const seed = (hash32(`${atlas.seed}:${landmass.id}:surface`) % 9000) + 1;
 
-function renderLegend(atlas: WorldAtlasDocument): string {
-  const x = atlas.widthMiles * 0.805;
-  const y = atlas.heightMiles * 0.67;
-  const width = atlas.widthMiles * 0.17;
-  const row = atlas.heightMiles * 0.026;
-  const height = Math.max(atlas.heightMiles * 0.16, row * (atlas.legend.length + 2));
-  const entries = atlas.legend
-    .map((entry, index) => {
-      const yy = y + row * (index + 1.65);
-      const glyph = ["road", "trail", "sea-route"].includes(entry.kind)
-        ? "━━"
-        : placeGlyph({ kind: entry.kind } as AtlasPlace);
-      return `<text x="${x + width * 0.08}" y="${yy}" class="legend-glyph">${escapeXml(glyph)}</text>
-        <text x="${x + width * 0.24}" y="${yy}" class="legend-text">${escapeXml(entry.label)}</text>`;
-    })
-    .join("\n");
-  return `<g filter="url(#inkShadow)">
-    <rect x="${x}" y="${y}" width="${width}" height="${height}" rx="24" fill="rgba(244,231,195,.9)" stroke="#65492f" stroke-width="8"/>
-    <text x="${x + width / 2}" y="${y + row * 0.82}" text-anchor="middle" class="legend-title">LEGEND</text>
-    ${entries}
-  </g>`;
-}
-
-function renderScale(atlas: WorldAtlasDocument): string {
-  const scaleMiles = niceScale(atlas.widthMiles);
-  const visualWidth = scaleMiles;
-  const x = atlas.widthMiles * 0.055;
-  const y = atlas.heightMiles * 0.92;
-  return `<g filter="url(#inkShadow)">
-    <line x1="${x}" y1="${y}" x2="${x + visualWidth}" y2="${y}" stroke="#2f2118" stroke-width="14"/>
-    <line x1="${x}" y1="${y - 42}" x2="${x}" y2="${y + 42}" stroke="#2f2118" stroke-width="10"/>
-    <line x1="${x + visualWidth}" y1="${y - 42}" x2="${x + visualWidth}" y2="${y + 42}" stroke="#2f2118" stroke-width="10"/>
-    <text x="${x + visualWidth / 2}" y="${y - 70}" text-anchor="middle" class="scale">${scaleMiles.toLocaleString()} miles</text>
-  </g>`;
-}
-
-export function renderWorldAtlasSvg(atlas: WorldAtlasDocument): string {
-  const land = atlas.landmasses
-    .map((landmass, index) => {
-      const fills = ["url(#landA)", "url(#landB)", "url(#landC)", "url(#landD)"];
-      return `<polygon points="${points(landmass.points)}" fill="${fills[index % fills.length]}" stroke="#66523b" stroke-width="14" stroke-linejoin="round"/>`;
-    })
-    .join("\n");
-
-  const roads = atlas.paths
+  const mountainRanges = atlas.mountainRanges
+    .filter((range) => range.landmassId === landmass.id)
     .map(
-      (path) =>
-        `<polyline points="${points(path.points)}" fill="none" ${pathStyle(path)} stroke-linecap="round" stroke-linejoin="round"/>`,
+      (range) => `<g>
+        <polyline points="${points(range.points)}" fill="none" stroke="#272923" stroke-width="72" opacity=".24" stroke-linecap="round" stroke-linejoin="round" filter="url(#ridgeBlur)"/>
+        <polyline points="${points(range.points)}" fill="none" stroke="#4a4a40" stroke-width="40" opacity=".72" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="${points(range.points)}" fill="none" stroke="#a7a293" stroke-width="13" opacity=".42" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>`,
     )
     .join("\n");
 
   const rivers = atlas.rivers
+    .filter((river) => river.landmassId === landmass.id)
     .map(
-      (river) =>
-        `<polyline points="${points(river.points)}" fill="none" stroke="#4f88a0" stroke-width="16" opacity=".8" stroke-linecap="round"/>`,
+      (river) => `<g>
+        <polyline points="${points(river.points)}" fill="none" stroke="#183b47" stroke-width="16" opacity=".66" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="${points(river.points)}" fill="none" stroke="#4f8fa5" stroke-width="8" opacity=".95" stroke-linecap="round" stroke-linejoin="round"/>
+      </g>`,
     )
     .join("\n");
 
-  const mountains = atlas.mountainRanges
-    .flatMap((range) =>
-      range.points.map(
-        (point, index) => `<g transform="translate(${point.x} ${point.y})">
-          <path d="M-56 48 L0 -62 L56 48 Z" fill="#837666" stroke="#4d4339" stroke-width="8"/>
-          <path d="M-18 -26 L0 -62 L20 -24 L8 -32 L0 -18 L-7 -31 Z" fill="#e9e4d9" opacity=".92"/>
-          ${index === Math.floor(range.points.length / 2) ? `<text y="-82" text-anchor="middle" class="terrain-label">${escapeXml(range.name)}</text>` : ""}
-        </g>`,
-      ),
-    )
-    .join("\n");
+  return `<g>
+    <clipPath id="${clipId}"><polygon points="${points(landmass.points)}"/></clipPath>
 
-  const regionLabels = atlas.regions
-    .filter((region) => region.importance > 0.7)
-    .map(
-      (region) =>
-        `<text x="${region.center.x}" y="${region.center.y}" text-anchor="middle" class="region-label">${escapeXml(region.name)}</text>`,
-    )
-    .join("\n");
+    <!-- continental shelf / shallow water -->
+    <polygon points="${points(landmass.points)}" fill="none" stroke="#82aaa3" stroke-width="130" opacity=".18" stroke-linejoin="round"/>
+    <polygon points="${points(landmass.points)}" fill="none" stroke="#a5c0ae" stroke-width="58" opacity=".18" stroke-linejoin="round"/>
 
-  const placeMarks = atlas.places
-    .filter((place) => place.importance > 0.38)
-    .map((place) => {
-      const fontSize = 42 + place.importance * 38;
-      const labelSize = 28 + place.importance * 22;
-      return `<g transform="translate(${place.x} ${place.y})">
-        <text text-anchor="middle" dominant-baseline="middle" font-size="${fontSize}" class="place-glyph">${escapeXml(placeGlyph(place))}</text>
-        ${place.importance > 0.52 ? `<text y="${fontSize * 0.92}" text-anchor="middle" font-size="${labelSize}" class="place-label">${escapeXml(place.name)}</text>` : ""}
-      </g>`;
-    })
-    .join("\n");
+    <polygon points="${points(landmass.points)}" fill="${base}" stroke="#26342d" stroke-width="7" stroke-linejoin="round"/>
+    <g clip-path="url(#${clipId})">
+      <rect x="${(landmass.center.x - landmass.radiusX * 1.15).toFixed(1)}"
+        y="${(landmass.center.y - landmass.radiusY * 1.15).toFixed(1)}"
+        width="${(landmass.radiusX * 2.3).toFixed(1)}"
+        height="${(landmass.radiusY * 2.3).toFixed(1)}"
+        fill="${shadeHex(base, 8)}" filter="url(#terrain-${index})" opacity=".78"/>
+      ${regions}
+      <rect x="${(landmass.center.x - landmass.radiusX * 1.15).toFixed(1)}"
+        y="${(landmass.center.y - landmass.radiusY * 1.15).toFixed(1)}"
+        width="${(landmass.radiusX * 2.3).toFixed(1)}"
+        height="${(landmass.radiusY * 2.3).toFixed(1)}"
+        filter="url(#surfaceGrain)" opacity=".28"/>
+      ${mountainRanges}
+      ${rivers}
+    </g>
+  </g>
+  <filter id="terrain-${index}" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency=".0028 .0042" numOctaves="5" seed="${seed}" result="height"/>
+    <feDiffuseLighting in="height" surfaceScale="38" diffuseConstant="1.1" lighting-color="#ffffff" result="light">
+      <feDistantLight azimuth="315" elevation="42"/>
+    </feDiffuseLighting>
+    <feBlend in="SourceGraphic" in2="light" mode="multiply" result="shaded"/>
+    <feTurbulence type="fractalNoise" baseFrequency=".011" numOctaves="3" seed="${seed + 29}" result="detail"/>
+    <feBlend in="shaded" in2="detail" mode="soft-light"/>
+  </filter>`;
+}
+
+export function renderWorldAtlasSvg(atlas: WorldAtlasDocument): string {
+  const oceanSeed = (hash32(`${atlas.seed}:ocean`) % 9000) + 1;
+  const land = atlas.landmasses.map((landmass, index) => renderLandmass(atlas, landmass, index)).join("\n");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${atlas.widthMiles} ${atlas.heightMiles}" role="img" aria-label="${escapeXml(atlas.title)} fantasy world atlas">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${atlas.widthMiles} ${atlas.heightMiles}" role="img" aria-label="${escapeXml(atlas.title)} satellite terrain map">
   <defs>
     <linearGradient id="ocean" x1="0" x2="0" y1="0" y2="1">
-      <stop offset="0" stop-color="#8fb6bd"/>
-      <stop offset=".55" stop-color="#6f9fa9"/>
-      <stop offset="1" stop-color="#527f8c"/>
+      <stop offset="0" stop-color="#356c78"/>
+      <stop offset=".42" stop-color="#275866"/>
+      <stop offset="1" stop-color="#173c4c"/>
     </linearGradient>
-    <radialGradient id="landA"><stop offset="0" stop-color="#9dad72"/><stop offset="1" stop-color="#70875a"/></radialGradient>
-    <radialGradient id="landB"><stop offset="0" stop-color="#c3ae75"/><stop offset="1" stop-color="#92744f"/></radialGradient>
-    <radialGradient id="landC"><stop offset="0" stop-color="#86a98d"/><stop offset="1" stop-color="#5e816e"/></radialGradient>
-    <radialGradient id="landD"><stop offset="0" stop-color="#b8a271"/><stop offset="1" stop-color="#7f8763"/></radialGradient>
-    <filter id="paper"><feTurbulence baseFrequency=".018" numOctaves="4" seed="7"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="table" tableValues="0 .13"/></feComponentTransfer></filter>
-    <filter id="inkShadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="9" dy="12" stdDeviation="10" flood-color="#1d1610" flood-opacity=".34"/></filter>
-    <style>
-      .place-label{font-family:Georgia,serif;font-weight:700;paint-order:stroke;stroke:#ead9ad;stroke-width:10px;fill:#34271d;letter-spacing:.02em}
-      .place-glyph{font-family:Georgia,serif;paint-order:stroke;stroke:#ead9ad;stroke-width:8px;fill:#432d22}
-      .region-label{font-family:Georgia,serif;font-size:68px;font-style:italic;font-weight:700;fill:#6b2824;opacity:.83;paint-order:stroke;stroke:#d9c99f;stroke-width:12px;letter-spacing:.08em}
-      .terrain-label{font-family:Georgia,serif;font-size:42px;font-style:italic;fill:#443a34;paint-order:stroke;stroke:#d9c99f;stroke-width:8px}
-      .legend-title,.compass,.scale{font-family:Georgia,serif;font-size:44px;font-weight:700;fill:#39281b}
-      .legend-text{font-family:Georgia,serif;font-size:31px;fill:#39281b}
-      .legend-glyph{font-family:Georgia,serif;font-size:34px;fill:#39281b}
-    </style>
+    <radialGradient id="oceanDepth" cx="48%" cy="40%" r="78%">
+      <stop offset="0" stop-color="#5b9095" stop-opacity=".24"/>
+      <stop offset=".55" stop-color="#254f60" stop-opacity=".12"/>
+      <stop offset="1" stop-color="#0e2c3b" stop-opacity=".42"/>
+    </radialGradient>
+    <filter id="oceanNoise" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency=".003 .008" numOctaves="4" seed="${oceanSeed}" result="noise"/>
+      <feColorMatrix in="noise" type="matrix" values="
+        .22 0 0 0 .03
+        0 .34 0 0 .05
+        0 0 .42 0 .08
+        0 0 0 .34 0"/>
+    </filter>
+    <filter id="surfaceGrain" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency=".018" numOctaves="4" seed="41"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="table" tableValues="0 .34"/></feComponentTransfer>
+    </filter>
+    <filter id="biomeBlend" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="115"/>
+    </filter>
+    <filter id="ridgeBlur" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="16"/>
+    </filter>
   </defs>
+
   <rect width="100%" height="100%" fill="url(#ocean)"/>
-  <rect width="100%" height="100%" filter="url(#paper)" opacity=".7"/>
+  <rect width="100%" height="100%" fill="url(#oceanDepth)"/>
+  <rect width="100%" height="100%" filter="url(#oceanNoise)" opacity=".62"/>
   ${land}
-  ${roads}
-  ${rivers}
-  ${mountains}
-  ${regionLabels}
-  ${placeMarks}
-  <text x="${atlas.widthMiles / 2}" y="${atlas.heightMiles * 0.065}" text-anchor="middle" style="font-family:Georgia,serif;font-size:110px;font-weight:700;letter-spacing:.08em;fill:#3c2a20;paint-order:stroke;stroke:#d7c99e;stroke-width:18px">${escapeXml(atlas.title)}</text>
-  ${renderCompass(atlas)}
-  ${renderScale(atlas)}
-  ${renderLegend(atlas)}
 </svg>`;
 }

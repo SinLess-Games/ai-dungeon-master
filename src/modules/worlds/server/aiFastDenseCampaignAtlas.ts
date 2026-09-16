@@ -192,7 +192,7 @@ function regionOccupancy(
   regions: readonly AtlasRegion[],
   places: readonly AtlasPlace[],
 ): Map<string, number> {
-  const counts = new Map(regions.map((region) => [region.id, 0] as const));
+  const counts = new Map<string, number>(regions.map((region) => [region.id, 0]));
   for (const place of places) {
     if (!place.regionId || !counts.has(place.regionId)) continue;
     counts.set(place.regionId, (counts.get(place.regionId) ?? 0) + 1);

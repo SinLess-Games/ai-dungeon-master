@@ -5,6 +5,7 @@ import {
   worldMaps,
   type WorldMapData,
 } from "@/infrastructure/database/schema";
+import { enforceCoastalAtlasIntegrity } from "@/modules/worlds/domain/coastalAtlasIntegrity";
 import { generateStrictRealisticCampaignWorldAtlas } from "@/modules/worlds/domain/strictRealisticCampaignAtlas";
 import type { WorldGenerator } from "./startCampaign";
 
@@ -42,14 +43,16 @@ export class BootstrapWorldGenerator implements WorldGenerator {
 
     if (!campaign) throw new Error("Campaign disappeared during world generation.");
 
-    const atlas = generateStrictRealisticCampaignWorldAtlas({
-      campaign: {
-        name: campaign.name,
-        description: campaign.description,
-        settings: campaign.settings,
-      },
-      seed: input.generationSeed,
-    });
+    const atlas = enforceCoastalAtlasIntegrity(
+      generateStrictRealisticCampaignWorldAtlas({
+        campaign: {
+          name: campaign.name,
+          description: campaign.description,
+          settings: campaign.settings,
+        },
+        seed: input.generationSeed,
+      }),
+    );
     const mapId = `world-atlas-${input.worldId}`;
     let atlasPersisted = false;
 

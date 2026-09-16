@@ -295,7 +295,6 @@ export async function offlineRequestJson<T>(
           "X-Endless-Codex-Resource-Id": resource.id,
         }
       : {}),
-    ...(baseVersion === null ? {} : { "X-Endless-Codex-Base-Version": String(baseVersion) }),
   };
 
   if (networkAvailable()) {
@@ -336,7 +335,7 @@ export async function offlineRequestJson<T>(
     url: requestedPath,
     body: replayableBody(prepared.body),
     resource: inferred,
-    baseVersion: inferred ? await getResourceVersion(resolveOfflineResource(userId, inferred)!) : null,
+    baseVersion,
     forceLocal: false,
   });
   const automatic = automaticOptimisticValue<T>(

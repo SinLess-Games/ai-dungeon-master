@@ -6,7 +6,7 @@ import {
   worldMaps,
   type WorldMapData,
 } from "@/infrastructure/database/schema";
-import { generateAICampaignWorldAtlas } from "@/modules/worlds/server/aiOnlyCampaignAtlas";
+import { generateAICampaignWorldAtlasV2 } from "@/modules/worlds/server/aiOnlyCampaignAtlasV2";
 import type { WorldGenerator } from "./startCampaign";
 
 function missingWorldMapTable(error: unknown): boolean {
@@ -30,25 +30,36 @@ export class BootstrapWorldGenerator implements WorldGenerator {
 
   async generate(input: Parameters<WorldGenerator["generate"]>[0]) {
     const campaign = await this.db
-      .select({
-        name: campaigns.name,
-        description: campaigns.description,
-        ownerUserId: campaigns.ownerUserId,
-        settings: campaigns.settings,
-      })
+      .select()
       .from(campaigns)
       .where(eq(campaigns.id, input.campaignId))
       .get();
 
     if (!campaign) throw new Error("Campaign disappeared during world generation.");
 
-    const atlas = await generateAICampaignWorldAtlas({
+    const atlas = await generateAICampaignWorldAtlasV2({
       env: this.aiEnv,
       request: {
         campaign: {
           name: campaign.name,
           description: campaign.description,
           settings: campaign.settings,
+          context: {
+            campaignId: campaign.id,
+            notes: campaign.notes,
+            status: campaign.status,
+            playMode: campaign.playMode,
+            gameMasterMode: campaign.gameMasterMode,
+            timeMode: campaign.timeMode,
+            visibility: campaign.visibility,
+            maxPlayers: campaign.maxPlayers,
+            rulesetId: campaign.rulesetId,
+            rulesetVersion: campaign.rulesetVersion,
+            generationSeed: campaign.generationSeed,
+            worldTime: campaign.worldTime,
+            startingCharacterCount: input.characterIds.length,
+            creatorSettings: campaign.settings,
+          },
         },
         seed: input.generationSeed,
         generatedAt: new Date().toISOString(),

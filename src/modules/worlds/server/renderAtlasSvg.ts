@@ -1,25 +1,35 @@
 import type {
   AtlasBiome,
   AtlasLandmass,
+  AtlasPlace,
   AtlasPoint,
   AtlasRegion,
   WorldAtlasDocument,
 } from "../domain/atlas";
 
-export const WORLD_ATLAS_RENDERER_VERSION = "satellite-v2-natural-terrain";
+export const WORLD_ATLAS_RENDERER_VERSION = "satellite-v3-orthographic-landcover";
 
 const BIOME_COLORS: Record<AtlasBiome, string> = {
-  temperate: "#667b4e",
-  forest: "#284d31",
-  tundra: "#aab5ae",
-  desert: "#b99a62",
-  steppe: "#8e8958",
-  swamp: "#405b46",
-  jungle: "#205233",
-  highlands: "#756c5b",
-  badlands: "#945f48",
-  enchanted: "#456956",
+  temperate: "#667851",
+  forest: "#24472e",
+  tundra: "#9ba69e",
+  desert: "#b39968",
+  steppe: "#8b8758",
+  swamp: "#3c5544",
+  jungle: "#1d4d2b",
+  highlands: "#6d685a",
+  badlands: "#8c5c47",
+  enchanted: "#3e6550",
 };
+
+const CULTIVATED_KINDS = new Set([
+  "capital",
+  "city",
+  "town",
+  "village",
+  "hamlet",
+  "port",
+]);
 
 function escapeXml(value: string): string {
   return value
@@ -43,6 +53,17 @@ function hash32(value: string): number {
   return hash >>> 0;
 }
 
+function mulberry32(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state += 0x6d2b79f5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 function shadeHex(hex: string, amount: number): string {
   const source = hex.replace("#", "");
   const value = Number.parseInt(source, 16);
@@ -55,19 +76,88 @@ function shadeHex(hex: string, amount: number): string {
 
 function biomeTexture(region: AtlasRegion, index: number): string {
   const color = BIOME_COLORS[region.biome];
-  const rx = 420 + region.importance * 560;
+  const rx = 430 + region.importance * 560;
   const ry = 300 + region.importance * 430;
   const rotation = hash32(`${region.id}:rotation`) % 180;
   const opacity =
     region.biome === "forest" || region.biome === "jungle"
-      ? 0.5
+      ? 0.64
       : region.biome === "desert" || region.biome === "badlands"
-        ? 0.42
-        : 0.34;
+        ? 0.5
+        : 0.38;
   return `<ellipse cx="${region.center.x.toFixed(1)}" cy="${region.center.y.toFixed(1)}"
     rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}"
     transform="rotate(${rotation} ${region.center.x.toFixed(1)} ${region.center.y.toFixed(1)})"
     fill="${color}" opacity="${opacity}" filter="url(#biomeBlend)" data-region="${index}"/>`;
+}
+
+function settlementRadius(place: AtlasPlace): number {
+  const population = place.population ?? 0;
+  const populationScale = population > 0 ? Math.min(1.45, Math.log10(population + 10) / 5) : 0;
+  switch (place.kind) {
+    case "capital":
+      return 52 + place.importance * 34 + populationScale * 22;
+    case "city":
+      return 38 + place.importance * 28 + populationScale * 18;
+    case "port":
+      return 34 + place.importance * 24 + populationScale * 16;
+    case "town":
+      return 22 + place.importance * 18 + populationScale * 12;
+    case "village":
+      return 11 + place.importance * 10;
+    case "hamlet":
+      return 7 + place.importance * 6;
+    default:
+      return 0;
+  }
+}
+
+function renderCultivatedLand(place: AtlasPlace): string {
+  if (!CULTIVATED_KINDS.has(place.kind)) return "";
+  const radius = settlementRadius(place);
+  if (radius <= 0) return "";
+  const random = mulberry32(hash32(`${place.id}:cultivated`));
+  const parcels: string[] = [];
+  const parcelCount = place.kind === "capital" || place.kind === "city" ? 18 : place.kind === "town" || place.kind === "port" ? 12 : 7;
+  for (let index = 0; index < parcelCount; index += 1) {
+    const angle = random() * Math.PI * 2;
+    const ring = radius * (1.25 + random() * 1.8);
+    const x = place.x + Math.cos(angle) * ring;
+    const y = place.y + Math.sin(angle) * ring;
+    const width = radius * (0.45 + random() * 0.9);
+    const height = radius * (0.22 + random() * 0.48);
+    const rotation = Math.round(random() * 180);
+    const fill = ["#7f8551", "#8d8a57", "#75794b", "#9a8e5f", "#6e794a"][index % 5]!;
+    parcels.push(
+      `<rect x="${(x - width / 2).toFixed(1)}" y="${(y - height / 2).toFixed(1)}" width="${width.toFixed(1)}" height="${height.toFixed(1)}" rx="3" fill="${fill}" opacity=".33" transform="rotate(${rotation} ${x.toFixed(1)} ${y.toFixed(1)})"/>`,
+    );
+  }
+  return `<g opacity=".86">${parcels.join("")}</g>`;
+}
+
+function renderUrbanArea(place: AtlasPlace): string {
+  if (!CULTIVATED_KINDS.has(place.kind)) return "";
+  const radius = settlementRadius(place);
+  if (radius <= 0) return "";
+  const random = mulberry32(hash32(`${place.id}:urban`));
+  const clusters: string[] = [];
+  const clusterCount = place.kind === "capital" ? 13 : place.kind === "city" || place.kind === "port" ? 10 : place.kind === "town" ? 7 : 4;
+  for (let index = 0; index < clusterCount; index += 1) {
+    const angle = random() * Math.PI * 2;
+    const distance = random() * radius * 0.7;
+    const x = place.x + Math.cos(angle) * distance;
+    const y = place.y + Math.sin(angle) * distance;
+    const rx = radius * (0.28 + random() * 0.32);
+    const ry = radius * (0.18 + random() * 0.26);
+    const fill = index % 3 === 0 ? "#9b9a8e" : index % 3 === 1 ? "#85867f" : "#aaa698";
+    clusters.push(
+      `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}" fill="${fill}" opacity=".5"/>`,
+    );
+  }
+  return `<g filter="url(#urbanBlend)">
+    <ellipse cx="${place.x.toFixed(1)}" cy="${place.y.toFixed(1)}" rx="${radius.toFixed(1)}" ry="${(radius * 0.72).toFixed(1)}" fill="#8d8f88" opacity=".34"/>
+    ${clusters.join("")}
+  </g>`;
 }
 
 function renderLandmass(
@@ -80,14 +170,17 @@ function renderLandmass(
   const localRegions = atlas.regions.filter((region) => region.landmassId === landmass.id);
   const regions = localRegions.map(biomeTexture).join("\n");
   const seed = (hash32(`${atlas.seed}:${landmass.id}:surface`) % 9000) + 1;
+  const localPlaces = atlas.places.filter((place) => place.landmassId === landmass.id);
+  const cultivated = localPlaces.map(renderCultivatedLand).join("\n");
+  const urban = localPlaces.map(renderUrbanArea).join("\n");
 
   const mountainRanges = atlas.mountainRanges
     .filter((range) => range.landmassId === landmass.id)
     .map(
       (range) => `<g>
-        <polyline points="${points(range.points)}" fill="none" stroke="#272923" stroke-width="72" opacity=".18" stroke-linecap="round" stroke-linejoin="round" filter="url(#ridgeBlur)"/>
-        <polyline points="${points(range.points)}" fill="none" stroke="#4a4a40" stroke-width="38" opacity=".64" stroke-linecap="round" stroke-linejoin="round"/>
-        <polyline points="${points(range.points)}" fill="none" stroke="#aaa696" stroke-width="10" opacity=".3" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="${points(range.points)}" fill="none" stroke="#1e241f" stroke-width="90" opacity=".16" stroke-linecap="round" stroke-linejoin="round" filter="url(#ridgeBlur)"/>
+        <polyline points="${points(range.points)}" fill="none" stroke="#4f5148" stroke-width="48" opacity=".48" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="${points(range.points)}" fill="none" stroke="#a4a08d" stroke-width="14" opacity=".25" stroke-linecap="round" stroke-linejoin="round"/>
       </g>`,
     )
     .join("\n");
@@ -96,8 +189,8 @@ function renderLandmass(
     .filter((river) => river.landmassId === landmass.id)
     .map(
       (river) => `<g>
-        <polyline points="${points(river.points)}" fill="none" stroke="#183b47" stroke-width="15" opacity=".58" stroke-linecap="round" stroke-linejoin="round"/>
-        <polyline points="${points(river.points)}" fill="none" stroke="#5b96a9" stroke-width="7" opacity=".9" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="${points(river.points)}" fill="none" stroke="#173942" stroke-width="17" opacity=".42" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline points="${points(river.points)}" fill="none" stroke="#4d8595" stroke-width="8" opacity=".82" stroke-linecap="round" stroke-linejoin="round"/>
       </g>`,
     )
     .join("\n");
@@ -110,46 +203,38 @@ function renderLandmass(
   return `<g>
     <clipPath id="${clipId}"><polygon points="${points(landmass.points)}"/></clipPath>
 
-    <!-- continental shelf / shallow water -->
-    <polygon points="${points(landmass.points)}" fill="none" stroke="#789b94" stroke-width="128" opacity=".14" stroke-linejoin="round"/>
-    <polygon points="${points(landmass.points)}" fill="none" stroke="#a2b9aa" stroke-width="52" opacity=".13" stroke-linejoin="round"/>
+    <!-- Bright shallow coastal shelf, like true-color orbital imagery. -->
+    <polygon points="${points(landmass.points)}" fill="none" stroke="#4e9c91" stroke-width="155" opacity=".18" stroke-linejoin="round"/>
+    <polygon points="${points(landmass.points)}" fill="none" stroke="#73bbb0" stroke-width="82" opacity=".22" stroke-linejoin="round"/>
+    <polygon points="${points(landmass.points)}" fill="none" stroke="#91cec0" stroke-width="30" opacity=".28" stroke-linejoin="round"/>
 
-    <polygon points="${points(landmass.points)}" fill="${base}" stroke="#26342d" stroke-width="6" stroke-linejoin="round"/>
+    <polygon points="${points(landmass.points)}" fill="${base}" stroke="#395447" stroke-width="2.5" stroke-linejoin="round"/>
     <g clip-path="url(#${clipId})">
-      <!-- Broad low-frequency elevation field. This is intentionally smooth: no RGB static. -->
+      <!-- Broad terrain reflectance/elevation, deliberately low frequency. -->
       <rect x="${boundsX}" y="${boundsY}" width="${boundsWidth}" height="${boundsHeight}"
-        fill="${shadeHex(base, 7)}" filter="url(#terrain-${index})" opacity=".68"/>
+        fill="${shadeHex(base, 6)}" filter="url(#terrain-${index})" opacity=".52"/>
 
-      <!-- Large blended biome zones provide satellite-scale vegetation/climate variation. -->
+      <!-- Climate/vegetation land cover. -->
       ${regions}
 
-      <!-- Restrained monochrome ground variation. -->
-      <rect x="${boundsX}" y="${boundsY}" width="${boundsWidth}" height="${boundsHeight}"
-        fill="${shadeHex(base, 3)}" filter="url(#surfaceVariation-${index})" opacity=".16"/>
+      <!-- Agricultural mosaic around inhabited places. -->
+      ${cultivated}
+
+      <!-- Built-up gray footprint around settlements. -->
+      ${urban}
 
       ${mountainRanges}
       ${rivers}
     </g>
   </g>
   <filter id="terrain-${index}" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
-    <feTurbulence type="fractalNoise" baseFrequency=".00065 .00105" numOctaves="3" seed="${seed}" result="heightRaw"/>
+    <feTurbulence type="fractalNoise" baseFrequency=".00042 .0007" numOctaves="2" seed="${seed}" result="heightRaw"/>
     <feColorMatrix in="heightRaw" type="saturate" values="0" result="height"/>
-    <feGaussianBlur in="height" stdDeviation="18" result="smoothHeight"/>
-    <feDiffuseLighting in="smoothHeight" surfaceScale="20" diffuseConstant=".78" lighting-color="#ffffff" result="light">
+    <feGaussianBlur in="height" stdDeviation="28" result="smoothHeight"/>
+    <feDiffuseLighting in="smoothHeight" surfaceScale="18" diffuseConstant=".72" lighting-color="#f3f0df" result="light">
       <feDistantLight azimuth="315" elevation="48"/>
     </feDiffuseLighting>
     <feBlend in="SourceGraphic" in2="light" mode="multiply"/>
-  </filter>
-  <filter id="surfaceVariation-${index}" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
-    <feTurbulence type="fractalNoise" baseFrequency=".0022 .0031" numOctaves="2" seed="${seed + 29}" result="variationRaw"/>
-    <feColorMatrix in="variationRaw" type="saturate" values="0" result="variationGray"/>
-    <feGaussianBlur in="variationGray" stdDeviation="4.5"/>
-    <feComponentTransfer>
-      <feFuncR type="linear" slope=".32" intercept=".34"/>
-      <feFuncG type="linear" slope=".32" intercept=".34"/>
-      <feFuncB type="linear" slope=".32" intercept=".34"/>
-      <feFuncA type="table" tableValues="0 .22"/>
-    </feComponentTransfer>
   </filter>`;
 }
 
@@ -160,40 +245,43 @@ export function renderWorldAtlasSvg(atlas: WorldAtlasDocument): string {
     .join("\n");
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${atlas.widthMiles} ${atlas.heightMiles}" role="img" aria-label="${escapeXml(atlas.title)} satellite terrain map">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${atlas.widthMiles} ${atlas.heightMiles}" role="img" aria-label="${escapeXml(atlas.title)} orthographic satellite map">
   <defs>
     <linearGradient id="ocean" x1="0" x2="0" y1="0" y2="1">
-      <stop offset="0" stop-color="#376c77"/>
-      <stop offset=".42" stop-color="#285866"/>
-      <stop offset="1" stop-color="#173c4b"/>
+      <stop offset="0" stop-color="#0d4160"/>
+      <stop offset=".45" stop-color="#0a3552"/>
+      <stop offset="1" stop-color="#072a43"/>
     </linearGradient>
     <radialGradient id="oceanDepth" cx="48%" cy="40%" r="78%">
-      <stop offset="0" stop-color="#65969a" stop-opacity=".18"/>
-      <stop offset=".55" stop-color="#254f60" stop-opacity=".1"/>
-      <stop offset="1" stop-color="#0e2c3b" stop-opacity=".38"/>
+      <stop offset="0" stop-color="#256e7e" stop-opacity=".19"/>
+      <stop offset=".58" stop-color="#0d4962" stop-opacity=".08"/>
+      <stop offset="1" stop-color="#061e35" stop-opacity=".34"/>
     </radialGradient>
-    <filter id="oceanNoise" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
-      <feTurbulence type="fractalNoise" baseFrequency=".0008 .0018" numOctaves="2" seed="${oceanSeed}" result="oceanRaw"/>
-      <feColorMatrix in="oceanRaw" type="saturate" values="0" result="oceanGray"/>
-      <feGaussianBlur in="oceanGray" stdDeviation="7"/>
+    <filter id="oceanVariation" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency=".00032 .00072" numOctaves="2" seed="${oceanSeed}" result="waterRaw"/>
+      <feColorMatrix in="waterRaw" type="saturate" values="0" result="waterGray"/>
+      <feGaussianBlur in="waterGray" stdDeviation="16"/>
       <feComponentTransfer>
-        <feFuncR type="linear" slope=".22" intercept=".2"/>
-        <feFuncG type="linear" slope=".3" intercept=".25"/>
-        <feFuncB type="linear" slope=".38" intercept=".32"/>
-        <feFuncA type="table" tableValues="0 .18"/>
+        <feFuncR type="linear" slope=".16" intercept=".1"/>
+        <feFuncG type="linear" slope=".22" intercept=".16"/>
+        <feFuncB type="linear" slope=".3" intercept=".24"/>
+        <feFuncA type="table" tableValues="0 .12"/>
       </feComponentTransfer>
     </filter>
     <filter id="biomeBlend" x="-35%" y="-35%" width="170%" height="170%">
-      <feGaussianBlur stdDeviation="145"/>
+      <feGaussianBlur stdDeviation="155"/>
+    </filter>
+    <filter id="urbanBlend" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3.5"/>
     </filter>
     <filter id="ridgeBlur" x="-40%" y="-40%" width="180%" height="180%">
-      <feGaussianBlur stdDeviation="18"/>
+      <feGaussianBlur stdDeviation="22"/>
     </filter>
   </defs>
 
   <rect width="100%" height="100%" fill="url(#ocean)"/>
   <rect width="100%" height="100%" fill="url(#oceanDepth)"/>
-  <rect width="100%" height="100%" filter="url(#oceanNoise)" opacity=".34"/>
+  <rect width="100%" height="100%" filter="url(#oceanVariation)" opacity=".26"/>
   ${land}
 </svg>`;
 }

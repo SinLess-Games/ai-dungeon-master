@@ -74,7 +74,7 @@ const finalReview = {
 };
 
 describe("finalized hybrid campaign atlas", () => {
-  it("lets AI review the finished map before the engine materializes the final atlas", async () => {
+  it("lets AI review a continental-scale finished map before the engine materializes the final atlas", async () => {
     const run = vi
       .fn()
       .mockResolvedValueOnce({ response: JSON.stringify(plan) })
@@ -95,6 +95,15 @@ describe("finalized hybrid campaign atlas", () => {
     expect(stored?.settlementSpacingMultiplier).toBe(1.6);
     expect(stored?.routeDensity).toBe("sparse");
     expect(stored?.findings[0]).toContain("[FINAL_MAP_REVIEW]");
+
+    const primary = [...atlas.landmasses].sort((left, right) => right.radiusX - left.radiusX)[0];
+    expect(primary).toBeDefined();
+    expect(((primary?.radiusX ?? 0) * 2) / atlas.widthMiles).toBeGreaterThanOrEqual(0.55);
+    expect(
+      (atlas.metadata as typeof atlas.metadata & {
+        continentalScale?: { applied?: boolean };
+      }).continentalScale?.applied,
+    ).toBe(true);
 
     for (const port of atlas.places.filter((place) => place.kind === "port")) {
       expect(coastDistanceMiles(port, atlas)).toBeLessThan(0.000001);

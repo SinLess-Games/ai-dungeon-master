@@ -120,7 +120,9 @@ const pathSchema = z.object({
   fromPlaceIndex: z.number().int().nonnegative(),
   toPlaceIndex: z.number().int().nonnegative(),
   distanceMiles: z.number().finite().positive(),
-  points: z.array(pointSchema).min(2).max(24),
+  // Accept short/empty AI path geometry here so a single malformed route does
+  // not reject the entire inhabited world. sanitizeInhabitedPaths() drops it.
+  points: z.array(pointSchema).max(24).default([]),
 });
 const inhabitedSchema = z.object({
   places: z.array(placeSchema).min(12).max(60),
@@ -167,7 +169,9 @@ const finalCorrectionsSchema = z.object({
       z.object({
         pathIndex: z.number().int().nonnegative(),
         distanceMiles: z.number().finite().positive().optional(),
-        points: z.array(pointSchema).min(2).max(24).optional(),
+        // A malformed final-review path correction should be ignored, not make
+        // the entire final review fail validation.
+        points: z.array(pointSchema).max(24).optional(),
       }),
     )
     .max(80)
@@ -323,6 +327,7 @@ function sanitizeInhabitedPaths(value: InhabitedDraft, geometry: GeometryDraft):
     paths: value.paths.filter((path) => {
       if (path.fromPlaceIndex >= value.places.length || path.toPlaceIndex >= value.places.length) return false;
       if (path.fromPlaceIndex === path.toPlaceIndex) return false;
+      if (path.points.length < 2) return false;
       if (path.points.some((point) => !pointInBounds(point, geometry))) return false;
       if (path.kind !== "sea-route") return true;
       const from = value.places[path.fromPlaceIndex];
@@ -347,7 +352,7 @@ function inhabitedPrompt(request: RichCampaignAtlasRequest, geometry: GeometryDr
   return `${campaignContext(request)}\n\nAUTHORITATIVE AI GEOGRAPHY:\n${compactJson(geometry, 30_000)}\n\nCreate the complete inhabited fantasy world AND transportation network in one JSON response:\n{
   "places": [{"landmassIndex":number,"regionIndex":number|null,"name":string,"kind":${JSON.stringify(PLACE_KINDS)},"x":number,"y":number,"importance":0.1..1,"population"?:number,"description":string,"tags":string[]}],
   "paths": [{"kind":${JSON.stringify(PATH_KINDS)},"fromPlaceIndex":number,"toPlaceIndex":number,"distanceMiles":number,"points":[{"x":number,"y":number}]}]
-}\n\nThis is D&D 3.5 fantasy, not modern Earth. Settlements should reflect the campaign's cultures, magic, dangers, politics, exploration structure, and intended scale. Major cities should usually be hundreds of miles apart on a world-scale map; towns and villages should cluster only where geography/economy supports them. Put settlements near rivers, harbors, passes, fertile plains, mines, sacred sites, old roads, magical resources, or defensive terrain as appropriate. Ports MUST be directly on coastlines. Adventure locations should feel intentionally placed in believable wilderness. Roads and trails stay on land and follow valleys, passes, rivers, borders, and settlement hierarchy. Sea routes connect ports only and every intermediate point must stay over water. If there are fewer than TWO places whose kind is exactly \"port\", return ZERO sea-route paths. NEVER use a city, town, village, or other non-port as a sea-route endpoint. When unsure, omit the sea route rather than invent an invalid one. Keep the route network sparse enough to preserve wilderness. Choose all coordinates yourself. Return JSON only.`;
+}\n\nThis is D&D 3.5 fantasy, not modern Earth. Settlements should reflect the campaign's cultures, magic, dangers, politics, exploration structure, and intended scale. Major cities should usually be hundreds of miles apart on a world-scale map; towns and villages should cluster only where geography/economy supports them. Put settlements near rivers, harbors, passes, fertile plains, mines, sacred sites, old roads, magical resources, or defensive terrain as appropriate. Ports MUST be directly on coastlines. Adventure locations should feel intentionally placed in believable wilderness. Roads and trails stay on land and follow valleys, passes, rivers, borders, and settlement hierarchy. Every path must contain at least TWO points. Sea routes connect ports only and every intermediate point must stay over water. If there are fewer than TWO places whose kind is exactly \"port\", return ZERO sea-route paths. NEVER use a city, town, village, or other non-port as a sea-route endpoint. When unsure, omit the route rather than invent invalid path geometry. Keep the route network sparse enough to preserve wilderness. Choose all coordinates yourself. Return JSON only.`;
 }
 
 function finalReviewPrompt(
@@ -361,7 +366,7 @@ function finalReviewPrompt(
  "regionCorrections": [{"regionIndex":number,"center"?:{"x":number,"y":number},"biome"?:${JSON.stringify(BIOMES)}}],
  "placeCorrections": [{"placeIndex":number,"x"?:number,"y"?:number,"regionIndex"?:number|null}],
  "pathCorrections": [{"pathIndex":number,"distanceMiles"?:number,"points"?:[{"x":number,"y":number}]}]
-}\nOnly return corrections that materially improve the final world. Preserve the campaign's fantasy identity. Return JSON only.`;
+}\nOnly return corrections that materially improve the final world. Any path correction with points must contain at least TWO points; otherwise omit the points field. Preserve the campaign's fantasy identity. Return JSON only.`;
 }
 
 function applyFinalCorrections(
@@ -406,7 +411,7 @@ function applyFinalCorrections(
         ? {
             ...path,
             ...(correction.distanceMiles === undefined ? {} : { distanceMiles: correction.distanceMiles }),
-            ...(correction.points ? { points: correction.points } : {}),
+            ...(correction.points && correction.points.length >= 2 ? { points: correction.points } : {}),
           }
         : path;
     }),

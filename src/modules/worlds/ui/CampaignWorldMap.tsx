@@ -10,13 +10,17 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  useCallback,
   useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
   type WheelEvent as ReactWheelEvent,
 } from "react";
-import { getCampaignWorldAtlas } from "../client/worldAtlasApi";
+import {
+  getCampaignWorldAtlas,
+  getCampaignWorldState,
+} from "../client/worldAtlasApi";
 import type {
   AtlasBiome,
   AtlasPath,
@@ -25,6 +29,7 @@ import type {
   AtlasPoint,
   WorldAtlasDocument,
 } from "../domain/atlas";
+import { CampaignWorldControls } from "./CampaignWorldControls";
 
 interface ViewBox {
   x: number;
@@ -240,6 +245,12 @@ function InteractiveAtlas({
   response: Awaited<ReturnType<typeof getCampaignWorldAtlas>>;
 }) {
   const atlas = response.atlas;
+  const stateQuery = useQuery({
+    queryKey: ["campaigns", "play", campaignId, "world-state"],
+    queryFn: () => getCampaignWorldState(campaignId),
+    staleTime: 15_000,
+  });
+  const worldState = stateQuery.data ?? null;
   const svg = useRef<SVGSVGElement>(null);
   const drag = useRef<{ x: number; y: number; view: ViewBox } | null>(null);
   const [view, setView] = useState<ViewBox>(() => fullView(atlas));
@@ -248,23 +259,62 @@ function InteractiveAtlas({
   const [showPlaces, setShowPlaces] = useState(true);
   const [showLabels, setShowLabels] = useState(true);
   const [showLegend, setShowLegend] = useState(true);
+  const [gmFogPreview, setGmFogPreview] = useState(false);
   const [search, setSearch] = useState("");
+  const [previewPathIds, setPreviewPathIds] = useState<readonly string[]>([]);
+  const onTravelPreview = useCallback((pathIds: readonly string[]) => {
+    setPreviewPathIds([...pathIds]);
+  }, []);
 
-  const selectedPlace = useMemo(
-    () => atlas.places.find((place) => place.id === selectedPlaceId) ?? null,
-    [atlas.places, selectedPlaceId],
+  const canEdit = worldState?.canEdit ?? false;
+  const fogEnabled = Boolean(worldState) && (!canEdit || gmFogPreview);
+  const discoveredPlaceIds = useMemo(
+    () => new Set(worldState?.discovery.placeIds ?? []),
+    [worldState?.discovery.placeIds],
   );
+  const discoveredPathIds = useMemo(
+    () => new Set(worldState?.discovery.pathIds ?? []),
+    [worldState?.discovery.pathIds],
+  );
+  const discoveredRegionIds = useMemo(
+    () => new Set(worldState?.discovery.regionIds ?? []),
+    [worldState?.discovery.regionIds],
+  );
+
+  const selectedPlace = useMemo(() => {
+    const place = atlas.places.find((entry) => entry.id === selectedPlaceId) ?? null;
+    if (!place) return null;
+    if (fogEnabled && !discoveredPlaceIds.has(place.id)) return null;
+    return place;
+  }, [atlas.places, discoveredPlaceIds, fogEnabled, selectedPlaceId]);
+
   const threshold = visibleImportance(atlas, view);
   const visiblePlaces = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return atlas.places.filter(
-      (place) =>
-        place.importance >= threshold ||
-        (term.length >= 2 &&
-          (place.name.toLowerCase().includes(term) ||
-            PLACE_LABELS[place.kind].toLowerCase().includes(term))),
-    );
-  }, [atlas.places, search, threshold]);
+    return atlas.places.filter((place) => {
+      if (fogEnabled && !discoveredPlaceIds.has(place.id)) return false;
+      if (term.length >= 2) {
+        return (
+          place.name.toLowerCase().includes(term) ||
+          PLACE_LABELS[place.kind].toLowerCase().includes(term)
+        );
+      }
+      return place.importance >= threshold || discoveredPlaceIds.has(place.id);
+    });
+  }, [atlas.places, discoveredPlaceIds, fogEnabled, search, threshold]);
+
+  const visiblePaths = useMemo(
+    () => atlas.paths.filter((path) => !fogEnabled || discoveredPathIds.has(path.id)),
+    [atlas.paths, discoveredPathIds, fogEnabled],
+  );
+  const visibleRegions = useMemo(
+    () => atlas.regions.filter((region) => !fogEnabled || discoveredRegionIds.has(region.id)),
+    [atlas.regions, discoveredRegionIds, fogEnabled],
+  );
+  const previewPaths = useMemo(
+    () => atlas.paths.filter((path) => previewPathIds.includes(path.id)),
+    [atlas.paths, previewPathIds],
+  );
 
   function wheel(event: ReactWheelEvent<SVGSVGElement>) {
     event.preventDefault();
@@ -316,6 +366,7 @@ function InteractiveAtlas({
   const scaleMiles = niceScale(view.width);
   const scalePercent = clamp((scaleMiles / view.width) * 100, 8, 40);
   const zoom = atlas.widthMiles / view.width;
+  const mapCenter = { x: view.x + view.width / 2, y: view.y + view.height / 2 };
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#111612] text-[#e8dcb7]">
@@ -332,18 +383,26 @@ function InteractiveAtlas({
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Find a place…"
-              className="w-52 rounded-lg border border-[#6d5638]/70 bg-[#211f18] py-2 pl-8 pr-3 text-sm text-[#efe3c3] outline-none placeholder:text-[#82765f] focus:border-[#bd9353]"
+              placeholder={fogEnabled ? "Search discovered places…" : "Find a place…"}
+              className="w-56 rounded-lg border border-[#6d5638]/70 bg-[#211f18] py-2 pl-8 pr-3 text-sm text-[#efe3c3] outline-none placeholder:text-[#82765f] focus:border-[#bd9353]"
             />
           </div>
-          <span className="rounded-full border border-[#7a613f]/70 bg-[#2a2419] px-2.5 py-1 text-[11px] font-semibold text-[#cbb688]">
-            {response.asset.status === "ready" ? "Rendered atlas ready" : "Painting atlas…"}
-          </span>
+          {worldState ? (
+            <span className="rounded-full border border-[#7a613f]/70 bg-[#2a2419] px-2.5 py-1 text-[11px] font-semibold text-[#cbb688]">
+              {worldState.state.weather.replaceAll("-", " ")} · {worldState.discovery.placeIds.length} places known
+            </span>
+          ) : null}
           <span className="rounded-full border border-[#7a613f]/70 px-2.5 py-1 text-[11px] text-[#a99a7d]">
             {Math.round(zoom * 100)}% atlas zoom
           </span>
         </div>
       </div>
+
+      {stateQuery.error ? (
+        <div className="border-b border-[#8a663d]/50 bg-[#3b2b1b] px-4 py-2 text-xs text-[#e7cca0]">
+          Map viewing still works, but world-builder/travel state is unavailable: {errorMessage(stateQuery.error)}
+        </div>
+      ) : null}
 
       <div className="relative min-h-[620px] flex-1 overflow-hidden bg-[#6c9297]">
         <svg
@@ -380,12 +439,7 @@ function InteractiveAtlas({
           </defs>
 
           <rect width={atlas.widthMiles} height={atlas.heightMiles} fill={`url(#ocean-${campaignId})`} />
-          <rect
-            width={atlas.widthMiles}
-            height={atlas.heightMiles}
-            filter={`url(#paper-${campaignId})`}
-            opacity=".7"
-          />
+          <rect width={atlas.widthMiles} height={atlas.heightMiles} filter={`url(#paper-${campaignId})`} opacity=".7" />
 
           {atlas.landmasses.map((landmass) => (
             <g key={landmass.id} filter={`url(#coast-${campaignId})`}>
@@ -406,20 +460,20 @@ function InteractiveAtlas({
             </g>
           ))}
 
-          {atlas.regions.map((region) => (
-            <g key={region.id} opacity=".26">
-              <ellipse
-                cx={region.center.x}
-                cy={region.center.y}
-                rx={Math.max(160, atlas.widthMiles * 0.018)}
-                ry={Math.max(120, atlas.heightMiles * 0.02)}
-                fill={BIOME_COLORS[region.biome]}
-              />
-            </g>
+          {visibleRegions.map((region) => (
+            <ellipse
+              key={region.id}
+              cx={region.center.x}
+              cy={region.center.y}
+              rx={Math.max(160, atlas.widthMiles * 0.018)}
+              ry={Math.max(120, atlas.heightMiles * 0.02)}
+              fill={BIOME_COLORS[region.biome]}
+              opacity=".26"
+            />
           ))}
 
           {showRoads
-            ? atlas.paths.map((path) => {
+            ? visiblePaths.map((path) => {
                 const style = pathStroke(path);
                 return (
                   <polyline
@@ -437,6 +491,20 @@ function InteractiveAtlas({
                 );
               })
             : null}
+
+          {previewPaths.map((path) => (
+            <polyline
+              key={`preview:${path.id}`}
+              points={svgPoints(path.points)}
+              fill="none"
+              stroke="#f2cf75"
+              strokeWidth={12}
+              opacity=".95"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
 
           {atlas.rivers.map((river) => (
             <polyline
@@ -467,11 +535,11 @@ function InteractiveAtlas({
           )}
 
           {showLabels && zoom >= 1.45
-            ? atlas.regions
+            ? visibleRegions
                 .filter((region) => region.importance >= (zoom > 3 ? 0.55 : 0.76))
                 .map((region) => (
                   <text
-                    key={region.id}
+                    key={`label:${region.id}`}
                     x={region.center.x}
                     y={region.center.y}
                     textAnchor="middle"
@@ -494,7 +562,9 @@ function InteractiveAtlas({
           {showPlaces
             ? visiblePlaces.map((place) => {
                 const selected = selectedPlaceId === place.id;
-                const size = clamp(30 + place.importance * 42, 34, 76) / Math.sqrt(Math.max(1, zoom * 0.45));
+                const size =
+                  clamp(30 + place.importance * 42, 34, 76) /
+                  Math.sqrt(Math.max(1, zoom * 0.45));
                 return (
                   <g
                     key={place.id}
@@ -514,7 +584,13 @@ function InteractiveAtlas({
                     className="cursor-pointer"
                   >
                     {selected ? (
-                      <circle r={size * 0.72} fill="none" stroke="#f0ce78" strokeWidth="5" vectorEffect="non-scaling-stroke" />
+                      <circle
+                        r={size * 0.72}
+                        fill="none"
+                        stroke="#f0ce78"
+                        strokeWidth="5"
+                        vectorEffect="non-scaling-stroke"
+                      />
                     ) : null}
                     <text
                       textAnchor="middle"
@@ -547,7 +623,41 @@ function InteractiveAtlas({
                 );
               })
             : null}
+
+          {worldState ? (
+            <g
+              transform={`translate(${worldState.state.currentX} ${worldState.state.currentY})`}
+              aria-label="Current party position"
+            >
+              <circle
+                r={42 / Math.sqrt(Math.max(1, zoom * 0.4))}
+                fill="#f0cf72"
+                stroke="#2d2018"
+                strokeWidth="6"
+                vectorEffect="non-scaling-stroke"
+              />
+              <text
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={32 / Math.sqrt(Math.max(1, zoom * 0.4))}
+                fill="#2d2018"
+              >
+                ◆
+              </text>
+            </g>
+          ) : null}
         </svg>
+
+        <CampaignWorldControls
+          campaignId={campaignId}
+          atlas={atlas}
+          revision={response.revision}
+          selectedPlace={selectedPlace}
+          mapCenter={mapCenter}
+          worldState={worldState}
+          onSelectPlace={setSelectedPlaceId}
+          onTravelPreview={onTravelPreview}
+        />
 
         <div className="pointer-events-none absolute left-4 top-4 rounded-xl border border-[#71573b]/70 bg-[#eadcaf]/90 p-3 text-[#3a2a20] shadow-2xl backdrop-blur-sm">
           <div className="relative grid h-24 w-24 place-items-center">
@@ -563,7 +673,7 @@ function InteractiveAtlas({
           </div>
         </div>
 
-        <div className="absolute right-4 top-4 flex flex-col gap-2">
+        <div className="absolute right-4 top-4 z-30 flex flex-col gap-2">
           <button
             type="button"
             onClick={() => zoomButton(0.78)}
@@ -604,7 +714,7 @@ function InteractiveAtlas({
           </div>
         </div>
 
-        <div className="absolute bottom-4 right-4 flex max-h-[55%] flex-col gap-2">
+        <div className="absolute bottom-4 right-4 z-20 flex max-h-[55%] flex-col gap-2">
           <div className="flex justify-end">
             <button
               type="button"
@@ -618,7 +728,9 @@ function InteractiveAtlas({
             <div className="w-64 overflow-y-auto rounded-xl border border-[#71573b]/70 bg-[#eadcaf]/94 p-4 text-[#3a2a20] shadow-2xl backdrop-blur-sm">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="font-display text-lg font-bold">Legend</h3>
-                <span className="text-[10px] uppercase tracking-wider opacity-60">{atlas.legend.length} marks</span>
+                <span className="text-[10px] uppercase tracking-wider opacity-60">
+                  {atlas.legend.length} marks
+                </span>
               </div>
               <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2">
                 {atlas.legend.map((entry) => (
@@ -635,16 +747,38 @@ function InteractiveAtlas({
               <div className="mt-4 border-t border-[#765d3d]/30 pt-3 text-[11px]">
                 <label className="flex items-center justify-between gap-2 py-1">
                   <span>Roads & routes</span>
-                  <input type="checkbox" checked={showRoads} onChange={(event) => setShowRoads(event.target.checked)} />
+                  <input
+                    type="checkbox"
+                    checked={showRoads}
+                    onChange={(event) => setShowRoads(event.target.checked)}
+                  />
                 </label>
                 <label className="flex items-center justify-between gap-2 py-1">
                   <span>Places</span>
-                  <input type="checkbox" checked={showPlaces} onChange={(event) => setShowPlaces(event.target.checked)} />
+                  <input
+                    type="checkbox"
+                    checked={showPlaces}
+                    onChange={(event) => setShowPlaces(event.target.checked)}
+                  />
                 </label>
                 <label className="flex items-center justify-between gap-2 py-1">
                   <span>Labels</span>
-                  <input type="checkbox" checked={showLabels} onChange={(event) => setShowLabels(event.target.checked)} />
+                  <input
+                    type="checkbox"
+                    checked={showLabels}
+                    onChange={(event) => setShowLabels(event.target.checked)}
+                  />
                 </label>
+                {canEdit && worldState ? (
+                  <label className="flex items-center justify-between gap-2 py-1">
+                    <span>Preview player fog</span>
+                    <input
+                      type="checkbox"
+                      checked={gmFogPreview}
+                      onChange={(event) => setGmFogPreview(event.target.checked)}
+                    />
+                  </label>
+                ) : null}
               </div>
             </div>
           ) : null}
@@ -676,7 +810,10 @@ function InteractiveAtlas({
             ) : null}
             <div className="mt-3 flex flex-wrap gap-1.5">
               {selectedPlace.tags.map((tag) => (
-                <span key={tag} className="rounded-full border border-[#71583a] px-2 py-0.5 text-[10px] text-[#cdb98b]">
+                <span
+                  key={tag}
+                  className="rounded-full border border-[#71583a] px-2 py-0.5 text-[10px] text-[#cdb98b]"
+                >
                   {tag.replaceAll("-", " ")}
                 </span>
               ))}

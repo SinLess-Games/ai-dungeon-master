@@ -310,7 +310,9 @@ async function encodeControlPng(rgb: Uint8Array): Promise<Blob> {
     pngChunk("IDAT", compressed),
     pngChunk("IEND", new Uint8Array()),
   ]);
-  return new Blob([png], { type: "image/png" });
+  const pngBuffer = new ArrayBuffer(png.byteLength);
+  new Uint8Array(pngBuffer).set(png);
+  return new Blob([pngBuffer], { type: "image/png" });
 }
 
 function outputDimensions(atlas: WorldAtlasDocument): { width: number; height: number } {

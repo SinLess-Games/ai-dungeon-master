@@ -66,3 +66,12 @@ CREATE TABLE `campaign_travel_events` (
 );
 --> statement-breakpoint
 CREATE INDEX `campaign_travel_events_campaign_created_idx` ON `campaign_travel_events` (`campaign_id`, `created_at`);
+--> statement-breakpoint
+CREATE TRIGGER `campaign_travel_events_advance_world_time`
+AFTER INSERT ON `campaign_travel_events`
+BEGIN
+  UPDATE `campaigns`
+  SET `world_time` = `world_time` + NEW.`elapsed_clock_minutes`,
+      `updated_at` = unixepoch()
+  WHERE `id` = NEW.`campaign_id`;
+END;

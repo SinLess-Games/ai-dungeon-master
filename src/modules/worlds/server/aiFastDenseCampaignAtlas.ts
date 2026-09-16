@@ -56,7 +56,7 @@ const SHARD_TARGET = 22;
 const MAX_CONCURRENT_SHARDS = 8;
 const MAX_ROUNDS = 4;
 const FINAL_BACKFILL_ATTEMPTS = 4;
-const FINAL_BACKFILL_CONCURRENCY = 4;
+const FINAL_BACKFILL_CONCURRENCY = 8;
 
 function extractJsonObject(value: string): string {
   const trimmed = value.trim();
@@ -401,9 +401,9 @@ async function runFinalBackfill(input: {
     const missing = MINIMUM_ACCEPTABLE_LOCATIONS - existingPlaces.length;
     const jobCount = Math.min(
       FINAL_BACKFILL_CONCURRENCY,
-      Math.max(2, Math.ceil((missing * 1.8) / 14)),
+      Math.max(4, Math.ceil(missing / 4)),
     );
-    const desired = Math.min(24, Math.max(14, Math.ceil(missing / jobCount) + 8));
+    const desired = Math.min(24, Math.max(16, Math.ceil(missing / jobCount) + 12));
     const nameSnapshot = [...input.usedNames];
     const assignedRegions = assignRegionsForJobs({
       regions: input.base.regions,
@@ -439,7 +439,7 @@ async function runFinalBackfill(input: {
         usedNames: input.usedNames,
         nextNumber: input.base.places.length + input.additions.length + 1,
         existingPlaces: [...input.base.places, ...input.additions],
-        spacingFactor: Math.max(0.72, 0.92 - attempt * 0.06),
+        spacingFactor: Math.max(0.4, 0.82 - attempt * 0.14),
       });
       input.additions.push(...accepted);
       if (input.base.places.length + input.additions.length >= MINIMUM_ACCEPTABLE_LOCATIONS) break;

@@ -3,9 +3,9 @@ import type { WorldAtlasDocument } from "../domain/atlas";
 import type { CampaignAtlasRequest } from "../domain/campaignAtlas";
 import {
   AI_ONLY_CAMPAIGN_ATLAS_GENERATOR_VERSION,
-  generateAICampaignWorldAtlasV2,
   type RichCampaignAtlasRequest,
 } from "./aiOnlyCampaignAtlasV2";
+import { generateDenseAICampaignWorldAtlas } from "./aiDenseCampaignAtlas";
 import {
   storedAIPlan,
   storedAIRealismAudit,
@@ -27,7 +27,7 @@ export async function generateHybridCampaignWorldAtlas(input: {
   existingPlan?: CampaignWorldAIPlan | null;
   existingAudit?: CampaignWorldRealismAudit | null;
 }): Promise<WorldAtlasDocument> {
-  return generateAICampaignWorldAtlasV2({
+  return generateDenseAICampaignWorldAtlas({
     env: input.env,
     request: input.request as RichCampaignAtlasRequest,
   });

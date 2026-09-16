@@ -4,6 +4,7 @@ import { zValidator } from "@hono/zod-validator";
 import { and, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
+import type { OpenAICompatibleEnv } from "@/infrastructure/ai/openaiCompatible";
 import { createDatabase } from "@/infrastructure/database/client";
 import { campaignMemberships, campaigns, worldMaps } from "@/infrastructure/database/schema";
 import { createAuth, type AuthEnv } from "@/modules/auth/server/auth";
@@ -19,7 +20,6 @@ import {
   isWorldAtlasDocument,
   type WorldAtlasDocument,
 } from "../domain/atlas";
-import { generateStrictRealisticCampaignWorldAtlas } from "../domain/strictRealisticCampaignAtlas";
 import {
   createInitialExplorationState,
   explorationState,
@@ -27,13 +27,17 @@ import {
   withExplorationState,
 } from "../domain/worldBuilder";
 import {
+  generateHybridCampaignWorldAtlas,
+  storedAIPlan,
+} from "./hybridCampaignAtlas";
+import {
   enqueueWorldAtlasBuild,
   getWorldAtlasManifest,
   type WorldAtlasJob,
 } from "./worldAtlasJobs";
 import { worldBuilderRoutes } from "./worldBuilderRoutes";
 
-interface Bindings extends AuthEnv {
+interface Bindings extends AuthEnv, OpenAICompatibleEnv {
   DB?: D1Database;
   R2_BUCKET?: R2Bucket;
   RUNTIME_CACHE?: KVNamespace;
@@ -191,14 +195,18 @@ export const worldAtlasRoutes = new Hono<Env>()
         body.seedMode === "same"
           ? atlas.seed
           : `${atlas.seed}:gm:${crypto.randomUUID()}`;
-      const generated = generateStrictRealisticCampaignWorldAtlas({
-        campaign: {
-          name: access.campaign.name,
-          description: access.campaign.description,
-          settings: access.campaign.settings,
+      const generated = await generateHybridCampaignWorldAtlas({
+        env: c.env,
+        request: {
+          campaign: {
+            name: access.campaign.name,
+            description: access.campaign.description,
+            settings: access.campaign.settings,
+          },
+          seed,
+          generatedAt: new Date().toISOString(),
         },
-        seed,
-        generatedAt: new Date().toISOString(),
+        existingPlan: body.seedMode === "same" ? storedAIPlan(atlas) : null,
       });
       const next = withExplorationState(generated, createInitialExplorationState(generated));
       const revision = await persistAtlas({

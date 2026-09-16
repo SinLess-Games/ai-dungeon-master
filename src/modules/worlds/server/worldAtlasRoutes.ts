@@ -30,7 +30,7 @@ import {
   generateHybridCampaignWorldAtlas,
   storedAIPlan,
   storedAIRealismAudit,
-} from "./hybridCampaignAtlas";
+} from "./finalizedHybridCampaignAtlas";
 import {
   enqueueWorldAtlasBuild,
   getWorldAtlasManifest,

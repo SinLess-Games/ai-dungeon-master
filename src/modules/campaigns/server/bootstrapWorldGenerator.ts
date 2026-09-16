@@ -5,24 +5,8 @@ import {
   worldMaps,
   type WorldMapData,
 } from "@/infrastructure/database/schema";
-import { generateWorldAtlas, WORLD_ATLAS_GENERATOR_VERSION } from "@/modules/worlds/domain/atlas";
+import { generateCampaignWorldAtlas } from "@/modules/worlds/domain/campaignAtlas";
 import type { WorldGenerator } from "./startCampaign";
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
-
-function optionalString(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value : null;
-}
-
-function stringArray(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.filter((entry): entry is string => typeof entry === "string" && Boolean(entry.trim()))
-    : [];
-}
 
 function missingWorldMapTable(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
@@ -48,6 +32,7 @@ export class BootstrapWorldGenerator implements WorldGenerator {
     const campaign = await this.db
       .select({
         name: campaigns.name,
+        description: campaigns.description,
         ownerUserId: campaigns.ownerUserId,
         settings: campaigns.settings,
       })
@@ -57,39 +42,13 @@ export class BootstrapWorldGenerator implements WorldGenerator {
 
     if (!campaign) throw new Error("Campaign disappeared during world generation.");
 
-    const settings = asRecord(campaign.settings);
-    const rulesetSettings = asRecord(settings["ruleset"]);
-    const worldSettings = asRecord(settings["world"]);
-    const rulesSettings = asRecord(settings["rules"]);
-    const styleIds =
-      stringArray(settings["genres"]).length > 0
-        ? stringArray(settings["genres"])
-        : stringArray(rulesetSettings["campaignStyleIds"]);
-    const templateId =
-      optionalString(worldSettings["templateId"]) ??
-      optionalString(rulesetSettings["worldTemplateId"]);
-    const pace = optionalString(settings["pace"]) ?? optionalString(rulesetSettings["pace"]);
-    const multiPlanar =
-      typeof worldSettings["multiPlanar"] === "boolean"
-        ? worldSettings["multiPlanar"]
-        : rulesetSettings["multiPlanar"] === true;
-    const epic =
-      typeof rulesSettings["epicLevels"] === "boolean"
-        ? rulesSettings["epicLevels"]
-        : rulesetSettings["epicLevels"] === true;
-    const structure = optionalString(settings["structure"]);
-    const scale = optionalString(settings["scale"]);
-
-    const atlas = generateWorldAtlas({
+    const atlas = generateCampaignWorldAtlas({
+      campaign: {
+        name: campaign.name,
+        description: campaign.description,
+        settings: campaign.settings,
+      },
       seed: input.generationSeed,
-      title: `${campaign.name} World`,
-      templateId,
-      styleIds,
-      structure,
-      scale,
-      pace,
-      multiPlanar,
-      epic,
     });
     const mapId = `world-atlas-${input.worldId}`;
     let atlasPersisted = false;
@@ -114,14 +73,18 @@ export class BootstrapWorldGenerator implements WorldGenerator {
 
     return {
       name: `${campaign.name} World`,
-      generatorVersion: WORLD_ATLAS_GENERATOR_VERSION,
+      generatorVersion: atlas.generatorVersion,
       settings: {
         generation: {
-          ...(templateId ? { templateId } : {}),
-          ...(styleIds.length ? { styleIds } : {}),
-          ...(pace ? { pace } : {}),
-          multiPlanar,
-          epic,
+          ...(atlas.campaignDecisions.templateId
+            ? { templateId: atlas.campaignDecisions.templateId }
+            : {}),
+          ...(atlas.campaignDecisions.styleIds.length
+            ? { styleIds: atlas.campaignDecisions.styleIds }
+            : {}),
+          ...(atlas.campaignDecisions.pace ? { pace: atlas.campaignDecisions.pace } : {}),
+          multiPlanar: atlas.campaignDecisions.multiPlanar,
+          epic: atlas.campaignDecisions.epic,
         },
         extensions: {
           campaignId: input.campaignId,

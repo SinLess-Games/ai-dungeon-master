@@ -33,6 +33,7 @@ export default defineConfig({
   },
 
   build: {
+    outDir: "dist/web",
     sourcemap: true,
   },
 });

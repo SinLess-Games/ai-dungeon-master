@@ -21,6 +21,7 @@ export default tseslint.config(
       "old/**",
 
       "android/**",
+      "ios/**",
       "src-tauri/**",
 
       "src/routeTree.gen.ts",

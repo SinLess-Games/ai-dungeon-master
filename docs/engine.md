@@ -127,7 +127,7 @@ Engine work must pass:
 npm run typecheck
 npm run lint
 npm run test:unit
-npm run build
+npm run build:web
 ```
 
 The dedicated GitHub Actions workflow `.github/workflows/engine-ci.yml` runs the same validation for engine changes.

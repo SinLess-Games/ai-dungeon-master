@@ -317,7 +317,7 @@ Changes under `src/engine/**` or `src/rulesets/**` are covered by the Rules Engi
 npm run typecheck
 npm run lint
 npm run test:unit
-npm run build
+npm run build:web
 ```
 
 Do not merge engine/ruleset work while any of those checks are failing.

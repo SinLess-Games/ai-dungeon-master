@@ -36,6 +36,6 @@ Public pages set descriptive titles and metadata using React 19. The application
 - Fresh local databases: `npm run db:migrate:local`, then `npm run dev`.
 - This workspace's existing local database has a legacy campaigns table that conflicts with the older campaign migration. The new additive devblog migration was applied directly and recorded in the local migration ledger; legacy campaigns were preserved. Do not mark that unrelated campaign migration applied without converting its data.
 - Deployment: apply pending migrations to the target D1 and ensure its existing R2 binding is available before publishing the Worker. No remote migration or deployment was performed for this task.
-- `npm run build`: bundle and strict TypeScript checks.
+- `npm run build:web`: bundle and strict TypeScript checks.
 - `npm run test:unit`: includes slug/content validation and secure Markdown rendering tests.
 - `npm run test:devblog`: disposable local D1/R2 plus a real browser. Covers drafts, preview, R2 upload, cover/inline images, publishing, slug conflicts, concurrent edits, public access, anonymous/member comments, moderation, throttling, archival, authorization, and mobile overflow. Requires installed Playwright Chromium; `PLAYWRIGHT_BROWSERS_PATH` can select the browser cache.

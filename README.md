@@ -1903,9 +1903,15 @@ seeded databases, see [content seeding](docs/content-seeding.md).
 
 ### Build, preview and deploy
 
+`npm run build` builds web, Android, and the current desktop platform (plus iOS
+on macOS). Outputs live under `dist/web`, `dist/android`, `dist/mac`,
+`dist/windows`, `dist/linux`, and `dist/ios` as supported by the host. See
+[local platform builds](docs/building.md) for prerequisites, signing details, and
+individual target commands.
+
 \`\`\`bash
 
-npm run build
+npm run build:web
 
 npm run preview
 
@@ -1925,7 +1931,7 @@ npm run deploy       # build and publish the Worker plus its static assets
 
 \`\`\`
 
-The Cloudflare Vite plugin writes the deployment configuration under \`dist/\` and
+The Cloudflare Vite plugin writes the deployment configuration under \`dist/web/\` and
 
 \`.wrangler/deploy/\`; Wrangler discovers it automatically. Source configuration
 

@@ -4,6 +4,7 @@ import { zValidator } from "@hono/zod-validator";
 import { and, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
+import type { OpenAICompatibleEnv } from "@/infrastructure/ai/openaiCompatible";
 import { createDatabase } from "@/infrastructure/database/client";
 import {
   campaignMemberships,
@@ -39,7 +40,7 @@ import { BootstrapWorldGenerator } from "./bootstrapWorldGenerator";
 import { D1CampaignStartRepository } from "./d1StartRepository";
 import { startCampaign } from "./startCampaign";
 
-interface CampaignBindings extends AuthEnv {
+interface CampaignBindings extends AuthEnv, OpenAICompatibleEnv {
   DB?: D1Database;
 }
 
@@ -600,7 +601,7 @@ export const campaignRoutes = new Hono<CampaignEnv>()
       campaignId: c.req.param("campaignId"),
       requestingUserId: session.user.id,
       repository: new D1CampaignStartRepository(db),
-      worldGenerator: new BootstrapWorldGenerator(db),
+      worldGenerator: new BootstrapWorldGenerator(db, c.env),
     });
     if (!result.ok) throwStartFailure(result.errors);
     return c.json(result.value);

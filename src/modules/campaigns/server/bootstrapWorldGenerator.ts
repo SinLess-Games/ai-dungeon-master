@@ -6,7 +6,7 @@ import {
   worldMaps,
   type WorldMapData,
 } from "@/infrastructure/database/schema";
-import { generateStableDenseAICampaignWorldAtlas } from "@/modules/worlds/server/aiDenseCampaignAtlasStable";
+import { generateFastDenseAICampaignWorldAtlas } from "@/modules/worlds/server/aiFastDenseCampaignAtlas";
 import type { WorldGenerator } from "./startCampaign";
 
 function missingWorldMapTable(error: unknown): boolean {
@@ -37,7 +37,7 @@ export class BootstrapWorldGenerator implements WorldGenerator {
 
     if (!campaign) throw new Error("Campaign disappeared during world generation.");
 
-    const atlas = await generateStableDenseAICampaignWorldAtlas({
+    const atlas = await generateFastDenseAICampaignWorldAtlas({
       env: this.aiEnv,
       request: {
         campaign: {

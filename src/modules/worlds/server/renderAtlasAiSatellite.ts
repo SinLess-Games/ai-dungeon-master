@@ -7,7 +7,7 @@ import type {
   WorldAtlasDocument,
 } from "../domain/atlas";
 
-export const WORLD_ATLAS_RENDERER_VERSION = "ai-satellite-v1-flux2-dev";
+export const WORLD_ATLAS_RENDERER_VERSION = "ai-satellite-v2-fast-progressive";
 export const DEFAULT_ATLAS_IMAGE_MODEL = "@cf/black-forest-labs/flux-2-dev";
 
 const CONTROL_SIZE = 512;
@@ -317,8 +317,8 @@ async function encodeControlPng(rgb: Uint8Array): Promise<Blob> {
 
 function outputDimensions(atlas: WorldAtlasDocument): { width: number; height: number } {
   const aspect = atlas.widthMiles / Math.max(1, atlas.heightMiles);
-  const maximum = 1536;
-  const minimum = 768;
+  const maximum = 1280;
+  const minimum = 704;
   const round64 = (value: number) => Math.max(256, Math.round(value / 64) * 64);
   if (aspect >= 1) {
     return { width: maximum, height: clamp(round64(maximum / aspect), minimum, maximum) };
@@ -333,16 +333,17 @@ function satellitePrompt(atlas: WorldAtlasDocument): string {
     return counts;
   }, {});
   return [
-    "Transform image 0 into a highly realistic cloud-free orbital satellite photograph of a fictional inhabited fantasy world.",
-    "IMAGE 0 IS THE AUTHORITATIVE GEOGRAPHIC CONTROL MAP. Preserve its coastline shapes, island/continent positions, water-vs-land boundaries, mountain corridors, rivers, settlement centers, and transport corridors as closely as possible.",
-    "Camera: perfectly straight-down orthographic nadir view, high altitude Earth-observation satellite, no perspective, no horizon, no clouds, daytime natural sunlight.",
-    "Visual target: modern Google Earth / commercial satellite imagery, photorealistic remote-sensing colors and land cover, not an illustrated map, not painterly, not a fantasy parchment map.",
-    "Render dense forests as irregular dark-green canopy, grasslands as natural muted green, farmland as believable patchwork around population centers, deserts as tan mineral terrain, wetlands as dark green-brown mosaics, highlands and mountain ranges with realistic relief shadows and exposed rock.",
-    "Cities and towns should appear as physically believable gray/tan built-up footprints with branching street texture and surrounding agricultural land; major cities larger than towns and villages. Ports must visibly touch the coastline with harbor development.",
-    "Roads should appear as subtle realistic corridors connecting inhabited areas. Rivers must remain in their supplied corridors and flow through natural valleys. Sea routes are conceptual only: DO NOT draw dashed lines or shipping-lane graphics in the satellite image.",
+    "Transform image 0 into a highly realistic cloud-free orbital satellite photograph of a persistent Dungeons & Dragons 3.5 FANTASY WORLD.",
+    "IMAGE 0 IS THE AUTHORITATIVE AI-GENERATED GEOGRAPHIC CONTROL MAP. Preserve its continent/coastline shapes, water-vs-land boundaries, mountain corridors, rivers, settlement centers, and transport corridors as closely as possible.",
+    "Camera: perfectly straight-down orthographic nadir view, high-altitude Earth-observation satellite, no perspective, no horizon, no clouds, daytime natural sunlight.",
+    "Visual target: modern Google Earth / commercial satellite imagery applied to a believable medieval-fantasy world. It must be photorealistic remote-sensing imagery, not an illustrated map, not painterly, not parchment, and not a modern-world map.",
+    "Render dense forests as irregular dark-green canopy, grasslands as natural muted green, farmland as believable pre-industrial patchwork around settlements, deserts as tan mineral terrain, wetlands as dark green-brown mosaics, and highlands/mountain ranges with realistic relief shadows and exposed rock.",
+    "Cities and towns should appear as believable medieval-fantasy built-up footprints: dense old street fabrics, stone walls where appropriate, castles, temples, docks, farms, and roads rather than highways, suburbs, skyscrapers, airports, power grids, or modern industrial zones. Ports must visibly touch the coastline with harbor development.",
+    "Fantasy elements implied by the atlas—enchanted terrain, ancient ruins, magical scars, planar sites, cursed regions, monumental keeps or temples—should be visible when plausible from altitude, but should still look physically integrated into the landscape.",
+    "Roads should appear as subtle old corridors connecting inhabited areas. Rivers must remain in their supplied corridors and flow through natural valleys. Sea routes are conceptual only: DO NOT draw dashed lines or shipping-lane graphics in the satellite image.",
     "Ocean should be deep navy offshore with realistic turquoise/teal shallow coastal water and shelf variation. Coastlines should look naturally eroded while retaining the control-map geometry.",
     "Do not add labels, text, icons, borders, compass roses, legends, markers, dashed map lines, UI, frames, decorative cartography, or clouds.",
-    `World title: ${atlas.title}. Dominant biomes: ${biomeList.join(", ")}. Settlement inventory: ${JSON.stringify(settlementCounts)}.`,
+    `World title: ${atlas.title}. Campaign decisions: ${JSON.stringify(atlas.campaignDecisions)}. Dominant biomes: ${biomeList.join(", ")}. Settlement inventory: ${JSON.stringify(settlementCounts)}.`,
   ].join("\n");
 }
 
@@ -404,8 +405,8 @@ export async function renderWorldAtlasWithAI(
   form.append("prompt", satellitePrompt(atlas));
   form.append("width", String(dimensions.width));
   form.append("height", String(dimensions.height));
-  form.append("steps", "28");
-  form.append("guidance", "4.5");
+  form.append("steps", "20");
+  form.append("guidance", "4.2");
   form.append("seed", String(hash32(`${atlas.seed}:satellite-image`) % 2_147_483_647));
 
   const request = new Response(form);

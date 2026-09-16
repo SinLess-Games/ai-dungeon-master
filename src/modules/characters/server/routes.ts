@@ -451,4 +451,57 @@ export const characterRoutes = new Hono<CharacterEnv>()
       maximumHitPoints,
       campaignStatus: reconciled.status,
     });
+  })
+  .delete("/api/characters/:characterId", async (c) => {
+    const session = await requireUser(createAuth(c.env), c.req.raw.headers);
+    const db = createDatabase(requireDatabase(c.env.DB));
+    const row = await requireCharacterEditor({
+      db,
+      characterId: c.req.param("characterId"),
+      userId: session.user.id,
+    });
+
+    await db.batch([
+      db.delete(dnd35Characters).where(eq(dnd35Characters.characterId, row.character.id)),
+      db.delete(characters).where(eq(characters.id, row.character.id)),
+    ]);
+
+    const remainingCharacters = await db
+      .select({
+        id: characters.id,
+        status: characters.status,
+        rulesetId: characters.rulesetId,
+        rulesetVersion: characters.rulesetVersion,
+      })
+      .from(characters)
+      .where(eq(characters.campaignId, row.campaign.id))
+      .all();
+    const reconciled = reconcileCampaignReadiness({
+      campaign: {
+        id: row.campaign.id,
+        status: row.campaign.status,
+        rulesetId: row.campaign.rulesetId,
+        rulesetVersion: row.campaign.rulesetVersion,
+        worldId: row.campaign.worldId,
+        startRequestedAt: row.campaign.startRequestedAt?.getTime() ?? null,
+        startedAt: row.campaign.startedAt?.getTime() ?? null,
+      },
+      characters: remainingCharacters,
+    });
+    const now = new Date();
+    await db
+      .update(campaigns)
+      .set({
+        status: reconciled.status,
+        readyAt: reconciled.status === "ready" ? row.campaign.readyAt : null,
+        updatedAt: now,
+      })
+      .where(eq(campaigns.id, row.campaign.id))
+      .run();
+
+    return c.json({
+      characterId: row.character.id,
+      deleted: true as const,
+      campaignStatus: reconciled.status,
+    });
   });

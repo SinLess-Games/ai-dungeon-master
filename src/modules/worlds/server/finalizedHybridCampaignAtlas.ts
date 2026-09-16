@@ -27,9 +27,28 @@ export async function generateHybridCampaignWorldAtlas(input: {
   existingPlan?: CampaignWorldAIPlan | null;
   existingAudit?: CampaignWorldRealismAudit | null;
 }): Promise<WorldAtlasDocument> {
+  const request = input.request as RichCampaignAtlasRequest;
+  const context = request.campaign.context;
+  const productionContext =
+    context && typeof context["campaignId"] === "string"
+      ? {
+          ...context,
+          minimumLocations:
+            typeof context["minimumLocations"] === "number"
+              ? context["minimumLocations"]
+              : 320,
+        }
+      : context;
+
   return generateDenseAICampaignWorldAtlas({
     env: input.env,
-    request: input.request as RichCampaignAtlasRequest,
+    request: {
+      ...request,
+      campaign: {
+        ...request.campaign,
+        ...(productionContext ? { context: productionContext } : {}),
+      },
+    },
   });
 }
 

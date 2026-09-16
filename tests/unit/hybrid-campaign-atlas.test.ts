@@ -3,6 +3,7 @@ import {
   generateHybridCampaignWorldAtlas,
   HYBRID_CAMPAIGN_ATLAS_GENERATOR_VERSION,
   storedAIPlan,
+  storedAIRealismAudit,
 } from "@/modules/worlds/server/hybridCampaignAtlas";
 
 function request() {
@@ -44,9 +45,37 @@ const plan = {
   landmarkNames: ["The Black Stair", "Saintless Tor", "The Hollow Crown"],
 } as const;
 
+const realismAudit = {
+  realismScore: 68,
+  settlementSpacingMultiplier: 1.65,
+  maxCitiesPerLandmass: 2,
+  maxTownsPerLandmass: 4,
+  maxPortsPerLandmass: 1,
+  maxFortificationsPerLandmass: 3,
+  maxVillagesPerLandmass: 7,
+  maxHamletsPerLandmass: 5,
+  routeDensity: "sparse",
+  wildernessSiteTrailThreshold: 0.78,
+  biomeCorrections: [
+    {
+      scope: "region",
+      index: 0,
+      biome: "forest",
+      reason: "The academy's core region should remain humid forest rather than an isolated dry biome.",
+    },
+  ],
+  findings: [
+    "Major population centers were too dense for a frontier-scale world.",
+    "Long-distance routes should be sparse trunks with wilderness between them.",
+  ],
+} as const;
+
 describe("hybrid campaign atlas", () => {
-  it("lets AI plan themes while the deterministic engine owns the actual map", async () => {
-    const run = vi.fn(async () => ({ response: JSON.stringify(plan) }));
+  it("uses AI for creative planning and a second realism audit while the engine owns coordinates", async () => {
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce({ response: JSON.stringify(plan) })
+      .mockResolvedValueOnce({ response: JSON.stringify(realismAudit) });
     const atlas = await generateHybridCampaignWorldAtlas({
       env: {
         AI: { run },
@@ -55,13 +84,23 @@ describe("hybrid campaign atlas", () => {
       request: request(),
     });
 
-    expect(run).toHaveBeenCalledTimes(1);
+    expect(run).toHaveBeenCalledTimes(2);
     expect(atlas.generatorVersion).toBe(HYBRID_CAMPAIGN_ATLAS_GENERATOR_VERSION);
     expect(atlas.landmasses).toHaveLength(1);
     expect(atlas.landmasses[0]?.name).toBe("Edravar");
     expect(atlas.landmasses[0]?.biome).toBe("forest");
     expect(atlas.regions.some((region) => region.name === "The Gloam March")).toBe(true);
     expect(atlas.places.some((place) => place.name === "Vile Academy")).toBe(true);
+
+    const localPlaces = atlas.places.filter(
+      (place) => place.landmassId === atlas.landmasses[0]?.id,
+    );
+    expect(localPlaces.filter((place) => place.kind === "city")).toHaveLength(
+      Math.min(2, localPlaces.filter((place) => place.kind === "city").length),
+    );
+    expect(localPlaces.filter((place) => place.kind === "city").length).toBeLessThanOrEqual(2);
+    expect(localPlaces.filter((place) => place.kind === "town").length).toBeLessThanOrEqual(4);
+    expect(localPlaces.filter((place) => place.kind === "port").length).toBeLessThanOrEqual(1);
 
     // AI never supplies coordinates: every place still has numeric coordinates
     // produced by the engine, and every route points at real engine entities.
@@ -77,21 +116,32 @@ describe("hybrid campaign atlas", () => {
       geography: "supercontinent",
       dominantBiomes: ["forest", "highlands", "temperate"],
     });
+    expect(storedAIRealismAudit(atlas)).toMatchObject({
+      realismScore: 68,
+      settlementSpacingMultiplier: 1.65,
+      routeDensity: "sparse",
+    });
   });
 
-  it("reuses a stored AI brief for deterministic same-seed regeneration", async () => {
+  it("reuses the stored AI plan and realism audit for deterministic same-seed regeneration", async () => {
+    const initialRun = vi
+      .fn()
+      .mockResolvedValueOnce({ response: JSON.stringify(plan) })
+      .mockResolvedValueOnce({ response: JSON.stringify(realismAudit) });
     const initial = await generateHybridCampaignWorldAtlas({
       env: {
-        AI: { run: async () => ({ response: JSON.stringify(plan) }) },
+        AI: { run: initialRun },
         AI_GAME_MODEL: "@cf/google/gemma-4-26b-a4b-it",
       },
       request: request(),
     });
     const savedPlan = storedAIPlan(initial);
+    const savedAudit = storedAIRealismAudit(initial);
     expect(savedPlan).not.toBeNull();
+    expect(savedAudit).not.toBeNull();
 
     const run = vi.fn(async () => {
-      throw new Error("AI should not be called when a saved same-seed plan exists");
+      throw new Error("AI should not be called when the saved plan and audit are reused");
     });
     const regenerated = await generateHybridCampaignWorldAtlas({
       env: {
@@ -100,6 +150,7 @@ describe("hybrid campaign atlas", () => {
       },
       request: request(),
       existingPlan: savedPlan,
+      existingAudit: savedAudit,
     });
 
     expect(run).not.toHaveBeenCalled();

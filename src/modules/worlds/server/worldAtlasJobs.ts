@@ -7,11 +7,11 @@ import {
   type WorldAtlasDocument,
 } from "../domain/atlas";
 import {
-  renderWorldAtlasSvg,
+  renderWorldAtlasWithAI,
   WORLD_ATLAS_RENDERER_VERSION,
-} from "./renderAtlasSvg";
+} from "./renderAtlasAiSatellite";
 
-export { WORLD_ATLAS_RENDERER_VERSION } from "./renderAtlasSvg";
+export { WORLD_ATLAS_RENDERER_VERSION } from "./renderAtlasAiSatellite";
 
 export interface WorldAtlasRenderJob {
   type: "world.atlas.render";
@@ -36,6 +36,8 @@ export interface WorldAtlasJobBindings {
   R2_BUCKET?: R2Bucket;
   RUNTIME_CACHE?: KVNamespace;
   WORLD_VECTOR_INDEX?: VectorizeIndex;
+  AI?: Ai;
+  AI_MAP_IMAGE_MODEL?: string;
 }
 
 interface AtlasMapRow {
@@ -51,6 +53,7 @@ export interface WorldAtlasAssetManifest {
   mapId: string;
   revision: number;
   rendererVersion?: string;
+  aiImageModel?: string;
   r2Key?: string;
   renderedAt?: string;
   vectorizedAt?: string;
@@ -125,12 +128,15 @@ async function renderAtlas(
 ): Promise<void> {
   if (!env.DB) throw new Error("World atlas rendering requires D1.");
   if (!env.R2_BUCKET) throw new Error("World atlas rendering requires R2.");
+  if (!env.AI) throw new Error("World atlas rendering requires the Workers AI binding.");
+
   const { atlas } = await loadAtlas(env.DB, job);
-  const key = `worlds/${job.worldId}/atlas/world-v${job.revision}-${WORLD_ATLAS_RENDERER_VERSION}.svg`;
-  const svg = renderWorldAtlasSvg(atlas);
-  await env.R2_BUCKET.put(key, svg, {
+  const rendered = await renderWorldAtlasWithAI(env.AI, atlas, env.AI_MAP_IMAGE_MODEL);
+  const key = `worlds/${job.worldId}/atlas/world-v${job.revision}-${WORLD_ATLAS_RENDERER_VERSION}.${rendered.extension}`;
+
+  await env.R2_BUCKET.put(key, rendered.bytes, {
     httpMetadata: {
-      contentType: "image/svg+xml; charset=utf-8",
+      contentType: rendered.contentType,
       cacheControl: "public, max-age=31536000, immutable",
     },
     customMetadata: {
@@ -139,6 +145,9 @@ async function renderAtlas(
       revision: String(job.revision),
       generatorVersion: atlas.generatorVersion,
       rendererVersion: WORLD_ATLAS_RENDERER_VERSION,
+      aiImageModel: rendered.model,
+      width: String(rendered.width),
+      height: String(rendered.height),
     },
   });
 
@@ -149,6 +158,7 @@ async function renderAtlas(
     mapId: job.mapId,
     revision: job.revision,
     rendererVersion: WORLD_ATLAS_RENDERER_VERSION,
+    aiImageModel: rendered.model,
     r2Key: key,
     renderedAt: new Date().toISOString(),
   });

@@ -14,6 +14,14 @@ function distance(a: AtlasPoint, b: AtlasPoint): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
+function pathDistance(points: readonly AtlasPoint[]): number {
+  let total = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    total += distance(points[index - 1]!, points[index]!);
+  }
+  return total;
+}
+
 function pointInPolygon(point: AtlasPoint, polygon: readonly AtlasPoint[]): boolean {
   let inside = false;
   for (

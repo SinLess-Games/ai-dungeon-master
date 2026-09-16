@@ -1,5 +1,9 @@
 import type { WorldAtlasDocument } from "../domain/atlas";
-import { enforceCoastalAtlasIntegrity } from "../domain/coastalAtlasIntegrity";
+import {
+  coastDistanceMiles,
+  enforceCoastalAtlasIntegrity,
+  seaRouteStaysInWater,
+} from "../domain/coastalAtlasIntegrity";
 import {
   auditCampaignWorldRealismWithAI,
   generateHybridCampaignWorldAtlas as generateHybridCampaignWorldAtlasV7,
@@ -28,6 +32,54 @@ function markFinalReview(audit: CampaignWorldRealismAudit): CampaignWorldRealism
   };
 }
 
+function finalReviewRequest(
+  request: Parameters<typeof generateHybridCampaignWorldAtlasV7>[0]["request"],
+  atlas: WorldAtlasDocument,
+): Parameters<typeof generateHybridCampaignWorldAtlasV7>[0]["request"] {
+  const diagnostics = {
+    ports: atlas.places
+      .filter((place) => place.kind === "port")
+      .map((place) => ({
+        name: place.name,
+        landmassId: place.landmassId,
+        coastDistanceMiles: Number(coastDistanceMiles(place, atlas).toFixed(3)),
+      })),
+    seaRoutes: atlas.paths
+      .filter((path) => path.kind === "sea-route")
+      .map((path) => ({
+        fromPlaceId: path.fromPlaceId,
+        toPlaceId: path.toPlaceId,
+        distanceMiles: path.distanceMiles,
+        waterOnly: seaRouteStaysInWater(path, atlas),
+      })),
+    majorSettlements: atlas.places
+      .filter((place) =>
+        ["capital", "city", "town", "port", "fort", "castle"].includes(place.kind),
+      )
+      .map((place) => ({
+        name: place.name,
+        kind: place.kind,
+        landmassId: place.landmassId,
+        x: Math.round(place.x),
+        y: Math.round(place.y),
+      })),
+  };
+
+  return {
+    ...request,
+    campaign: {
+      ...request.campaign,
+      description: [
+        request.campaign.description ?? "",
+        `FINAL MAP GEOMETRY DIAGNOSTICS: ${JSON.stringify(diagnostics)}`,
+        "During this final pass, explicitly check that every port is on its coast, every sea route is water-only, major settlements have believable separation, and transport links fit the geography.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    },
+  };
+}
+
 function attachFinalReviewMetadata(
   atlas: WorldAtlasDocument,
   review: CampaignWorldRealismAudit | null,
@@ -53,9 +105,10 @@ function attachFinalReviewMetadata(
  *
  * v7 creates the AI-planned, engine-realistic atlas. We then enforce hard
  * coastline/ocean invariants and give AI one final review of the resulting map.
- * The AI review is not allowed to supply coordinates; instead it becomes the
- * final bounded realism directive set and the engine materializes it once more.
- * Same-seed regeneration reuses a marked final review, preserving determinism.
+ * The AI review receives explicit geometric diagnostics from the finished atlas
+ * and is not allowed to supply coordinates; instead it becomes the final bounded
+ * realism directive set and the engine materializes it once more. Same-seed
+ * regeneration reuses a marked final review, preserving determinism.
  */
 export async function generateHybridCampaignWorldAtlas(
   input: Parameters<typeof generateHybridCampaignWorldAtlasV7>[0],
@@ -72,7 +125,7 @@ export async function generateHybridCampaignWorldAtlas(
 
   const finalReview = await auditCampaignWorldRealismWithAI({
     env: input.env,
-    request: input.request,
+    request: finalReviewRequest(input.request, firstPass),
     plan,
     atlas: firstPass,
   });

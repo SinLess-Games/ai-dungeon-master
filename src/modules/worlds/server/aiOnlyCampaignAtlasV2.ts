@@ -305,7 +305,7 @@ function validateGeometry(geometry: GeometryDraft): string | null {
   return null;
 }
 
-function validateInhabited(value: InhabitedDraft, geometry: GeometryDraft): string | null {
+function validateInhabitedPlaces(value: InhabitedDraft, geometry: GeometryDraft): string | null {
   if (!value.places.some((place) => ["capital", "city", "town"].includes(place.kind))) {
     return "the world must contain at least one capital, city, or town";
   }
@@ -314,19 +314,22 @@ function validateInhabited(value: InhabitedDraft, geometry: GeometryDraft): stri
     if (place.regionIndex !== null && place.regionIndex >= geometry.regions.length) return `place ${index} references a missing region`;
     if (!pointInBounds(place, geometry)) return `place ${index} is outside the world bounds`;
   }
-  for (const [index, path] of value.paths.entries()) {
-    if (path.fromPlaceIndex >= value.places.length || path.toPlaceIndex >= value.places.length) {
-      return `path ${index} references a missing place`;
-    }
-    if (path.fromPlaceIndex === path.toPlaceIndex) return `path ${index} connects a place to itself`;
-    if (path.points.some((point) => !pointInBounds(point, geometry))) return `path ${index} leaves the world bounds`;
-    if (path.kind === "sea-route") {
-      const from = value.places[path.fromPlaceIndex]!;
-      const to = value.places[path.toPlaceIndex]!;
-      if (from.kind !== "port" || to.kind !== "port") return `sea route ${index} must connect two ports`;
-    }
-  }
   return null;
+}
+
+function sanitizeInhabitedPaths(value: InhabitedDraft, geometry: GeometryDraft): InhabitedDraft {
+  return {
+    ...value,
+    paths: value.paths.filter((path) => {
+      if (path.fromPlaceIndex >= value.places.length || path.toPlaceIndex >= value.places.length) return false;
+      if (path.fromPlaceIndex === path.toPlaceIndex) return false;
+      if (path.points.some((point) => !pointInBounds(point, geometry))) return false;
+      if (path.kind !== "sea-route") return true;
+      const from = value.places[path.fromPlaceIndex];
+      const to = value.places[path.toPlaceIndex];
+      return from?.kind === "port" && to?.kind === "port";
+    }),
+  };
 }
 
 function geometryPrompt(request: RichCampaignAtlasRequest): string {
@@ -344,7 +347,7 @@ function inhabitedPrompt(request: RichCampaignAtlasRequest, geometry: GeometryDr
   return `${campaignContext(request)}\n\nAUTHORITATIVE AI GEOGRAPHY:\n${compactJson(geometry, 30_000)}\n\nCreate the complete inhabited fantasy world AND transportation network in one JSON response:\n{
   "places": [{"landmassIndex":number,"regionIndex":number|null,"name":string,"kind":${JSON.stringify(PLACE_KINDS)},"x":number,"y":number,"importance":0.1..1,"population"?:number,"description":string,"tags":string[]}],
   "paths": [{"kind":${JSON.stringify(PATH_KINDS)},"fromPlaceIndex":number,"toPlaceIndex":number,"distanceMiles":number,"points":[{"x":number,"y":number}]}]
-}\n\nThis is D&D 3.5 fantasy, not modern Earth. Settlements should reflect the campaign's cultures, magic, dangers, politics, exploration structure, and intended scale. Major cities should usually be hundreds of miles apart on a world-scale map; towns and villages should cluster only where geography/economy supports them. Put settlements near rivers, harbors, passes, fertile plains, mines, sacred sites, old roads, magical resources, or defensive terrain as appropriate. Ports MUST be directly on coastlines. Adventure locations should feel intentionally placed in believable wilderness. Roads and trails stay on land and follow valleys, passes, rivers, borders, and settlement hierarchy. Sea routes connect ports only and every intermediate point must stay over water. Keep the route network sparse enough to preserve wilderness. Choose all coordinates yourself. Return JSON only.`;
+}\n\nThis is D&D 3.5 fantasy, not modern Earth. Settlements should reflect the campaign's cultures, magic, dangers, politics, exploration structure, and intended scale. Major cities should usually be hundreds of miles apart on a world-scale map; towns and villages should cluster only where geography/economy supports them. Put settlements near rivers, harbors, passes, fertile plains, mines, sacred sites, old roads, magical resources, or defensive terrain as appropriate. Ports MUST be directly on coastlines. Adventure locations should feel intentionally placed in believable wilderness. Roads and trails stay on land and follow valleys, passes, rivers, borders, and settlement hierarchy. Sea routes connect ports only and every intermediate point must stay over water. If there are fewer than TWO places whose kind is exactly \"port\", return ZERO sea-route paths. NEVER use a city, town, village, or other non-port as a sea-route endpoint. When unsure, omit the sea route rather than invent an invalid one. Keep the route network sparse enough to preserve wilderness. Choose all coordinates yourself. Return JSON only.`;
 }
 
 function finalReviewPrompt(
@@ -548,7 +551,7 @@ export async function generateAICampaignWorldAtlasV2(input: {
     maxTokens: 6200,
     validate: validateGeometry,
   });
-  const inhabited = await structured({
+  const inhabitedDraft = await structured({
     env: input.env,
     label: "fantasy inhabited world",
     system:
@@ -556,8 +559,9 @@ export async function generateAICampaignWorldAtlasV2(input: {
     prompt: inhabitedPrompt(input.request, geometry),
     schema: inhabitedSchema,
     maxTokens: 7600,
-    validate: (value) => validateInhabited(value, geometry),
+    validate: (value) => validateInhabitedPlaces(value, geometry),
   });
+  const inhabited = sanitizeInhabitedPaths(inhabitedDraft, geometry);
   const corrections = await structured({
     env: input.env,
     label: "final fantasy map review",
@@ -575,10 +579,19 @@ export async function generateAICampaignWorldAtlasV2(input: {
     },
   });
   const corrected = applyFinalCorrections(geometry, inhabited, corrections);
-  const geometryError = validateGeometry(corrected.geometry);
-  const inhabitedError = validateInhabited(corrected.inhabited, corrected.geometry);
+  const sanitizedCorrected = {
+    geometry: corrected.geometry,
+    inhabited: sanitizeInhabitedPaths(corrected.inhabited, corrected.geometry),
+  };
+  const geometryError = validateGeometry(sanitizedCorrected.geometry);
+  const inhabitedError = validateInhabitedPlaces(sanitizedCorrected.inhabited, sanitizedCorrected.geometry);
   if (geometryError || inhabitedError) {
     throw new Error(`AI final fantasy-map corrections produced invalid data: ${geometryError ?? inhabitedError}`);
   }
-  return materialize(input.request, corrected.geometry, corrected.inhabited, corrections.findings);
+  return materialize(
+    input.request,
+    sanitizedCorrected.geometry,
+    sanitizedCorrected.inhabited,
+    corrections.findings,
+  );
 }

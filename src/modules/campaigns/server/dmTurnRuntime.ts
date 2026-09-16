@@ -12,6 +12,7 @@ import {
   loadDmToolEncounterContext,
 } from "./dmToolContext";
 import type { DmPlannerActor, DmPlannerContext } from "./dmToolPlanner";
+import { loadDmWorldAtlasContext } from "./dmWorldAtlasContext";
 
 function safeJson(value: string): unknown {
   try {
@@ -158,12 +159,13 @@ function formatConversationRows(rows: readonly DmConversationRow[]): string {
 /**
  * Builds the AI Dungeon Master's shared context.
  *
- * Every call hydrates complete current campaign character profiles plus the
- * persistent NPC registry directly from authoritative D1 state. Character
- * sheets and NPC memory are informational and never widen the validated tool
- * permissions for the acting character. The requesting player's private OOC ·
- * DM thread remains separate and the shared campaign table remains last so the
- * active turn is the final dialogue the planner sees.
+ * Every call hydrates the authoritative world atlas and current party position,
+ * complete current campaign character profiles, and the persistent NPC registry
+ * directly from D1. The DM receives the full map regardless of player fog-of-war.
+ * Character sheets, map state, and NPC memory are informational and never widen
+ * validated tool permissions for the acting character. The requesting player's
+ * private OOC · DM thread remains separate and the shared campaign table remains
+ * last so the active turn is the final dialogue the planner sees.
  */
 export async function loadDmConversationText(input: {
   binding: D1Database;
@@ -172,58 +174,61 @@ export async function loadDmConversationText(input: {
   limit?: number;
 }): Promise<string> {
   const limit = input.limit ?? 18;
-  const [campaignResult, privateOocResult, characterProfiles, npcRegistry] = await Promise.all([
-    input.binding
-      .prepare(
-        `SELECT m.author_kind AS authorKind,
-                m.content,
-                u.name AS userName,
-                u.username,
-                u.display_username AS displayUsername,
-                c.name AS characterName
-         FROM campaign_play_messages m
-         LEFT JOIN users u ON u.id = m.author_user_id
-         LEFT JOIN characters c ON c.id = m.character_id
-         WHERE m.campaign_id = ?
-           AND m.channel = 'campaign'
-           AND m.private_user_id IS NULL
-         ORDER BY m.created_at DESC, m.rowid DESC
-         LIMIT ?`,
-      )
-      .bind(input.campaignId, limit)
-      .all<DmConversationRow>(),
-    input.binding
-      .prepare(
-        `SELECT m.author_kind AS authorKind,
-                m.content,
-                u.name AS userName,
-                u.username,
-                u.display_username AS displayUsername,
-                c.name AS characterName
-         FROM campaign_play_messages m
-         LEFT JOIN users u ON u.id = m.author_user_id
-         LEFT JOIN characters c ON c.id = m.character_id
-         WHERE m.campaign_id = ?
-           AND m.channel = 'ooc_dm'
-           AND m.private_user_id = ?
-         ORDER BY m.created_at DESC, m.rowid DESC
-         LIMIT ?`,
-      )
-      .bind(input.campaignId, input.userId, limit)
-      .all<DmConversationRow>(),
-    loadDmCampaignCharacterProfiles(input.binding, input.campaignId),
-    loadCampaignNpcRegistry(input.binding, input.campaignId, 100),
-  ]);
+  const [campaignResult, privateOocResult, characterProfiles, npcRegistry, worldAtlasContext] =
+    await Promise.all([
+      input.binding
+        .prepare(
+          `SELECT m.author_kind AS authorKind,
+                  m.content,
+                  u.name AS userName,
+                  u.username,
+                  u.display_username AS displayUsername,
+                  c.name AS characterName
+           FROM campaign_play_messages m
+           LEFT JOIN users u ON u.id = m.author_user_id
+           LEFT JOIN characters c ON c.id = m.character_id
+           WHERE m.campaign_id = ?
+             AND m.channel = 'campaign'
+             AND m.private_user_id IS NULL
+           ORDER BY m.created_at DESC, m.rowid DESC
+           LIMIT ?`,
+        )
+        .bind(input.campaignId, limit)
+        .all<DmConversationRow>(),
+      input.binding
+        .prepare(
+          `SELECT m.author_kind AS authorKind,
+                  m.content,
+                  u.name AS userName,
+                  u.username,
+                  u.display_username AS displayUsername,
+                  c.name AS characterName
+           FROM campaign_play_messages m
+           LEFT JOIN users u ON u.id = m.author_user_id
+           LEFT JOIN characters c ON c.id = m.character_id
+           WHERE m.campaign_id = ?
+             AND m.channel = 'ooc_dm'
+             AND m.private_user_id = ?
+           ORDER BY m.created_at DESC, m.rowid DESC
+           LIMIT ?`,
+        )
+        .bind(input.campaignId, input.userId, limit)
+        .all<DmConversationRow>(),
+      loadDmCampaignCharacterProfiles(input.binding, input.campaignId),
+      loadCampaignNpcRegistry(input.binding, input.campaignId, 100),
+      loadDmWorldAtlasContext(input.binding, input.campaignId),
+    ]);
 
   const campaign = formatConversationRows([...campaignResult.results].reverse());
   const privateOoc = formatConversationRows([...privateOocResult.results].reverse());
-
-  return composeDmConversationContext({
+  const conversation = composeDmConversationContext({
     characterProfilesJson: serializeDmCampaignCharacterProfiles(characterProfiles),
     npcRegistryJson: serializeCampaignNpcRegistry(npcRegistry),
     privateOoc,
     campaign,
   });
+
+  return [worldAtlasContext, conversation].filter(Boolean).join("\n\n");
 }
 
 export async function loadDmPlayerMessage(

@@ -8,6 +8,7 @@ import {
 } from "@/infrastructure/database/schema";
 import { generateFastDenseAICampaignWorldAtlas } from "@/modules/worlds/server/aiFastDenseCampaignAtlas";
 import { ensureAIPortsAreCoastal } from "@/modules/worlds/server/aiPortCoastAudit";
+import { enforceCityOnlyRoads } from "@/modules/worlds/server/aiRoadHierarchyAudit";
 import type { RichCampaignAtlasRequest } from "@/modules/worlds/server/aiOnlyCampaignAtlasV2";
 import type { WorldGenerator } from "./startCampaign";
 
@@ -21,8 +22,9 @@ function missingWorldMapTable(error: unknown): boolean {
  *
  * The AI creates all physical geography, settlements, routes, names, and exact
  * map coordinates. Application code validates the returned structured map,
- * including a final AI-authored coastal-port correction pass, assigns internal
- * IDs, persists it, and later queues the AI satellite render.
+ * including a final AI-authored coastal-port correction pass and transportation
+ * hierarchy validation, assigns internal IDs, persists it, and later queues the
+ * AI satellite render.
  */
 export class BootstrapWorldGenerator implements WorldGenerator {
   constructor(
@@ -70,11 +72,12 @@ export class BootstrapWorldGenerator implements WorldGenerator {
       env: this.aiEnv,
       request,
     });
-    const atlas = await ensureAIPortsAreCoastal({
+    const coastalAtlas = await ensureAIPortsAreCoastal({
       env: this.aiEnv,
       request,
       atlas: generatedAtlas,
     });
+    const atlas = enforceCityOnlyRoads(coastalAtlas);
     const mapId = `world-atlas-${input.worldId}`;
     let atlasPersisted = false;
 

@@ -6,6 +6,8 @@ import type {
   WorldAtlasDocument,
 } from "../domain/atlas";
 
+export const WORLD_ATLAS_RENDERER_VERSION = "satellite-v2-natural-terrain";
+
 const BIOME_COLORS: Record<AtlasBiome, string> = {
   temperate: "#667b4e",
   forest: "#284d31",

@@ -55,6 +55,8 @@ const MINIMUM_ACCEPTABLE_LOCATIONS = 300;
 const SHARD_TARGET = 22;
 const MAX_CONCURRENT_SHARDS = 8;
 const MAX_ROUNDS = 4;
+const FINAL_BACKFILL_ATTEMPTS = 3;
+const FINAL_BACKFILL_CONCURRENCY = 4;
 
 function extractJsonObject(value: string): string {
   const trimmed = value.trim();
@@ -135,7 +137,7 @@ function promptForShard(input: {
 }): string {
   const landmassIds = new Set(input.regions.map((region) => region.landmassId));
   const landmasses = input.atlas.landmasses.filter((landmass) => landmassIds.has(landmass.id));
-  return `You are expanding a persistent D&D 3.5 FANTASY WORLD.\n\nCAMPAIGN DATA:\n${campaignContext(input.request)}\n\nThis is fast regional density shard ${input.shardIndex + 1} of ${input.shardCount}. Create ${Math.max(10, input.desired - 3)}-${input.desired} distinct locations. Do NOT create capitals, major cities, or ports; those already exist. Favor villages, hamlets, ruins, caves, temples, towers, mines, landmarks, dungeons, forts and castles. Towns should be uncommon.\n\nASSIGNED REGIONS:\n${compactJson(input.regions, 7_000)}\n\nAUTHORITATIVE LANDMASSES/COASTLINES:\n${compactJson(landmasses, 8_000)}\n\nNAMES ALREADY USED — do not repeat:\n${compactJson(input.usedNames.slice(-180), 6_000)}\n\nReturn JSON only:\n{"places":[{"landmassId":string,"regionId":string,"name":string,"kind":${JSON.stringify(DENSE_PLACE_KINDS)},"x":number,"y":number,"importance":number,"population"?:number,"description":string,"tags":string[]}]}\n\nEvery coordinate must be inside the supplied landmass for its region. Spread locations naturally through habitable corridors and wilderness rather than grids or tight clusters. Use campaign-specific fantasy naming and one short description sentence (under 14 words). Keep tags to 0-3 short values. The application will merge these with the existing major settlements and road network; do not generate routes in this pass.`;
+  return `You are expanding a persistent D&D 3.5 FANTASY WORLD.\n\nCAMPAIGN DATA:\n${campaignContext(input.request)}\n\nThis is fast regional density shard ${input.shardIndex + 1} of ${input.shardCount}. Create ${Math.max(10, input.desired - 3)}-${input.desired} distinct locations. Do NOT create capitals, major cities, or ports; those already exist. Favor villages, hamlets, ruins, caves, temples, towers, mines, landmarks, dungeons, forts and castles. Towns should be uncommon.\n\nASSIGNED REGIONS:\n${compactJson(input.regions, 7_000)}\n\nAUTHORITATIVE LANDMASSES/COASTLINES:\n${compactJson(landmasses, 8_000)}\n\nNAMES ALREADY USED — do not repeat:\n${compactJson(input.usedNames.slice(-180), 6_000)}\n\nReturn JSON only:\n{"places":[{"landmassId":string,"regionId":string,"name":string,"kind":${JSON.stringify(DENSE_PLACE_KINDS)},"x":number,"y":number,"importance":number,"population"?:number,"description":string,"tags":string[]}]}\n\nEvery coordinate must be inside the supplied landmass for its region. Treat each supplied region.center as a safe interior reference point. Unless a location specifically belongs near a boundary, keep its coordinates comfortably near that region center and well inside the coastline instead of guessing close to a polygon edge. Spread locations naturally through habitable corridors and wilderness rather than grids or tight clusters. Use campaign-specific fantasy naming and one short description sentence (under 14 words). Keep tags to 0-3 short values. The application will merge these with the existing major settlements and road network; do not generate routes in this pass.`;
 }
 
 async function generateShard(input: {
@@ -231,6 +233,69 @@ function withPlaces(
   };
 }
 
+async function runFinalBackfill(input: {
+  env: OpenAICompatibleEnv;
+  request: RichCampaignAtlasRequest;
+  base: WorldAtlasDocument;
+  additions: AtlasPlace[];
+  usedNames: Set<string>;
+  startingRound: number;
+}): Promise<number> {
+  let rounds = input.startingRound;
+
+  for (
+    let attempt = 0;
+    attempt < FINAL_BACKFILL_ATTEMPTS &&
+    input.base.places.length + input.additions.length < MINIMUM_ACCEPTABLE_LOCATIONS;
+    attempt += 1
+  ) {
+    const missing = MINIMUM_ACCEPTABLE_LOCATIONS - (input.base.places.length + input.additions.length);
+    const jobCount = Math.min(
+      FINAL_BACKFILL_CONCURRENCY,
+      Math.max(2, Math.ceil((missing * 1.8) / 14)),
+    );
+    const desired = Math.min(24, Math.max(14, Math.ceil(missing / jobCount) + 8));
+    const nameSnapshot = [...input.usedNames];
+    const jobs = Array.from({ length: jobCount }, (_, shardIndex) => {
+      const regionIndex =
+        (rounds * FINAL_BACKFILL_CONCURRENCY + attempt * jobCount + shardIndex) %
+        input.base.regions.length;
+      const region = input.base.regions[regionIndex]!;
+      const regions = [region];
+      return {
+        regions,
+        promise: generateShard({
+          env: input.env,
+          request: input.request,
+          atlas: input.base,
+          regions,
+          desired,
+          shardIndex,
+          shardCount: jobCount,
+          usedNames: nameSnapshot,
+        }),
+      };
+    });
+
+    const results = await Promise.allSettled(jobs.map((job) => job.promise));
+    for (const [index, result] of results.entries()) {
+      if (result.status !== "fulfilled") continue;
+      const accepted = sanitizePlaces({
+        atlas: input.base,
+        regions: jobs[index]!.regions,
+        drafts: result.value,
+        usedNames: input.usedNames,
+        nextNumber: input.base.places.length + input.additions.length + 1,
+      });
+      input.additions.push(...accepted);
+      if (input.base.places.length + input.additions.length >= MINIMUM_ACCEPTABLE_LOCATIONS) break;
+    }
+    rounds += 1;
+  }
+
+  return rounds;
+}
+
 /**
  * Fast production density pass.
  *
@@ -293,10 +358,21 @@ export async function generateFastDenseAICampaignWorldAtlas(input: {
     }
   }
 
+  if (base.places.length + additions.length < MINIMUM_ACCEPTABLE_LOCATIONS) {
+    rounds = await runFinalBackfill({
+      env: input.env,
+      request: input.request,
+      base,
+      additions,
+      usedNames,
+      startingRound: rounds,
+    });
+  }
+
   const total = base.places.length + additions.length;
   if (total < MINIMUM_ACCEPTABLE_LOCATIONS) {
     throw new Error(
-      `AI location expansion reached ${total}/${MINIMUM_ACCEPTABLE_LOCATIONS} required locations. Try regeneration again.`,
+      `AI location expansion reached ${total}/${MINIMUM_ACCEPTABLE_LOCATIONS} required locations after targeted backfill. Try regeneration again.`,
     );
   }
 

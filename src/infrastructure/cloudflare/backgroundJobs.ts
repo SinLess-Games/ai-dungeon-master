@@ -174,17 +174,14 @@ export async function processBackgroundJobBatch(
             await processGameEventPostprocess(env, message.body);
             break;
           case "world.atlas.render":
+          case "world.atlas.detail-render":
           case "world.atlas.vectorize":
             await processWorldAtlasJob(env, message.body);
             break;
         }
         message.ack();
       } catch (error) {
-        console.error("Background job failed", {
-          jobType: message.body.type,
-          messageId: message.id,
-          error,
-        });
+        console.error("Background queue job failed", { type: message.body.type, error });
         message.retry();
       }
     }),

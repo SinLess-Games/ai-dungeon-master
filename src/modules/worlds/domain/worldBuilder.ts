@@ -7,11 +7,14 @@ import type {
 } from "./atlas";
 import {
   calculateOverlandTravel,
+  terrainForBiome,
   terrainForPath,
   travelEncounterChance,
   type AtlasTravelTerrain,
   type AtlasTravelWeather,
 } from "./overlandTravel";
+
+export type AtlasTravelRouteMode = "network" | "trackless";
 
 export interface AtlasPartyPosition {
   placeId: string;
@@ -23,6 +26,7 @@ export interface AtlasTravelRecord {
   id: string;
   fromPlaceId: string;
   toPlaceId: string;
+  routeMode: AtlasTravelRouteMode;
   pathIds: string[];
   distanceMiles: number;
   durationMinutes: number;
@@ -65,6 +69,7 @@ export interface AtlasTravelSegment {
 export interface AtlasTravelPlan {
   fromPlaceId: string;
   toPlaceId: string;
+  routeMode: AtlasTravelRouteMode;
   placeIds: string[];
   pathIds: string[];
   distanceMiles: number;
@@ -178,11 +183,10 @@ export function explorationState(atlas: WorldAtlasDocument): AtlasExplorationSta
   const fallback = startingPlace(atlas);
   const positionPlace = atlas.places.find((place) => place.id === stored.partyPosition?.placeId);
   const position = positionPlace ?? fallback;
+  const discoveredPlaceIds = uniqueKnownIds(stored.discoveredPlaceIds ?? [], placeIds);
 
   return {
-    discoveredPlaceIds: uniqueKnownIds(stored.discoveredPlaceIds ?? [], placeIds).length
-      ? uniqueKnownIds(stored.discoveredPlaceIds ?? [], placeIds)
-      : [position.id],
+    discoveredPlaceIds: discoveredPlaceIds.length ? discoveredPlaceIds : [position.id],
     discoveredRegionIds: uniqueKnownIds(stored.discoveredRegionIds ?? [], regionIds),
     partyPosition: { placeId: position.id, x: position.x, y: position.y },
     weather: stored.weather ?? "clear",
@@ -221,13 +225,14 @@ function normalizePath(atlas: WorldAtlasDocument, path: AtlasPath): AtlasPath {
 }
 
 function normalizeAttachedPaths(atlas: WorldAtlasDocument, placeId: string): WorldAtlasDocument {
-  const next = {
+  return {
     ...atlas,
     paths: atlas.paths.map((path) =>
-      path.fromPlaceId === placeId || path.toPlaceId === placeId ? normalizePath(atlas, path) : path,
+      path.fromPlaceId === placeId || path.toPlaceId === placeId
+        ? normalizePath(atlas, path)
+        : path,
     ),
   };
-  return next;
 }
 
 export function applyAtlasEdit(
@@ -507,13 +512,83 @@ function biomeForSegment(
   return region?.biome ?? landmass?.biome ?? "temperate";
 }
 
+function planTracklessTravel(input: {
+  atlas: WorldAtlasDocument;
+  state: AtlasExplorationState;
+  destinationPlaceId: string;
+  speedFeet: number;
+  weather: AtlasTravelWeather;
+}): AtlasTravelPlan {
+  const source = input.atlas.places.find(
+    (place) => place.id === input.state.partyPosition.placeId,
+  );
+  const destination = input.atlas.places.find((place) => place.id === input.destinationPlaceId);
+  if (!source || !destination) throw new RangeError("Trackless travel endpoints are unavailable.");
+  if (source.id === destination.id) throw new RangeError("The party is already at that destination.");
+  if (source.landmassId !== destination.landmassId) {
+    throw new RangeError("Trackless travel cannot cross open sea. Use a sea route when vessel travel is supported.");
+  }
+
+  const distanceMiles = Math.max(1, distance(source, destination));
+  const biome = biomeForSegment(input.atlas, source.id, destination.id);
+  const terrain = terrainForBiome(biome);
+  const timing = calculateOverlandTravel({
+    distanceMiles,
+    speedFeet: input.speedFeet,
+    terrain,
+    weather: input.weather,
+  });
+  const encounterChance = travelEncounterChance({
+    terrain,
+    weather: input.weather,
+    distanceMiles,
+  });
+
+  return {
+    fromPlaceId: source.id,
+    toPlaceId: destination.id,
+    routeMode: "trackless",
+    placeIds: [source.id, destination.id],
+    pathIds: [],
+    distanceMiles,
+    durationMinutes: timing.durationMinutes,
+    speedFeet: input.speedFeet,
+    weather: input.weather,
+    encounterChance,
+    segments: [
+      {
+        pathId: "trackless",
+        fromPlaceId: source.id,
+        toPlaceId: destination.id,
+        distanceMiles,
+        terrain,
+        durationMinutes: timing.durationMinutes,
+        effectiveMilesPerDay: timing.effectiveMilesPerDay,
+      },
+    ],
+  };
+}
+
 export function planAtlasTravel(input: {
   atlas: WorldAtlasDocument;
   state: AtlasExplorationState;
   destinationPlaceId: string;
   speedFeet: number;
   weather?: AtlasTravelWeather;
+  routeMode?: AtlasTravelRouteMode;
 }): AtlasTravelPlan {
+  const weather = input.weather ?? input.state.weather;
+  const routeMode = input.routeMode ?? "network";
+  if (routeMode === "trackless") {
+    return planTracklessTravel({
+      atlas: input.atlas,
+      state: input.state,
+      destinationPlaceId: input.destinationPlaceId,
+      speedFeet: input.speedFeet,
+      weather,
+    });
+  }
+
   const route = findAtlasRoute(
     input.atlas,
     input.state.partyPosition.placeId,
@@ -522,7 +597,6 @@ export function planAtlasTravel(input: {
   if (!route) throw new RangeError("No overland road or trail route reaches that destination.");
   if (route.pathIds.length === 0) throw new RangeError("The party is already at that destination.");
 
-  const weather = input.weather ?? input.state.weather;
   const segments: AtlasTravelSegment[] = [];
   let totalMinutes = 0;
   let combinedNoEncounterChance = 1;
@@ -562,6 +636,7 @@ export function planAtlasTravel(input: {
   return {
     fromPlaceId: input.state.partyPosition.placeId,
     toPlaceId: input.destinationPlaceId,
+    routeMode: "network",
     placeIds: route.placeIds,
     pathIds: route.pathIds,
     distanceMiles: route.distanceMiles,
@@ -591,6 +666,7 @@ export function commitAtlasTravel(input: {
     id: input.travelId,
     fromPlaceId: input.plan.fromPlaceId,
     toPlaceId: input.plan.toPlaceId,
+    routeMode: input.plan.routeMode,
     pathIds: [...input.plan.pathIds],
     distanceMiles: input.plan.distanceMiles,
     durationMinutes: input.plan.durationMinutes,

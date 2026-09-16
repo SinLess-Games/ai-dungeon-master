@@ -7,6 +7,8 @@ import {
   type WorldMapData,
 } from "@/infrastructure/database/schema";
 import { generateFastDenseAICampaignWorldAtlas } from "@/modules/worlds/server/aiFastDenseCampaignAtlas";
+import { ensureAIPortsAreCoastal } from "@/modules/worlds/server/aiPortCoastAudit";
+import type { RichCampaignAtlasRequest } from "@/modules/worlds/server/aiOnlyCampaignAtlasV2";
 import type { WorldGenerator } from "./startCampaign";
 
 function missingWorldMapTable(error: unknown): boolean {
@@ -18,9 +20,9 @@ function missingWorldMapTable(error: unknown): boolean {
  * AI-authoritative full-world generator used by campaign start.
  *
  * The AI creates all physical geography, settlements, routes, names, and exact
- * map coordinates. Application code only validates the returned structured map,
- * assigns internal IDs, persists it, and later queues the AI satellite render.
- * There is intentionally no procedural atlas fallback in this production path.
+ * map coordinates. Application code validates the returned structured map,
+ * including a final AI-authored coastal-port correction pass, assigns internal
+ * IDs, persists it, and later queues the AI satellite render.
  */
 export class BootstrapWorldGenerator implements WorldGenerator {
   constructor(
@@ -37,34 +39,41 @@ export class BootstrapWorldGenerator implements WorldGenerator {
 
     if (!campaign) throw new Error("Campaign disappeared during world generation.");
 
-    const atlas = await generateFastDenseAICampaignWorldAtlas({
-      env: this.aiEnv,
-      request: {
-        campaign: {
-          name: campaign.name,
-          description: campaign.description,
-          settings: campaign.settings,
-          context: {
-            campaignId: campaign.id,
-            notes: campaign.notes,
-            status: campaign.status,
-            playMode: campaign.playMode,
-            gameMasterMode: campaign.gameMasterMode,
-            timeMode: campaign.timeMode,
-            visibility: campaign.visibility,
-            maxPlayers: campaign.maxPlayers,
-            rulesetId: campaign.rulesetId,
-            rulesetVersion: campaign.rulesetVersion,
-            generationSeed: campaign.generationSeed,
-            worldTime: campaign.worldTime,
-            startingCharacterCount: input.characterIds.length,
-            creatorSettings: campaign.settings,
-            minimumLocations: 320,
-          },
+    const request: RichCampaignAtlasRequest = {
+      campaign: {
+        name: campaign.name,
+        description: campaign.description,
+        settings: campaign.settings,
+        context: {
+          campaignId: campaign.id,
+          notes: campaign.notes,
+          status: campaign.status,
+          playMode: campaign.playMode,
+          gameMasterMode: campaign.gameMasterMode,
+          timeMode: campaign.timeMode,
+          visibility: campaign.visibility,
+          maxPlayers: campaign.maxPlayers,
+          rulesetId: campaign.rulesetId,
+          rulesetVersion: campaign.rulesetVersion,
+          generationSeed: campaign.generationSeed,
+          worldTime: campaign.worldTime,
+          startingCharacterCount: input.characterIds.length,
+          creatorSettings: campaign.settings,
+          minimumLocations: 320,
         },
-        seed: input.generationSeed,
-        generatedAt: new Date().toISOString(),
       },
+      seed: input.generationSeed,
+      generatedAt: new Date().toISOString(),
+    };
+
+    const generatedAtlas = await generateFastDenseAICampaignWorldAtlas({
+      env: this.aiEnv,
+      request,
+    });
+    const atlas = await ensureAIPortsAreCoastal({
+      env: this.aiEnv,
+      request,
+      atlas: generatedAtlas,
     });
     const mapId = `world-atlas-${input.worldId}`;
     let atlasPersisted = false;

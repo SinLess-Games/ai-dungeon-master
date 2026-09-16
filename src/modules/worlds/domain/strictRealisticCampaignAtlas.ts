@@ -12,6 +12,37 @@ import { generateRealisticCampaignWorldAtlas } from "./realisticCampaignAtlas";
 
 export const STRICT_REALISTIC_CAMPAIGN_ATLAS_GENERATOR_VERSION = "campaign-atlas-v5";
 
+export type AtlasRouteDensity = "sparse" | "balanced" | "dense";
+
+/**
+ * Bounded knobs that a higher-level planner (including AI) may use to make the
+ * deterministic engine stricter. The planner never supplies coordinates or
+ * routes directly; it only tightens world-scale realism constraints.
+ */
+export interface AtlasRealismDirectives {
+  settlementSpacingMultiplier?: number;
+  maxCitiesPerLandmass?: number;
+  maxTownsPerLandmass?: number;
+  maxPortsPerLandmass?: number;
+  maxFortificationsPerLandmass?: number;
+  maxVillagesPerLandmass?: number;
+  maxHamletsPerLandmass?: number;
+  routeDensity?: AtlasRouteDensity;
+  wildernessSiteTrailThreshold?: number;
+}
+
+interface NormalizedRealismDirectives {
+  settlementSpacingMultiplier: number;
+  maxCitiesPerLandmass: number;
+  maxTownsPerLandmass: number;
+  maxPortsPerLandmass: number;
+  maxFortificationsPerLandmass: number;
+  maxVillagesPerLandmass: number;
+  maxHamletsPerLandmass: number;
+  routeDensity: AtlasRouteDensity;
+  wildernessSiteTrailThreshold: number;
+}
+
 const SETTLEMENT_KINDS = new Set<AtlasPlaceKind>([
   "capital",
   "city",
@@ -50,6 +81,28 @@ const SETTLEMENT_RANK: Record<AtlasPlaceKind, number> = {
   landmark: 2,
   "planar-gate": 2,
 };
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
+function integer(value: number | undefined, fallback: number, minimum: number, maximum: number): number {
+  return Math.round(clamp(value ?? fallback, minimum, maximum));
+}
+
+function normalizeDirectives(input: AtlasRealismDirectives = {}): NormalizedRealismDirectives {
+  return {
+    settlementSpacingMultiplier: clamp(input.settlementSpacingMultiplier ?? 1, 0.9, 2.5),
+    maxCitiesPerLandmass: integer(input.maxCitiesPerLandmass, 4, 1, 8),
+    maxTownsPerLandmass: integer(input.maxTownsPerLandmass, 8, 1, 16),
+    maxPortsPerLandmass: integer(input.maxPortsPerLandmass, 3, 0, 6),
+    maxFortificationsPerLandmass: integer(input.maxFortificationsPerLandmass, 6, 0, 12),
+    maxVillagesPerLandmass: integer(input.maxVillagesPerLandmass, 12, 1, 24),
+    maxHamletsPerLandmass: integer(input.maxHamletsPerLandmass, 12, 0, 24),
+    routeDensity: input.routeDensity ?? "balanced",
+    wildernessSiteTrailThreshold: clamp(input.wildernessSiteTrailThreshold ?? 0.68, 0.5, 0.95),
+  };
+}
 
 function distance(a: AtlasPoint, b: AtlasPoint): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
@@ -100,25 +153,67 @@ function spacingFactor(kind: AtlasPlaceKind): number {
 export function strictSettlementMinimumSpacing(
   landmass: AtlasLandmass,
   kind: AtlasPlaceKind,
+  multiplier = 1,
 ): number {
-  return Math.min(landmass.radiusX, landmass.radiusY) * spacingFactor(kind);
+  return Math.min(landmass.radiusX, landmass.radiusY) * spacingFactor(kind) * multiplier;
 }
 
 function pairMinimumSpacing(
   landmass: AtlasLandmass,
   left: AtlasPlaceKind,
   right: AtlasPlaceKind,
+  directives: NormalizedRealismDirectives,
 ): number {
   const minimum = Math.max(
-    strictSettlementMinimumSpacing(landmass, left),
-    strictSettlementMinimumSpacing(landmass, right),
+    strictSettlementMinimumSpacing(landmass, left, directives.settlementSpacingMultiplier),
+    strictSettlementMinimumSpacing(landmass, right, directives.settlementSpacingMultiplier),
   );
   return (left === "capital" || left === "city") && (right === "capital" || right === "city")
     ? minimum * 1.15
     : minimum;
 }
 
-function pruneCrowdedSettlements(atlas: WorldAtlasDocument): AtlasPlace[] {
+function quotaAllows(
+  place: AtlasPlace,
+  counts: Map<AtlasPlaceKind | "fortifications", number>,
+  directives: NormalizedRealismDirectives,
+): boolean {
+  const value = (key: AtlasPlaceKind | "fortifications") => counts.get(key) ?? 0;
+  switch (place.kind) {
+    case "capital":
+      return value("capital") < 1;
+    case "city":
+      return value("city") < directives.maxCitiesPerLandmass;
+    case "town":
+      return value("town") < directives.maxTownsPerLandmass;
+    case "port":
+      return value("port") < directives.maxPortsPerLandmass;
+    case "fort":
+    case "castle":
+      return value("fortifications") < directives.maxFortificationsPerLandmass;
+    case "village":
+      return value("village") < directives.maxVillagesPerLandmass;
+    case "hamlet":
+      return value("hamlet") < directives.maxHamletsPerLandmass;
+    default:
+      return true;
+  }
+}
+
+function incrementQuota(
+  place: AtlasPlace,
+  counts: Map<AtlasPlaceKind | "fortifications", number>,
+): void {
+  counts.set(place.kind, (counts.get(place.kind) ?? 0) + 1);
+  if (place.kind === "fort" || place.kind === "castle") {
+    counts.set("fortifications", (counts.get("fortifications") ?? 0) + 1);
+  }
+}
+
+function pruneCrowdedSettlements(
+  atlas: WorldAtlasDocument,
+  directives: NormalizedRealismDirectives,
+): AtlasPlace[] {
   const kept: AtlasPlace[] = [];
 
   for (const landmass of atlas.landmasses) {
@@ -132,14 +227,18 @@ function pruneCrowdedSettlements(atlas: WorldAtlasDocument): AtlasPlace[] {
           left.id.localeCompare(right.id),
       );
     const accepted: AtlasPlace[] = [];
+    const counts = new Map<AtlasPlaceKind | "fortifications", number>();
 
     for (const settlement of settlements) {
+      if (!quotaAllows(settlement, counts, directives)) continue;
       const fits = accepted.every(
         (other) =>
           distance(settlement, other) >=
-          pairMinimumSpacing(landmass, settlement.kind, other.kind),
+          pairMinimumSpacing(landmass, settlement.kind, other.kind, directives),
       );
-      if (fits) accepted.push(settlement);
+      if (!fits) continue;
+      accepted.push(settlement);
+      incrementQuota(settlement, counts);
     }
 
     kept.push(...accepted, ...local.filter((place) => !SETTLEMENT_KINDS.has(place.kind)));
@@ -217,7 +316,27 @@ function nearestPair(
   return best;
 }
 
-function rebuildRoutes(seed: string, places: readonly AtlasPlace[]): AtlasPath[] {
+function trunkSettlements(
+  major: readonly AtlasPlace[],
+  routeDensity: AtlasRouteDensity,
+): AtlasPlace[] {
+  if (routeDensity !== "sparse") return [...major];
+  const sparse = major.filter(
+    (place) =>
+      place.kind === "capital" ||
+      place.kind === "city" ||
+      place.kind === "port" ||
+      (place.kind === "town" && place.importance >= 0.76) ||
+      ((place.kind === "fort" || place.kind === "castle") && place.importance >= 0.84),
+  );
+  return sparse.length ? sparse : major.slice(0, Math.min(2, major.length));
+}
+
+function rebuildRoutes(
+  seed: string,
+  places: readonly AtlasPlace[],
+  directives: NormalizedRealismDirectives,
+): AtlasPath[] {
   const paths: AtlasPath[] = [];
   const seen = new Set<string>();
   const landmassIds = [...new Set(places.map((place) => place.landmassId))];
@@ -227,10 +346,11 @@ function rebuildRoutes(seed: string, places: readonly AtlasPlace[]): AtlasPath[]
     const major = local
       .filter((place) => MAJOR_SETTLEMENT_KINDS.has(place.kind))
       .sort((left, right) => right.importance - left.importance);
+    const trunk = trunkSettlements(major, directives.routeDensity);
 
-    if (major.length > 1) {
-      const connected = [major[0]!];
-      const remaining = major.slice(1);
+    if (trunk.length > 1) {
+      const connected = [trunk[0]!];
+      const remaining = trunk.slice(1);
       while (remaining.length > 0) {
         const pair = nearestPair(remaining, connected);
         if (!pair) break;
@@ -240,17 +360,39 @@ function rebuildRoutes(seed: string, places: readonly AtlasPlace[]): AtlasPath[]
       }
     }
 
+    if (directives.routeDensity === "dense" && trunk.length > 2) {
+      for (const settlement of trunk) {
+        const nearest = trunk
+          .filter((other) => other.id !== settlement.id)
+          .sort((left, right) => distance(settlement, left) - distance(settlement, right))[0];
+        if (nearest) addPath(paths, seen, seed, "road", settlement, nearest);
+      }
+    }
+
+    const trunkIds = new Set(trunk.map((place) => place.id));
+    for (const settlement of major.filter((place) => !trunkIds.has(place.id))) {
+      const destination = [...trunk].sort(
+        (left, right) => distance(settlement, left) - distance(settlement, right),
+      )[0];
+      if (destination) addPath(paths, seen, seed, "trail", settlement, destination);
+    }
+
     const allSettlements = local.filter((place) => SETTLEMENT_KINDS.has(place.kind));
     const minor = local.filter((place) => place.kind === "village" || place.kind === "hamlet");
+    const minorImportanceFloor =
+      directives.routeDensity === "sparse" ? 0.72 : directives.routeDensity === "balanced" ? 0.56 : 0;
     for (const settlement of minor) {
-      const destination = [...major].sort(
+      if (settlement.importance < minorImportanceFloor) continue;
+      const destination = [...(trunk.length ? trunk : major)].sort(
         (left, right) => distance(settlement, left) - distance(settlement, right),
       )[0];
       if (destination) addPath(paths, seen, seed, "trail", settlement, destination);
     }
 
     const sites = local.filter(
-      (place) => !SETTLEMENT_KINDS.has(place.kind) && place.importance >= 0.68,
+      (place) =>
+        !SETTLEMENT_KINDS.has(place.kind) &&
+        place.importance >= directives.wildernessSiteTrailThreshold,
     );
     for (const site of sites) {
       const destination = [...allSettlements].sort(
@@ -285,17 +427,19 @@ function rebuildRoutes(seed: string, places: readonly AtlasPlace[]): AtlasPath[]
 
 /**
  * World-scale realism layer. It keeps the terrain-aware v4 placement, then
- * removes lower-ranked settlements that still cannot satisfy the final
- * continent's spacing constraints. This is intentional: a world map should
- * omit redundant population centers instead of drawing cities a few pixels
- * apart and implying impossible density at continental scale.
+ * removes lower-ranked settlements that cannot satisfy the final continent's
+ * spacing and population-center constraints. Optional directives let a
+ * validated planner tighten density without ever supplying authoritative map
+ * coordinates.
  */
 export function generateStrictRealisticCampaignWorldAtlas(
   request: CampaignAtlasRequest,
+  inputDirectives: AtlasRealismDirectives = {},
 ): WorldAtlasDocument {
+  const directives = normalizeDirectives(inputDirectives);
   const base = generateRealisticCampaignWorldAtlas(request);
-  const places = pruneCrowdedSettlements(base);
-  const paths = rebuildRoutes(base.seed, places);
+  const places = pruneCrowdedSettlements(base, directives);
+  const paths = rebuildRoutes(base.seed, places, directives);
   const usedKinds = new Set<string>([
     ...places.map((place) => place.kind),
     ...paths.map((path) => path.kind),

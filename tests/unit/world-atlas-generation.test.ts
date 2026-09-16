@@ -3,6 +3,7 @@ import {
   generateWorldAtlas,
   hashedAtlasEmbedding,
   isWorldAtlasDocument,
+  WORLD_ATLAS_GENERATOR_VERSION,
 } from "@/modules/worlds/domain/atlas";
 import { renderWorldAtlasSvg } from "@/modules/worlds/server/renderAtlasSvg";
 
@@ -24,7 +25,7 @@ describe("campaign world atlas generation", () => {
     expect(generateWorldAtlas(input)).toEqual(generateWorldAtlas(input));
   });
 
-  it("creates a full planet atlas with geography, places, routes, legend, and physical scale", () => {
+  it("creates a readable full-world atlas without overwhelming the map", () => {
     const atlas = generateWorldAtlas({
       seed: "atlas-shape-test",
       title: "Atlas Shape Test",
@@ -34,16 +35,48 @@ describe("campaign world atlas generation", () => {
     });
 
     expect(isWorldAtlasDocument(atlas)).toBe(true);
+    expect(atlas.generatorVersion).toBe(WORLD_ATLAS_GENERATOR_VERSION);
+    expect(WORLD_ATLAS_GENERATOR_VERSION).toBe("campaign-atlas-v2");
     expect(atlas.widthMiles).toBeGreaterThan(10_000);
     expect(atlas.heightMiles).toBeGreaterThan(6_000);
     expect(atlas.landmasses.length).toBeGreaterThanOrEqual(4);
     expect(atlas.regions.length).toBeGreaterThan(10);
-    expect(atlas.mountainRanges.length).toBeGreaterThan(4);
-    expect(atlas.rivers.length).toBeGreaterThan(8);
-    expect(atlas.places.length).toBeGreaterThan(100);
-    expect(atlas.paths.length).toBeGreaterThan(20);
+    expect(atlas.mountainRanges.length).toBeGreaterThanOrEqual(4);
+    expect(atlas.rivers.length).toBeGreaterThanOrEqual(8);
+    expect(atlas.places.length).toBeGreaterThan(60);
+    expect(atlas.places.length).toBeLessThan(130);
+    expect(atlas.paths.length).toBeGreaterThan(30);
+    expect(atlas.paths.length).toBeLessThan(140);
     expect(atlas.legend.length).toBeGreaterThan(8);
     expect(atlas.northUp).toBe(true);
+    expect(atlas.landmasses.every((landmass) => landmass.points.length >= 64)).toBe(true);
+  });
+
+  it("keeps land roads on their own landmass and uses sea routes between landmasses", () => {
+    const atlas = generateWorldAtlas({
+      seed: "route-topology-test",
+      title: "Route Topology Test",
+      templateId: "isles-and-seas",
+      styleIds: ["seafaring", "pirates"],
+      generatedAt,
+    });
+    const places = new Map(atlas.places.map((place) => [place.id, place] as const));
+
+    for (const path of atlas.paths) {
+      const from = places.get(path.fromPlaceId);
+      const to = places.get(path.toPlaceId);
+      expect(from).toBeDefined();
+      expect(to).toBeDefined();
+      if (!from || !to) continue;
+      if (path.kind === "road" || path.kind === "trail") {
+        expect(from.landmassId).toBe(to.landmassId);
+      }
+      if (path.kind === "sea-route") {
+        expect(from.kind).toBe("port");
+        expect(to.kind).toBe("port");
+        expect(from.landmassId).not.toBe(to.landmassId);
+      }
+    }
   });
 
   it("uses campaign decisions to bias the kinds of places in the generated world", () => {

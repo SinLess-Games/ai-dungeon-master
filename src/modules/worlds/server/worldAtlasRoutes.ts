@@ -34,6 +34,8 @@ import {
 import {
   enqueueWorldAtlasBuild,
   getWorldAtlasManifest,
+  isCurrentWorldAtlasRender,
+  WORLD_ATLAS_RENDERER_VERSION,
   type WorldAtlasJob,
 } from "./worldAtlasJobs";
 import { worldBuilderRoutes } from "./worldBuilderRoutes";
@@ -150,8 +152,8 @@ async function maybeQueueBuild(input: {
   revision: number;
 }): Promise<void> {
   const manifest = await getWorldAtlasManifest(input.env, input.worldId);
-  if (manifest?.revision === input.revision && manifest.r2Key) return;
-  const lockKey = `world:${input.worldId}:atlas:queue-lock:${input.revision}`;
+  if (isCurrentWorldAtlasRender(manifest, input.revision)) return;
+  const lockKey = `world:${input.worldId}:atlas:queue-lock:${input.revision}:${WORLD_ATLAS_RENDERER_VERSION}`;
   if (input.env.RUNTIME_CACHE) {
     const locked = await input.env.RUNTIME_CACHE.get(lockKey);
     if (locked) return;
@@ -257,7 +259,7 @@ export const worldAtlasRoutes = new Hono<Env>()
         revision: map.revision,
       }).catch((error) => console.error("Unable to queue atlas assets", { error })),
     );
-    const ready = manifest?.revision === map.revision && Boolean(manifest.r2Key);
+    const ready = isCurrentWorldAtlasRender(manifest, map.revision);
     return c.json({
       campaignId: access.campaign.id,
       worldId: access.campaign.worldId,
@@ -307,9 +309,20 @@ export const worldAtlasRoutes = new Hono<Env>()
     });
     if (!access.campaign.worldId) throw new NotFoundError("Campaign world not found.");
     if (!c.env.R2_BUCKET) throw new ServiceUnavailableError("Atlas object storage is unavailable.");
+    const { map } = await loadAtlas({ db, worldId: access.campaign.worldId });
     const manifest = await getWorldAtlasManifest(c.env, access.campaign.worldId);
-    if (!manifest?.r2Key) throw new NotFoundError("Rendered atlas asset is still being prepared.");
-    const object = await c.env.R2_BUCKET.get(manifest.r2Key);
+    if (!isCurrentWorldAtlasRender(manifest, map.revision)) {
+      c.executionCtx.waitUntil(
+        maybeQueueBuild({
+          env: c.env,
+          worldId: access.campaign.worldId,
+          mapId: map.id,
+          revision: map.revision,
+        }).catch((error) => console.error("Unable to queue current atlas render", { error })),
+      );
+      throw new NotFoundError("Rendered atlas asset is still being prepared.");
+    }
+    const object = await c.env.R2_BUCKET.get(manifest!.r2Key!);
     if (!object) throw new NotFoundError("Rendered atlas asset is unavailable.");
     const headers = new Headers();
     object.writeHttpMetadata(headers);

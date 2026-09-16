@@ -5,7 +5,7 @@ import {
   worldMaps,
   type WorldMapData,
 } from "@/infrastructure/database/schema";
-import { generateRealisticCampaignWorldAtlas } from "@/modules/worlds/domain/realisticCampaignAtlas";
+import { generateStrictRealisticCampaignWorldAtlas } from "@/modules/worlds/domain/strictRealisticCampaignAtlas";
 import type { WorldGenerator } from "./startCampaign";
 
 function missingWorldMapTable(error: unknown): boolean {
@@ -42,7 +42,7 @@ export class BootstrapWorldGenerator implements WorldGenerator {
 
     if (!campaign) throw new Error("Campaign disappeared during world generation.");
 
-    const atlas = generateRealisticCampaignWorldAtlas({
+    const atlas = generateStrictRealisticCampaignWorldAtlas({
       campaign: {
         name: campaign.name,
         description: campaign.description,

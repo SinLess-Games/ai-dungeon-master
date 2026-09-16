@@ -23,6 +23,7 @@ import {
   getWorldAtlasManifest,
   type WorldAtlasJob,
 } from "./worldAtlasJobs";
+import { worldBuilderRoutes } from "./worldBuilderRoutes";
 
 interface Bindings extends AuthEnv {
   DB?: D1Database;
@@ -129,6 +130,7 @@ function renderUrl(campaignId: string): string {
 }
 
 export const worldAtlasRoutes = new Hono<Env>()
+  .route("/", worldBuilderRoutes)
   .get("/api/campaigns/:campaignId/atlas", async (c) => {
     const session = await requireUser(createAuth(c.env), c.req.raw.headers);
     const db = createDatabase(requireDatabase(c.env.DB));

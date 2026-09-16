@@ -88,7 +88,7 @@ export interface WorldAtlasAssetManifest {
   r2Key?: string;
   renderedAt?: string;
   vectorizedAt?: string;
-  details?: Record<string, WorldAtlasDetailManifest>;
+  details?: Record<string, WorldAtlasDetailManifest> | undefined;
 }
 
 function manifestKey(worldId: string): string {

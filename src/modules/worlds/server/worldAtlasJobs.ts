@@ -6,7 +6,12 @@ import {
   isWorldAtlasDocument,
   type WorldAtlasDocument,
 } from "../domain/atlas";
-import { renderWorldAtlasSvg } from "./renderAtlasSvg";
+import {
+  renderWorldAtlasSvg,
+  WORLD_ATLAS_RENDERER_VERSION,
+} from "./renderAtlasSvg";
+
+export { WORLD_ATLAS_RENDERER_VERSION } from "./renderAtlasSvg";
 
 export interface WorldAtlasRenderJob {
   type: "world.atlas.render";
@@ -45,6 +50,7 @@ export interface WorldAtlasAssetManifest {
   worldId: string;
   mapId: string;
   revision: number;
+  rendererVersion?: string;
   r2Key?: string;
   renderedAt?: string;
   vectorizedAt?: string;
@@ -102,6 +108,17 @@ async function writeManifest(
   });
 }
 
+export function isCurrentWorldAtlasRender(
+  manifest: WorldAtlasAssetManifest | null | undefined,
+  revision: number,
+): boolean {
+  return Boolean(
+    manifest?.revision === revision &&
+      manifest.r2Key &&
+      manifest.rendererVersion === WORLD_ATLAS_RENDERER_VERSION,
+  );
+}
+
 async function renderAtlas(
   env: WorldAtlasJobBindings,
   job: WorldAtlasRenderJob,
@@ -109,7 +126,7 @@ async function renderAtlas(
   if (!env.DB) throw new Error("World atlas rendering requires D1.");
   if (!env.R2_BUCKET) throw new Error("World atlas rendering requires R2.");
   const { atlas } = await loadAtlas(env.DB, job);
-  const key = `worlds/${job.worldId}/atlas/world-v${job.revision}.svg`;
+  const key = `worlds/${job.worldId}/atlas/world-v${job.revision}-${WORLD_ATLAS_RENDERER_VERSION}.svg`;
   const svg = renderWorldAtlasSvg(atlas);
   await env.R2_BUCKET.put(key, svg, {
     httpMetadata: {
@@ -121,6 +138,7 @@ async function renderAtlas(
       mapId: job.mapId,
       revision: String(job.revision),
       generatorVersion: atlas.generatorVersion,
+      rendererVersion: WORLD_ATLAS_RENDERER_VERSION,
     },
   });
 
@@ -130,6 +148,7 @@ async function renderAtlas(
     worldId: job.worldId,
     mapId: job.mapId,
     revision: job.revision,
+    rendererVersion: WORLD_ATLAS_RENDERER_VERSION,
     r2Key: key,
     renderedAt: new Date().toISOString(),
   });

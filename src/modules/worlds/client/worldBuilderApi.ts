@@ -158,7 +158,7 @@ export function setCampaignPartyPosition(
 export function planCampaignTravel(
   campaignId: string,
   destinationPlaceId: string,
-  routeMode: AtlasTravelRouteMode,
+  routeMode: AtlasTravelRouteMode = "network",
 ): Promise<{ revision: number; speedFeet: number; plan: AtlasTravelPlan }> {
   return offlineRequestJson(`/api/campaigns/${encodeURIComponent(campaignId)}/world/travel/plan`, {
     method: "POST",
@@ -170,7 +170,7 @@ export function commitCampaignTravel(
   campaignId: string,
   revision: number,
   destinationPlaceId: string,
-  routeMode: AtlasTravelRouteMode,
+  routeMode: AtlasTravelRouteMode = "network",
 ): Promise<{
   revision: number;
   exploration: AtlasExplorationState;

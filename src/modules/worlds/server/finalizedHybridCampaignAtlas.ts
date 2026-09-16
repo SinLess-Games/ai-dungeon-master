@@ -6,7 +6,7 @@ import {
   AI_ONLY_CAMPAIGN_ATLAS_GENERATOR_VERSION,
   type RichCampaignAtlasRequest,
 } from "./aiOnlyCampaignAtlasV2";
-import { generateStableDenseAICampaignWorldAtlas } from "./aiDenseCampaignAtlasStable";
+import { generateFastDenseAICampaignWorldAtlas } from "./aiFastDenseCampaignAtlas";
 import {
   storedAIPlan,
   storedAIRealismAudit,
@@ -34,15 +34,12 @@ export async function generateHybridCampaignWorldAtlas(input: {
     context && typeof context["campaignId"] === "string"
       ? {
           ...context,
-          minimumLocations:
-            typeof context["minimumLocations"] === "number"
-              ? context["minimumLocations"]
-              : 320,
+          minimumLocations: 320,
         }
       : context;
 
   try {
-    return await generateStableDenseAICampaignWorldAtlas({
+    return await generateFastDenseAICampaignWorldAtlas({
       env: input.env,
       request: {
         ...request,

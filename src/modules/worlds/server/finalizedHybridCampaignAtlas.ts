@@ -8,6 +8,7 @@ import {
 } from "./aiOnlyCampaignAtlasV2";
 import { generateFastDenseAICampaignWorldAtlas } from "./aiFastDenseCampaignAtlas";
 import { ensureAIPortsAreCoastal } from "./aiPortCoastAudit";
+import { enforceCityOnlyRoads } from "./aiRoadHierarchyAudit";
 import {
   storedAIPlan,
   storedAIRealismAudit,
@@ -47,15 +48,16 @@ export async function generateHybridCampaignWorldAtlas(input: {
   };
 
   try {
-    const atlas = await generateFastDenseAICampaignWorldAtlas({
+    const generatedAtlas = await generateFastDenseAICampaignWorldAtlas({
       env: input.env,
       request: productionRequest,
     });
-    return await ensureAIPortsAreCoastal({
+    const coastalAtlas = await ensureAIPortsAreCoastal({
       env: input.env,
       request: productionRequest,
-      atlas,
+      atlas: generatedAtlas,
     });
+    return enforceCityOnlyRoads(coastalAtlas);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     console.error("AI world regeneration failed", { reason, error });

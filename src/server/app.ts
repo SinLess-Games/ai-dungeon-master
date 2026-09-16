@@ -37,6 +37,7 @@ import { gameRoutes } from "@/modules/game/server/routes";
 import { offlineMutationMiddleware } from "@/modules/sync/server/offlineMutationMiddleware";
 import { syncRoutes } from "@/modules/sync/server/routes";
 import { worldAtlasRoutes } from "@/modules/worlds/server/worldAtlasRoutes";
+import { worldTravelRoutes } from "@/modules/worlds/server/worldTravelRoutes";
 
 const isolateStartedAt = Date.now();
 
@@ -216,6 +217,7 @@ const routes = app
   .route("/", devblogAIRoutes)
   .route("/", syncRoutes)
   .route("/", worldAtlasRoutes)
+  .route("/", worldTravelRoutes)
   .route("/", campaignRoutes)
   .route("/", campaignDeleteRoutes)
   .route("/", campaignPlayCharacterRoutes)
@@ -255,6 +257,10 @@ const routes = app
         campaignAtlas: "/api/campaigns/:campaignId/atlas",
         campaignAtlasRender: "/api/campaigns/:campaignId/atlas/render",
         campaignAtlasSearch: "/api/campaigns/:campaignId/atlas/search",
+        campaignWorldState: "/api/campaigns/:campaignId/world-state",
+        campaignWorldBuilder: "/api/campaigns/:campaignId/world-builder",
+        campaignTravelPlan: "/api/campaigns/:campaignId/travel/plan",
+        campaignTravel: "/api/campaigns/:campaignId/travel",
         game: "/api/campaigns/:campaignId/game",
         gameState: "/api/campaigns/:campaignId/game/state",
         gameCommands: "/api/campaigns/:campaignId/game/commands",

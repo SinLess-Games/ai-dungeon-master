@@ -3,8 +3,9 @@ import type { WorldAtlasDocument } from "../domain/atlas";
 import type { CampaignAtlasRequest } from "../domain/campaignAtlas";
 import {
   AI_ONLY_CAMPAIGN_ATLAS_GENERATOR_VERSION,
-  generateAICampaignWorldAtlas,
-} from "./aiOnlyCampaignAtlas";
+  generateAICampaignWorldAtlasV2,
+  type RichCampaignAtlasRequest,
+} from "./aiOnlyCampaignAtlasV2";
 import {
   storedAIPlan,
   storedAIRealismAudit,
@@ -14,7 +15,7 @@ import {
 
 /**
  * Compatibility export retained for callers while the production pipeline is
- * now fully AI-authored. No procedural atlas generator, continental reshaper,
+ * fully AI-authored. No procedural atlas generator, continental reshaper,
  * settlement engine, route engine, or coastal correction engine runs here.
  */
 export const FINALIZED_HYBRID_CAMPAIGN_ATLAS_GENERATOR_VERSION =
@@ -22,11 +23,14 @@ export const FINALIZED_HYBRID_CAMPAIGN_ATLAS_GENERATOR_VERSION =
 
 export async function generateHybridCampaignWorldAtlas(input: {
   env: OpenAICompatibleEnv;
-  request: CampaignAtlasRequest;
+  request: CampaignAtlasRequest | RichCampaignAtlasRequest;
   existingPlan?: CampaignWorldAIPlan | null;
   existingAudit?: CampaignWorldRealismAudit | null;
 }): Promise<WorldAtlasDocument> {
-  return generateAICampaignWorldAtlas({ env: input.env, request: input.request });
+  return generateAICampaignWorldAtlasV2({
+    env: input.env,
+    request: input.request as RichCampaignAtlasRequest,
+  });
 }
 
 // Kept for API compatibility with same-seed callers. AI-only generation no

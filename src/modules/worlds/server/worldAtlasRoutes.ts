@@ -9,6 +9,7 @@ import { campaignMemberships, campaigns, worldMaps } from "@/infrastructure/data
 import { createAuth, type AuthEnv } from "@/modules/auth/server/auth";
 import { requireUser } from "@/modules/auth/server/requireAuth";
 import {
+  ConflictError,
   ForbiddenError,
   NotFoundError,
   ServiceUnavailableError,
@@ -18,6 +19,13 @@ import {
   isWorldAtlasDocument,
   type WorldAtlasDocument,
 } from "../domain/atlas";
+import { generateCampaignWorldAtlas } from "../domain/campaignAtlas";
+import {
+  createInitialExplorationState,
+  explorationState,
+  inspectAtlas,
+  withExplorationState,
+} from "../domain/worldBuilder";
 import {
   enqueueWorldAtlasBuild,
   getWorldAtlasManifest,
@@ -38,6 +46,10 @@ type Env = { Bindings: Bindings };
 const searchSchema = z.object({
   query: z.string().trim().min(2).max(200),
 });
+const regenerateSchema = z.object({
+  revision: z.number().int().positive(),
+  seedMode: z.enum(["same", "new"]).default("new"),
+});
 
 function requireDatabase(binding: D1Database | undefined): D1Database {
   if (!binding) throw new ServiceUnavailableError("World atlas storage is unavailable.");
@@ -55,6 +67,8 @@ async function requireCampaignAccess(input: {
       ownerUserId: campaigns.ownerUserId,
       worldId: campaigns.worldId,
       name: campaigns.name,
+      description: campaigns.description,
+      settings: campaigns.settings,
       status: campaigns.status,
     })
     .from(campaigns)
@@ -104,6 +118,26 @@ async function loadAtlas(input: {
   return { map, atlas: map.data };
 }
 
+async function persistAtlas(input: {
+  binding: D1Database;
+  mapId: string;
+  expectedRevision: number;
+  atlas: WorldAtlasDocument;
+}): Promise<number> {
+  const result = await input.binding
+    .prepare(
+      `UPDATE world_maps
+       SET data = ?, revision = revision + 1, updated_at = unixepoch()
+       WHERE id = ? AND revision = ?`,
+    )
+    .bind(JSON.stringify(input.atlas), input.mapId, input.expectedRevision)
+    .run();
+  if ((result.meta.changes ?? 0) !== 1) {
+    throw new ConflictError("The world changed before regeneration was saved. Refresh and try again.");
+  }
+  return input.expectedRevision + 1;
+}
+
 async function maybeQueueBuild(input: {
   env: Bindings;
   worldId: string;
@@ -130,6 +164,67 @@ function renderUrl(campaignId: string): string {
 }
 
 export const worldAtlasRoutes = new Hono<Env>()
+  .post(
+    "/api/campaigns/:campaignId/world/regenerate",
+    zValidator("json", regenerateSchema),
+    async (c) => {
+      const session = await requireUser(createAuth(c.env), c.req.raw.headers);
+      const binding = requireDatabase(c.env.DB);
+      const db = createDatabase(binding);
+      const access = await requireCampaignAccess({
+        db,
+        campaignId: c.req.param("campaignId"),
+        userId: session.user.id,
+      });
+      if (access.role !== "owner" && access.role !== "gm") {
+        throw new ForbiddenError("Only the campaign owner or GM can regenerate the world atlas.");
+      }
+      if (!access.campaign.worldId) throw new NotFoundError("Campaign world not found.");
+
+      const body = c.req.valid("json");
+      const { map, atlas } = await loadAtlas({ db, worldId: access.campaign.worldId });
+      if (map.revision !== body.revision) {
+        throw new ConflictError("The world has changed. Refresh before regenerating.");
+      }
+
+      const seed =
+        body.seedMode === "same"
+          ? atlas.seed
+          : `${atlas.seed}:gm:${crypto.randomUUID()}`;
+      const generated = generateCampaignWorldAtlas({
+        campaign: {
+          name: access.campaign.name,
+          description: access.campaign.description,
+          settings: access.campaign.settings,
+        },
+        seed,
+        generatedAt: new Date().toISOString(),
+      });
+      const next = withExplorationState(generated, createInitialExplorationState(generated));
+      const revision = await persistAtlas({
+        binding,
+        mapId: map.id,
+        expectedRevision: body.revision,
+        atlas: next,
+      });
+
+      c.executionCtx.waitUntil(
+        maybeQueueBuild({
+          env: c.env,
+          worldId: access.campaign.worldId,
+          mapId: map.id,
+          revision,
+        }).catch((error) => console.error("Unable to queue regenerated atlas assets", { error })),
+      );
+
+      return c.json({
+        revision,
+        atlas: next,
+        exploration: explorationState(next),
+        inspector: inspectAtlas(next),
+      });
+    },
+  )
   .route("/", worldBuilderRoutes)
   .get("/api/campaigns/:campaignId/atlas", async (c) => {
     const session = await requireUser(createAuth(c.env), c.req.raw.headers);

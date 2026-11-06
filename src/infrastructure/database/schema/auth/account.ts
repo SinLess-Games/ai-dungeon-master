@@ -13,9 +13,6 @@ export const accounts = sqliteTable(
       .references(() => users.id, { onDelete: "cascade" }),
     accountId: text("account_id").notNull(),
     providerId: text("provider_id").notNull(),
-    // Required in 1.7.2. Better Auth supplies the real or synthetic issuer;
-    // credential accounts use local:credential. Do not derive it here.
-    issuer: text("issuer").notNull(),
     accessToken: text("access_token"),
     refreshToken: text("refresh_token"),
     idToken: text("id_token"),
@@ -32,8 +29,8 @@ export const accounts = sqliteTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [
-    // Provider aliases do not make a second identity for the same issuer/subject.
-    uniqueIndex("accounts_issuer_account_id_uq").on(table.issuer, table.accountId),
+    // Better Auth 1.7.3+ identifies an account by provider and provider subject.
+    uniqueIndex("accounts_provider_account_id_uq").on(table.providerId, table.accountId),
     index("accounts_user_id_idx").on(table.userId),
   ],
 );

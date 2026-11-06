@@ -49,7 +49,14 @@ Existing web validation workflows likewise call `build:web`.
 
 ## Prerequisites
 
-Install dependencies with `npm ci` and use the platform SDKs below:
+Install dependencies with `npm ci` on Node.js 26, the version used by CI. Node 26
+is the Active LTS line. A Node.js security release for the 22, 24, and 26 lines
+is scheduled on or shortly after 11 November 2026; the announcement rates the
+highest issue high and does not publish CVE ids or the new version numbers.
+Workflows use floating `node-version: 26`, so the next CI run after that release
+installs the updated 26.x. Do not pin a guessed patch version ahead of the release.
+
+Use the platform SDKs below:
 
 - **Desktop:** Rust/Cargo and the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
   Linux needs WebKitGTK 4.1 development libraries, a C/C++ toolchain, and the Linux

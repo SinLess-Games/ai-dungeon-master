@@ -29,8 +29,10 @@ Use package versions from `package.json` and the lockfile rather than this docum
 The stack includes React 19, TypeScript, Vite, TanStack Router/Query, Zustand, Hono
 and Hono RPC, Drizzle/D1, Better Auth, Tailwind CSS 4, Base UI, Vitest, and Playwright.
 Cloudflare provides R2, Workers AI, Durable Objects, Queues, and KV. Stripe,
-Capacitor (Android), Tauri (desktop), and Vercel AI SDK packages are also present;
-verify the actual integration before claiming support.
+Capacitor (Android), and Tauri (desktop) are also present; verify the actual
+integration before claiming support. Text generation calls the Workers AI binding
+from `src/infrastructure/ai/openaiCompatible.ts`. The Vercel AI SDK packages are
+not dependencies.
 
 This is a Vite SPA, not TanStack Start. Do not introduce Next.js, Nitro, Lovable
 runtime dependencies, Supabase Auth/Storage, a separate Node API server, a second

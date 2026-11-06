@@ -20,12 +20,12 @@ Implemented against the installed `better-auth` **1.7.2**, `@better-auth/core` *
 
 TypeScript fields map to snake_case SQLite columns; the tables are `users`, `sessions`, `accounts`, and `verifications`.
 
-| Model        | Core fields                                                                                                                                                                                   | Admin plugin fields                         |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| User         | `id`, `name`, `email`, `emailVerified`, `image`, `createdAt`, `updatedAt`                                                                                                                     | `role`, `banned`, `banReason`, `banExpires` |
-| Session      | `id`, `userId`, `token`, `expiresAt`, `ipAddress`, `userAgent`, `createdAt`, `updatedAt`                                                                                                      | `impersonatedBy`                            |
-| Account      | `id`, `userId`, `accountId`, `providerId`, `issuer`, `accessToken`, `refreshToken`, `idToken`, `accessTokenExpiresAt`, `refreshTokenExpiresAt`, `scope`, `password`, `createdAt`, `updatedAt` | None                                        |
-| Verification | `id`, `identifier`, `value`, `expiresAt`, `createdAt`, `updatedAt`                                                                                                                            | None                                        |
+| Model        | Core fields                                                                                                                                                                         | Admin plugin fields                         |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| User         | `id`, `name`, `email`, `emailVerified`, `image`, `createdAt`, `updatedAt`                                                                                                           | `role`, `banned`, `banReason`, `banExpires` |
+| Session      | `id`, `userId`, `token`, `expiresAt`, `ipAddress`, `userAgent`, `createdAt`, `updatedAt`                                                                                            | `impersonatedBy`                            |
+| Account      | `id`, `userId`, `accountId`, `providerId`, `accessToken`, `refreshToken`, `idToken`, `accessTokenExpiresAt`, `refreshTokenExpiresAt`, `scope`, `password`, `createdAt`, `updatedAt` | None                                        |
+| Verification | `id`, `identifier`, `value`, `expiresAt`, `createdAt`, `updatedAt`                                                                                                                  | None                                        |
 
 Every ID is required text supplied by Better Auth. There is no Drizzle UUID default: the installed adapter generates IDs, and its default strings need not be UUIDs. A future Better Auth `advanced.database.generateId: "uuid"` setting would remain compatible.
 
@@ -43,16 +43,16 @@ The installed Admin schema declares role optional text; its create hook supplies
 
 All four tables have text primary keys. Additional indexes are:
 
-| Index                           | Columns                | Unique |
-| ------------------------------- | ---------------------- | ------ |
-| `users_email_uq`                | `email`                | Yes    |
-| `sessions_token_uq`             | `token`                | Yes    |
-| `sessions_user_id_idx`          | `user_id`              | No     |
-| `sessions_expires_at_idx`       | `expires_at`           | No     |
-| `accounts_issuer_account_id_uq` | `issuer`, `account_id` | Yes    |
-| `accounts_user_id_idx`          | `user_id`              | No     |
-| `verifications_identifier_idx`  | `identifier`           | No     |
-| `verifications_expires_at_idx`  | `expires_at`           | No     |
+| Index                             | Columns                     | Unique |
+| --------------------------------- | --------------------------- | ------ |
+| `users_email_uq`                  | `email`                     | Yes    |
+| `sessions_token_uq`               | `token`                     | Yes    |
+| `sessions_user_id_idx`            | `user_id`                   | No     |
+| `sessions_expires_at_idx`         | `expires_at`                | No     |
+| `accounts_provider_account_id_uq` | `provider_id`, `account_id` | Yes    |
+| `accounts_user_id_idx`            | `user_id`                   | No     |
+| `verifications_identifier_idx`    | `identifier`                | No     |
+| `verifications_expires_at_idx`    | `expires_at`                | No     |
 
 `users_role_valid`, `users_email_verified_boolean`, and `users_banned_boolean` are the added CHECK constraints. Email uniqueness uses the reference's ordinary SQLite text semantics; Better Auth normalizes email during account flows. There is no additional name/email format constraint that could reject values accepted by the installed package.
 
@@ -70,7 +70,7 @@ The installed conventional adapter does not expose a `createSchema` implementati
 
 Specific decisions:
 
-- `issuer` is required, not optional. The installed identity key is **issuer + accountId**, not providerId + accountId. Two provider aliases cannot claim the same issuer/subject; different issuers may have the same subject/provider label. Better Auth supplies synthetic issuers such as `local:credential` where appropriate.
+- Better Auth 1.7.3+ does not write `issuer`. `drizzle/0028_drop_account_issuer.sql` drops that 1.7.0–1.7.2 column. The identity key is **providerId + accountId**. The same provider subject cannot be stored twice; a different provider may reuse the same subject string.
 - All dates use **milliseconds**, unlike the D&D schema's seconds.
 - The single-role constraint/default/NOT NULL requirement intentionally strengthens the optional Admin role field for this application's policy.
 - IDs explicitly use NOT NULL to avoid SQLite's nullable text-primary-key behavior. Their generation remains owned by Better Auth.
@@ -105,6 +105,6 @@ Account, session and verification inferred types are internal persistence types,
 
 ## Validation
 
-The tests apply all migrations to in-memory SQLite with foreign keys enabled. The real Better Auth test performs email/password signup, checks credential issuer and hashed password storage, signs in, reads sessions with joins enabled, changes roles through Admin, impersonates a user, bans them and verifies denied sign-in, then unbans them. Other cases cover defaults, supported roles, duplicate emails/tokens, provider-identity collisions, ownership cascades, preserved impersonation markers, independent challenges and exact millisecond round trips. Node's built-in SQLite is used only in tests.
+The tests apply all migrations to in-memory SQLite with foreign keys enabled. The real Better Auth test performs email/password signup, checks the credential provider key and hashed password storage, signs in, reads sessions with joins enabled, changes roles through Admin, impersonates a user, bans them and verifies denied sign-in, then unbans them. Other cases cover defaults, supported roles, duplicate emails/tokens, provider-identity collisions, ownership cascades, preserved impersonation markers, independent challenges and exact millisecond round trips. Node's built-in SQLite is used only in tests.
 
 Validation completed: focused `npm run format`, `npm run lint` (only the existing button Fast Refresh warning), `npm run db:generate`, all 22 unit tests, and the isolated strict database/test TypeScript check. Full-project typechecking initially found the existing missing route tree and `cn` import; those were subsequently resolved while fulfilling the user's React/Hono monolith request, and `npm run build` now passes its full TypeScript check. No remote migration was applied.

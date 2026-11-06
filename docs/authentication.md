@@ -1,6 +1,6 @@
 # Endless Codex authentication
 
-The web app uses Better Auth 1.7.2 through the same Cloudflare Worker as Hono and React. The browser calls `/api/auth` on its own origin; secrets and D1 stay on the server. No separate auth server, token storage, or CORS configuration is needed.
+The web app uses Better Auth 1.7.18 through the same Cloudflare Worker as Hono and React. The browser calls `/api/auth` on its own origin; secrets and D1 stay on the server. No separate auth server, token storage, or CORS configuration is needed. The package is pinned to 1.7.18 so a later install does not pick up a 1.8 beta. In-flight OAuth and magic-link flows must be restarted after this upgrade. This app does not enable the Magic Link plugin.
 
 ## Local setup
 
@@ -33,7 +33,7 @@ Use Cloudflare secret management (`npx wrangler secret put VARIABLE_NAME`, inter
 
 ## OAuth callback URLs
 
-These paths are verified from Better Auth 1.7.2's `getOAuthCallbackPath(provider)` in `dist/oauth2/utils.mjs` and the actual authorization URLs produced by our factory with `/api/auth` as `basePath`.
+These paths are verified from Better Auth 1.7.18's `getOAuthCallbackPath(provider)` and the actual authorization URLs produced by our factory with `/api/auth` as `basePath`.
 
 | Provider | Local callback                                    | Production callback                                                     |
 | -------- | ------------------------------------------------- | ----------------------------------------------------------------------- |

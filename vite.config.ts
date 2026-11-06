@@ -28,12 +28,17 @@ export default defineConfig({
   },
 
   server: {
-    host: true,
+    // Loopback only. `host: true` listens on every interface, which is the
+    // exposure condition for the Vite filesystem advisories.
+    host: "localhost",
     port: 5173,
   },
 
   build: {
     outDir: "dist/web",
-    sourcemap: true,
+    // Client bundles must not ship source maps as public assets. Worker source
+    // maps, when the Cloudflare plugin emits them, stay eligible for
+    // `upload_source_maps` and are not part of the static asset directory.
+    sourcemap: false,
   },
 });

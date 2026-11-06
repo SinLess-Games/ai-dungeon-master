@@ -70,7 +70,7 @@ afterEach(() => {
   sqlite.close();
 });
 
-describe("Better Auth 1.7.2 persistence", () => {
+describe("Better Auth 1.7.18 persistence", () => {
   it("matches every installed core/Admin field and date representation", () => {
     const expected = getAuthTables({ plugins: [admin(adminOptions), username()] });
     const tables = {
@@ -103,10 +103,12 @@ describe("Better Auth 1.7.2 persistence", () => {
       expect(id?.defaultFn).toBeUndefined();
       expect(id?.notNull).toBe(true);
     }
-    expect(expected["account"]?.indexes).toContainEqual({
-      fields: ["issuer", "accountId"],
-      unique: true,
-    });
+    expect(expected["account"]?.fields).not.toHaveProperty("issuer");
+    const accountIndexes = getTableConfig(schema.accounts).indexes.map(
+      (entry) => entry.config.name,
+    );
+    expect(accountIndexes).toContain("accounts_provider_account_id_uq");
+    expect(accountIndexes).not.toContain("accounts_issuer_account_id_uq");
   });
 
   it("defaults to user, supports admin and bans, and rejects other roles and duplicate emails", async () => {
@@ -169,7 +171,6 @@ describe("Better Auth 1.7.2 persistence", () => {
     await db.insert(schema.accounts).values({
       id: "account",
       userId: "user",
-      issuer: "local:credential",
       accountId: "user",
       providerId: "credential",
     });
@@ -183,14 +184,13 @@ describe("Better Auth 1.7.2 persistence", () => {
     expect(await db.select().from(schema.accounts)).toEqual([]);
   });
 
-  it("keys accounts by issuer and subject, independent of provider aliases", async () => {
+  it("keys accounts by provider and subject", async () => {
     insertUser();
     insertUser("other");
     const db = database();
     await db.insert(schema.accounts).values({
       id: "a",
       userId: "user",
-      issuer: "https://issuer.test",
       accountId: "subject",
       providerId: "provider-a",
       accessTokenExpiresAt: preciseDate,
@@ -199,23 +199,20 @@ describe("Better Auth 1.7.2 persistence", () => {
       db.insert(schema.accounts).values({
         id: "duplicate",
         userId: "other",
-        issuer: "https://issuer.test",
         accountId: "subject",
-        providerId: "provider-alias",
+        providerId: "provider-a",
       }),
     ).rejects.toThrow();
     await db.insert(schema.accounts).values({
-      id: "different-issuer",
+      id: "other-provider",
       userId: "other",
-      issuer: "https://other-issuer.test",
       accountId: "subject",
-      providerId: "provider-a",
+      providerId: "provider-b",
     });
     await expect(
       db.insert(schema.accounts).values({
         id: "orphan",
         userId: "missing",
-        issuer: "local:credential",
         accountId: "missing",
         providerId: "credential",
       }),
@@ -257,7 +254,8 @@ describe("Better Auth 1.7.2 persistence", () => {
     const credential = await db.query.accounts.findFirst({
       where: eq(schema.accounts.userId, owner.user.id),
     });
-    expect(credential?.issuer).toBe("local:credential");
+    expect(credential?.providerId).toBe("credential");
+    expect(credential?.accountId).toBe(owner.user.id);
     expect(credential?.password).toBeTruthy();
     expect(credential?.password === "test-only-password-123").toBe(false);
     expect("password" in owner.user).toBe(false);

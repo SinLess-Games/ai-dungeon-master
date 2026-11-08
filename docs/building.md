@@ -69,8 +69,10 @@ Cloudflare Worker code or private environment files into mobile assets.
 ## Runtime scope
 
 Packaging preserves the existing native runtime setup. Tauri loads the hosted
-Endless Codex site. Capacitor packages `dist/web/client` locally. The shared browser
-API currently uses same-origin requests, so packaging the mobile application does
-not by itself establish authenticated connectivity to the deployed Worker. That
-native API/auth integration is a separate application change. No backend is
-embedded in a native installer.
+Endless Codex site. Capacitor packages `dist/web/client` locally. Android Auto
+Backup and device-to-device transfer are disabled so WebView storage is not
+exported with the app. The shared browser API currently uses same-origin
+requests, so packaging the mobile application does not by itself establish
+authenticated connectivity to the deployed Worker. That native API/auth
+integration is a separate application change. No backend is embedded in a
+native installer.
